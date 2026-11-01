@@ -226,6 +226,13 @@ android {
         compose = true
         buildConfig = true
     }
+    lint {
+        // assembleRelease otherwise runs lintVitalAnalyze + lintVitalReport over
+        // the whole app (minutes on a project this size). The release build here
+        // is produced by CI for sideloading, not gated on lint.
+        checkReleaseBuilds = false
+        abortOnError = false
+    }
     testOptions {
         unitTests {
             // Unit tests run against a stub android.jar whose methods throw

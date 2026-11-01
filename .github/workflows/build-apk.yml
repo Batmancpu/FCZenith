@@ -19,7 +19,8 @@ jobs:
     timeout-minutes: 60
     env:
       CCACHE_DIR: /home/runner/.ccache
-      CCACHE_MAXSIZE: 500M
+      CCACHE_MAXSIZE: 1G
+      CCACHE_COMPRESS: "1"
       CCACHE_COMPILERCHECK: content
     steps:
       - name: Checkout
