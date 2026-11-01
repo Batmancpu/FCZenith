@@ -211,6 +211,14 @@ internal class ArtworkDissolve(first: PlayerArtwork) {
     var outgoing by mutableStateOf<PlayerArtwork?>(null)
         private set
 
+    /**
+     * Cover yang dipegang layer "lama" yang SELALU ter-mount. Layer itu sudah
+     * menampilkan cover ini sebelum lagu berganti, jadi saat transisi mulai tidak
+     * ada AsyncImage baru yang harus dimuat (itulah penyebab blink cover lama).
+     */
+    var held by mutableStateOf(first)
+        private set
+
     /** 0f saat cover lama masih utuh, 1f saat hanya cover baru yang tersisa. */
     var progress by mutableFloatStateOf(1f)
 
@@ -219,9 +227,11 @@ internal class ArtworkDissolve(first: PlayerArtwork) {
         if (old === next) return
         current = next
         if (enabled && old.url != null && next.url != null) {
+            held = old
             outgoing = old
             progress = 0f
         } else {
+            held = next
             outgoing = null
             progress = 1f
         }
@@ -230,6 +240,7 @@ internal class ArtworkDissolve(first: PlayerArtwork) {
     internal fun finish() {
         progress = 1f
         outgoing = null
+        held = current
     }
 }
 
@@ -257,7 +268,7 @@ internal fun rememberArtworkDissolve(art: PlayerArtwork, mixing: Boolean): Artwo
 }
 
 private const val ART_DISSOLVE_WAIT_MS = 2_500L
-private const val MIX_DISSOLVE_MS = 1_400
+private const val MIX_DISSOLVE_MS = 1_800
 private const val SKIP_DISSOLVE_MS = 380
 
 /**

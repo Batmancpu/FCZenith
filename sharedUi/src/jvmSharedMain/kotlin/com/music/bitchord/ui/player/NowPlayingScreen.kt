@@ -3243,14 +3243,14 @@ fun NowPlayingScreen(
                                     // collapse, once the dissolve has all but gone. Let
                                     // go of on the way to the mini player, whose cover
                                     // sits flat in its bar.
-                                    shadowElevation = if (art.loaded) {
+                                    shadowElevation = if (art.loaded || dissolve.outgoing != null) {
                                         10.dp.toPx() * (1f - 2f * shown).coerceAtLeast(0f) * dockT()
                                     } else {
                                         0f
                                     }
                                     shape = dockFrame.cornerShape(sleeveCorner())
                                     // What `.shadow` did: it clips only when it casts.
-                                    clip = art.loaded
+                                    clip = art.loaded || dissolve.outgoing != null
                                 }
                                 .graphicsLayer {
                                     // Clipped a second time, as `.shadow` and then
@@ -3339,7 +3339,7 @@ fun NowPlayingScreen(
                                     .background(Color.Black.copy(alpha = 0.18f)),
                                 contentAlignment = Alignment.Center,
                             ) {
-                                if (!art.loaded && !canvasRendered) {
+                                if (!art.loaded && !canvasRendered && dissolve.outgoing == null) {
                                     Icon(
                                         imageVector = BitChordIcons.MusicNote,
                                         contentDescription = null,
@@ -3428,18 +3428,45 @@ fun NowPlayingScreen(
                                     },
                             )
 
-                            // Cover sebelumnya, memudar di atas cover baru: cross
-                            // dissolve ala iOS, bukan potongan langsung.
-                            dissolve.outgoing?.let { old ->
-                                AsyncImage(
-                                    model = old.request,
-                                    contentDescription = null,
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .graphicsLayer { alpha = 1f - dissolve.progress },
-                                )
-                            }
+                            // Cover sebelumnya, selalu ter-mount (alpha 0 saat tidak
+                            // ada transisi) sehingga tidak pernah dimuat ulang dan
+                            // tidak ada frame kosong. Saat transisi, cover lama
+                            // tersapu keluar dari kiri ke kanan dengan tepi lembut
+                            // sambil bergeser sedikit, memperlihatkan cover baru.
+                            AsyncImage(
+                                model = dissolve.held.request,
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .graphicsLayer {
+                                        val sweeping = dissolve.outgoing != null
+                                        alpha = if (sweeping) 1f else 0f
+                                        translationX = if (sweeping) size.width * 0.05f * dissolve.progress else 0f
+                                        compositingStrategy = if (sweeping) {
+                                            CompositingStrategy.Offscreen
+                                        } else {
+                                            CompositingStrategy.Auto
+                                        }
+                                    }
+                                    .drawWithContent {
+                                        drawContent()
+                                        if (dissolve.outgoing == null) return@drawWithContent
+                                        val feather = size.width * 0.45f
+                                        val start = -feather + (size.width + feather) * dissolve.progress
+                                        drawRect(
+                                            brush = Brush.horizontalGradient(
+                                                colorStops = Array(FADE_CURVE_STOPS + 1) { i ->
+                                                    val t = i / FADE_CURVE_STOPS.toFloat()
+                                                    t to Color.Black.copy(alpha = smootherStep(t))
+                                                },
+                                                startX = start,
+                                                endX = start + feather,
+                                            ),
+                                            blendMode = BlendMode.DstIn,
+                                        )
+                                    },
+                            )
 
                             // Where the clip plays when it can't have the banner:
                             // inside the same clip as the still art, taking the
