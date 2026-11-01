@@ -288,11 +288,20 @@ internal class ArtworkDissolve(first: PlayerArtwork) {
         // dianggap maju.
         direction = if (queueIndex >= 0 && lastQueueIndex >= 0 && queueIndex < lastQueueIndex) -1f else 1f
         val framed = frame != null
-        if (enabled && next.url != null && (old.url != null || framed)) {
-            held = old
-            outgoing = old
+        // Cover yang BENAR-BENAR sedang terlihat. Kalau transisi sebelumnya belum
+        // sempat menyapu (cover lama masih menutup layar) lalu state lagu berkedip
+        // (lagu 2 -> lagu 1 -> lagu 2), [old] belum pernah tampil. Memasangnya
+        // sebagai lapisan lama itulah yang memunculkan cover 2 sebentar, lalu
+        // kembali ke cover 1 sebelum disapu. Dibaca tanpa observasi supaya layar
+        // tidak recompose di tiap frame animasi.
+        val inFlight = androidx.compose.runtime.snapshots.Snapshot.withoutReadObservation { outgoing }
+        val flightProgress = androidx.compose.runtime.snapshots.Snapshot.withoutReadObservation { progress }
+        val visible = if (inFlight != null && flightProgress < RETARGET_KEEP_PROGRESS) inFlight else old
+        if (enabled && next.url != null && (visible.url != null || framed)) {
+            held = visible
+            outgoing = visible
             progress = 0f
-            heldBlur = shownBlur
+            if (visible !== inFlight) heldBlur = shownBlur
         } else {
             held = next
             outgoing = null
@@ -402,10 +411,20 @@ internal fun rememberArtworkDissolve(
     val mixingNow by rememberUpdatedState(mixing)
     val skipFadeNow by rememberUpdatedState(skipFadeMs)
     LaunchedEffect(art) {
-        if (dissolve.outgoing == null) return@LaunchedEffect
+        val shown = dissolve.outgoing ?: return@LaunchedEffect
         // Cover baru harus sudah ada untuk dijadikan tujuan dissolve; cover
         // yang tidak kunjung datang ditinggalkan, bukan ditutupi yang lama.
         withTimeoutOrNull(ART_DISSOLVE_WAIT_MS) { snapshotFlow { art.loaded }.first { it } }
+        // State lagu berkedip dan kembali ke cover yang masih menutup layar:
+        // tidak ada yang perlu disapu, cukup lepas lapisan lama setelah termuat.
+        if (shown.url == art.url && dissolve.frame == null) {
+            dissolve.finish()
+            return@LaunchedEffect
+        }
+        // Dua frame supaya bitmap baru sudah tergambar sebelum sapuan mulai,
+        // bukan menyapu ke layar kosong lalu pop-in di tengah animasi.
+        androidx.compose.runtime.withFrameNanos { }
+        androidx.compose.runtime.withFrameNanos { }
         val duration = when {
             // Crossfade next/prev: cover lama melebur ke cover baru selama
             // audio-nya memudar, bukan lebih cepat atau lebih lambat.
@@ -423,6 +442,9 @@ internal fun rememberArtworkDissolve(
 }
 
 private const val ART_DISSOLVE_WAIT_MS = 2_500L
+
+/** Selama progres sapuan masih di bawah ini, cover lama dianggap masih penuh terlihat. */
+private const val RETARGET_KEEP_PROGRESS = 0.3f
 private const val MIX_DISSOLVE_MS = 1_800
 private const val SKIP_DISSOLVE_MS = 950
 private const val FRAME_DISSOLVE_MS = 1_100
