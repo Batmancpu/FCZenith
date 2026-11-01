@@ -77,13 +77,8 @@ jobs:
             ALIAS="$KEY_ALIAS"
             KEY_PASS="${KEY_PASSWORD:-$KEYSTORE_PASSWORD}"
           else
-            echo "::warning::Secret keystore belum diisi, pakai keystore sementara (APK tidak bisa di-update menimpa build sebelumnya)."
-            STORE_PASS="android123"
-            ALIAS="bitchord"
-            KEY_PASS="android123"
-            keytool -genkeypair -keystore keystore.jks -storetype PKCS12 \
-              -alias "$ALIAS" -keyalg RSA -keysize 2048 -validity 10000 \
-              -storepass "$STORE_PASS" -keypass "$KEY_PASS" -dname "CN=BitChord"
+            echo "::error::Secret KEYSTORE_BASE64 belum diisi. Build dihentikan agar APK tidak ditandatangani key acak (tidak bisa meng-update versi sebelumnya)."
+            exit 1
           fi
           printf 'storeFile=keystore.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
             "$STORE_PASS" "$ALIAS" "$KEY_PASS" > keystore.properties
