@@ -17,6 +17,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    env:
+      CCACHE_DIR: /home/runner/.ccache
+      CCACHE_MAXSIZE: 500M
+      CCACHE_COMPILERCHECK: content
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,6 +32,28 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+
+      - name: Install ccache
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends ccache
+          ccache --version | head -n1
+
+      - name: Cache ccache (native build)
+        uses: actions/cache@v4
+        with:
+          path: /home/runner/.ccache
+          key: ccache-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            ccache-${{ runner.os }}-
+
+      - name: Cache Android CMake & NDK
+        uses: actions/cache@v4
+        with:
+          path: |
+            /usr/local/lib/android/sdk/cmake/3.22.1
+            /usr/local/lib/android/sdk/ndk/27.0.12077973
+          key: android-sdk-cmake3.22.1-ndk27.0.12077973
 
       - name: Install CMake & NDK
         run: |
@@ -67,6 +93,10 @@ jobs:
           chmod +x gradlew
           ./gradlew :app:assembleProdRelease --parallel --build-cache --stacktrace \
             -Dorg.gradle.jvmargs="-Xmx5g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8"
+
+      - name: ccache stats
+        if: always()
+        run: ccache -s || true
 
       - name: Rename APK
         run: |
