@@ -111,6 +111,8 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.lerp
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.drawscope.inset
+import androidx.compose.animation.core.snap
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
@@ -303,6 +305,9 @@ private const val MESH_REFRESH_MS = 3_000L
 
 /** How long a full-screen Spotify Canvas holds still after the player has opened. */
 private const val SPOTIFY_CANVAS_RESUME_DELAY_MS = 1_000L
+
+/** Tinggi dek kaca Spotify Canvas sebagai bagian dari layar; sama dengan lapisan kaca hidupnya. */
+private const val SPOTIFY_DECK_HEIGHT_FRACTION = 0.56f
 
 /** [image] filling this scope, centred and cropped as [ContentScale.Crop] would. */
 private fun DrawScope.drawCropped(image: ImageBitmap) {
@@ -1435,7 +1440,10 @@ fun NowPlayingScreen(
     val grabClipFrame: () -> Unit = {
         val panelsUp = lyricsOpen || queueOpen
         dissolve.holdFrame(if (panelsUp) null else canvasFrameGrab.grab?.invoke())
-        dissolve.holdFullFrame(if (panelsUp) null else fullFrameGrab.grab?.invoke())
+        dissolve.holdFullFrame(
+            if (panelsUp) null else fullFrameGrab.grab?.invoke(),
+            spotifyCanvasControlsOpen,
+        )
     }
     // Lagu baru masuk: frame layar penuh yang tadi ditahan memudar (blur + zoom)
     // menuju layar lagu berikutnya.
@@ -1847,9 +1855,14 @@ fun NowPlayingScreen(
             FullArtworkBlurBackdrop(
                 image = currentFullArtworkBlurImage.value,
                 modifier = backdropModifier,
+                outgoing = dissolve.heldBlur,
+                progress = { dissolve.progress },
             )
         }
     }
+    // Blur yang sedang tampil, dibaca ArtworkDissolve saat cover berganti sebagai
+    // blur lama yang harus dilebur keluar bersama cover lamanya.
+    SideEffect { dissolve.shownBlur = fullArtworkBlurImage }
 
     // Docking into the mini player — see [PlayerDock]. Both shapes of the
     // player take part: the portrait sleeve morphs into the cover (see the
@@ -2463,9 +2476,16 @@ fun NowPlayingScreen(
                         !legacyMeshBackdrop &&
                         (tabletArtworkBackdrop || fullArtworkBlurImage != null) &&
                         (!spotifyCanvasPresentation || lyricsOpen || queueOpen ||
-                            mixing || crossfading || clipDimmed)
+                            mixing || crossfading || clipDimmed || dissolve.fullFrame != null)
                     ) 1f else 0f,
-                    animationSpec = tween(durationMillis = 360, easing = FastOutSlowInEasing),
+                    // Selagi frame canvas menutup layar, backdrop sudah harus utuh di
+                    // bawahnya; kalau masih naik pelan, bagian bawah terlihat gelap
+                    // lalu terang saat frame memudar.
+                    animationSpec = if (dissolve.fullFrame != null) {
+                        snap()
+                    } else {
+                        tween(durationMillis = 360, easing = FastOutSlowInEasing)
+                    },
                     label = "fullArtworkBackdropCrossfade",
                 )
                 if (legacyMeshBackdrop) {
@@ -2610,9 +2630,66 @@ fun NowPlayingScreen(
                         }
                         .drawWithContent {
                             val grabbed = dissolve.fullFrame
-                            if (grabbed != null && dissolve.fullProgress < 1f) drawCropped(grabbed)
+                            if (grabbed != null && dissolve.fullProgress < 1f) {
+                                drawCropped(grabbed)
+                                drawContent()
+                            }
                         },
-                )
+                ) {
+                    // Frame yang diambil hanya berisi video. Blur kaca di bagian bawah
+                    // dan dim 50% digambar ulang di atasnya, di lapisan yang sama, supaya
+                    // keduanya ikut memudar + zoom + blur bersama frame dan tidak langsung
+                    // berganti ke kaca lagu baru.
+                    if (dissolve.fullFrame != null && dissolve.fullFrameDeck) {
+                        val deckFlat = PlayerSettings.reduceDynamicBlur.collectAsStateWithLifecycle().value ||
+                            !renderEffectBlurSupported
+                        val deckBlurPx = with(density) { 48.dp.toPx() }
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .fillMaxWidth()
+                                .fillMaxHeight(SPOTIFY_DECK_HEIGHT_FRACTION)
+                                .graphicsLayer {
+                                    compositingStrategy = CompositingStrategy.Offscreen
+                                    renderEffect = if (deckFlat) {
+                                        null
+                                    } else {
+                                        BlurEffect(deckBlurPx, deckBlurPx, TileMode.Clamp)
+                                    }
+                                }
+                                .drawWithContent {
+                                    val grabbed = dissolve.fullFrame ?: return@drawWithContent
+                                    if (deckFlat) {
+                                        drawRect(
+                                            brush = Brush.verticalGradient(
+                                                0.00f to Color.Transparent,
+                                                SPOTIFY_DECK_TOP_FADE_FRACTION to Color.Black.copy(alpha = 0.40f),
+                                                1.00f to Color.Black.copy(alpha = 0.40f),
+                                            ),
+                                        )
+                                    } else {
+                                        // Frame layar penuh, digeser naik supaya bagian
+                                        // bawahnya jatuh persis di atas wilayah kaca.
+                                        val extra = size.height / SPOTIFY_DECK_HEIGHT_FRACTION - size.height
+                                        inset(top = -extra) { drawCropped(grabbed) }
+                                        drawRect(
+                                            brush = Brush.verticalGradient(
+                                                0.00f to Color.Transparent,
+                                                SPOTIFY_DECK_TOP_FADE_FRACTION to Color.Black,
+                                                1.00f to Color.Black,
+                                            ),
+                                            blendMode = BlendMode.DstIn,
+                                        )
+                                    }
+                                },
+                        )
+                        Box(
+                            Modifier
+                                .matchParentSize()
+                                .background(Color.Black.copy(alpha = 0.5f)),
+                        )
+                    }
+                }
 
                 // This transparent top gradient is always present while the modal
                 // player owns the system bar. Its opacity follows the actual top-band
@@ -2645,12 +2722,23 @@ fun NowPlayingScreen(
                 // glass blur belongs only under the temporary lower control deck,
                 // above the video. When the deck slides away this layer leaves with
                 // it as well.
+                // Selagi frame canvas lama menutup layar, kaca dan dim hidup ikut
+                // tersembunyi (kaca di dalam frame sudah menggantikannya), lalu naik
+                // pelan seiring frame memudar — bukan langsung tampil memblur video baru.
+                val liveDeckShare: () -> Float = {
+                    if (dissolve.fullFrame != null && dissolve.fullProgress < 1f) {
+                        smootherStep(dissolve.fullProgress)
+                    } else {
+                        1f
+                    }
+                }
                 AnimatedVisibility(
                     visible = spotifyCanvasPresentation && spotifyCanvasControlsOpen,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
-                        .fillMaxHeight(0.56f),
+                        .fillMaxHeight(SPOTIFY_DECK_HEIGHT_FRACTION)
+                        .graphicsLayer { alpha = liveDeckShare() },
                     enter = fadeIn(tween(SPOTIFY_CANVAS_CONTROLS_ANIMATION_MS)) + playerDeckSlideIn(),
                     exit = fadeOut(tween(SPOTIFY_CANVAS_CONTROLS_ANIMATION_MS)) + playerDeckSlideOut(),
                 ) {
@@ -2730,7 +2818,7 @@ fun NowPlayingScreen(
                 if (spotifyCanvasPresentation || spotifyCanvasDimShowing) {
                     Box(
                         Modifier.matchParentSize()
-                            .graphicsLayer { alpha = spotifyCanvasDim.value }
+                            .graphicsLayer { alpha = spotifyCanvasDim.value * liveDeckShare() }
                             .background(Color.Black),
                     )
                 }

@@ -18,6 +18,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
@@ -143,21 +144,48 @@ fun rememberFullArtworkBlurImage(
 fun FullArtworkBlurBackdrop(
     image: ImageBitmap?,
     modifier: Modifier = Modifier,
+    /**
+     * Blur cover yang sedang dipudarkan. Selama ada, ia tetap tergambar di
+     * bawah [image] dan [image] masuk mengikuti [progress], jadi blur bawah
+     * berganti dengan jam yang sama dengan cover di atasnya.
+     */
+    outgoing: ImageBitmap? = null,
+    /** 0 = hanya [outgoing], 1 = hanya [image]. Dibaca di fase gambar. */
+    progress: () -> Float = { 1f },
 ) {
     Box(modifier = modifier.fillMaxSize().background(FallbackBackdrop)) {
-        Crossfade(
-            targetState = image,
-            animationSpec = tween(320, easing = FastOutSlowInEasing),
-            label = "preparedBackdropImage",
-        ) { bitmap ->
-            if (bitmap != null) {
-                val painter = remember(bitmap) { BitmapPainter(bitmap) }
-                Image(
-                    painter = painter,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
-                )
+        if (outgoing != null) {
+            val outgoingPainter = remember(outgoing) { BitmapPainter(outgoing) }
+            Image(
+                painter = outgoingPainter,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    alpha = if (outgoing != null) progress().coerceIn(0f, 1f) else 1f
+                },
+        ) {
+            // Blur baru yang baru selesai di tengah dissolve ikut dilebur di sini,
+            // bukan ditukar mendadak di atas lapisan yang sedang naik.
+            Crossfade(
+                targetState = image,
+                animationSpec = tween(320, easing = FastOutSlowInEasing),
+                label = "preparedBackdropImage",
+            ) { bitmap ->
+                if (bitmap != null) {
+                    val painter = remember(bitmap) { BitmapPainter(bitmap) }
+                    Image(
+                        painter = painter,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
             }
         }
 

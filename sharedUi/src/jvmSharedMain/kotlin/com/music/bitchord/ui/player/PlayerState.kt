@@ -265,6 +265,21 @@ internal class ArtworkDissolve(first: PlayerArtwork) {
     var fullProgress by mutableFloatStateOf(1f)
         private set
 
+    /**
+     * Apakah dek kaca (blur bawah + dim) sedang terbuka saat [fullFrame] diambil.
+     * Frame hanya berisi video, jadi tampilan dek itu digambar ulang di atasnya
+     * supaya bagian bawah ikut memudar bersama frame, bukan langsung berubah.
+     */
+    var fullFrameDeck by mutableStateOf(false)
+        private set
+
+    /** Blur backdrop yang sedang tampil; diisi layar tiap komposisi, dibaca saat [retarget]. */
+    var shownBlur: ImageBitmap? = null
+
+    /** Blur backdrop dari cover yang sedang dipudarkan; ditahan selama [outgoing] ada. */
+    var heldBlur by mutableStateOf<ImageBitmap?>(null)
+        private set
+
     internal fun retarget(next: PlayerArtwork, enabled: Boolean, queueIndex: Int = -1) {
         val old = current
         if (old === next) return
@@ -277,11 +292,13 @@ internal class ArtworkDissolve(first: PlayerArtwork) {
             held = old
             outgoing = old
             progress = 0f
+            heldBlur = shownBlur
         } else {
             held = next
             outgoing = null
             progress = 1f
             frame = null
+            heldBlur = null
         }
     }
 
@@ -290,6 +307,7 @@ internal class ArtworkDissolve(first: PlayerArtwork) {
         outgoing = null
         held = current
         frame = null
+        heldBlur = null
     }
 
     /** Simpan frame clip yang tampil sebelum skip; null membersihkan sisa sebelumnya. */
@@ -303,9 +321,10 @@ internal class ArtworkDissolve(first: PlayerArtwork) {
     }
 
     /** Tahan frame canvas layar penuh; tersembunyi sampai [runFullTransition] jalan. */
-    internal fun holdFullFrame(image: ImageBitmap?) {
+    internal fun holdFullFrame(image: ImageBitmap?, deckUp: Boolean = false) {
         if (image == null) return
         fullFrame = image
+        fullFrameDeck = deckUp
         fullProgress = 1f
     }
 
