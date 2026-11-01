@@ -212,7 +212,7 @@ class PlayerDock {
     }
 
     /** 0 on the pill (all glass), 1 once the plain panel has fully covered the glass. */
-    fun panelFill(): Float = (openFraction() / PANEL_FILL_UNTIL).coerceIn(0f, 1f)
+    fun panelFill(until: Float = PANEL_FILL_UNTIL): Float = (openFraction() / until).coerceIn(0f, 1f)
 
     /** The panel's corner radius this frame: the pill's, rounding off to square. */
     fun panelCornerPx(): Float {

@@ -41,6 +41,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -80,6 +81,16 @@ import kotlin.math.roundToInt
 
 /** Up to this much of the open fraction the mini row is still on the panel. */
 private const val MINI_ROW_UNTIL = 0.2f
+
+/**
+ * The same two, in a light theme. The pill there is pale glass and the player
+ * is dark, so there is no middle that matches either: the less of the drag
+ * spent between them, the less of it is a muddy grey with the pill's dark
+ * text half-visible on it.
+ */
+private const val MINI_ROW_UNTIL_LIGHT = 0.1f
+private const val PANEL_FILL_UNTIL_LIGHT = 0.1f
+private const val PANEL_FILL_UNTIL_DARK = 0.2f
 
 /** What the panel is filled with where the liquid glass is off. */
 private val PanelFallbackFill = Color(0xFF151517)
@@ -134,16 +145,19 @@ fun PlayerPanel(
     val covered by remember(dock) {
         derivedStateOf { dock != null && dock.attached && dock.openFraction() >= 1f }
     }
-    val miniVisible by remember(dock) {
-        derivedStateOf { dock != null && dock.openFraction() < MINI_ROW_UNTIL }
+    val lightTheme = MaterialTheme.colorScheme.surface.luminance() > 0.5f
+    val rowUntil = if (lightTheme) MINI_ROW_UNTIL_LIGHT else MINI_ROW_UNTIL
+    val fillUntil = if (lightTheme) PANEL_FILL_UNTIL_LIGHT else PANEL_FILL_UNTIL_DARK
+    val miniVisible by remember(dock, rowUntil) {
+        derivedStateOf { dock != null && dock.openFraction() < rowUntil }
     }
     val glassOn = LocalLiquidGlassEnabled.current && isGlassSupported()
     // The pill's own liquid glass is the container, so pill and panel are one
     // surface. As it opens, a plain fill comes in over the glass (see
     // [PlayerDock.panelFill]) and the glass is dropped once that is opaque,
     // which is when its blur stops costing anything.
-    val glassNeeded by remember(dock) {
-        derivedStateOf { dock != null && dock.panelFill() < 1f }
+    val glassNeeded by remember(dock, fillUntil) {
+        derivedStateOf { dock != null && dock.panelFill(fillUntil) < 1f }
     }
     val surface = when {
         dock == null || covered -> Modifier
@@ -180,7 +194,7 @@ fun PlayerPanel(
                 Box(
                     Modifier
                         .matchParentSize()
-                        .graphicsLayer { alpha = dock.panelFill() }
+                        .graphicsLayer { alpha = dock.panelFill(fillUntil) }
                         .background(PanelFallbackFill, shape),
                 )
             }
@@ -194,7 +208,7 @@ fun PlayerPanel(
                             alpha = if (dock == null || dock.attached) {
                                 1f
                             } else {
-                                (dock.openFraction() / MINI_ROW_UNTIL).coerceIn(0f, 1f)
+                                (dock.openFraction() / rowUntil).coerceIn(0f, 1f)
                             }
                         },
                 ) { content() }
@@ -225,7 +239,7 @@ fun PlayerPanel(
                             .fillMaxWidth()
                             .height(rowHeight)
                             .graphicsLayer {
-                                alpha = (1f - dock.openFraction() / MINI_ROW_UNTIL).coerceIn(0f, 1f)
+                                alpha = (1f - dock.openFraction() / rowUntil).coerceIn(0f, 1f)
                             },
                     )
                 }
