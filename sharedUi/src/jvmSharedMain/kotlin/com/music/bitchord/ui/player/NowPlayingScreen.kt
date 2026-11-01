@@ -938,6 +938,11 @@ fun NowPlayingScreen(
         ),
         label = "clipMixFade",
     )
+    // True selagi klip dipadamkan oleh mix/crossfade, dan sampai klip benar-benar
+    // kembali penuh. Selama itu yang tampil adalah cover diam, yang tepi bawahnya
+    // melebur ke backdrop blur — jadi backdrop itu harus menyala, bukan hitam.
+    // Derived: layar ini hanya recompose saat nilainya berganti, bukan tiap frame fade.
+    val clipDimmed by remember { derivedStateOf { clipMixFade.value < 0.999f } }
     // A music video plays its own picture where the sleeve is — see
     // [MusicVideoSurface] — and takes the place of any animated cover.
     val showMusicVideo by PlayerSettings.showMusicVideo.collectAsStateWithLifecycle()
@@ -2401,7 +2406,8 @@ fun NowPlayingScreen(
                     targetValue = if (
                         !legacyMeshBackdrop &&
                         (tabletArtworkBackdrop || fullArtworkBlurImage != null) &&
-                        (!spotifyCanvasPresentation || lyricsOpen || queueOpen)
+                        (!spotifyCanvasPresentation || lyricsOpen || queueOpen ||
+                            mixing || crossfading || clipDimmed)
                     ) 1f else 0f,
                     animationSpec = tween(durationMillis = 360, easing = FastOutSlowInEasing),
                     label = "fullArtworkBackdropCrossfade",
