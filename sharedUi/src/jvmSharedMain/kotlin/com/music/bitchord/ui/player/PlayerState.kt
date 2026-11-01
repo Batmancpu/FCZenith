@@ -349,9 +349,14 @@ internal fun rememberArtworkDissolve(
     // ke cover berikutnya, tanpa memunculkan thumbnail lama dulu.
     remember(art) {
         dissolve.punch = if (mixing) 0.35f else 1f
+        // Spotify Canvas layar penuh sudah menahan frame terakhirnya sendiri
+        // (fullFrame) dan memudarkannya ke layar lagu baru. Sleeve tidak boleh
+        // ikut menyapu thumbnail lagu lama di bawahnya, kalau tidak thumbnail
+        // lagu 1 muncul di lagu 2 alih-alih gambar terakhir canvas.
         dissolve.retarget(
             art,
-            enabled = !reduceAnimation && (dissolve.frame != null || !dissolve.lastClipShowing),
+            enabled = !reduceAnimation && dissolve.fullFrame == null &&
+                (dissolve.frame != null || !dissolve.lastClipShowing),
             queueIndex = queueIndex,
         )
     }
