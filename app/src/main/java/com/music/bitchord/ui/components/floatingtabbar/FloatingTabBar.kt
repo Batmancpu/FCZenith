@@ -80,6 +80,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -120,9 +121,19 @@ import com.music.bitchord.ui.components.backdrop.backdrops.rememberLayerBackdrop
 import com.music.bitchord.ui.components.isGlassSupported
 import com.music.bitchord.ui.haptics.Haptic
 import com.music.bitchord.ui.haptics.rememberHaptics
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /** Hoisted so the default is one stable lambda rather than a new one per call. */
+/**
+ * How much the glass pill covers the tab being drawn right now: `1` with the pill
+ * centred on it, `0` once it is a full step away. Read inside a tab's icon/title
+ * content to colour it by where the pill is, not by which tab is selected.
+ * `NaN` where no pill is involved (the inline bar), so callers fall back to the
+ * selected/unselected colour.
+ */
+val LocalTabPillCoverage = compositionLocalOf<() -> Float> { { Float.NaN } }
+
 private val DefaultTabBarContentModifier: @Composable () -> Modifier = { Modifier }
 
 /**
@@ -920,8 +931,11 @@ private fun SharedTransitionScope.ExpandedTabs(
                             )
                         }
                 ) {
-                    scope.tabs.forEach { tab ->
+                    scope.tabs.forEachIndexed { tabIndex, tab ->
                         val isSelected = tab.key == selectedTabKey
+                        val tabCoverage = remember(tabIndex) {
+                            { (1f - abs(pill.position - tabIndex)).coerceIn(0f, 1f) }
+                        }
                         val iconScale by animateFloatAsState(
                             targetValue = if (isSelected) 1.08f else 1f,
                             animationSpec = selectionSpec,
@@ -946,7 +960,9 @@ private fun SharedTransitionScope.ExpandedTabs(
                                         scaleY = iconScale
                                     }
                                 ) {
-                                    tab.icon()
+                                    CompositionLocalProvider(LocalTabPillCoverage provides tabCoverage) {
+                                        tab.icon()
+                                    }
                                 }
                             },
                             title = {
@@ -956,7 +972,9 @@ private fun SharedTransitionScope.ExpandedTabs(
                                         animatedVisibilityScope = animatedVisibilityScope
                                     )
                                 ) {
-                                    tab.title()
+                                    CompositionLocalProvider(LocalTabPillCoverage provides tabCoverage) {
+                                        tab.title()
+                                    }
                                 }
                             },
                             isInline = false,

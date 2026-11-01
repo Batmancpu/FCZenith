@@ -46,6 +46,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -60,6 +61,7 @@ import com.music.bitchord.data.model.artworkAt
 import com.music.bitchord.ui.components.floatingtabbar.FloatingTabBar
 import com.music.bitchord.ui.components.floatingtabbar.FloatingTabBarDefaults
 import com.music.bitchord.ui.components.floatingtabbar.FloatingTabBarScrollConnection
+import com.music.bitchord.ui.components.floatingtabbar.LocalTabPillCoverage
 import com.music.bitchord.ui.haptics.Haptic
 import com.music.bitchord.ui.haptics.rememberHaptics
 import com.music.bitchord.ui.player.PlayerDock
@@ -228,7 +230,6 @@ fun GlassNavBar(
     ) {
         tabs.forEachIndexed { index, tab ->
             val isSelected = index == selectedIndex
-            val tint = if (isSelected) selectedColor else unselectedColor
             val onClick = {
                 if (!isSelected) haptics.play(Haptic.Select)
                 currentOnTabSelected(index)
@@ -240,7 +241,7 @@ fun GlassNavBar(
                         Icon(
                             imageVector = tab.icon,
                             contentDescription = tab.label,
-                            tint = tint,
+                            tint = tabTint(isSelected, selectedColor, unselectedColor),
                             modifier = Modifier.size(TAB_ICON_SIZE),
                         )
                     },
@@ -253,7 +254,7 @@ fun GlassNavBar(
                         Icon(
                             imageVector = tab.icon,
                             contentDescription = tab.label,
-                            tint = tint,
+                            tint = tabTint(isSelected, selectedColor, unselectedColor),
                             modifier = Modifier.size(TAB_ICON_SIZE),
                         )
                     },
@@ -261,7 +262,7 @@ fun GlassNavBar(
                         Text(
                             text = tab.label,
                             style = tabLabelStyle(),
-                            color = tint,
+                            color = tabTint(isSelected, selectedColor, unselectedColor),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             // The library's Tab stacks the glyph and the label
@@ -516,3 +517,18 @@ private val ACCESSORY_ART_CORNER = 5.7.dp
 
 /** The expanded play glyph: its triangle about Apple's 15pt tall. */
 private val EXPANDED_GLYPH_SIZE = 29.dp
+
+/**
+ * A tab's colour from where the glass pill is: blends unselected -> selected by how
+ * much the pill covers it, so icons change colour as the pill slides over them.
+ * Without a pill (inline bar) it is just the selected/unselected colour.
+ */
+@Composable
+private fun tabTint(isSelected: Boolean, selected: Color, unselected: Color): Color {
+    val coverage = LocalTabPillCoverage.current()
+    return if (coverage.isNaN()) {
+        if (isSelected) selected else unselected
+    } else {
+        lerp(unselected, selected, coverage)
+    }
+}
