@@ -23,9 +23,12 @@ import com.music.bitchord.data.settings.AppFont
 // spots (Replay's rank badge) that want that specific red regardless of theme.
 val AccentRed = Color(0xFFFA2D48)
 
+// Apple Music's accent: tab bar, active glyphs, sliders, links, selected states.
+val AppleRed = Color(0xFFFA243C)
+
 private val DarkColors = darkColorScheme(
-    primary = Color.White,
-    onPrimary = Color.Black,
+    primary = AppleRed,
+    onPrimary = Color.White,
     background = Color.Black,
     onBackground = Color.White,
     surface = Color(0xFF0D0D0F),
@@ -36,7 +39,7 @@ private val DarkColors = darkColorScheme(
 )
 
 private val LightColors = lightColorScheme(
-    primary = Color.Black,
+    primary = AppleRed,
     onPrimary = Color.White,
     background = Color.White,
     onBackground = Color.Black,

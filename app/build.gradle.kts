@@ -80,6 +80,20 @@ android {
         ndk {
             abiFilters += "arm64-v8a"
         }
+        // Native build cache: only when ccache is installed, so builds without it still work.
+        externalNativeBuild {
+            cmake {
+                val hasCcache = (System.getenv("PATH") ?: "")
+                    .split(File.pathSeparator)
+                    .any { File(it, "ccache").canExecute() }
+                if (hasCcache) {
+                    arguments += listOf(
+                        "-DCMAKE_C_COMPILER_LAUNCHER=ccache",
+                        "-DCMAKE_CXX_COMPILER_LAUNCHER=ccache",
+                    )
+                }
+            }
+        }
         versionCode = rootProject.extra["bitchordVersionCode"] as Int
         versionName = rootProject.extra["bitchordVersionName"] as String
 

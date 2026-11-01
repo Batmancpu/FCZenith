@@ -16,6 +16,11 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "BitChord"
+
+// Build speed: reuse task outputs from earlier builds and run modules in parallel.
+// Needs ~/.gradle/caches/build-cache-1 persisted between CI runs (see workflow).
+gradle.startParameter.isBuildCacheEnabled = true
+gradle.startParameter.isParallelProjectExecutionEnabled = true
 include(":shared")
 include(":sharedUi")
 
