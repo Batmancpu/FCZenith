@@ -472,6 +472,10 @@ private class DockFrame {
     var miniInBox: Rect? = null
     /** The sheet's offset this frame, in the whole pixels it is placed at. */
     var offset = 0f
+    /** The offset one frame earlier, for telling which way the sheet is going. */
+    var lastOffset = Float.NaN
+    /** Whether the sheet last moved up (opening) rather than down (closing). */
+    var opening = true
     /** How much of that the artwork rides — see `dockRide`. */
     var ride = 0f
     /** The sleeve as laid out, in the same box. */
@@ -3111,7 +3115,16 @@ fun NowPlayingScreen(
                                     // within this, and for the player's own draw.
                                     val mini = miniInBox()
                                     val open = sleeveRect()
-                                    if (mini != null) dockFrame.ride = dockRide(open, mini) * DOCK_RIDE_SHARE
+                                    // Which way the sheet is going, from its last movement:
+                                    // opening rides the sheet as it always did, closing keeps
+                                    // to the straighter path (see [DOCK_RIDE_SHARE]).
+                                    val moved = dockFrame.offset - dockFrame.lastOffset
+                                    if (!moved.isNaN() && moved != 0f) dockFrame.opening = moved < 0f
+                                    dockFrame.lastOffset = dockFrame.offset
+                                    if (mini != null) {
+                                        dockFrame.ride = dockRide(open, mini) *
+                                            (if (dockFrame.opening) 1f else DOCK_RIDE_SHARE)
+                                    }
                                     val rect = towardsDock(open, mini)
                                     dockFrame.miniInBox = mini
                                     dockFrame.sleeve = rect
