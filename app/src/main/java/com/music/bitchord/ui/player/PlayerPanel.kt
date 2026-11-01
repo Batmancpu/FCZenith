@@ -72,6 +72,7 @@ import com.music.bitchord.ui.components.glassContentColor
 import com.music.bitchord.ui.components.isGlassSupported
 import com.music.bitchord.ui.components.liquidGlass
 import com.music.bitchord.ui.components.miniPlayerGestures
+import com.music.bitchord.ui.components.thumbnailBorder
 import com.music.bitchord.ui.components.rememberRemoteArtworkUrl
 import com.music.bitchord.ui.haptics.Haptic
 import com.music.bitchord.ui.haptics.rememberHaptics
@@ -204,13 +205,15 @@ fun PlayerPanel(
                     val rowHeight = with(density) { (pill?.height ?: 0f).toDp() }.takeIf { it > 0.dp } ?: 52.dp
                     // Inline in the tab bar the pill is narrow and drops its
                     // skip button; the row does the same.
-                    val showNext = pill == null || pill.width > windowWidth * 0.8f
+                    // The plain mini player is never inline: it always has its skip button.
+                    val showNext = !glassOn || pill == null || pill.width > windowWidth * 0.8f
                     PanelMiniRow(
                         dock = dock,
                         song = song,
                         isPlaying = isPlaying,
                         isLoading = isLoading,
                         showNext = showNext,
+                        glass = glassOn,
                         controlsLocked = controlsLocked,
                         onBlockedControl = onBlockedControl,
                         onPlayPause = onPlayPause,
@@ -277,20 +280,37 @@ private fun PanelMiniRow(
     motion: PlayerSheetMotion?,
     modifier: Modifier,
     dock: PlayerDock? = null,
+    /** Whether the pill underneath is the glass bar's accessory rather than the plain mini player. */
+    glass: Boolean = true,
 ) {
     val haptics = rememberHaptics()
-    val contentColor = glassContentColor()
-    val secondary = contentColor.copy(alpha = 0.7f)
-    // The same type as the pill's own (see its accessory): the pill comes back
-    // when this panel goes, and any difference reads as the title resizing.
-    val titleStyle = MaterialTheme.typography.titleMedium.copy(
-        fontSize = 13.sp,
-        fontWeight = FontWeight.W700,
-        letterSpacing = 0.15.sp,
-    )
-    val artistStyle = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp, letterSpacing = 0.35.sp)
-    val glyphSlot = if (showNext) 40.dp else 32.dp
-    val glyphSize = if (showNext) 28.dp else 24.dp
+    val contentColor = if (glass) glassContentColor() else MaterialTheme.colorScheme.onBackground
+    val secondary = if (glass) {
+        contentColor.copy(alpha = 0.7f)
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    // The same type as the pill's own: the pill comes back when this panel
+    // goes, and any difference reads as the title resizing. The glass bar's
+    // accessory and the plain mini player are set differently, so this
+    // follows whichever of them is underneath.
+    val titleStyle = if (glass) {
+        MaterialTheme.typography.titleMedium.copy(
+            fontSize = 13.sp,
+            fontWeight = FontWeight.W700,
+            letterSpacing = 0.15.sp,
+        )
+    } else {
+        MaterialTheme.typography.titleMedium
+    }
+    val artistStyle = if (glass) {
+        MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp, letterSpacing = 0.35.sp)
+    } else {
+        MaterialTheme.typography.bodyMedium
+    }
+    val glyphSlot = if (!glass) 40.dp else if (showNext) 40.dp else 32.dp
+    // 29dp expanded, as the glass accessory's own play glyph is.
+    val glyphSize = if (!glass) 32.dp else if (showNext) 29.dp else 24.dp
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
@@ -317,16 +337,28 @@ private fun PanelMiniRow(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 16.dp, end = if (showNext) 12.dp else 8.dp, top = 4.dp, bottom = 4.dp),
+                .padding(
+                    start = if (glass) 16.dp else 12.dp,
+                    end = if (!glass) 12.dp else if (showNext) 12.dp else 8.dp,
+                    top = if (glass) 4.dp else 8.dp,
+                    bottom = if (glass) 4.dp else 8.dp,
+                ),
         ) {
-            val artWidth = if (song.isVideo) MINI_ART_SIZE * (16f / 9f) else MINI_ART_SIZE
+            val artSize = if (glass) MINI_ART_SIZE else 40.dp
+            val artShape = RoundedCornerShape(if (glass) MINI_ART_CORNER else 8.dp)
+            val artWidth = when {
+                !song.isVideo -> artSize
+                glass -> artSize * (16f / 9f)
+                else -> 71.dp
+            }
             Box(
                 Modifier
-                    .size(width = artWidth, height = MINI_ART_SIZE)
+                    .size(width = artWidth, height = artSize)
                     // The player's own cover is the one that flies; this one
                     // stands aside as soon as it does.
                     .graphicsLayer { alpha = if (dock != null && dock.coversMiniArt) 0f else 1f }
-                    .clip(RoundedCornerShape(MINI_ART_CORNER))
+                    .clip(artShape)
+                    .then(if (glass) Modifier else Modifier.thumbnailBorder(artShape))
                     .background(MaterialTheme.colorScheme.surfaceVariant),
             ) {
                 AsyncImage(
@@ -336,7 +368,7 @@ private fun PanelMiniRow(
                     modifier = Modifier.fillMaxSize(),
                 )
             }
-            Spacer(Modifier.width(if (showNext) 9.dp else 8.dp))
+            Spacer(Modifier.width(if (!glass) 10.dp else if (showNext) 9.dp else 8.dp))
             Column(Modifier.weight(1f)) {
                 ExplicitSongTitle(
                     song = song,
@@ -352,7 +384,7 @@ private fun PanelMiniRow(
                     CircularProgressIndicator(
                         color = contentColor,
                         strokeWidth = 2.dp,
-                        modifier = Modifier.size(if (showNext) 20.dp else 18.dp),
+                        modifier = Modifier.size(if (!glass) 22.dp else if (showNext) 20.dp else 18.dp),
                     )
                 }
             } else {
@@ -372,7 +404,7 @@ private fun PanelMiniRow(
                 }
             }
             if (showNext) {
-                Spacer(Modifier.width(4.dp))
+                Spacer(Modifier.width(if (glass) 4.dp else 8.dp))
                 IconButton(
                     onClick = {
                         haptics.play(Haptic.SkipNext)

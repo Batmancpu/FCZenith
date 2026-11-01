@@ -251,7 +251,11 @@ class PlayerDock {
     // and every one of those invalidated the page's whole window behind the
     // player: a full redraw, liquid glass and all, for a cover that hadn't
     // changed.
-    private val coversMiniArtState = derivedStateOf { attached && openFraction() > 0f }
+    // Also while the panel stands on the pill, even fully down: the panel's own
+    // row shows a cover of its own, and at the end of a close — the sheet at
+    // zero but the player not yet gone — it was a second cover beside the one
+    // flying in.
+    private val coversMiniArtState = derivedStateOf { attached && (openFraction() > 0f || panelShown) }
 }
 
 /** The [PlayerDock] around the player, if its host has a mini player to dock into. */

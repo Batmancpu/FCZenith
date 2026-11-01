@@ -360,8 +360,12 @@ private fun GlassNowPlaying(
                 onBlocked = onBlockedControl,
             )
             .graphicsLayer {
-                scaleX = pressScale
-                scaleY = pressScale
+                // Level while the panel is up: the player's cover flies to and
+                // from the artwork laid out inside this, and a press still
+                // easing back would move that target from under it.
+                val factor = if (dock?.panelShown == true) 1f else pressScale
+                scaleX = factor
+                scaleY = factor
             }
             .then(modifier)
             .clickable(
