@@ -424,6 +424,9 @@ private var lastHeroSettled = false
  */
 private const val DOCK_FADE_LEAD = 0.15f
 
+/** How far open the player is when the rest of it (title, controls) is fully solid. */
+private const val DOCK_FADE_FULL = 0.6f
+
 /** The least the faded player is drawn at while docking — see the player's fade. */
 private const val DOCK_FADE_FLOOR = 1f / 255f
 
@@ -1746,7 +1749,7 @@ fun NowPlayingScreen(
     val dockMoving by remember { derivedStateOf { docking() } }
     // The rest of the player gets out of the way a little ahead of the artwork,
     // so the cover lands on the bar rather than on a ghost of the player.
-    val dockFade: () -> Float = { ((dockT() - DOCK_FADE_LEAD) / (1f - DOCK_FADE_LEAD)).coerceIn(0f, 1f) }
+    val dockFade: () -> Float = { ((dockT() - DOCK_FADE_LEAD) / (DOCK_FADE_FULL - DOCK_FADE_LEAD)).coerceIn(0f, 1f) }
 
     // The clip's own frame, standing in for it while the sleeve moves — so
     // opening, closing, and collapsing into the lyrics or the queue carry
