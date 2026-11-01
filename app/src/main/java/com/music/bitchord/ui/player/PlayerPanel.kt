@@ -281,10 +281,12 @@ private fun PanelMiniRow(
     val haptics = rememberHaptics()
     val contentColor = glassContentColor()
     val secondary = contentColor.copy(alpha = 0.7f)
+    // The same type as the pill's own (see its accessory): the pill comes back
+    // when this panel goes, and any difference reads as the title resizing.
     val titleStyle = MaterialTheme.typography.titleMedium.copy(
         fontSize = 13.sp,
-        fontWeight = FontWeight.SemiBold,
-        letterSpacing = 0.4.sp,
+        fontWeight = FontWeight.W700,
+        letterSpacing = 0.15.sp,
     )
     val artistStyle = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp, letterSpacing = 0.35.sp)
     val glyphSlot = if (showNext) 40.dp else 32.dp

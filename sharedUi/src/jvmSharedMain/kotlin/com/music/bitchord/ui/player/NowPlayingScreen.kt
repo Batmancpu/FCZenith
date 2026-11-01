@@ -431,6 +431,14 @@ private const val DOCK_FADE_FULL = 0.6f
 private const val DOCK_FADE_FLOOR = 1f / 255f
 
 /**
+ * Where, as the player docks, the clip's frame starts to dissolve into the
+ * plain thumbnail the mini player's cover shows, and how much of the trip the
+ * dissolve takes. Whole thumbnail by the time the cover is reached.
+ */
+private const val DOCK_ART_SWAP_FROM = 0.6f
+private const val DOCK_ART_SWAP_SPAN = 0.5f
+
+/**
  * What one frame of docking into the mini player worked out — see
  * [PlayerDock]. Written while the sleeve is laid out and read further down
  * the same frame, by the tile inside the sleeve and by the player's draw; plain
@@ -1809,6 +1817,9 @@ fun NowPlayingScreen(
     val onClipResumed: () -> Unit = { CanvasStills.fresh = false }
     // The sleeve, drawn over the faded player while it docks — see the sleeve.
     val sleeveLayer = rememberGraphicsLayer()
+    // The plain thumbnail, drawn over the clip's frame while docking so the
+    // flying artwork lands as the same picture the mini player's cover shows.
+    val thumbLayer = rememberGraphicsLayer()
 
     // The player's own end of the docking, for whichever shape it takes: where
     // it sits on screen, the fade, and the artwork drawn over that fade.
@@ -3287,6 +3298,20 @@ fun NowPlayingScreen(
                                             (heroMode && canvasCover.floatValue < 1f)
                                         ) {
                                             drawCropped(frame.image)
+                                            // Landing on (or leaving) the mini player's
+                                            // cover, which is the plain thumbnail: dissolve
+                                            // the clip's frame into it rather than swap
+                                            // at the last pixel.
+                                            val swap = if (dock != null && art.loaded) {
+                                                ((DOCK_ART_SWAP_FROM - dockT()) / DOCK_ART_SWAP_SPAN).coerceIn(0f, 1f)
+                                            } else {
+                                                0f
+                                            }
+                                            if (swap > 0f) {
+                                                thumbLayer.alpha = swap
+                                                thumbLayer.record { this@drawWithContent.drawContent() }
+                                                drawLayer(thumbLayer)
+                                            }
                                         }
                                     },
                             )
