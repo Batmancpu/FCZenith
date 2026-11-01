@@ -3518,7 +3518,7 @@ fun NowPlayingScreen(
                                         scaleX = shrink
                                         scaleY = shrink
                                         rotationY = if (sweeping) move * 12f * dissolve.progress else 0f
-                                        cameraDistance = 14f * density
+                                        cameraDistance = 14f * this.density
                                         compositingStrategy = if (sweeping) {
                                             CompositingStrategy.Offscreen
                                         } else {
