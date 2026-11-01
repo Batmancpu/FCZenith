@@ -66,6 +66,8 @@ import com.music.bitchord.ui.haptics.Haptic
 import com.music.bitchord.ui.haptics.rememberHaptics
 import com.music.bitchord.ui.player.PlayerDock
 import com.music.bitchord.ui.player.AndroidMusicVideo
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.music.bitchord.data.settings.AppSettings
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.layout.fillMaxSize
@@ -329,6 +331,7 @@ private fun GlassNowPlaying(
     )
     val glyphSlot = if (isInline) 32.dp else 40.dp
     val glyphSize = if (isInline) 24.dp else EXPANDED_GLYPH_SIZE
+    val showMusicVideo by AppSettings.showMusicVideo.collectAsStateWithLifecycle()
 
     Box(
         // Inline, the accessory is stretched to the row's height by the tab bar
@@ -392,7 +395,7 @@ private fun GlassNowPlaying(
             // A music video plays in the cover's place at its own 16:9, as in
             // the floating mini player; the full player takes it over when up.
             val artWidth by animateDpAsState(
-                targetValue = if (song.isVideo) ACCESSORY_ART_SIZE * (16f / 9f) else ACCESSORY_ART_SIZE,
+                targetValue = if (song.isVideo && showMusicVideo) ACCESSORY_ART_SIZE * (16f / 9f) else ACCESSORY_ART_SIZE,
                 label = "glassMiniArtWidth",
             )
             Box(
@@ -410,7 +413,7 @@ private fun GlassNowPlaying(
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
                 )
-                if (song.isVideo) {
+                if (song.isVideo && showMusicVideo) {
                     AndroidMusicVideo(
                         videoId = song.videoId,
                         fit = false,

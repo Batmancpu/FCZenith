@@ -283,6 +283,7 @@ fun SettingsScreen(
     val syncDownloadedPlaylists by AppSettings.syncDownloadedPlaylists.collectAsStateWithLifecycle()
     val stopOnTaskRemoved by AppSettings.stopOnTaskRemoved.collectAsStateWithLifecycle()
     val hideVolumeBar by AppSettings.hideVolumeBar.collectAsStateWithLifecycle()
+    val showMusicVideo by AppSettings.showMusicVideo.collectAsStateWithLifecycle()
     val hideStatusBarInPlayer by AppSettings.hideStatusBarInPlayer.collectAsStateWithLifecycle()
     val hideSongStatus by AppSettings.hideSongStatus.collectAsStateWithLifecycle()
     val showQueueHistory by AppSettings.showQueueHistory.collectAsStateWithLifecycle()
@@ -1471,6 +1472,21 @@ fun SettingsScreen(
                         )
                     },
                     onClick = { AppSettings.setHideVolumeBar(!hideVolumeBar) },
+                )
+            }
+            val showMusicVideoTitle = stringResource(R.string.show_music_video)
+            row(showMusicVideoTitle, "video", "cover", "thumbnail", "player") {
+                SettingsRow(
+                    icon = SfIcons.Video,
+                    title = showMusicVideoTitle,
+                    subtitle = stringResource(R.string.show_music_video_subtitle),
+                    trailing = {
+                        IosSwitch(
+                            checked = showMusicVideo,
+                            onCheckedChange = AppSettings::setShowMusicVideo,
+                        )
+                    },
+                    onClick = { AppSettings.setShowMusicVideo(!showMusicVideo) },
                 )
             }
             val listenTogetherButtonTitle = stringResource(R.string.show_listen_together_button)
