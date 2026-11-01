@@ -248,6 +248,7 @@ fun SettingsScreen(
     val spatialAudio by AppSettings.spatialAudio.collectAsStateWithLifecycle()
     val nerdStats by AppSettings.showNerdStats.collectAsStateWithLifecycle()
     val listenTogetherButton by AppSettings.showListenTogetherButton.collectAsStateWithLifecycle()
+    val listenTogetherTab by AppSettings.showListenTogetherTab.collectAsStateWithLifecycle()
     val reduceAnimation by AppSettings.reduceAnimation.collectAsStateWithLifecycle()
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
     val liquidGlass by AppSettings.liquidGlass.collectAsStateWithLifecycle()
@@ -1572,6 +1573,21 @@ fun SettingsScreen(
                         )
                     },
                     onClick = { AppSettings.setShowMusicVideo(!showMusicVideo) },
+                )
+            }
+            val listenTogetherTabTitle = stringResource(R.string.show_listen_together_tab)
+            row(listenTogetherTabTitle, "party", "jam", "tab", "navbar", "navigation", "listen together") {
+                SettingsRow(
+                    icon = SfIcons.Groups,
+                    title = listenTogetherTabTitle,
+                    subtitle = stringResource(R.string.show_listen_together_tab_subtitle),
+                    trailing = {
+                        IosSwitch(
+                            checked = listenTogetherTab,
+                            onCheckedChange = AppSettings::setShowListenTogetherTab,
+                        )
+                    },
+                    onClick = { AppSettings.setShowListenTogetherTab(!listenTogetherTab) },
                 )
             }
             val listenTogetherButtonTitle = stringResource(R.string.show_listen_together_button)

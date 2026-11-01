@@ -69,6 +69,7 @@ import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.CloudOff
+import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.IosShare
 import androidx.compose.material.icons.rounded.MoreHoriz
@@ -1308,6 +1309,22 @@ private fun BitChordApp(
             BottomTab(libraryLabel, BitChordIcons.TabLibrary),
             BottomTab(searchLabel, BitChordIcons.TabSearch),
         )
+    }
+    // The bars draw this list; [tabs] stays the four fixed pages (titles and
+    // TAB_* indexes read it). Listen Together is not a page of its own — its
+    // tab opens AppRoute.ListenTogether over the current tab — and is slotted
+    // in before Search, which has to stay last: GlassNavBar draws the final
+    // tab as its standalone circle.
+    val listenTogetherTab by AppSettings.showListenTogetherTab.collectAsStateWithLifecycle()
+    val listenTogetherTabLabel = stringResource(R.string.listen_together_tab)
+    val barTabs = remember(tabs, listenTogetherTab, listenTogetherTabLabel) {
+        if (!listenTogetherTab) {
+            tabs
+        } else {
+            tabs.toMutableList().apply {
+                add(TAB_SEARCH, BottomTab(listenTogetherTabLabel, Icons.Rounded.Groups))
+            }
+        }
     }
 
     val scope = rememberCoroutineScope()
@@ -4094,7 +4111,25 @@ private fun BitChordApp(
                 // One tab handler, whichever bar is drawing it.
                 // A tab is a fresh start: everything pushed over the old one —
                 // routes and release pages alike — goes with it.
-                val onTabSelected: (Int) -> Unit = { index ->
+                // The bar's position of the highlighted tab. With the Listen
+                // Together tab on, it sits at TAB_SEARCH and Search moves one
+                // place right; it is lit whenever its page is the one showing.
+                val selectedBarIndex = when {
+                    !listenTogetherTab -> selectedTab
+                    route == AppRoute.ListenTogether -> TAB_SEARCH
+                    selectedTab == TAB_SEARCH -> TAB_SEARCH + 1
+                    else -> selectedTab
+                }
+                val onTabSelected: (Int) -> Unit = tabSelected@{ barIndex ->
+                    if (listenTogetherTab && barIndex == TAB_SEARCH) {
+                        if (route != AppRoute.ListenTogether) {
+                            navigator.clear()
+                            viewModel.closeMoodGenre()
+                            navigator.push(AppRoute.ListenTogether)
+                        }
+                        return@tabSelected
+                    }
+                    val index = if (listenTogetherTab && barIndex > TAB_SEARCH) barIndex - 1 else barIndex
                     navigator.clear()
                     viewModel.closeMoodGenre()
                     selectedTab = index
@@ -4120,8 +4155,8 @@ private fun BitChordApp(
                     // controls dock into the tab bar rather than riding above it,
                     // and the pair folds together on scroll. See [GlassNavBar].
                     GlassNavBar(
-                        tabs = tabs,
-                        selectedIndex = selectedTab,
+                        tabs = barTabs,
+                        selectedIndex = selectedBarIndex,
                         onTabSelected = onTabSelected,
                         scrollConnection = navBarScroll,
                         song = player.song,
@@ -4183,8 +4218,8 @@ private fun BitChordApp(
                         Spacer(Modifier.height(8.dp))
                     }
                     FloatingBottomBar(
-                        tabs = tabs,
-                        selectedIndex = selectedTab,
+                        tabs = barTabs,
+                        selectedIndex = selectedBarIndex,
                         hazeState = hazeState,
                         onTabSelected = onTabSelected,
                     )
