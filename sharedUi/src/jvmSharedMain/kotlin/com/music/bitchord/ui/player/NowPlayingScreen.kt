@@ -3675,7 +3675,7 @@ fun NowPlayingScreen(
                         // panel, and doesn't then listen for the sleeve leaving the
                         // header — which is its first frame of moving.
                         val lyricsPanelVisible = lyricsOpen && collapseDone
-                        if (lyricsPanelVisible || playerPrewarmStage >= 2) {
+                        if (lyricsPanelVisible) {
                                 LyricsTranslationMotion(
                                     trigger = lyricsTranslation.transition,
                                     reduceMotion = lyricsTranslation.reduceMotion,
@@ -3793,7 +3793,7 @@ fun NowPlayingScreen(
                         // for that frame was a recomposition on it.
                         val queuePanelVisible = !lyricsOpen &&
                             (queueDragging || (queueOpen && queueShowing && collapseDone))
-                        if (queuePanelVisible || playerPrewarmStage >= 3) {
+                        if (queuePanelVisible) {
                             Column(
                                 modifier = Modifier
                                     .fillMaxSize()
