@@ -431,6 +431,20 @@ private const val DOCK_FADE_FULL = 0.6f
 private const val DOCK_FADE_FLOOR = 1f / 255f
 
 /**
+ * The share of the sheet's travel the artwork rides on its way to the cover. All
+ * of it bowed the path below the straight line and cut the cover's foot off at
+ * the panel's edge; a quarter keeps it close to a straight line.
+ */
+private const val DOCK_RIDE_SHARE = 0.25f
+
+/**
+ * The title row, drawn over the flying artwork while docking: gone by this
+ * far open, and solid [DOCK_TITLE_SOLID_SPAN] further on.
+ */
+private const val DOCK_TITLE_GONE = 0.2f
+private const val DOCK_TITLE_SOLID_SPAN = 0.15f
+
+/**
  * Where, as the player docks, the clip's frame starts to dissolve into the
  * plain thumbnail the mini player's cover shows, and how much of the trip the
  * dissolve takes. Whole thumbnail by the time the cover is reached.
@@ -489,6 +503,8 @@ private class DockFrame {
     var host: LayoutCoordinates? = null
     /** The landscape sleeve, as last placed. */
     var landscapeArt: LayoutCoordinates? = null
+    /** The title and menu row, as last placed — drawn above the flying artwork. */
+    var titleRow: LayoutCoordinates? = null
 }
 
 /**
@@ -1820,6 +1836,9 @@ fun NowPlayingScreen(
     // The plain thumbnail, drawn over the clip's frame while docking so the
     // flying artwork lands as the same picture the mini player's cover shows.
     val thumbLayer = rememberGraphicsLayer()
+    // The title row, recorded while docking so it can be drawn over the flying
+    // artwork instead of under it.
+    val titleLayer = rememberGraphicsLayer()
 
     // The player's own end of the docking, for whichever shape it takes: where
     // it sits on screen, the fade, and the artwork drawn over that fade.
@@ -1860,6 +1879,15 @@ fun NowPlayingScreen(
                 translate(dockFrame.portalLeft, dockFrame.portalTop) {
                     val portalScale = dockFrame.portalScale
                     scale(portalScale, portalScale, pivot = Offset.Zero) { drawLayer(sleeveLayer) }
+                }
+                // The title and menu stand above the artwork, whose dissolving
+                // foot would otherwise wash them out.
+                val titleAt = dockFrame.titleRow?.takeIf { it.isAttached }
+                val titleHost = dockFrame.host?.takeIf { it.isAttached }
+                if (titleAt != null && titleHost != null && titleLayer.size.width > 0) {
+                    val at = titleHost.localPositionOf(titleAt, Offset.Zero)
+                    titleLayer.alpha = ((dockT() - DOCK_TITLE_GONE) / DOCK_TITLE_SOLID_SPAN).coerceIn(0f, 1f)
+                    translate(at.x, at.y) { drawLayer(titleLayer) }
                 }
 
             }
@@ -3063,7 +3091,7 @@ fun NowPlayingScreen(
                                     // within this, and for the player's own draw.
                                     val mini = miniInBox()
                                     val open = sleeveRect()
-                                    if (mini != null) dockFrame.ride = dockRide(open, mini)
+                                    if (mini != null) dockFrame.ride = dockRide(open, mini) * DOCK_RIDE_SHARE
                                     val rect = towardsDock(open, mini)
                                     dockFrame.miniInBox = mini
                                     dockFrame.sleeve = rect
@@ -3550,7 +3578,17 @@ fun NowPlayingScreen(
                                 // from the sleeve so the gap between the two is inside
                                 // the band as well: it is a gap in one block, not a seam
                                 // between two, and a finger should not be able to find it.
-                                .onGloballyPositioned { dismissBandBottom = it.boundsInRoot().bottom },
+                                .onGloballyPositioned { dismissBandBottom = it.boundsInRoot().bottom }
+                                .onGloballyPositioned { dockFrame.titleRow = it }
+                                // While docking, drawn by the player's own draw above
+                                // the artwork rather than here beneath it.
+                                .drawWithContent {
+                                    if (docking()) {
+                                        titleLayer.record { this@drawWithContent.drawContent() }
+                                    } else {
+                                        drawContent()
+                                    }
+                                },
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Column(
