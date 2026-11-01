@@ -321,9 +321,9 @@
     <string name="show_nerd_stats">Show stats for nerds</string>
     <string name="show_nerd_stats_subtitle">Codec, bitrate and sample rate on the player</string>
     <string name="show_listen_together_button">Show Listen Together button</string>
-    <string name="listen_together_tab">Jam</string>
+    <string name="listen_together_tab">Together</string>
     <string name="show_listen_together_tab">Show Listen Together tab</string>
-    <string name="show_listen_together_tab_subtitle">Adds a Jam tab to the navigation bar, right of Explore</string>
+    <string name="show_listen_together_tab_subtitle">Adds a Together tab to the navigation bar, right of Explore</string>
     <string name="show_listen_together_button_subtitle">Off, the player shows only the audio output button between lyrics and the queue</string>
     <string name="app_icon">App icon</string>
     <string name="app_icon_default">Default</string>
