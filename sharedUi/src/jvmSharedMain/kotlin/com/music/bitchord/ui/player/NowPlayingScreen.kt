@@ -309,6 +309,16 @@ private const val SPOTIFY_CANVAS_RESUME_DELAY_MS = 1_000L
 /** Tinggi dek kaca Spotify Canvas sebagai bagian dari layar; sama dengan lapisan kaca hidupnya. */
 private const val SPOTIFY_DECK_HEIGHT_FRACTION = 0.56f
 
+/** [image] selebar scope, rata atas, rasio aslinya tanpa crop; yang melewati tepi bawah terpotong. */
+private fun DrawScope.drawFrameTopAligned(image: ImageBitmap) {
+    if (size.width <= 0f || size.height <= 0f) return
+    val dstHeight = (size.width * image.height / image.width).roundToInt().coerceAtLeast(1)
+    drawContext.canvas.save()
+    drawContext.canvas.clipRect(0f, 0f, size.width, size.height)
+    drawImage(image = image, dstSize = IntSize(size.width.roundToInt(), dstHeight))
+    drawContext.canvas.restore()
+}
+
 /** [image] filling this scope, centred and cropped as [ContentScale.Crop] would. */
 private fun DrawScope.drawCropped(image: ImageBitmap) {
     if (size.width <= 0f || size.height <= 0f) return
@@ -3738,7 +3748,15 @@ fun NowPlayingScreen(
                                     .drawWithContent {
                                         val grabbed = dissolve.frame
                                         if (grabbed != null) {
-                                            drawCropped(grabbed)
+                                            // Klip portrait di hero tampil selebar player,
+                                            // rata atas, setinggi aslinya. Frame-nya sudah
+                                            // sebesar itu; di-crop ke kotak banner membuatnya
+                                            // tampak ter-zoom dan bergeser dari canvas tadi.
+                                            if (heroMode && grabbed.width < grabbed.height) {
+                                                drawFrameTopAligned(grabbed)
+                                            } else {
+                                                drawCropped(grabbed)
+                                            }
                                             return@drawWithContent
                                         }
                                         drawContent()
