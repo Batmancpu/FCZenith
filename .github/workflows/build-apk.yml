@@ -1,0 +1,103 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main, master]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install CMake & NDK
+        run: |
+          yes | sdkmanager --licenses > /dev/null || true
+          sdkmanager "cmake;3.22.1" "ndk;27.0.12077973"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Siapkan keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > keystore.jks
+            STORE_PASS="$KEYSTORE_PASSWORD"
+            ALIAS="$KEY_ALIAS"
+            KEY_PASS="${KEY_PASSWORD:-$KEYSTORE_PASSWORD}"
+          else
+            echo "::warning::Secret keystore belum diisi, pakai keystore sementara (APK tidak bisa di-update menimpa build sebelumnya)."
+            STORE_PASS="android123"
+            ALIAS="bitchord"
+            KEY_PASS="android123"
+            keytool -genkeypair -keystore keystore.jks -storetype PKCS12 \
+              -alias "$ALIAS" -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass "$STORE_PASS" -keypass "$KEY_PASS" -dname "CN=BitChord"
+          fi
+          printf 'storeFile=keystore.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
+            "$STORE_PASS" "$ALIAS" "$KEY_PASS" > keystore.properties
+
+      - name: Build release APK
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleProdRelease --no-daemon --stacktrace \
+            -Dorg.gradle.jvmargs="-Xmx5g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8"
+
+      - name: Rename APK
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            VER="$GITHUB_REF_NAME"
+          else
+            VER="build-$GITHUB_RUN_NUMBER"
+          fi
+          mkdir -p dist
+          for f in app/build/outputs/apk/prod/release/*.apk; do
+            n=$(basename "$f")
+            case "$n" in
+              *universal*)    cp "$f" "dist/BitChord-${VER}.apk" ;;
+              *arm64-v8a*)    cp "$f" "dist/BitChord-${VER}_arm64-v8a.apk" ;;
+              *armeabi-v7a*)  cp "$f" "dist/BitChord-${VER}_armeabi-v7a.apk" ;;
+              *x86_64*)       cp "$f" "dist/BitChord-${VER}_x86_64.apk" ;;
+            esac
+          done
+          ls -lh dist
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BitChord-APK
+          path: dist/*.apk
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.apk
+          generate_release_notes: true

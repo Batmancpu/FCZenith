@@ -21,13 +21,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
  */
 val cmp = "1.10.3"
 
-/** What the desktop graph resolves; see the comment above. */
-val CMP_DESKTOP =
-    // Haze 1.7.x, which the Windows build uses, was compiled
-    // against a ShaderBrush.createShader that returns skia's Shader; 1.12 changed that return
-    // type, so on 1.12 every blur dies with NoSuchMethodError. Windows stays on the plugin's
-    // own 1.10.3 / skiko 0.9; only Linux moves to 1.12.
-    if (System.getProperty("os.name").contains("Windows", ignoreCase = true)) "1.10.3" else "1.12.0"
+
 
 plugins {
     id("org.jetbrains.kotlin.multiplatform")
@@ -39,12 +33,6 @@ plugins {
 
 kotlin {
     androidTarget {
-        compilerOptions {
-            jvmTarget.set(JvmTarget.JVM_17)
-        }
-    }
-
-    jvm {
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_17)
         }
@@ -63,7 +51,6 @@ kotlin {
             dependsOn(commonMain.get())
         }
         androidMain.get().dependsOn(jvmSharedMain)
-        jvmMain.get().dependsOn(jvmSharedMain)
 
         commonMain.dependencies {
             api(project(":shared"))
@@ -81,17 +68,7 @@ kotlin {
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
         }
-        // Compiled against what the desktop actually resolves, not the phone's
-        // pin — see the CMP_DESKTOP comment at the top of this file. Skia's
-        // Matrix33 changed shape between skiko 0.9 and 0.15, and bytecode built
-        // against 0.9 NoSuchMethodError'd the desktop's 0.15 at draw time.
-        jvmMain.dependencies {
-            api("org.jetbrains.compose.ui:ui-desktop:$CMP_DESKTOP")
-        }
-        jvmTest.dependencies {
-            implementation(kotlin("test"))
-            implementation("junit:junit:4.13.2")
-        }
+
         androidMain.dependencies {
             // The phone's own versions, so nothing here moves them.
             implementation("androidx.activity:activity-compose:1.9.3")

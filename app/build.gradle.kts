@@ -53,6 +53,16 @@ val listenTogetherServer: String = (
         ?: "https://bitchord-listen-together.onrender.com"
     ).trim().trimEnd('/')
 
+/*
+ * Repo "owner/name" yang dicek in-app updater untuk release terbaru. Di GitHub
+ * Actions otomatis terisi repo fork kamu (GITHUB_REPOSITORY). Kosong = updater mati.
+ */
+val updateRepo: String = (
+    localProps.getProperty("UPDATE_REPO")
+        ?: System.getenv("GITHUB_REPOSITORY")
+        ?: ""
+    ).trim()
+
 // See the root build.gradle.kts: one version for the phone and its watch app.
 val betaSuffix = rootProject.extra["bitchordBetaSuffix"] as String
 
@@ -84,6 +94,7 @@ android {
         // the same GitHub release, told apart by file name. See
         // AppUpdateChecker.apkAssetUrl.
         buildConfigField("String", "UPDATE_APK_PREFIX", "\"BitChord-\"")
+        buildConfigField("String", "UPDATE_REPO", "\"${updateRepo.replace("\\", "\\\\").replace("\"", "\\\"")}\"")
     }
 
     splits {
@@ -474,59 +485,3 @@ val verifyDevInstall = tasks.register("verifyDevInstall") {
 }
 tasks.matching { it.name == "installDevDebug" }.configureEach { finalizedBy(verifyDevInstall) }
 
-/*
- * The watch app rides inside the phone app, so "BitChord for Wear OS" in
- * Settings can put it on a watch — or update it — with no computer involved.
- *
- * Each phone variant carries the watch build of the same flavor *and* build
- * type: the same package (dev with dev, prod with prod) and the same signing
- * key, which is what the Wearable Data Layer needs before the two will talk at
- * all. A SHA-256 travels with it, so the phone can tell the watch's build from
- * the one it carries even when the version numbers match.
- *
- * Costs a watch build per phone build; -Pbitchord.bundleWear=false skips it
- * for a quick local iteration (Settings then offers no install).
- */
-abstract class BundleWearApk : DefaultTask() {
-    @get:InputFiles
-    abstract val apks: ConfigurableFileCollection
-
-    @get:OutputDirectory
-    abstract val outputDir: DirectoryProperty
-
-    @TaskAction
-    fun bundle() {
-        val out = outputDir.get().asFile.resolve("wear")
-        out.deleteRecursively()
-        out.mkdirs()
-        val apk = apks.asFileTree.matching { include("*.apk") }.files.singleOrNull()
-            ?: throw GradleException("Expected exactly one watch APK in ${apks.files}")
-        val target = out.resolve("BitChordWear.apk")
-        apk.copyTo(target, overwrite = true)
-        val digest = MessageDigest.getInstance("SHA-256")
-        target.inputStream().use { input ->
-            val buffer = ByteArray(64 * 1024)
-            while (true) {
-                val read = input.read(buffer)
-                if (read < 0) break
-                digest.update(buffer, 0, read)
-            }
-        }
-        out.resolve("BitChordWear.sha256").writeText(digest.digest().joinToString("") { "%02x".format(it) })
-    }
-}
-
-if (providers.gradleProperty("bitchord.bundleWear").orNull != "false" && findProject(":wearos") != null) {
-    androidComponents.onVariants { variant ->
-        val flavor = variant.productFlavors.firstOrNull { it.first == "env" }?.second ?: return@onVariants
-        val type = variant.buildType ?: return@onVariants
-        // The benchmark build has no watch counterpart.
-        if (type != "debug" && type != "release") return@onVariants
-        val cap = variant.name.replaceFirstChar { it.uppercase() }
-        val bundle = tasks.register<BundleWearApk>("bundleWearApk$cap") {
-            dependsOn(":wearos:assemble$cap")
-            apks.from(rootProject.layout.projectDirectory.dir("wearos/build/outputs/apk/$flavor/$type"))
-        }
-        variant.sources.assets?.addGeneratedSourceDirectory(bundle, BundleWearApk::outputDir)
-    }
-}

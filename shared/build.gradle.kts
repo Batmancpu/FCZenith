@@ -13,14 +13,6 @@ kotlin {
         }
     }
 
-    jvm {
-        compilerOptions {
-            jvmTarget.set(JvmTarget.JVM_17)
-        }
-    }
-
-    // Android and desktop are both JVM, but the default hierarchy gives them no source set in
-    // common.
     applyDefaultHierarchyTemplate()
 
     sourceSets {
@@ -48,7 +40,6 @@ kotlin {
             }
         }
         androidMain.get().dependsOn(jvmSharedMain)
-        jvmMain.get().dependsOn(jvmSharedMain)
 
         commonMain.dependencies {
             // Models in this module intentionally have no Android or Compose dependency.
@@ -56,9 +47,6 @@ kotlin {
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
-        }
-        jvmTest.dependencies {
-            implementation("com.squareup.okhttp3:mockwebserver:5.3.2")
         }
     }
 }
