@@ -934,7 +934,17 @@ private fun SharedTransitionScope.ExpandedTabs(
                     scope.tabs.forEachIndexed { tabIndex, tab ->
                         val isSelected = tab.key == selectedTabKey
                         val tabCoverage = remember(tabIndex) {
-                            { (1f - abs(pill.position - tabIndex)).coerceIn(0f, 1f) }
+                            {
+                                // Tanpa tab terpilih (mis. Search, tab standalone) pill
+                                // disembunyikan, tapi posisi terakhirnya tetap di tab
+                                // sebelumnya. Tanpa pengecekan ini ikon tab itu tetap
+                                // berwarna aktif.
+                                if (currentSelectedTabIndex < 0) {
+                                    0f
+                                } else {
+                                    (1f - abs(pill.position - tabIndex)).coerceIn(0f, 1f)
+                                }
+                            }
                         }
                         val iconScale by animateFloatAsState(
                             targetValue = if (isSelected) 1.08f else 1f,

@@ -431,6 +431,14 @@ private const val DOCK_FADE_FULL = 0.6f
 private const val DOCK_FADE_FLOOR = 1f / 255f
 
 /**
+ * Backdrop cover yang diburamkan baru mulai muncul setelah sleeve yang terbang
+ * dari mini player melewati titik ini. Sebelumnya backdrop ikut memudar bersama
+ * sheet dan terlihat sebagai salinan cover ukuran penuh di belakang cover kecil
+ * yang masih terbang (tampak seperti dua cover).
+ */
+private const val DOCK_BACKDROP_FROM = 0.55f
+
+/**
  * The share of the sheet's travel the artwork rides on its way to the cover. All
  * of it bowed the path below the straight line and cut the cover's foot off at
  * the panel's edge; a quarter keeps it close to a straight line.
@@ -1781,6 +1789,15 @@ fun NowPlayingScreen(
         }
     }
     val docking: () -> Boolean = { dockT() < 1f }
+    // 0 selagi sleeve masih terbang kecil, naik ke 1 di ujung perjalanan; 1 saat
+    // player tidak sedang docking.
+    val dockBackdropAlpha: () -> Float = {
+        if (!docking()) {
+            1f
+        } else {
+            ((dockT() - DOCK_BACKDROP_FROM) / (1f - DOCK_BACKDROP_FROM)).coerceIn(0f, 1f)
+        }
+    }
     // The same, for composition: derived, so it recomposes the player twice a
     // trip — as the sheet leaves fully open and as it gets back — rather than
     // on each frame between.
@@ -2371,7 +2388,7 @@ fun NowPlayingScreen(
                     )
                 }
                 fullArtworkBlurContent(
-                    Modifier.graphicsLayer { alpha = fullArtworkBackdropAlpha },
+                    Modifier.graphicsLayer { alpha = fullArtworkBackdropAlpha * dockBackdropAlpha() },
                 )
 
                 // Mount once, behind the controls. A known portrait aspect changes the
