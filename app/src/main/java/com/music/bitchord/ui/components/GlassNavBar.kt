@@ -224,8 +224,8 @@ fun GlassNavBar(
         ),
         // Held too: this is declared `Any?`, so a fresh list every pass is a
         // changed argument by identity and defeats skipping on its own.
-        contentKey = remember(selectedIndex, tabs, contentColor) {
-            listOf(selectedIndex, tabs, contentColor)
+        contentKey = remember(selectedIndex, tabs, contentColor, selectedColor) {
+            listOf(selectedIndex, tabs, contentColor, selectedColor)
         },
     ) {
         tabs.forEachIndexed { index, tab ->
