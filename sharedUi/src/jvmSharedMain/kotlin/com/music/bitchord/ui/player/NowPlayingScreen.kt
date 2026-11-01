@@ -1962,9 +1962,19 @@ fun NowPlayingScreen(
     // tall. Read off the still, which is there before a reopened clip knows
     // its own shape.
     fun stillBottomPx(): Float {
-        val image = still()?.image ?: return 0f
+        val still = still()?.image
+        // Frame yang ditahan untuk transisi skip punya bentuk klip yang tadi tampil.
+        // Sleeve mengikutinya seperti still, supaya frame jatuh tepat di tempat klip
+        // tadi berada, bukan di-crop ke kotak banner yang lebih pendek.
+        val held = if (still == null) dissolve.frame else null
+        val image = still ?: held ?: return 0f
         if (!heroMode || image.width >= image.height || playerBounds.width <= 0) return 0f
-        return minOf(playerBounds.width * image.height / image.width.toFloat(), playerBounds.height.toFloat())
+        val full = minOf(playerBounds.width * image.height / image.width.toFloat(), playerBounds.height.toFloat())
+        // Selama frame dipudarkan, tinggi mengerut mulus ke banner, supaya cover lagu
+        // baru tidak melompat ukuran begitu frame dilepas.
+        if (held == null || dissolve.outgoing == null) return full
+        val banner = with(density) { heroHeight.toPx() }
+        return full + (banner - full) * smootherStep(dissolve.progress)
     }
     // The clip's dissolve, held at the banner's height in pixels — see [clipFadeFraction].
     fun stillFadeFraction(): Float {

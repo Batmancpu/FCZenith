@@ -259,7 +259,12 @@ internal fun AndroidCanvasArtworkPlayer(
             if (!rendered || view == null) {
                 null
             } else {
-                view.captureAt(LIVE_GRAB_PX, clipAspect, currentContentMode, currentAlignPortraitTop)
+                // LIVE_GRAB_PX untuk sisi PENDEK view. View hero portrait setinggi
+                // player, sedangkan isi klipnya hanya sebagian; dengan sisi panjang
+                // sebagai patokan, isinya cuma ~330px lalu di-upscale 3x (buram).
+                val shortSide = minOf(view.width, view.height).coerceAtLeast(1)
+                val grabPx = (LIVE_GRAB_PX.toLong() * maxOf(view.width, view.height) / shortSide).toInt()
+                view.captureAt(grabPx, clipAspect, currentContentMode, currentAlignPortraitTop)
                     ?.asImageBitmap()
             }
         }
