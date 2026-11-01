@@ -907,6 +907,9 @@ object AudioCache {
         }.sortedByDescending { it.lastUsedMs }
     }
 
+    /** Bytes the song cache occupies on disk right now, across every entry it holds. */
+    fun usedBytes(): Long = if (::cache.isInitialized) cache.cacheSpace else 0L
+
     /** Every cache key holding a rendition of [mediaId]; see [keyFactory]. */
     private fun keysOf(mediaId: String): List<String> {
         val base = cacheKeyBaseOf(mediaId)

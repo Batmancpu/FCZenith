@@ -118,7 +118,7 @@ class BitChordApplication : Application(), SingletonImageLoader.Factory, Configu
             // never sized for. See CanvasCache's doc for why this one exists at
             // all — it is the fix for canvas clips re-fetching the same few
             // seconds of video from the network on every loop.
-            CanvasCache.init(this)
+            // CanvasCache is opened below, after AppSettings: its ceiling is a setting.
         }
         // Migration-safe: an old single cookie becomes the first encrypted
         // session, while newer installs restore the profile the listener chose.
@@ -172,6 +172,7 @@ class BitChordApplication : Application(), SingletonImageLoader.Factory, Configu
         // One cache directory can only be opened once per process, and
         // PlaybackService shares this one — so it's opened here, not there.
         AudioCache.init(this)
+        CanvasCache.init(this)
         // The offscreen WebView that mints a Spotify access token from the
         // listener's own session cookie needs a Context, and nothing in the
         // suspend call chain that reaches it (a track's canvas lookup) has

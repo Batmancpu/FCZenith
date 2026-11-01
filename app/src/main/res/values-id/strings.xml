@@ -93,6 +93,15 @@
     <string name="username">Nama pengguna</string>
     <string name="login_failed">Login gagal</string>
     <string name="song_cache_cleared">Cache lagu dibersihkan</string>
+    <string name="song_cache_usage">Pemakaian cache lagu</string>
+    <string name="cache_usage_songs">%1$s tersimpan · %2$d lagu</string>
+    <string name="canvas_cache_limit">Batas cache animasi cover</string>
+    <string name="canvas_cache_limit_subtitle">Menyimpan klip cover yang berulang di disk agar tidak diunduh lagi</string>
+    <string name="canvas_cache_usage">Cache animasi cover</string>
+    <string name="canvas_cache_usage_detail">%1$s tersimpan · %2$d klip</string>
+    <string name="clear_canvas_cache">Bersihkan cache animasi cover</string>
+    <string name="clear_canvas_cache_subtitle">Membebaskan ruang yang dipakai klip cover</string>
+    <string name="canvas_cache_cleared">Cache animasi cover dibersihkan</string>
     <string name="image_cache_cleared">Cache gambar dibersihkan</string>
     <string name="no_equalizer">Tidak ada equalizer sistem di perangkat ini</string>
     <string name="no_dolby_atmos">Tidak ada panel Dolby Atmos di perangkat ini</string>

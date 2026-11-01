@@ -634,6 +634,13 @@ object AppSettings {
     val audioCacheLimitBytes = MutableStateFlow(DEFAULT_CACHE_LIMIT_BYTES)
 
     /**
+     * Disk budget for animated cover (canvas) clips, separate from the song
+     * cache. [CanvasCache][com.music.bitchord.data.canvas.CanvasCache] evicts
+     * the least recently used clips past it.
+     */
+    val canvasCacheLimitBytes = MutableStateFlow(DEFAULT_CANVAS_CACHE_LIMIT_BYTES)
+
+    /**
      * Whether Library's "On device" shelf carries the Cached songs folder —
      * the YouTube and JioSaavn tracks the song cache is holding. Off by
      * default: the cache is an implementation detail most people never need
@@ -1046,6 +1053,8 @@ object AppSettings {
         paxSenixApiKey.value = prefs.getString(KEY_PAXSENIX_API_KEY, "").orEmpty()
         com.music.bitchord.data.lyrics.PaxSenix.setApiKey(paxSenixApiKey.value)
         audioCacheLimitBytes.value = clampCacheLimit(prefs.getLong(KEY_CACHE_LIMIT, DEFAULT_CACHE_LIMIT_BYTES))
+        canvasCacheLimitBytes.value = prefs.getLong(KEY_CANVAS_CACHE_LIMIT, DEFAULT_CANVAS_CACHE_LIMIT_BYTES)
+            .coerceIn(MIN_CANVAS_CACHE_LIMIT_BYTES, MAX_CANVAS_CACHE_LIMIT_BYTES)
         showCacheFolder.value = prefs.getBoolean(KEY_SHOW_CACHE_FOLDER, false)
         lastfmEnabled.value = prefs.getBoolean(KEY_LASTFM_ENABLED, false)
         lastfmUsername.value = prefs.getString(KEY_LASTFM_USERNAME, "").orEmpty()
@@ -1661,6 +1670,13 @@ object AppSettings {
         if (value > MAX_CACHE_LIMIT_BYTES) UNLIMITED_CACHE_LIMIT_BYTES
         else value.coerceAtLeast(DEFAULT_CACHE_LIMIT_BYTES)
 
+    /** Clamped to [MIN_CANVAS_CACHE_LIMIT_BYTES]..[MAX_CANVAS_CACHE_LIMIT_BYTES]. */
+    fun setCanvasCacheLimitBytes(value: Long) {
+        val clamped = value.coerceIn(MIN_CANVAS_CACHE_LIMIT_BYTES, MAX_CANVAS_CACHE_LIMIT_BYTES)
+        canvasCacheLimitBytes.value = clamped
+        prefs.edit().putLong(KEY_CANVAS_CACHE_LIMIT, clamped).apply()
+    }
+
     fun setShowCacheFolder(value: Boolean) {
         showCacheFolder.value = value
         prefs.edit().putBoolean(KEY_SHOW_CACHE_FOLDER, value).apply()
@@ -2154,6 +2170,10 @@ object AppSettings {
     const val DEFAULT_CACHE_LIMIT_BYTES = 512L * 1024 * 1024
     const val MAX_CACHE_LIMIT_BYTES = 10L * 1024 * 1024 * 1024
 
+    const val DEFAULT_CANVAS_CACHE_LIMIT_BYTES = 256L * 1024 * 1024
+    const val MIN_CANVAS_CACHE_LIMIT_BYTES = 128L * 1024 * 1024
+    const val MAX_CANVAS_CACHE_LIMIT_BYTES = 5L * 1024 * 1024 * 1024
+
     /** The cache limit with no ceiling: only free storage bounds it. */
     const val UNLIMITED_CACHE_LIMIT_BYTES = Long.MAX_VALUE
 
@@ -2211,6 +2231,7 @@ object AppSettings {
     private const val KEY_NERD_STATS = "show_nerd_stats"
     private const val KEY_LISTEN_TOGETHER_BUTTON = "show_listen_together_button"
     private const val KEY_CACHE_LIMIT = "audio_cache_limit_bytes"
+    private const val KEY_CANVAS_CACHE_LIMIT = "canvas_cache_limit_bytes"
     private const val KEY_REDUCE_ANIMATION = "reduce_animation"
     private const val KEY_ONBOARDING_COMPLETE = "onboarding_complete"
     private const val KEY_HIGH_PERFORMANCE_MODE = "high_performance_mode"

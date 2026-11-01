@@ -174,7 +174,12 @@ import com.music.bitchord.data.settings.AppFont
 import com.music.bitchord.data.stats.Backup
 import com.music.bitchord.playback.AudioCache
 import com.music.bitchord.ui.player.fullBleedArtworkAvailable
+import androidx.compose.runtime.produceState
+import com.music.bitchord.data.canvas.CanvasCache
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 import java.util.Locale
 
@@ -276,6 +281,7 @@ fun SettingsScreen(
     val playingFormat by NerdStats.current.collectAsStateWithLifecycle()
     val playingDolbyAtmos = playingFormat?.isDolbyAtmos == true
     val cacheLimitBytes by AppSettings.audioCacheLimitBytes.collectAsStateWithLifecycle()
+    val canvasCacheLimitBytes by AppSettings.canvasCacheLimitBytes.collectAsStateWithLifecycle()
     val showCacheFolder by AppSettings.showCacheFolder.collectAsStateWithLifecycle()
     val downloadQuality by AppSettings.downloadQuality.collectAsStateWithLifecycle()
     val wifiOnlyDownloads by AppSettings.wifiOnlyDownloads.collectAsStateWithLifecycle()
@@ -1322,6 +1328,85 @@ fun SettingsScreen(
                     steps = 19,
                 )
             }
+            // Live numbers, re-read every few seconds while this page is open.
+            val songCacheStats by produceState(initialValue = 0L to 0) {
+                while (true) {
+                    value = withContext(Dispatchers.IO) {
+                        AudioCache.usedBytes() to AudioCache.cachedSongs().size
+                    }
+                    delay(3_000)
+                }
+            }
+            val canvasCacheStats by produceState(initialValue = 0L to 0) {
+                while (true) {
+                    value = withContext(Dispatchers.IO) {
+                        CanvasCache.usedBytes() to CanvasCache.clipCount()
+                    }
+                    delay(3_000)
+                }
+            }
+            val songCacheUsageTitle = stringResource(R.string.song_cache_usage)
+            row(songCacheUsageTitle, "cache", "size", "used", "songs") {
+                SettingsRow(
+                    icon = SfIcons.Storage,
+                    title = songCacheUsageTitle,
+                    subtitle = stringResource(
+                        R.string.cache_usage_songs,
+                        formatStoredBytes(songCacheStats.first),
+                        songCacheStats.second,
+                    ),
+                )
+            }
+            val canvasLimitMinMb = (AppSettings.MIN_CANVAS_CACHE_LIMIT_BYTES / (1024 * 1024)).toInt()
+            val canvasLimitMaxMb = (AppSettings.MAX_CANVAS_CACHE_LIMIT_BYTES / (1024 * 1024)).toInt()
+            val canvasLimitMb = (canvasCacheLimitBytes / (1024 * 1024)).toInt()
+                .coerceIn(canvasLimitMinMb, canvasLimitMaxMb)
+            val canvasCacheLimitTitle = stringResource(R.string.canvas_cache_limit)
+            row(canvasCacheLimitTitle, "cache", "canvas", "animated", "cover", "video", "space") {
+                SliderRow(
+                    icon = SfIcons.Animation,
+                    title = canvasCacheLimitTitle,
+                    subtitle = stringResource(R.string.canvas_cache_limit_subtitle),
+                    value = formatCacheSize(canvasLimitMb),
+                    sliderValue = canvasLimitMb.toFloat(),
+                    onSliderValue = {
+                        AppSettings.setCanvasCacheLimitBytes(it.roundToInt().toLong() * 1024 * 1024)
+                    },
+                    valueRange = canvasLimitMinMb.toFloat()..canvasLimitMaxMb.toFloat(),
+                    // 128 MB per stop: 128 MB, 256 MB ... 5 GB.
+                    steps = (canvasLimitMaxMb - canvasLimitMinMb) / canvasLimitMinMb - 1,
+                )
+            }
+            val canvasCacheUsageTitle = stringResource(R.string.canvas_cache_usage)
+            row(canvasCacheUsageTitle, "cache", "canvas", "animated", "cover", "size", "used") {
+                SettingsRow(
+                    icon = SfIcons.Animation,
+                    title = canvasCacheUsageTitle,
+                    subtitle = stringResource(
+                        R.string.canvas_cache_usage_detail,
+                        formatStoredBytes(canvasCacheStats.first),
+                        canvasCacheStats.second,
+                    ),
+                )
+            }
+            val clearCanvasCacheTitle = stringResource(R.string.clear_canvas_cache)
+            row(clearCanvasCacheTitle, "cache", "canvas", "animated", "cover", "free space") {
+                SettingsRow(
+                    icon = SfIcons.DeleteSweep,
+                    title = clearCanvasCacheTitle,
+                    subtitle = stringResource(R.string.clear_canvas_cache_subtitle),
+                    onClick = {
+                        backupScope.launch {
+                            withContext(Dispatchers.IO) { CanvasCache.clear() }
+                            Toast.makeText(
+                                context,
+                                context.getString(R.string.canvas_cache_cleared),
+                                Toast.LENGTH_SHORT,
+                            ).show()
+                        }
+                    },
+                )
+            }
             val clearSongCacheTitle = stringResource(R.string.clear_song_cache)
             row(clearSongCacheTitle, "cache", "free space") {
                 SettingsRow(
@@ -2023,6 +2108,19 @@ private fun formatCacheSize(mb: Int): String {
     if (mb < 1024) return "$mb MB"
     val gb = mb / 1024f
     return if (gb == gb.toInt().toFloat()) "${gb.toInt()} GB" else "%.1f GB".format(Locale.ROOT, gb)
+}
+
+/** "850 KB", "42.3 MB", "1.20 GB" — the exact size stored, finer than [formatCacheSize]. */
+private fun formatStoredBytes(bytes: Long): String {
+    val kb = bytes / 1024.0
+    val mb = kb / 1024.0
+    val gb = mb / 1024.0
+    return when {
+        gb >= 1.0 -> "%.2f GB".format(Locale.ROOT, gb)
+        mb >= 1.0 -> "%.1f MB".format(Locale.ROOT, mb)
+        kb >= 1.0 -> "%.0f KB".format(Locale.ROOT, kb)
+        else -> "$bytes B"
+    }
 }
 
 /** Who you're signed in as, straight from YouTube Music's account menu. */
