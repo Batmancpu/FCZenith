@@ -412,6 +412,7 @@
     <string name="queued">Dalam antrean</string>
     <string name="remove">Hapus</string>
     <string name="remove_from_liked">Hapus dari Musik yang Disukai</string>
+    <string name="liked_music">Musik yang Disukai</string>
     <string name="remove_from_playlist">Hapus dari playlist ini</string>
     <string name="rename_playlist">Ganti nama playlist</string>
     <string name="reorder_songs">Atur ulang urutan lagu</string>

@@ -21,6 +21,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.layout.fillMaxWidth
+import coil3.compose.AsyncImage
+import com.music.bitchord.data.model.CARD_ART_PX
+import com.music.bitchord.data.model.artworkAt
+import com.music.bitchord.ui.player.renderEffectBlurSupported
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -99,7 +110,7 @@ fun ReplayCreditCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val palette = rememberArtworkColors(artworkUrl)
+    val artUrl = artworkUrl.artworkAt(CARD_ART_PX)
     Box(
         modifier = modifier
             .aspectRatio(CARD_RATIO)
@@ -107,12 +118,17 @@ fun ReplayCreditCard(
             .clip(CardShape)
             .clickable(onClick = onClick),
     ) {
-        MeshGradientBackground(
-            palette = palette,
-            trackKey = artworkUrl ?: label,
-            blurRadius = 34.dp,
-            animated = false,
-        )
+        if (artUrl != null) {
+            CardArtwork(url = artUrl)
+        } else {
+            val palette = rememberArtworkColors(artworkUrl)
+            MeshGradientBackground(
+                palette = palette,
+                trackKey = artworkUrl ?: label,
+                blurRadius = 34.dp,
+                animated = false,
+            )
+        }
         // Deepened towards the foot, where the embossed lines are: the mesh is
         // built to be bright and those lines are pale, and without this the
         // cardholder name lands on whichever blob happened to drift under it.
@@ -121,9 +137,10 @@ fun ReplayCreditCard(
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
-                        0.0f to Color.Black.copy(alpha = 0.18f),
-                        0.55f to Color.Black.copy(alpha = 0.30f),
-                        1.0f to Color.Black.copy(alpha = 0.55f),
+                        0.0f to Color.Black.copy(alpha = 0.24f),
+                        0.40f to Color.Black.copy(alpha = 0.12f),
+                        0.72f to Color.Black.copy(alpha = 0.38f),
+                        1.0f to Color.Black.copy(alpha = 0.72f),
                     ),
                 ),
         )
@@ -305,6 +322,44 @@ private val EmbossShadow = Shadow(
 )
 
 private val CardShape = RoundedCornerShape(20.dp)
+
+/**
+ * Gambar utama card: artwork top 1 penuh satu card, dengan lapisan blur kedua
+ * yang dimask gradien sehingga makin kuat ke arah bawah. Tempat teks
+ * tertulis jadi tetap terbaca tanpa menutup gambar di bagian atas.
+ */
+@Composable
+private fun CardArtwork(url: String) {
+    Box(Modifier.fillMaxSize().background(Color(0xFF1C1C1E))) {
+        AsyncImage(
+            model = url,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize(),
+        )
+        if (renderEffectBlurSupported) {
+            AsyncImage(
+                model = url,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
+                    .drawWithContent {
+                        drawContent()
+                        drawRect(
+                            brush = Brush.verticalGradient(
+                                0.30f to Color.Transparent,
+                                0.75f to Color.Black,
+                            ),
+                            blendMode = BlendMode.DstIn,
+                        )
+                    }
+                    .blur(28.dp),
+            )
+        }
+    }
+}
 
 /** Whose card it is when there is no signed-in account to name. */
 

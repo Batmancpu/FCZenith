@@ -203,7 +203,9 @@ fun LibraryScreen(
                     shelves.forEach { shelf ->
                         item(key = "shelf:${shelf.title}") {
                             if (shelf.title == PLAYLISTS) {
-                                val pinnedFirst = shelf.pinnedFirst(pinnedPlaylists)
+                                val pinnedFirst = shelf
+                                    .copy(items = shelf.items.filterNot { it.browseId == YtMusicRepository.LIKED_MUSIC })
+                                    .pinnedFirst(pinnedPlaylists)
                                 PlaylistShelf(
                                     shelf = pinnedFirst,
                                     onItemClick = onShelfItemClick,
