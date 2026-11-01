@@ -438,6 +438,14 @@ private const val DOCK_FADE_FLOOR = 1f / 255f
 private const val DOCK_RIDE_SHARE = 0.25f
 
 /**
+ * How much of the way to its target the artwork's ride share moves each frame.
+ * Switching the share outright whenever the sheet changed direction put the
+ * cover on a different path for the same sheet position: drag up and it was
+ * here, drag down and it was somewhere else.
+ */
+private const val DOCK_RIDE_EASE = 0.2f
+
+/**
  * The title row, drawn over the flying artwork while docking: gone by this
  * far open, and solid [DOCK_TITLE_SOLID_SPAN] further on.
  */
@@ -478,6 +486,10 @@ private class DockFrame {
     var opening = true
     /** How much of that the artwork rides — see `dockRide`. */
     var ride = 0f
+    /** The share of [ride] in force, eased between opening's and closing's. */
+    var rideShare = 1f
+    /** Whether the sleeve recorded itself into the sleeve layer on its last draw. */
+    var recorded = false
     /** The sleeve as laid out, in the same box. */
     var sleeve: Rect = Rect.Zero
     /**
@@ -1884,9 +1896,13 @@ fun NowPlayingScreen(
         .drawWithContent {
             drawContent()
             if (docking()) {
-                translate(dockFrame.portalLeft, dockFrame.portalTop) {
-                    val portalScale = dockFrame.portalScale
-                    scale(portalScale, portalScale, pivot = Offset.Zero) { drawLayer(sleeveLayer) }
+                // Only a copy recorded on this very draw: otherwise the sleeve
+                // is drawn in place and an older recording lands over it too.
+                if (dockFrame.recorded) {
+                    translate(dockFrame.portalLeft, dockFrame.portalTop) {
+                        val portalScale = dockFrame.portalScale
+                        scale(portalScale, portalScale, pivot = Offset.Zero) { drawLayer(sleeveLayer) }
+                    }
                 }
                 // The title and menu stand above the artwork, whose dissolving
                 // foot would otherwise wash them out.
@@ -2096,6 +2112,7 @@ fun NowPlayingScreen(
                                         dockFrame.portalLeft = pose.left
                                         dockFrame.portalTop = pose.top
                                         dockFrame.portalScale = pose.scale
+                                        dockFrame.recorded = true
                                         sleeveLayer.record { this@drawWithContent.drawContent() }
                                     } else {
                                         if (docking()) {
@@ -3122,8 +3139,14 @@ fun NowPlayingScreen(
                                     if (!moved.isNaN() && moved != 0f) dockFrame.opening = moved < 0f
                                     dockFrame.lastOffset = dockFrame.offset
                                     if (mini != null) {
-                                        dockFrame.ride = dockRide(open, mini) *
-                                            (if (dockFrame.opening) 1f else DOCK_RIDE_SHARE)
+                                        // Eased toward the share of the direction the
+                                        // sheet is going, not switched to it: a drag
+                                        // that reverses must not move the cover.
+                                        val shareTarget = if (dockFrame.opening) 1f else DOCK_RIDE_SHARE
+                                        dockFrame.rideShare += (shareTarget - dockFrame.rideShare) * DOCK_RIDE_EASE
+                                        dockFrame.ride = dockRide(open, mini) * dockFrame.rideShare
+                                    } else {
+                                        dockFrame.rideShare = 1f
                                     }
                                     val rect = towardsDock(open, mini)
                                     dockFrame.miniInBox = mini
@@ -3147,8 +3170,10 @@ fun NowPlayingScreen(
                                 // where its pixels land changes.
                                 .drawWithContent {
                                     if (docking()) {
+                                        dockFrame.recorded = true
                                         sleeveLayer.record { this@drawWithContent.drawContent() }
                                     } else {
+                                        dockFrame.recorded = false
                                         drawContent()
                                     }
                                 }
