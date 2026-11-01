@@ -4,6 +4,7 @@ import kotlinx.coroutines.flow.first
 import androidx.compose.runtime.snapshotFlow
 import com.music.bitchord.playback.PlaybackPosition
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.size
@@ -214,6 +215,19 @@ internal class ArtworkDissolve(first: PlayerArtwork) {
      */
     internal var lastClipShowing = false
 
+    /** Indeks antrean pada komposisi terakhir. Dibaca saat [retarget]. */
+    internal var lastQueueIndex = -1
+
+    /**
+     * Arah gerak transisi: +1 untuk next (cover lama keluar ke kiri, cover baru
+     * masuk dari kanan), -1 untuk previous (kebalikannya).
+     */
+    var direction by mutableFloatStateOf(1f)
+        private set
+
+    /** Seberapa besar gerakan transisi: 1 untuk skip, kecil saat mix otomatis. */
+    var punch by mutableFloatStateOf(1f)
+
     /** Cover yang sedang dipudarkan, atau null kalau tidak ada. */
     var outgoing by mutableStateOf<PlayerArtwork?>(null)
         private set
@@ -229,10 +243,13 @@ internal class ArtworkDissolve(first: PlayerArtwork) {
     /** 0f saat cover lama masih utuh, 1f saat hanya cover baru yang tersisa. */
     var progress by mutableFloatStateOf(1f)
 
-    internal fun retarget(next: PlayerArtwork, enabled: Boolean) {
+    internal fun retarget(next: PlayerArtwork, enabled: Boolean, queueIndex: Int = -1) {
         val old = current
         if (old === next) return
         current = next
+        // Indeks antrean mundur = previous. Selain itu (next, auto-advance)
+        // dianggap maju.
+        direction = if (queueIndex >= 0 && lastQueueIndex >= 0 && queueIndex < lastQueueIndex) -1f else 1f
         if (enabled && old.url != null && next.url != null) {
             held = old
             outgoing = old
@@ -256,6 +273,7 @@ internal fun rememberArtworkDissolve(
     art: PlayerArtwork,
     mixing: Boolean,
     clipShowing: Boolean = false,
+    queueIndex: Int = -1,
 ): ArtworkDissolve {
     val reduceAnimation by PlayerSettings.reduceAnimation.collectAsStateWithLifecycle()
     val dissolve = remember { ArtworkDissolve(art) }
@@ -264,8 +282,14 @@ internal fun rememberArtworkDissolve(
     // adalah cut-nya.
     // Lagu lama yang clip-nya sedang berputar lalu diganti (next/prev): langsung
     // ke cover berikutnya, tanpa memunculkan thumbnail lama dulu.
-    remember(art) { dissolve.retarget(art, enabled = !reduceAnimation && !dissolve.lastClipShowing) }
-    SideEffect { dissolve.lastClipShowing = clipShowing }
+    remember(art) {
+        dissolve.punch = if (mixing) 0.35f else 1f
+        dissolve.retarget(art, enabled = !reduceAnimation && !dissolve.lastClipShowing, queueIndex = queueIndex)
+    }
+    SideEffect {
+        dissolve.lastClipShowing = clipShowing
+        dissolve.lastQueueIndex = queueIndex
+    }
     val mixingNow by rememberUpdatedState(mixing)
     LaunchedEffect(art) {
         if (dissolve.outgoing == null) return@LaunchedEffect
@@ -273,7 +297,7 @@ internal fun rememberArtworkDissolve(
         // yang tidak kunjung datang ditinggalkan, bukan ditutupi yang lama.
         withTimeoutOrNull(ART_DISSOLVE_WAIT_MS) { snapshotFlow { art.loaded }.first { it } }
         val duration = if (mixingNow) MIX_DISSOLVE_MS else SKIP_DISSOLVE_MS
-        animate(0f, 1f, animationSpec = tween(duration, easing = FastOutSlowInEasing)) { value, _ ->
+        animate(0f, 1f, animationSpec = tween(duration, easing = ARTWORK_FLOW_EASING)) { value, _ ->
             dissolve.progress = value
         }
         dissolve.finish()
@@ -283,7 +307,10 @@ internal fun rememberArtworkDissolve(
 
 private const val ART_DISSOLVE_WAIT_MS = 2_500L
 private const val MIX_DISSOLVE_MS = 1_800
-private const val SKIP_DISSOLVE_MS = 380
+private const val SKIP_DISSOLVE_MS = 700
+
+/** Mirip easeOutQuint: meluncur cepat di awal, lalu mengendap sangat halus. */
+private val ARTWORK_FLOW_EASING = CubicBezierEasing(0.22f, 1f, 0.36f, 1f)
 
 /**
  * The seek bar's own state: a drag in progress, and where the handle was

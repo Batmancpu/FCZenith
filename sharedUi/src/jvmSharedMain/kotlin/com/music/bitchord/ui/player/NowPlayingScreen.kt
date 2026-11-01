@@ -1416,6 +1416,7 @@ fun NowPlayingScreen(
         art = art,
         mixing = mixing || crossfading,
         clipShowing = canvas != null && canvasRendered && !mixing && !crossfading,
+        queueIndex = queueIndex,
     )
     // Sticky, unlike [PlayerArtwork.loaded]: the banner is the shape of the player rather
     // than a property of the track in it. Waiting on each new cover would
@@ -3453,12 +3454,16 @@ fun NowPlayingScreen(
                                 // [PlayerArtwork.loaded] still flips the moment it does.
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    // Cover baru mengendap ke ukuran normal selagi
-                                    // cover lama memudar di atasnya.
+                                    // Cover baru meluncur masuk dari arah gerak (next
+                                    // dari kanan, previous dari kiri) sambil mengendap
+                                    // dari sedikit membesar ke ukuran normal.
                                     .graphicsLayer {
-                                        val settle = 1f + 0.05f * (1f - dissolve.progress)
+                                        val left = 1f - dissolve.progress
+                                        val ease = left * left
+                                        val settle = 1f + 0.12f * dissolve.punch * ease
                                         scaleX = settle
                                         scaleY = settle
+                                        translationX = dissolve.direction * dissolve.punch * size.width * 0.05f * ease
                                     }
                                     .drawWithContent {
                                         val frame = still()
@@ -3504,7 +3509,16 @@ fun NowPlayingScreen(
                                     .graphicsLayer {
                                         val sweeping = dissolve.outgoing != null
                                         alpha = if (sweeping) 1f else 0f
-                                        translationX = if (sweeping) size.width * 0.05f * dissolve.progress else 0f
+                                        // Cover lama ikut terbawa searah gerak (next ke
+                                        // kiri, previous ke kanan), mengecil sedikit dan
+                                        // miring seperti kartu yang dilepas.
+                                        val move = dissolve.direction * dissolve.punch
+                                        translationX = if (sweeping) -move * size.width * 0.30f * dissolve.progress else 0f
+                                        val shrink = if (sweeping) 1f - 0.10f * dissolve.punch * dissolve.progress else 1f
+                                        scaleX = shrink
+                                        scaleY = shrink
+                                        rotationY = if (sweeping) move * 12f * dissolve.progress else 0f
+                                        cameraDistance = 14f * density
                                         compositingStrategy = if (sweeping) {
                                             CompositingStrategy.Offscreen
                                         } else {
@@ -3514,19 +3528,48 @@ fun NowPlayingScreen(
                                     .drawWithContent {
                                         drawContent()
                                         if (dissolve.outgoing == null) return@drawWithContent
-                                        val feather = size.width * 0.45f
-                                        val start = -feather + (size.width + feather) * dissolve.progress
+                                        val feather = size.width * 0.55f
+                                        val travel = size.width + feather
+                                        val forward = dissolve.direction >= 0f
+                                        // Tepi sapuan: next menyapu dari kanan ke kiri,
+                                        // previous dari kiri ke kanan.
+                                        val start = if (forward) {
+                                            size.width - travel * dissolve.progress
+                                        } else {
+                                            -feather + travel * dissolve.progress
+                                        }
                                         drawRect(
                                             brush = Brush.horizontalGradient(
                                                 colorStops = Array(FADE_CURVE_STOPS + 1) { i ->
                                                     val t = i / FADE_CURVE_STOPS.toFloat()
-                                                    t to Color.Black.copy(alpha = smootherStep(t))
+                                                    val keep = if (forward) 1f - smootherStep(t) else smootherStep(t)
+                                                    t to Color.Black.copy(alpha = keep)
                                                 },
                                                 startX = start,
                                                 endX = start + feather,
                                             ),
                                             blendMode = BlendMode.DstIn,
                                         )
+                                        // Kilau cahaya yang ikut berjalan di tepi sapuan,
+                                        // paling terang di tengah transisi.
+                                        val glint = 4f * dissolve.progress * (1f - dissolve.progress) *
+                                            0.35f * dissolve.punch
+                                        if (glint > 0.01f) {
+                                            val mid = start + feather * 0.5f
+                                            val half = feather * 0.28f
+                                            drawRect(
+                                                brush = Brush.horizontalGradient(
+                                                    colors = listOf(
+                                                        Color.Transparent,
+                                                        Color.White.copy(alpha = glint),
+                                                        Color.Transparent,
+                                                    ),
+                                                    startX = mid - half,
+                                                    endX = mid + half,
+                                                ),
+                                                blendMode = BlendMode.Plus,
+                                            )
+                                        }
                                     },
                             )
 
