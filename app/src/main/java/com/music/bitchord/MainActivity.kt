@@ -585,13 +585,6 @@ private fun BitChordApp(
         )
     }
     playerSheetMotion.windowInfo = LocalWindowInfo.current
-    // Whether a portrait player fully up has the page covered. Derived, so the
-    // page's draw below hears when that flips rather than on every frame of the
-    // sheet's travel: read straight off the fraction, each of those frames
-    // redrew the page's whole window behind the player, glass and blurs and all.
-    val coveredByPlayer by remember {
-        derivedStateOf { showNowPlaying && playerDock.attached && playerDock.openFraction() >= 1f }
-    }
     // "Reduce animation" keeps the player as it always was: M3's own slide up
     // and down, its own scrim and window animations, no pull from the mini
     // player and no artwork flying between the two. Everything below that
@@ -2757,18 +2750,7 @@ private fun BitChordApp(
     Box(
         Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            // Nothing of the page under a portrait player that is fully up:
-            // that player is its own window, opaque from edge to edge, and
-            // this one drawing on behind it — the page, the glass bar and the
-            // blurs that sample it, a now-playing row's bars — is GPU time
-            // taken from the player on every frame for nothing anyone can see.
-            // The same test the player's own dim skips itself on. Composition
-            // and layout carry on, so the page is current the moment the
-            // player starts to come down and this draws again.
-            .drawWithContent {
-                if (!coveredByPlayer) drawContent()
-            },
+            .background(MaterialTheme.colorScheme.background),
     ) {
         // A pushed page replaces the tab content but leaves the tab bar and
         // mini player in place.
