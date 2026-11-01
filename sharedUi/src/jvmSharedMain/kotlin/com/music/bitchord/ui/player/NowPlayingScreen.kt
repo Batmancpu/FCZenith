@@ -622,6 +622,8 @@ fun landscapePlayerAvailable(windowWidth: Dp, windowHeight: Dp): Boolean =
 private const val LYRICS_CONTROLS_IDLE_MS = 5_000L
 /** Default Spotify Canvas delay before its optional automatic collapse. */
 private const val SPOTIFY_CANVAS_CONTROLS_IDLE_MS = 5_000L
+/** Sisa durasi lagu saat kontrol canvas Spotify dipaksa muncul dan dikunci terbuka. */
+private const val SPOTIFY_CANVAS_END_REVEAL_MS = 12_000L
 /** One shared travel time keeps the deck, credits and stats moving as a unit. */
 private const val SPOTIFY_CANVAS_CONTROLS_ANIMATION_MS = 420
 /** The deck's fade back in on returning from lyrics or the queue. */
@@ -1473,6 +1475,18 @@ fun NowPlayingScreen(
     val clipPortrait = !clipFullscreen &&
         heroClipMounted != null && canvasAspect > 0f && canvasAspect < 1f
 
+    // Lagu hampir habis. Derived: layar ini hanya recompose saat nilainya
+    // berganti, bukan tiap tick posisi.
+    val endingSoon by remember(durationMs) {
+        derivedStateOf {
+            durationMs > 0L && durationMs - position.positionMs <= SPOTIFY_CANVAS_END_REVEAL_MS
+        }
+    }
+    // Pergantian lagu sedang atau akan terjadi: mix Automix, crossfade biasa
+    // (yang sengaja tidak menyalakan smartMixInProgress), atau akhir lagu.
+    // Selama itu kontrol dipaksa muncul, tidak bisa disembunyikan, dan timer
+    // auto-hide tidak berjalan.
+    val transitionHold = mixing || crossfading || endingSoon
     // The setting defaults on, restoring the five-second stand-down, but the
     // listener can keep the deck open indefinitely from Spotify integration.
     // Pausing or interacting with a continuous control suspends the countdown;
@@ -1486,11 +1500,11 @@ fun NowPlayingScreen(
         volume.dragging,
         lyricsOpen,
         queueOpen,
-        mixing,
+        transitionHold,
     ) {
         if (!spotifyCanvasPresentation || !spotifyCanvasControlsOpen ||
             !spotifyCanvasAutoHide || !isPlaying || scrub.scrubbing || volume.dragging ||
-            lyricsOpen || queueOpen || mixing
+            lyricsOpen || queueOpen || transitionHold
         ) return@LaunchedEffect
         delay(SPOTIFY_CANVAS_CONTROLS_IDLE_MS)
         spotifyCanvasControlsOpen = false
@@ -1506,8 +1520,8 @@ fun NowPlayingScreen(
     // A transition can begin while Canvas is standing alone. Restore and pin
     // the compact deck so both the outgoing and incoming song are identified;
     // normal tap/idle collapsing resumes as soon as the mix finishes.
-    LaunchedEffect(spotifyCanvasPresentation, mixing) {
-        if (spotifyCanvasPresentation && mixing) spotifyCanvasControlsOpen = true
+    LaunchedEffect(spotifyCanvasPresentation, transitionHold) {
+        if (spotifyCanvasPresentation && transitionHold) spotifyCanvasControlsOpen = true
     }
     // Whether the banner is the presentation at all: full-bleed is on, and there
     // is something to blow out. The collapse is deliberately *not* part of this:
@@ -2654,7 +2668,7 @@ fun NowPlayingScreen(
                         // the compact metadata row consume their own taps first; empty
                         // video above or below them toggles the lower deck either way.
                         .toggleSpotifyCanvasControlsOnTap(
-                            enabled = spotifyCanvasPresentation && !mixing,
+                            enabled = spotifyCanvasPresentation && !transitionHold,
                             onToggle = { spotifyCanvasControlsOpen = !spotifyCanvasControlsOpen },
                         )
                         .then(skipSwipeGesture),
@@ -4088,7 +4102,7 @@ fun NowPlayingScreen(
                         visible = !lyricPicker.picking &&
                             (!lyricsOpen || lyricsControlsOpen) &&
                             (!queueOpen || queueControlsOpen) &&
-                            (!spotifyCanvasPresentation || spotifyCanvasControlsOpen || mixing),
+                            (!spotifyCanvasPresentation || spotifyCanvasControlsOpen || transitionHold),
                         reveal = playerDeckReveal,
                         // Back to the main player from lyrics or the queue with the
                         // deck stood down: the sleeve is about to come back out, so
