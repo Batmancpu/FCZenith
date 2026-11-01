@@ -2,8 +2,17 @@ package com.music.bitchord.ui.theme
 
 import android.app.Activity
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.LocalTextSelectionColors
+import androidx.compose.foundation.text.selection.TextSelectionColors
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LocalRippleConfiguration
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.unit.dp
+import com.music.bitchord.ui.components.continuous
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
@@ -29,25 +38,82 @@ val AppleRed = Color(0xFFFA243C)
 private val DarkColors = darkColorScheme(
     primary = AppleRed,
     onPrimary = Color.White,
+    primaryContainer = Color(0xFF3A1217),
+    onPrimaryContainer = Color(0xFFFFD9DD),
+    secondary = Color(0xFF98989F),
+    onSecondary = Color.White,
+    secondaryContainer = Color(0xFF2C2C2E),
+    onSecondaryContainer = Color.White,
+    tertiary = Color(0xFF0A84FF),
+    onTertiary = Color.White,
     background = Color.Black,
     onBackground = Color.White,
     surface = Color(0xFF0D0D0F),
     onSurface = Color.White,
     surfaceVariant = Color(0xFF1C1C1E),
     onSurfaceVariant = Color(0xFF8E8E93),
+    surfaceContainerLowest = Color.Black,
+    surfaceContainerLow = Color(0xFF111113),
+    surfaceContainer = Color(0xFF1C1C1E),
+    surfaceContainerHigh = Color(0xFF2C2C2E),
+    surfaceContainerHighest = Color(0xFF3A3A3C),
     outline = Color(0xFF2C2C2E),
+    outlineVariant = Color(0xFF38383A),
+    error = Color(0xFFFF453A),
+    onError = Color.White,
+    inverseSurface = Color(0xFFF2F2F7),
+    inverseOnSurface = Color.Black,
+    scrim = Color.Black,
 )
 
 private val LightColors = lightColorScheme(
     primary = AppleRed,
     onPrimary = Color.White,
+    primaryContainer = Color(0xFFFFE3E6),
+    onPrimaryContainer = Color(0xFF5C0A14),
+    secondary = Color(0xFF6E6E73),
+    onSecondary = Color.White,
+    secondaryContainer = Color(0xFFE5E5EA),
+    onSecondaryContainer = Color.Black,
+    tertiary = Color(0xFF007AFF),
+    onTertiary = Color.White,
     background = Color.White,
     onBackground = Color.Black,
     surface = Color(0xFFF7F7F9),
     onSurface = Color.Black,
     surfaceVariant = Color(0xFFF2F2F7),
     onSurfaceVariant = Color(0xFF6E6E73),
+    surfaceContainerLowest = Color.White,
+    surfaceContainerLow = Color(0xFFF9F9FB),
+    surfaceContainer = Color(0xFFF2F2F7),
+    surfaceContainerHigh = Color(0xFFE5E5EA),
+    surfaceContainerHighest = Color(0xFFD1D1D6),
     outline = Color(0xFFE5E5EA),
+    outlineVariant = Color(0xFFC6C6C8),
+    error = Color(0xFFFF3B30),
+    onError = Color.White,
+    inverseSurface = Color(0xFF1C1C1E),
+    inverseOnSurface = Color.White,
+    scrim = Color.Black,
+)
+
+/**
+ * Corner radii for everything Material draws on its own (dialogs, sheets, menus,
+ * text fields, chips), cut as Apple's continuous squircle rather than a circular
+ * arc, so these surfaces match the glass bars and cards already drawn that way.
+ */
+private val AppleShapes = Shapes(
+    extraSmall = RoundedCornerShape(8.dp).continuous(),
+    small = RoundedCornerShape(12.dp).continuous(),
+    medium = RoundedCornerShape(16.dp).continuous(),
+    large = RoundedCornerShape(20.dp).continuous(),
+    extraLarge = RoundedCornerShape(28.dp).continuous(),
+)
+
+/** Cursor, handles and selection wash in the accent, as Apple Music sets them. */
+private val AppleSelectionColors = TextSelectionColors(
+    handleColor = AppleRed,
+    backgroundColor = AppleRed.copy(alpha = 0.3f),
 )
 
 /**
@@ -141,6 +207,7 @@ private fun Typography.withFamily(family: FontFamily) = Typography(
     labelSmall = labelSmall.copy(fontFamily = family),
 )
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BitChordTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
@@ -153,8 +220,17 @@ fun BitChordTheme(
             AppFont.DEFAULT -> BitChordTypography
             AppFont.LEGACY -> LegacyTypography
         },
-        content = content,
-    )
+        shapes = AppleShapes,
+    ) {
+        // iOS draws no Material ripple. Null switches off the one the remaining
+        // Material buttons and menu rows still carried; the app's own controls
+        // already pass indication = null and keep their own press behaviour.
+        CompositionLocalProvider(
+            LocalRippleConfiguration provides null,
+            LocalTextSelectionColors provides AppleSelectionColors,
+            content = content,
+        )
+    }
 }
 
 /**
