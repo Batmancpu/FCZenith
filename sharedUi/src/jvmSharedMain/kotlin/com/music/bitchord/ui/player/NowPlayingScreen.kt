@@ -1368,6 +1368,7 @@ fun NowPlayingScreen(
     // never fires again. Keyed on the cover there is nothing to reset: the
     // bitmap really is still loaded, so the state stays true.
     val art = rememberPlayerArtwork(remoteArt)
+    val dissolve = rememberArtworkDissolve(art, mixing)
     // Sticky, unlike [PlayerArtwork.loaded]: the banner is the shape of the player rather
     // than a property of the track in it. Waiting on each new cover would
     // collapse the banner into a card and blow it back out on every skip —
@@ -3373,6 +3374,13 @@ fun NowPlayingScreen(
                                 // [PlayerArtwork.loaded] still flips the moment it does.
                                 modifier = Modifier
                                     .fillMaxSize()
+                                    // Cover baru mengendap ke ukuran normal selagi
+                                    // cover lama memudar di atasnya.
+                                    .graphicsLayer {
+                                        val settle = 1f + 0.05f * (1f - dissolve.progress)
+                                        scaleX = settle
+                                        scaleY = settle
+                                    }
                                     .drawWithContent {
                                         val frame = still()
                                         if (frame == null) {
@@ -3402,6 +3410,19 @@ fun NowPlayingScreen(
                                         }
                                     },
                             )
+
+                            // Cover sebelumnya, memudar di atas cover baru: cross
+                            // dissolve ala iOS, bukan potongan langsung.
+                            dissolve.outgoing?.let { old ->
+                                AsyncImage(
+                                    model = old.request,
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .graphicsLayer { alpha = 1f - dissolve.progress },
+                                )
+                            }
 
                             // Where the clip plays when it can't have the banner:
                             // inside the same clip as the still art, taking the

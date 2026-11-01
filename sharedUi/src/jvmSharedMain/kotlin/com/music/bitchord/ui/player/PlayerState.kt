@@ -32,6 +32,9 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
+import androidx.compose.animation.core.animate
+import androidx.compose.runtime.rememberUpdatedState
 
 /**
  * The looping clip some releases publish alongside their cover, for [song], or
@@ -183,6 +186,71 @@ internal fun rememberPlayerArtwork(remoteArt: String?): PlayerArtwork {
     }
     return art
 }
+
+/**
+ * Dissolve dari cover yang tadi tampil ke cover penggantinya.
+ *
+ * Tanpa ini sleeve langsung berganti (cut) begitu model gambar berubah, jadi
+ * mix yang sudah mengalir mulus antar lagu berakhir dengan gambar yang
+ * "loncat". [outgoing] dipertahankan di atas cover baru lalu dipudarkan oleh
+ * [progress] (0 = masih cover lama, 1 = tinggal cover baru).
+ */
+@Stable
+internal class ArtworkDissolve(first: PlayerArtwork) {
+    private var current: PlayerArtwork = first
+
+    /** Cover yang sedang dipudarkan, atau null kalau tidak ada. */
+    var outgoing by mutableStateOf<PlayerArtwork?>(null)
+        private set
+
+    /** 0f saat cover lama masih utuh, 1f saat hanya cover baru yang tersisa. */
+    var progress by mutableFloatStateOf(1f)
+
+    internal fun retarget(next: PlayerArtwork, enabled: Boolean) {
+        val old = current
+        if (old === next) return
+        current = next
+        if (enabled && old.url != null && next.url != null) {
+            outgoing = old
+            progress = 0f
+        } else {
+            outgoing = null
+            progress = 1f
+        }
+    }
+
+    internal fun finish() {
+        progress = 1f
+        outgoing = null
+    }
+}
+
+@Composable
+internal fun rememberArtworkDissolve(art: PlayerArtwork, mixing: Boolean): ArtworkDissolve {
+    val reduceAnimation by PlayerSettings.reduceAnimation.collectAsStateWithLifecycle()
+    val dissolve = remember { ArtworkDissolve(art) }
+    // Dilakukan saat komposisi, sebelum sleeve membacanya: frame pertama cover
+    // baru harus sudah punya cover lama di atasnya, kalau tidak frame itu
+    // adalah cut-nya.
+    remember(art) { dissolve.retarget(art, enabled = !reduceAnimation) }
+    val mixingNow by rememberUpdatedState(mixing)
+    LaunchedEffect(art) {
+        if (dissolve.outgoing == null) return@LaunchedEffect
+        // Cover baru harus sudah ada untuk dijadikan tujuan dissolve; cover
+        // yang tidak kunjung datang ditinggalkan, bukan ditutupi yang lama.
+        withTimeoutOrNull(ART_DISSOLVE_WAIT_MS) { snapshotFlow { art.loaded }.first { it } }
+        val duration = if (mixingNow) MIX_DISSOLVE_MS else SKIP_DISSOLVE_MS
+        animate(0f, 1f, animationSpec = tween(duration, easing = FastOutSlowInEasing)) { value, _ ->
+            dissolve.progress = value
+        }
+        dissolve.finish()
+    }
+    return dissolve
+}
+
+private const val ART_DISSOLVE_WAIT_MS = 2_500L
+private const val MIX_DISSOLVE_MS = 1_400
+private const val SKIP_DISSOLVE_MS = 380
 
 /**
  * The seek bar's own state: a drag in progress, and where the handle was
