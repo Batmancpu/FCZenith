@@ -478,6 +478,8 @@ private class DockFrame {
     var host: LayoutCoordinates? = null
     /** The landscape sleeve, as last placed. */
     var landscapeArt: LayoutCoordinates? = null
+    /** The title and artist block, as last placed — it flies to the mini row's text. */
+    var credits: LayoutCoordinates? = null
 }
 
 /**
@@ -1712,7 +1714,10 @@ fun NowPlayingScreen(
         // sheet's window may not have drawn anything, and the mini player's
         // cover is the only artwork on screen.
         DisposableEffect(dock) {
-            onDispose { dock.attached = false }
+            onDispose {
+                dock.attached = false
+                dock.creditsDocking = false
+            }
         }
     }
     val dockFrame = remember { DockFrame() }
@@ -1806,6 +1811,9 @@ fun NowPlayingScreen(
     val onClipResumed: () -> Unit = { CanvasStills.fresh = false }
     // The sleeve, drawn over the faded player while it docks — see the sleeve.
     val sleeveLayer = rememberGraphicsLayer()
+    // The title and artist, recorded while docking so they can be drawn as one
+    // piece flying to the mini row's text, outside the player's fade.
+    val creditsLayer = rememberGraphicsLayer()
 
     // The player's own end of the docking, for whichever shape it takes: where
     // it sits on screen, the fade, and the artwork drawn over that fade.
@@ -1846,6 +1854,25 @@ fun NowPlayingScreen(
                 translate(dockFrame.portalLeft, dockFrame.portalTop) {
                     val portalScale = dockFrame.portalScale
                     scale(portalScale, portalScale, pivot = Offset.Zero) { drawLayer(sleeveLayer) }
+                }
+                val creditsAt = dockFrame.credits?.takeIf { it.isAttached }
+                val hostAt = dockFrame.host?.takeIf { it.isAttached }
+                val miniText = dock?.miniTextOnScreen()
+                if (
+                    creditsAt != null && hostAt != null && miniText != null &&
+                    creditsLayer.size.width > 0 && creditsAt.size.height > 0
+                ) {
+                    val t = dockT()
+                    val target = miniText.topLeft - hostAt.positionOnScreen()
+                    val source = hostAt.localPositionOf(creditsAt, Offset.Zero)
+                    val end = miniText.height / creditsAt.size.height
+                    val s = end + (1f - end) * t
+                    translate(
+                        target.x + (source.x - target.x) * t,
+                        target.y + (source.y - target.y) * t,
+                    ) {
+                        scale(s, s, pivot = Offset.Zero) { drawLayer(creditsLayer) }
+                    }
                 }
             }
         }
@@ -3535,6 +3562,19 @@ fun NowPlayingScreen(
                                         scaleX = scale
                                         scaleY = scale
                                         transformOrigin = TransformOrigin(0f, 0.5f)
+                                    }
+                                    .onGloballyPositioned {
+                                        dockFrame.credits = it
+                                        if (dock != null && !dock.creditsDocking) dock.creditsDocking = true
+                                    }
+                                    // While docking, drawn by the player's own draw as
+                                    // one piece with the cover, not here in the fade.
+                                    .drawWithContent {
+                                        if (docking()) {
+                                            creditsLayer.record { this@drawWithContent.drawContent() }
+                                        } else {
+                                            drawContent()
+                                        }
                                     },
                             ) {
                                 // Only the title's own overflow gates the artist's stagger

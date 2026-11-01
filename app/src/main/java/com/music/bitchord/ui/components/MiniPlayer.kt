@@ -360,7 +360,7 @@ internal fun Modifier.playerDockPill(dock: PlayerDock?): Modifier {
         }
         // The player's panel is standing where this pill is: it is one surface
         // with it, so the pill stands aside rather than show under it.
-        .graphicsLayer { alpha = if (dock.panelShown) 0f else 1f }
+        .graphicsLayer { alpha = if (dock.panelShown) 1f - dock.panelFill() else 1f }
 }
 
 /** The mini player's cover for a music video: 16:9 at the cover's 40dp height. */

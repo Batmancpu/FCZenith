@@ -98,6 +98,27 @@ class PlayerDock {
 
     internal fun miniArtCorner(): Dp = miniArtCorner
 
+    // ---- The player's title and artist fly into the mini row's text ----
+    private var miniTextRel: Rect? = null
+
+    /** Whether the player's credits are on screen to take over the mini row's text. */
+    var creditsDocking by mutableStateOf(false)
+        internal set
+
+    /** From the panel's mini row: its text, relative to the row's own corner. */
+    fun reportMiniText(rect: Rect) {
+        miniTextRel = rect
+    }
+
+    fun hasMiniText(): Boolean = miniTextRel != null && miniPill?.isAttached == true
+
+    /** The mini row's text where the pill stands on screen, or null with no pill. */
+    internal fun miniTextOnScreen(): Rect? {
+        val rel = miniTextRel ?: return null
+        val pill = miniPill?.takeIf { it.isAttached } ?: return null
+        return rel.translate(pill.localToScreen(Offset.Zero))
+    }
+
     // ---- Morph: the mini player's pill and the full player are ONE surface ----
     // The pill's rect (at rest, without the pull lift) is where the player
     // starts and ends; the player is clipped to a rounded rect that grows from
@@ -208,6 +229,9 @@ class PlayerDock {
         return Rect(left, offset, right.coerceAtLeast(left + 1f), bottom.coerceAtLeast(offset + 1f))
     }
 
+    /** 0 on the pill, 1 once the plain panel has fully taken its place. */
+    fun panelFill(): Float = (openFraction() / PANEL_FILL_UNTIL).coerceIn(0f, 1f)
+
     /** The panel's corner radius this frame: the pill's, rounding off to square. */
     fun panelCornerPx(): Float {
         val pill = miniPillInWindow() ?: return 0f
@@ -250,6 +274,9 @@ class PlayerDock {
 
 /** The [PlayerDock] around the player, if its host has a mini player to dock into. */
 val LocalPlayerDock = staticCompositionLocalOf<PlayerDock?> { null }
+
+/** The share of the opening over which the pill gives way to the plain panel. */
+private const val PANEL_FILL_UNTIL = 0.12f
 
 internal class PlayerMorph(val rect: Rect, val corner: Float, val progress: Float)
 

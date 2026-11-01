@@ -45,6 +45,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
@@ -136,10 +137,18 @@ fun PlayerPanel(
         derivedStateOf { dock != null && dock.openFraction() < MINI_ROW_UNTIL }
     }
     val glassOn = LocalLiquidGlassEnabled.current && isGlassSupported()
-    val surface = when {
-        dock == null || covered -> Modifier
-        glassOn -> Modifier.liquidGlass(shape)
-        else -> Modifier.background(PanelFallbackFill, shape)
+    // A plain panel, not liquid glass: it fades in over the pill's first
+    // stretch of travel (see [PlayerDock.panelFill]) and costs no blur.
+    val surface = if (dock == null || covered) {
+        Modifier
+    } else {
+        Modifier.drawBehind {
+            drawRoundRect(
+                color = PanelFallbackFill,
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(dock.panelCornerPx()),
+                alpha = dock.panelFill(),
+            )
+        }
     }
 
     Box(
@@ -170,7 +179,14 @@ fun PlayerPanel(
                 Box(
                     (if (dock != null) Modifier.windowSized(dock) { full } else Modifier.fillMaxSize())
                         .graphicsLayer {
-                            alpha = if (dock == null) 1f else (dock.openFraction() / MINI_ROW_UNTIL).coerceIn(0f, 1f)
+                            // Once the player takes part in the docking it fades
+                            // itself (and flies its cover, title and artist
+                            // outside that fade), so the panel must not.
+                            alpha = if (dock == null || dock.attached) {
+                                1f
+                            } else {
+                                (dock.openFraction() / MINI_ROW_UNTIL).coerceIn(0f, 1f)
+                            }
                         },
                 ) { content() }
                 if (dock != null && miniVisible) {
@@ -182,6 +198,7 @@ fun PlayerPanel(
                     // skip button; the row does the same.
                     val showNext = pill == null || pill.width > windowWidth * 0.8f
                     PanelMiniRow(
+                        dock = dock,
                         song = song,
                         isPlaying = isPlaying,
                         isLoading = isLoading,
@@ -251,8 +268,10 @@ private fun PanelMiniRow(
     onPrevious: () -> Unit,
     motion: PlayerSheetMotion?,
     modifier: Modifier,
+    dock: PlayerDock? = null,
 ) {
     val haptics = rememberHaptics()
+    val rowPlaced = remember { arrayOfNulls<LayoutCoordinates>(1) }
     val contentColor = glassContentColor()
     val secondary = contentColor.copy(alpha = 0.7f)
     val titleStyle = MaterialTheme.typography.titleMedium.copy(
@@ -266,6 +285,7 @@ private fun PanelMiniRow(
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
+            .onGloballyPositioned { rowPlaced[0] = it }
             .miniPlayerGestures(
                 pull = motion,
                 onNext = {
@@ -295,6 +315,9 @@ private fun PanelMiniRow(
             Box(
                 Modifier
                     .size(width = artWidth, height = MINI_ART_SIZE)
+                    // The player's own cover is the one that flies; this one
+                    // stands aside as soon as it does.
+                    .graphicsLayer { alpha = if (dock != null && dock.coversMiniArt) 0f else 1f }
                     .clip(RoundedCornerShape(MINI_ART_CORNER))
                     .background(MaterialTheme.colorScheme.surfaceVariant),
             ) {
@@ -306,7 +329,25 @@ private fun PanelMiniRow(
                 )
             }
             Spacer(Modifier.width(if (showNext) 9.dp else 8.dp))
-            Column(Modifier.weight(1f)) {
+            Column(
+                Modifier
+                    .weight(1f)
+                    .onGloballyPositioned { c ->
+                        val row = rowPlaced[0]
+                        if (dock != null && row != null && row.isAttached && c.isAttached) {
+                            dock.reportMiniText(
+                                androidx.compose.ui.geometry.Rect(
+                                    row.localPositionOf(c, Offset.Zero),
+                                    Size(c.size.width.toFloat(), c.size.height.toFloat()),
+                                ),
+                            )
+                        }
+                    }
+                    // The player's title and artist fly here instead.
+                    .graphicsLayer {
+                        alpha = if (dock != null && dock.attached && dock.creditsDocking && dock.hasMiniText()) 0f else 1f
+                    },
+            ) {
                 ExplicitSongTitle(
                     song = song,
                     style = titleStyle,
