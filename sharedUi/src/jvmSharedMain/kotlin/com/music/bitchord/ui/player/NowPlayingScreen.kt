@@ -2671,7 +2671,9 @@ fun NowPlayingScreen(
                                         // Frame layar penuh, digeser naik supaya bagian
                                         // bawahnya jatuh persis di atas wilayah kaca.
                                         val extra = size.height / SPOTIFY_DECK_HEIGHT_FRACTION - size.height
-                                        inset(top = -extra) { drawCropped(grabbed) }
+                                        inset(left = 0f, top = -extra, right = 0f, bottom = 0f) {
+                                            drawCropped(grabbed)
+                                        }
                                         drawRect(
                                             brush = Brush.verticalGradient(
                                                 0.00f to Color.Transparent,
