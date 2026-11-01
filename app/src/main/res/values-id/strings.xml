@@ -1393,7 +1393,7 @@
     <string name="show_listen_together_button">Tampilkan tombol Dengar bersama</string>
     <string name="listen_together_tab">Jam</string>
     <string name="show_listen_together_tab">Tampilkan tab Dengar bersama</string>
-    <string name="show_listen_together_tab_subtitle">Menambahkan tab Jam di bilah navigasi, sebelum Search</string>
+    <string name="show_listen_together_tab_subtitle">Menambahkan tab Jam di bilah navigasi, di kanan Explore</string>
     <string name="show_listen_together_button_subtitle">Jika nonaktif, pemutar hanya menampilkan tombol output audio di antara lirik dan antrean</string>
     <string name="font">Font</string>
     <string name="font_default">Default</string>

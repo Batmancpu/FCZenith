@@ -1313,8 +1313,8 @@ private fun BitChordApp(
     // The bars draw this list; [tabs] stays the four fixed pages (titles and
     // TAB_* indexes read it). Listen Together is not a page of its own — its
     // tab opens AppRoute.ListenTogether over the current tab — and is slotted
-    // in before Search, which has to stay last: GlassNavBar draws the final
-    // tab as its standalone circle.
+    // in right after Explore. Search still has to stay last: GlassNavBar
+    // draws the final tab as its standalone circle.
     val listenTogetherTab by AppSettings.showListenTogetherTab.collectAsStateWithLifecycle()
     val listenTogetherTabLabel = stringResource(R.string.listen_together_tab)
     val barTabs = remember(tabs, listenTogetherTab, listenTogetherTabLabel) {
@@ -1322,7 +1322,7 @@ private fun BitChordApp(
             tabs
         } else {
             tabs.toMutableList().apply {
-                add(TAB_SEARCH, BottomTab(listenTogetherTabLabel, Icons.Rounded.Groups))
+                add(TAB_LIBRARY, BottomTab(listenTogetherTabLabel, Icons.Rounded.Groups))
             }
         }
     }
@@ -4112,16 +4112,17 @@ private fun BitChordApp(
                 // A tab is a fresh start: everything pushed over the old one —
                 // routes and release pages alike — goes with it.
                 // The bar's position of the highlighted tab. With the Listen
-                // Together tab on, it sits at TAB_SEARCH and Search moves one
-                // place right; it is lit whenever its page is the one showing.
+                // Together tab on, it sits at TAB_LIBRARY (right of Explore)
+                // and Library and Search each move one place right; it is lit
+                // whenever its page is the one showing.
                 val selectedBarIndex = when {
                     !listenTogetherTab -> selectedTab
-                    route == AppRoute.ListenTogether -> TAB_SEARCH
-                    selectedTab == TAB_SEARCH -> TAB_SEARCH + 1
+                    route == AppRoute.ListenTogether -> TAB_LIBRARY
+                    selectedTab >= TAB_LIBRARY -> selectedTab + 1
                     else -> selectedTab
                 }
                 val onTabSelected: (Int) -> Unit = tabSelected@{ barIndex ->
-                    if (listenTogetherTab && barIndex == TAB_SEARCH) {
+                    if (listenTogetherTab && barIndex == TAB_LIBRARY) {
                         if (route != AppRoute.ListenTogether) {
                             navigator.clear()
                             viewModel.closeMoodGenre()
@@ -4129,7 +4130,7 @@ private fun BitChordApp(
                         }
                         return@tabSelected
                     }
-                    val index = if (listenTogetherTab && barIndex > TAB_SEARCH) barIndex - 1 else barIndex
+                    val index = if (listenTogetherTab && barIndex > TAB_LIBRARY) barIndex - 1 else barIndex
                     navigator.clear()
                     viewModel.closeMoodGenre()
                     selectedTab = index
