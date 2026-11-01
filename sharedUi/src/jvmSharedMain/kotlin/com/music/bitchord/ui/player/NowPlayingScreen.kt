@@ -431,6 +431,14 @@ private const val DOCK_FADE_FULL = 0.6f
 private const val DOCK_FADE_FLOOR = 1f / 255f
 
 /**
+ * Selama terbang dari/ke mini player, cover menuju kartu sampul di tengah, bukan
+ * rect banner full-bleed yang menempel di pojok kiri-atas sheet (itu yang membuat
+ * posisinya terasa terlalu ke atas). Banner baru mekar dari kartu setelah titik
+ * ini, di ujung perjalanan.
+ */
+private const val DOCK_BANNER_FROM = 0.7f
+
+/**
  * Backdrop cover yang diburamkan baru mulai muncul setelah sleeve yang terbang
  * dari mini player melewati titik ini. Sebelumnya backdrop ikut memudar bersama
  * sheet dan terlihat sebagai salinan cover ukuran penuh di belakang cover kecil
@@ -3150,7 +3158,15 @@ fun NowPlayingScreen(
                                     // Stashed for the tile inside, which is measured
                                     // within this, and for the player's own draw.
                                     val mini = miniInBox()
-                                    val open = sleeveRect()
+                                    val open = sleeveRect().let { full ->
+                                        if (mini == null) {
+                                            full
+                                        } else {
+                                            val bloom = ((dockT() - DOCK_BANNER_FROM) / (1f - DOCK_BANNER_FROM))
+                                                .coerceIn(0f, 1f)
+                                            lerp(cardRect(), full, smootherStep(bloom))
+                                        }
+                                    }
                                     // Which way the sheet is going, from its last movement:
                                     // opening rides the sheet as it always did, closing keeps
                                     // to the straighter path (see [DOCK_RIDE_SHARE]).
