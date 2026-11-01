@@ -814,21 +814,105 @@ class CrossfadeController(
     // ---- Entry points -------------------------------------------------------
 
     /**
-     * A skip the listener asked for: drop any blend in flight and get out of
-     * the way.
-     *
-     * Crossfade is deliberately a property of tracks *running out*, not of
-     * being changed. Blending a manual skip means the song just left behind
-     * stays audible over the one that was asked for, which reads as the app
-     * ignoring the button rather than as a transition — the point of pressing
-     * next is usually to stop hearing the current track.
+     * A skip the listener asked for, when it is not being crossfaded (see
+     * [trySkipWithCrossfade]): drop any blend in flight and get out of the way.
      *
      * Called before the skip is carried out, so the outgoing track is already on
      * its way down as the new one starts, and the listener's own seek lands on a
      * player this class has finished with.
+     *
+     * A skip crossfade still waiting for its standby to buffer has not moved the
+     * queue yet, so that skip is carried out plainly here rather than lost.
      */
     fun onSkipRequested() {
+        if (manualFade && phase == Phase.ARMING) {
+            abandonManual()
+            return
+        }
         if (phase != Phase.IDLE) bail()
+    }
+
+    /**
+     * Whether the transition in flight is a crossfaded next/previous. Read by
+     * the service at the handoff, so the song that was skipped is not booked as
+     * one that ran to its end.
+     */
+    val skipFadeInFlight: Boolean get() = manualFade
+
+    /** The transition in flight (or arming) is a next/previous the listener pressed. */
+    private var manualFade = false
+
+    /** Direction of that skip, kept so it can still be carried out plainly if the blend never starts. */
+    private var manualForward = true
+
+    /**
+     * Carries out next ([forward]) or previous as a crossfade, when the setting
+     * is on and there is something to blend. Returns true when the skip has
+     * been taken over — the caller must then not move the queue itself — and
+     * false when the caller should skip plainly, as it always did.
+     *
+     * The incoming track is loaded on the standby exactly like an automatic
+     * transition, and the session moves to it as soon as it is audible, so the
+     * title and cover change at once while the old track fades out beneath.
+     * If the standby is not ready within [SKIP_ARM_TIMEOUT_MS] the skip is
+     * carried out plainly, see [driveManualArming].
+     */
+    fun trySkipWithCrossfade(forward: Boolean): Boolean {
+        if (phase != Phase.IDLE) {
+            onSkipRequested()
+            return false
+        }
+        if (!AppSettings.crossfadeOnSkip.value) return false
+        if (versionSwapActive() || ListenTogether.state.value.inParty) return false
+        if (BitPerfectOutput.status.value.active) return false
+        val out = active()
+        if (!out.isPlaying) return false
+        val target = if (forward) {
+            out.nextMediaItemIndex
+        } else {
+            // Past the restart threshold back means "start this track again",
+            // which is not a track change and has nothing to blend.
+            if (out.currentPosition > out.maxSeekToPreviousPosition) return false
+            out.previousMediaItemIndex
+        }
+        if (target == C.INDEX_UNSET) return false
+        val duration = out.duration
+        if (duration == C.TIME_UNSET || duration <= 0L) return false
+        val left = duration - out.currentPosition
+        val fade = minOf(skipFadeMs(), left / 2, duration / 3)
+        if (fade < SKIP_FADE_MIN_MS) return false
+        if (!begin(fade = fade, endMs = out.currentPosition + fade, smart = false, targetIndex = target)) {
+            return false
+        }
+        manualFade = true
+        manualForward = forward
+        armDeadline = SystemClock.elapsedRealtime() + SKIP_ARM_TIMEOUT_MS
+        AppSettings.skipCrossfadeMs.value = fade
+        return true
+    }
+
+    /** How long a next/previous crossfade lasts: the listener's crossfade length, kept short, or a default. */
+    private fun skipFadeMs(): Long {
+        val configured = configuredFadeMs()
+        return if (configured > 0L) minOf(configured, SKIP_FADE_MAX_MS) else SKIP_FADE_DEFAULT_MS
+    }
+
+    /** Waits for the standby to be ready, then starts the blend. Gives up into a plain skip. */
+    private fun driveManualArming() {
+        val out = outgoing ?: return abandonManual()
+        val into = incoming ?: return abandonManual()
+        val ready = into.playbackState == Player.STATE_READY
+        if (!AppSettings.crossfadeOnSkip.value || !out.playWhenReady) return abandonManual()
+        if (!ready && SystemClock.elapsedRealtime() > armDeadline) return abandonManual()
+        if (ready) startFade()
+    }
+
+    /** The skip crossfade never began: drop the standby and move the queue the plain way. */
+    private fun abandonManual() {
+        val forward = manualForward
+        finish()
+        val player = active()
+        if (forward) player.seekToNextMediaItem() else player.seekToPreviousMediaItem()
     }
 
     // ---- Ticker -------------------------------------------------------------
@@ -1407,11 +1491,13 @@ class CrossfadeController(
         beatMs: Long = 0L,
         renderStyle: Render = Render(),
         plan: TransitionPlan? = null,
+        /** The queue index to blend into; unset means the next one, as an automatic transition does. */
+        targetIndex: Int = C.INDEX_UNSET,
     ): Boolean {
         val out = active()
         val into = standby()
         if (out === into) return false
-        val nextIndex = out.nextMediaItemIndex
+        val nextIndex = if (targetIndex != C.INDEX_UNSET) targetIndex else out.nextMediaItemIndex
         if (nextIndex == C.INDEX_UNSET) return false
         // The last blend's stretch, if it is somehow still easing off: this
         // player is about to be the outgoing side of a new one.
@@ -1603,6 +1689,7 @@ class CrossfadeController(
      * this is only ever waiting on a buffer.
      */
     private fun driveArming() {
+        if (manualFade) return driveManualArming()
         val out = outgoing ?: return bail()
         val into = incoming ?: return bail()
         if (!stillWorthFading()) return bail()
@@ -1832,7 +1919,10 @@ class CrossfadeController(
         // from under it: until the handoff its queue still runs on past the
         // track, and reaching the end would start the next item — the very
         // song fading in — a second time on the player that is leaving.
-        if (!handedOff && (progress >= render.handoffAt || (outRemaining != null && outRemaining <= HANDOFF_GUARD_MS))) {
+        // A skip crossfade hands off at once: the listener asked for the new
+        // track, so the title, cover and notification move to it immediately
+        // while the old one fades out underneath.
+        if (!handedOff && (manualFade || progress >= render.handoffAt || (outRemaining != null && outRemaining <= HANDOFF_GUARD_MS))) {
             handOff(out, player)
         }
         publishBlend(out, player)
@@ -1846,10 +1936,10 @@ class CrossfadeController(
         // setting that actually started it — a Automix normally runs with
         // [configuredFadeMs] at zero, and reading that as "turned off" would
         // end every Automix on its first tick.
-        val settingSwitchedOff = if (smartFadeActive) {
-            !AppSettings.smartFadeEnabled.value
-        } else {
-            configuredFadeMs() <= 0L
+        val settingSwitchedOff = when {
+            manualFade -> !AppSettings.crossfadeOnSkip.value
+            smartFadeActive -> !AppSettings.smartFadeEnabled.value
+            else -> configuredFadeMs() <= 0L
         }
         // An echo out rings past the end of the blend, carried by the outgoing
         // player's own silenced audio, so that player is kept until its tail
@@ -2843,6 +2933,8 @@ class CrossfadeController(
         outgoing = null
         incoming = null
         handedOff = false
+        manualFade = false
+        AppSettings.skipCrossfadeMs.value = 0L
         outgoingItemIndex = C.INDEX_UNSET
         queuedItemCount = 0
         incomingCueTimeMs = 0L
@@ -2857,6 +2949,7 @@ class CrossfadeController(
 
     /** Still a next track, still playing, still switched on — by whichever setting armed this one. */
     private fun stillWorthFading(): Boolean {
+        if (manualFade) return AppSettings.crossfadeOnSkip.value
         val stillOn = if (smartFadeActive) AppSettings.smartFadeEnabled.value else configuredFadeMs() > 0L
         return stillOn && (outgoing ?: active()).hasNextMediaItem()
     }
@@ -3738,6 +3831,22 @@ class CrossfadeController(
          * a missed crossfade rather than a broken one.
          */
         const val ARM_TIMEOUT_MS = 12_000L
+
+        /** Length of a next/previous crossfade when the listener's own crossfade length is off. */
+        const val SKIP_FADE_DEFAULT_MS = 2_000L
+
+        /** A next/previous crossfade never runs longer than this, whatever the crossfade slider says. */
+        const val SKIP_FADE_MAX_MS = 5_000L
+
+        /** Below this a skip blend is just a click; skip plainly instead. */
+        const val SKIP_FADE_MIN_MS = 400L
+
+        /**
+         * How long a skip waits for the next track to be ready to blend into
+         * before moving the queue plainly. Short on purpose: unlike an
+         * automatic transition, someone is waiting on this button.
+         */
+        const val SKIP_ARM_TIMEOUT_MS = 1_800L
 
         /**
          * Where the outgoing low-pass sits the instant a filter ride begins.

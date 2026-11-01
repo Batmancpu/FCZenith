@@ -203,6 +203,8 @@
     <string name="blocking">Memblokir</string>
     <string name="crossfade">Crossfade</string>
     <string name="crossfade_subtitle">Memadukan satu trek ke trek berikutnya</string>
+    <string name="crossfade_on_skip">Crossfade saat next/prev</string>
+    <string name="crossfade_on_skip_subtitle">Lagu memudar ke lagu tujuan saat di-skip, cover ikut melebur dari gambar lama ke gambar baru</string>
     <string name="automix">Automix [BETA]</string>
     <string name="skip_silence">Lewati keheningan</string>
     <string name="skip_silence_subtitle">Memotong jeda lebih dari satu detik</string>

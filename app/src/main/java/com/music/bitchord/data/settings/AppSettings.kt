@@ -282,6 +282,20 @@ object AppSettings {
     val crossfadeSeconds = MutableStateFlow(0)
 
     /**
+     * Crossfade juga saat pendengar menekan next/previous: lagu yang ditinggalkan
+     * memudar sementara lagu tujuan naik, dan cover ikut melebur dari gambar
+     * terakhir ke gambar lagu baru. Berdiri sendiri, tidak bergantung pada
+     * [crossfadeSeconds] (kalau 0, skip memakai durasi bawaan).
+     */
+    val crossfadeOnSkip = MutableStateFlow(true)
+
+    /**
+     * Lama crossfade skip yang sedang berjalan, dalam ms; 0 selain saat itu.
+     * Dibaca player untuk menyamakan durasi dissolve cover dengan audionya.
+     */
+    val skipCrossfadeMs = MutableStateFlow(0L)
+
+    /**
      * Lets Automix's analyzer decide the transition's timing and length
      * from each track's tempo, energy and structure, replacing the fixed
      * [crossfadeSeconds] window rather than needing it set to anything first
@@ -961,6 +975,7 @@ object AppSettings {
         exportDownloads.value = prefs.getBoolean(KEY_EXPORT_DOWNLOADS, false)
         syncDownloadedPlaylists.value = prefs.getBoolean(KEY_SYNC_DOWNLOADED_PLAYLISTS, false)
         crossfadeSeconds.value = prefs.getInt(KEY_CROSSFADE, 0)
+        crossfadeOnSkip.value = prefs.getBoolean(KEY_CROSSFADE_ON_SKIP, true)
         smartFadeEnabled.value = prefs.getBoolean(KEY_SMART_FADE, false)
         automixPerformanceMode.value = runCatching {
             AutomixPerformanceMode.valueOf(
@@ -1269,6 +1284,11 @@ object AppSettings {
     fun setCrossfadeSeconds(value: Int) {
         crossfadeSeconds.value = value
         prefs.edit().putInt(KEY_CROSSFADE, value).apply()
+    }
+
+    fun setCrossfadeOnSkip(value: Boolean) {
+        crossfadeOnSkip.value = value
+        prefs.edit().putBoolean(KEY_CROSSFADE_ON_SKIP, value).apply()
     }
 
     fun setSmartFadeEnabled(value: Boolean) {
@@ -2210,6 +2230,7 @@ object AppSettings {
     private const val KEY_EXPORT_DOWNLOADS = "export_downloads"
     private const val KEY_SYNC_DOWNLOADED_PLAYLISTS = "sync_downloaded_playlists"
     private const val KEY_CROSSFADE = "crossfade_seconds"
+    private const val KEY_CROSSFADE_ON_SKIP = "crossfade_on_skip"
     private const val KEY_SMART_FADE = "smart_fade_enabled"
     private const val KEY_AUTOMIX_PERFORMANCE_MODE = "automix_performance_mode"
     private const val KEY_SKIP_SILENCE = "skip_silence"

@@ -931,6 +931,9 @@ fun NowPlayingScreen(
     val spotifyCanvasAutoHide by PlayerSettings.spotifyCanvasAutoHide.collectAsStateWithLifecycle()
     val mixing by PlayerSettings.smartMixInProgress.collectAsStateWithLifecycle()
     val crossfading by PlayerSettings.crossfadeRunning.collectAsStateWithLifecycle()
+    // Lama crossfade next/prev yang sedang berjalan: dissolve cover memakai
+    // durasi yang sama supaya gambar dan audio berganti bersamaan.
+    val skipCrossfadeMs by PlayerSettings.skipCrossfadeMs.collectAsStateWithLifecycle()
     // Begitu mix atau crossfade berjalan, clip animasi cover dipadamkan halus
     // sehingga yang tersisa adalah cover thumbnail; transisi ke cover lagu
     // berikutnya lalu berangkat dari gambar diam, bukan dari video yang masih
@@ -1420,6 +1423,7 @@ fun NowPlayingScreen(
         mixing = mixing || crossfading,
         clipShowing = canvas != null && canvasRendered && !mixing && !crossfading,
         queueIndex = queueIndex,
+        skipFadeMs = skipCrossfadeMs,
     )
     // Pegangan yang diisi clip canvas dengan pembaca frame hidupnya. Frame itu
     // diambil sesaat sebelum skip, lalu sleeve menganimasikannya keluar menuju

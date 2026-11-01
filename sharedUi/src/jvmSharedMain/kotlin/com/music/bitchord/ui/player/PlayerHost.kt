@@ -269,6 +269,8 @@ interface PlayerSettingsSource {
     val smartMixInProgress: StateFlow<Boolean>
     /** True selama transisi apa pun (crossfade biasa maupun Automix) sedang berjalan. */
     val crossfadeRunning: StateFlow<Boolean>
+    /** Lama crossfade next/prev yang sedang berjalan (ms), 0 bila tidak ada. */
+    val skipCrossfadeMs: StateFlow<Long>
     /** The Automix blend in flight, for the scrubber's beat glow; null between blends. */
     val smartMixBlend: StateFlow<MixBlend?>
     /** The Automix blend in flight laid out for the mix popup; null between blends. */

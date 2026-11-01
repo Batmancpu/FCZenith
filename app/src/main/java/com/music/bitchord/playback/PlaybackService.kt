@@ -3494,10 +3494,17 @@ class PlaybackService : MediaLibraryService() {
         // that callback is driven explicitly instead. Without this the crossfade
         // would silently stop scrobbling, stop writing history, stop honouring
         // "sleep after this song" and stop reading ahead.
+        // A crossfaded next/previous is a skip, not a song that ran out: it
+        // must not be scrobbled or written to history as a full listen.
+        val skipped = crossfade?.skipFadeInFlight == true
         onTrackBecameCurrent(
             incoming.currentMediaItem,
-            previousEnded = true,
-            reason = Player.MEDIA_ITEM_TRANSITION_REASON_AUTO,
+            previousEnded = !skipped,
+            reason = if (skipped) {
+                Player.MEDIA_ITEM_TRANSITION_REASON_SEEK
+            } else {
+                Player.MEDIA_ITEM_TRANSITION_REASON_AUTO
+            },
             alreadyAudible = true,
         )
 
@@ -8241,6 +8248,7 @@ class PlaybackService : MediaLibraryService() {
                 castPrevious()
                 return
             }
+            if (crossfade.trySkipWithCrossfade(forward = false)) return
             super.seekToPrevious()
         }
 
@@ -8384,6 +8392,7 @@ class PlaybackService : MediaLibraryService() {
                 castPrevious()
                 return
             }
+            if (crossfade.trySkipWithCrossfade(forward = false)) return
             wrappedPlayer.seekToPrevious()
         }
 
@@ -8391,6 +8400,7 @@ class PlaybackService : MediaLibraryService() {
             if (locked()) return
             onUserIntent()
             crossfade.onSkipRequested()
+            if (crossfade.trySkipWithCrossfade(forward = true)) return
             wrappedPlayer.seekToNextMediaItem()
         }
 
@@ -8398,6 +8408,7 @@ class PlaybackService : MediaLibraryService() {
             if (locked()) return
             onUserIntent()
             crossfade.onSkipRequested()
+            if (crossfade.trySkipWithCrossfade(forward = true)) return
             wrappedPlayer.seekToNext()
         }
     }

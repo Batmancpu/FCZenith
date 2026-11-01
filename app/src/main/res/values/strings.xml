@@ -260,6 +260,8 @@
     <string name="blocking">Blocking</string>
     <string name="crossfade">Crossfade</string>
     <string name="crossfade_subtitle">Blends one track into the next</string>
+    <string name="crossfade_on_skip">Crossfade on next/previous</string>
+    <string name="crossfade_on_skip_subtitle">Fades into the song you skip to, and the cover dissolves along with it</string>
     <string name="automix">Automix [BETA]</string>
     <string name="automix_performance">Automix performance</string>
     <string name="automix_performance_subtitle">Sets how much CPU background analysis may use</string>

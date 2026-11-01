@@ -338,6 +338,7 @@ internal fun rememberArtworkDissolve(
     mixing: Boolean,
     clipShowing: Boolean = false,
     queueIndex: Int = -1,
+    skipFadeMs: Long = 0L,
 ): ArtworkDissolve {
     val reduceAnimation by PlayerSettings.reduceAnimation.collectAsStateWithLifecycle()
     val dissolve = remember { ArtworkDissolve(art) }
@@ -375,12 +376,16 @@ internal fun rememberArtworkDissolve(
         }
     }
     val mixingNow by rememberUpdatedState(mixing)
+    val skipFadeNow by rememberUpdatedState(skipFadeMs)
     LaunchedEffect(art) {
         if (dissolve.outgoing == null) return@LaunchedEffect
         // Cover baru harus sudah ada untuk dijadikan tujuan dissolve; cover
         // yang tidak kunjung datang ditinggalkan, bukan ditutupi yang lama.
         withTimeoutOrNull(ART_DISSOLVE_WAIT_MS) { snapshotFlow { art.loaded }.first { it } }
         val duration = when {
+            // Crossfade next/prev: cover lama melebur ke cover baru selama
+            // audio-nya memudar, bukan lebih cepat atau lebih lambat.
+            mixingNow && skipFadeNow > 0L -> skipFadeNow.toInt().coerceIn(400, 6_000)
             mixingNow -> MIX_DISSOLVE_MS
             dissolve.frame != null -> FRAME_DISSOLVE_MS
             else -> SKIP_DISSOLVE_MS
