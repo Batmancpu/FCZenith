@@ -5,8 +5,7 @@ import android.view.WindowManager
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.spring
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.SheetState
+
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -64,7 +63,6 @@ private const val WINDOW_ENTER_MS = 600L
  * [close] — which the sheet itself is routed through too, for a drag released
  * low, a back press or a tap on the scrim (see the sheet's `confirmValueChange`).
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Stable
 class PlayerSheetMotion(
     private val scope: CoroutineScope,
@@ -79,8 +77,7 @@ class PlayerSheetMotion(
     /** Whether the app, not the sheet, is placing the player. */
     val holding: Boolean get() = !held.isNaN()
 
-    /** The sheet, while it is up. Set by the host. */
-    var sheet: SheetState? = null
+
 
     /** The sheet's window, while it is up — see [attachWindow]. */
     private var window: Window? = null
@@ -125,11 +122,9 @@ class PlayerSheetMotion(
     private fun travel(): Float =
         dock.travel().takeIf { it > 0f } ?: (windowInfo?.containerSize?.height ?: 0).toFloat()
 
-    private fun sheetOffset(): Float = try {
-        sheet?.requireOffset() ?: Float.NaN
-    } catch (_: IllegalStateException) {
-        Float.NaN
-    }
+    // No sheet of M3's any more: the player is a panel in the page's own
+    // window, so while the app is not holding it, it is simply fully open.
+    private fun sheetOffset(): Float = if (shown() && laidOut) 0f else Float.NaN
 
     /** How far below fully open the player is: what [PlayerDock] is told. */
     fun position(): Float = if (holding) held else sheetOffset()
@@ -317,6 +312,38 @@ class PlayerSheetMotion(
         }
     }
 
+    private var dismissPull = false
+
+    /** Whether a finger is pulling the open player down. */
+    val pulling: Boolean get() = dismissPull
+
+    /**
+     * A finger pulling the open player down by [delta] pixels (negative: back
+     * up). Returns how much of it the player took, for a nested scroll that
+     * has to hand the rest on. Only a downward pull starts one.
+     */
+    fun pullBy(delta: Float): Float {
+        if (!shown() || closing) return 0f
+        if (!dismissPull) {
+            if (delta <= 0f) return 0f
+            settle?.cancel()
+            dismissPull = true
+            if (!holding) held = 0f
+            pullStartAt = held
+            pullStartNanos = System.nanoTime()
+        }
+        val before = held
+        held = (held + delta).coerceIn(0f, travel())
+        return held - before
+    }
+
+    /** The finger lifted off a pull down: it goes home or it goes, as any other pull does. */
+    fun releasePull(velocity: Float) {
+        if (!dismissPull) return
+        dismissPull = false
+        release(velocity)
+    }
+
     /** From the host, once the sheet has left composition. */
     fun onSheetGone() {
         closing = false
@@ -326,7 +353,7 @@ class PlayerSheetMotion(
         windowRestore?.cancel()
         held = Float.NaN
         laidOut = false
-        sheet = null
+        dismissPull = false
         window = null
     }
 
@@ -352,6 +379,8 @@ class PlayerSheetMotion(
     /** Gone — with the window's own exit animation already off (see [quietWindow]). */
     private fun dismissQuietly() {
         quietWindow()
+        // The pill comes back while the panel is still there to cover for it.
+        dock.releasePanel()
         setShown(false)
     }
 }

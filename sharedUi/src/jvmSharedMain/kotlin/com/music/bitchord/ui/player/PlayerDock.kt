@@ -118,7 +118,7 @@ class PlayerDock {
     }
 
     /** The pill in the player window's own pixels, or null with no pill on screen. */
-    internal fun miniPillInWindow(): Rect? {
+    fun miniPillInWindow(): Rect? {
         val c = miniPill?.takeIf { it.isAttached } ?: return null
         val size = c.size.toSize()
         return Rect(
@@ -165,6 +165,55 @@ class PlayerDock {
             corner = pill.height / 2f * (1f - progress),
             progress = progress,
         )
+    }
+
+    // ---- The one panel: pill and player as a single container ----
+
+    /**
+     * True while the single panel stands where the mini player's pill is, so
+     * the pill itself stands aside instead of showing as a second panel.
+     */
+    var panelShown by mutableStateOf(false)
+        private set
+
+    /** From the panel's root, once placed: where its window starts on screen. */
+    fun panelPlaced(coordinates: LayoutCoordinates) {
+        windowOrigin = coordinates.localToScreen(Offset.Zero)
+        panelShown = true
+    }
+
+    /** The pill comes back. Called as the panel goes, not after it has. */
+    fun releasePanel() {
+        panelShown = false
+    }
+
+    /**
+     * The panel's rect this frame, in the window's own pixels. At the bottom
+     * of its travel it is the pill's rect; fully open, the whole window. In
+     * between its left and right close in on the pill, its top follows the
+     * sheet's offset, and its bottom rises to meet the pill: one shape
+     * changing size. With no pill to grow from it is the whole window,
+     * sliding as one.
+     */
+    fun panelBounds(window: Size): Rect {
+        val offset = offset() ?: 0f
+        val pill = miniPillInWindow()
+        if (pill == null || pill.top <= 1f) {
+            return Rect(0f, offset, window.width, window.height + offset)
+        }
+        val progress = (1f - offset / pill.top).coerceIn(0f, 1f)
+        val left = pill.left * (1f - progress)
+        val right = window.width - (window.width - pill.right) * (1f - progress)
+        val bottom = pill.bottom + (window.height - pill.bottom) * progress
+        return Rect(left, offset, right.coerceAtLeast(left + 1f), bottom.coerceAtLeast(offset + 1f))
+    }
+
+    /** The panel's corner radius this frame: the pill's, rounding off to square. */
+    fun panelCornerPx(): Float {
+        val pill = miniPillInWindow() ?: return 0f
+        if (pill.top <= 1f) return 0f
+        val progress = (1f - (offset() ?: 0f) / pill.top).coerceIn(0f, 1f)
+        return pill.height / 2f * (1f - progress)
     }
 
     /** The sheet's offset this frame, or null with no sheet laid out. */

@@ -353,10 +353,14 @@ internal fun Modifier.playerDockPill(dock: PlayerDock?): Modifier {
     DisposableEffect(dock) {
         onDispose { placed[0]?.let(dock::releaseMiniPill) }
     }
-    return this.onPlaced { coordinates ->
-        placed[0] = coordinates
-        dock.reportMiniPill(coordinates)
-    }
+    return this
+        .onPlaced { coordinates ->
+            placed[0] = coordinates
+            dock.reportMiniPill(coordinates)
+        }
+        // The player's panel is standing where this pill is: it is one surface
+        // with it, so the pill stands aside rather than show under it.
+        .graphicsLayer { alpha = if (dock.panelShown) 0f else 1f }
 }
 
 /** The mini player's cover for a music video: 16:9 at the cover's 40dp height. */
