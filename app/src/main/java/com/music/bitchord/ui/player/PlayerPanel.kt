@@ -1,0 +1,404 @@
+package com.music.bitchord.ui.player
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CornerSize
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.Velocity
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import coil3.compose.AsyncImage
+import com.music.bitchord.R
+import com.music.bitchord.data.model.ROW_ART_PX
+import com.music.bitchord.data.model.Song
+import com.music.bitchord.data.model.artworkAt
+import com.music.bitchord.ui.components.ExplicitSongTitle
+import com.music.bitchord.ui.components.FadingLine
+import com.music.bitchord.ui.components.LocalLiquidGlassEnabled
+import com.music.bitchord.ui.components.MiniPlayerNextGlyph
+import com.music.bitchord.ui.components.glassContentColor
+import com.music.bitchord.ui.components.isGlassSupported
+import com.music.bitchord.ui.components.liquidGlass
+import com.music.bitchord.ui.components.miniPlayerGestures
+import com.music.bitchord.ui.components.rememberRemoteArtworkUrl
+import com.music.bitchord.ui.haptics.Haptic
+import com.music.bitchord.ui.haptics.rememberHaptics
+import kotlin.math.roundToInt
+
+/** Up to this much of the open fraction the mini row is still on the panel. */
+private const val MINI_ROW_UNTIL = 0.2f
+
+/** What the panel is filled with where the liquid glass is off. */
+private val PanelFallbackFill = Color(0xFF151517)
+
+private val MINI_ART_SIZE = 30.4.dp
+private val MINI_ART_CORNER = 5.7.dp
+
+/** The pill's own radius, shrinking with the panel's progress — read at draw. */
+private class PanelCorner(private val dock: PlayerDock) : CornerSize {
+    override fun toPx(shapeSize: Size, density: Density): Float = dock.panelCornerPx()
+}
+
+/**
+ * The mini player's pill and the full player as ONE surface, in the window the
+ * pill is in.
+ *
+ * The container is a single glass shape — the pill's material — whose width,
+ * height and corners follow [PlayerDock.panelBounds]. The pill's own row
+ * ([PanelMiniRow]) fades out of it and the full player fades in, both on the
+ * container; the real pill underneath stands aside while this is up (see
+ * [PlayerDock.panelShown]), so there is never a second panel to see.
+ *
+ * Without a [dock] ("reduce animation") it is just the player, full window.
+ */
+@Composable
+fun PlayerPanel(
+    dock: PlayerDock?,
+    motion: PlayerSheetMotion?,
+    song: Song,
+    isPlaying: Boolean,
+    isLoading: Boolean,
+    controlsLocked: Boolean,
+    onBlockedControl: () -> Unit,
+    onPlayPause: () -> Unit,
+    onNext: () -> Unit,
+    onPrevious: () -> Unit,
+    scrimAlpha: Float,
+    onLaidOut: (IntSize) -> Unit,
+    modifier: Modifier = Modifier,
+    /** Drawn above the panel in the window, unclipped — the ⋯ menu. */
+    overlay: @Composable BoxScope.() -> Unit = {},
+    content: @Composable () -> Unit,
+) {
+    var full by remember { mutableStateOf(IntSize.Zero) }
+    // Whatever takes the panel away, the pill comes back with it.
+    DisposableEffect(dock) {
+        onDispose { dock?.releasePanel() }
+    }
+    val shape = remember(dock) {
+        RoundedCornerShape(if (dock != null) PanelCorner(dock) else CornerSize(0.dp))
+    }
+    val covered by remember(dock) {
+        derivedStateOf { dock != null && dock.attached && dock.openFraction() >= 1f }
+    }
+    val miniVisible by remember(dock) {
+        derivedStateOf { dock != null && dock.openFraction() < MINI_ROW_UNTIL }
+    }
+    val glassOn = LocalLiquidGlassEnabled.current && isGlassSupported()
+    val surface = when {
+        dock == null || covered -> Modifier
+        glassOn -> Modifier.liquidGlass(shape)
+        else -> Modifier.background(PanelFallbackFill, shape)
+    }
+
+    Box(
+        modifier
+            .fillMaxSize()
+            .onSizeChanged {
+                full = it
+                onLaidOut(it)
+            }
+            .onGloballyPositioned { dock?.panelPlaced(it) }
+            .drawBehind {
+                if (dock == null) return@drawBehind
+                val open = dock.openFraction()
+                // Not under a portrait player that is fully up: its own
+                // background is opaque, and a full-screen blend behind it
+                // would be paid on every frame for nothing anyone can see.
+                if (open > 0f && !(open >= 1f && dock.attached)) {
+                    drawRect(Color.Black.copy(alpha = scrimAlpha * open))
+                }
+            },
+    ) {
+        Box(
+            (if (dock != null) Modifier.panelBounds(dock) else Modifier.fillMaxSize())
+                .then(surface)
+                .then(if (motion != null) Modifier.playerPullDown(motion) else Modifier),
+        ) {
+            Box(Modifier.fillMaxSize().clip(shape)) {
+                Box(
+                    (if (dock != null) Modifier.windowSized(dock) { full } else Modifier.fillMaxSize())
+                        .graphicsLayer {
+                            alpha = if (dock == null) 1f else (dock.openFraction() / MINI_ROW_UNTIL).coerceIn(0f, 1f)
+                        },
+                ) { content() }
+                if (dock != null && miniVisible) {
+                    val density = LocalDensity.current
+                    val windowWidth = LocalWindowInfo.current.containerSize.width
+                    val pill = remember(dock) { dock.miniPillInWindow() }
+                    val rowHeight = with(density) { (pill?.height ?: 0f).toDp() }.takeIf { it > 0.dp } ?: 52.dp
+                    // Inline in the tab bar the pill is narrow and drops its
+                    // skip button; the row does the same.
+                    val showNext = pill == null || pill.width > windowWidth * 0.8f
+                    PanelMiniRow(
+                        song = song,
+                        isPlaying = isPlaying,
+                        isLoading = isLoading,
+                        showNext = showNext,
+                        controlsLocked = controlsLocked,
+                        onBlockedControl = onBlockedControl,
+                        onPlayPause = onPlayPause,
+                        onNext = onNext,
+                        onPrevious = onPrevious,
+                        motion = motion,
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .fillMaxWidth()
+                            .height(rowHeight)
+                            .graphicsLayer {
+                                alpha = (1f - dock.openFraction() / MINI_ROW_UNTIL).coerceIn(0f, 1f)
+                            },
+                    )
+                }
+            }
+        }
+        overlay()
+    }
+}
+
+/** The container's place this frame: size and position come from the dock. */
+private fun Modifier.panelBounds(dock: PlayerDock): Modifier = layout { measurable, constraints ->
+    val window = Size(constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat())
+    val rect = dock.panelBounds(window)
+    val width = rect.width.roundToInt().coerceAtLeast(1)
+    val height = rect.height.roundToInt().coerceAtLeast(1)
+    val placeable = measurable.measure(Constraints.fixed(width, height))
+    layout(constraints.maxWidth, constraints.maxHeight) {
+        placeable.place(rect.left.roundToInt(), rect.top.roundToInt())
+    }
+}
+
+/**
+ * The full player, laid out at the whole window's size whatever the panel is,
+ * and put back where the window's left edge is — so the panel reveals it
+ * instead of squeezing it.
+ */
+private fun Modifier.windowSized(dock: PlayerDock, full: () -> IntSize): Modifier =
+    layout { measurable, constraints ->
+        val size = full()
+        val placeable = measurable.measure(Constraints.fixed(size.width, size.height))
+        layout(constraints.maxWidth, constraints.maxHeight) {
+            val rect = dock.panelBounds(Size(size.width.toFloat(), size.height.toFloat()))
+            placeable.place(-rect.left.roundToInt(), 0)
+        }
+    }
+
+/**
+ * The pill's row, on the panel: the same cover, title, artist and transport as
+ * the pill, where the pill had them.
+ */
+@Composable
+private fun PanelMiniRow(
+    song: Song,
+    isPlaying: Boolean,
+    isLoading: Boolean,
+    showNext: Boolean,
+    controlsLocked: Boolean,
+    onBlockedControl: () -> Unit,
+    onPlayPause: () -> Unit,
+    onNext: () -> Unit,
+    onPrevious: () -> Unit,
+    motion: PlayerSheetMotion?,
+    modifier: Modifier,
+) {
+    val haptics = rememberHaptics()
+    val contentColor = glassContentColor()
+    val secondary = contentColor.copy(alpha = 0.7f)
+    val titleStyle = MaterialTheme.typography.titleMedium.copy(
+        fontSize = 13.sp,
+        fontWeight = FontWeight.SemiBold,
+        letterSpacing = 0.4.sp,
+    )
+    val artistStyle = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp, letterSpacing = 0.35.sp)
+    val glyphSlot = if (showNext) 40.dp else 32.dp
+    val glyphSize = if (showNext) 28.dp else 24.dp
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .miniPlayerGestures(
+                pull = motion,
+                onNext = {
+                    haptics.play(Haptic.SkipNext)
+                    onNext()
+                },
+                onPrevious = {
+                    haptics.play(Haptic.SkipPrevious)
+                    onPrevious()
+                },
+                locked = controlsLocked,
+                onBlocked = onBlockedControl,
+            )
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = { motion?.open() },
+            ),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 16.dp, end = if (showNext) 12.dp else 8.dp, top = 4.dp, bottom = 4.dp),
+        ) {
+            val artWidth = if (song.isVideo) MINI_ART_SIZE * (16f / 9f) else MINI_ART_SIZE
+            Box(
+                Modifier
+                    .size(width = artWidth, height = MINI_ART_SIZE)
+                    .clip(RoundedCornerShape(MINI_ART_CORNER))
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+            ) {
+                AsyncImage(
+                    model = rememberRemoteArtworkUrl(song)?.artworkAt(ROW_ART_PX),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+            Spacer(Modifier.width(if (showNext) 9.dp else 8.dp))
+            Column(Modifier.weight(1f)) {
+                ExplicitSongTitle(
+                    song = song,
+                    style = titleStyle,
+                    color = contentColor,
+                    badgeColor = secondary,
+                    fadeOverflow = true,
+                )
+                FadingLine(text = song.artist, style = artistStyle, color = secondary)
+            }
+            if (isLoading) {
+                Box(Modifier.size(glyphSlot), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(
+                        color = contentColor,
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(if (showNext) 20.dp else 18.dp),
+                    )
+                }
+            } else {
+                IconButton(
+                    onClick = {
+                        haptics.play(if (isPlaying) Haptic.Pause else Haptic.Resume)
+                        onPlayPause()
+                    },
+                    modifier = Modifier.size(glyphSlot),
+                ) {
+                    Icon(
+                        imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                        contentDescription = stringResource(if (isPlaying) R.string.pause else R.string.play),
+                        tint = contentColor,
+                        modifier = Modifier.size(glyphSize),
+                    )
+                }
+            }
+            if (showNext) {
+                Spacer(Modifier.width(4.dp))
+                IconButton(
+                    onClick = {
+                        haptics.play(Haptic.SkipNext)
+                        onNext()
+                    },
+                    enabled = !controlsLocked,
+                    modifier = Modifier.size(glyphSlot),
+                ) {
+                    MiniPlayerNextGlyph(
+                        tint = contentColor.copy(alpha = if (controlsLocked) 0.3f else 1f),
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Drag the open player down to put it away — what the modal sheet used to do
+ * for it. A drag nothing inside claims, and the pull a list leaves over when
+ * it is already at its top, both move the panel through [PlayerSheetMotion]:
+ * the same motion the pill's pull and every close run on.
+ */
+@Composable
+internal fun Modifier.playerPullDown(motion: PlayerSheetMotion): Modifier {
+    val connection = remember(motion) {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                // Back up first: a pulled panel returns before the list scrolls again.
+                if (!motion.pulling || available.y >= 0f) return Offset.Zero
+                return Offset(0f, motion.pullBy(available.y))
+            }
+
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource,
+            ): Offset {
+                if (source != NestedScrollSource.UserInput || available.y <= 0f) {
+                    return Offset.Zero
+                }
+                return Offset(0f, motion.pullBy(available.y))
+            }
+
+            override suspend fun onPreFling(available: Velocity): Velocity {
+                if (!motion.pulling) return Velocity.Zero
+                motion.releasePull(available.y)
+                return available
+            }
+        }
+    }
+    val dragState = rememberDraggableState { delta -> motion.pullBy(delta) }
+    return this
+        .nestedScroll(connection)
+        .draggable(
+            state = dragState,
+            orientation = Orientation.Vertical,
+            onDragStopped = { velocity -> motion.releasePull(velocity) },
+        )
+}
