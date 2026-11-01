@@ -137,18 +137,18 @@ fun PlayerPanel(
         derivedStateOf { dock != null && dock.openFraction() < MINI_ROW_UNTIL }
     }
     val glassOn = LocalLiquidGlassEnabled.current && isGlassSupported()
-    // A plain panel, not liquid glass: it fades in over the pill's first
-    // stretch of travel (see [PlayerDock.panelFill]) and costs no blur.
-    val surface = if (dock == null || covered) {
-        Modifier
-    } else {
-        Modifier.drawBehind {
-            drawRoundRect(
-                color = PanelFallbackFill,
-                cornerRadius = androidx.compose.ui.geometry.CornerRadius(dock.panelCornerPx()),
-                alpha = dock.panelFill(),
-            )
-        }
+    // The pill's own liquid glass is the container, so pill and panel are one
+    // surface. As it opens, a plain fill comes in over the glass (see
+    // [PlayerDock.panelFill]) and the glass is dropped once that is opaque,
+    // which is when its blur stops costing anything.
+    val glassNeeded by remember(dock) {
+        derivedStateOf { dock != null && dock.panelFill() < 1f }
+    }
+    val surface = when {
+        dock == null || covered -> Modifier
+        glassOn && glassNeeded -> Modifier.liquidGlass(shape)
+        glassOn -> Modifier
+        else -> Modifier.background(PanelFallbackFill, shape)
     }
 
     Box(
@@ -175,6 +175,14 @@ fun PlayerPanel(
                 .then(surface)
                 .then(if (motion != null) Modifier.playerPullDown(motion) else Modifier),
         ) {
+            if (dock != null && !covered) {
+                Box(
+                    Modifier
+                        .matchParentSize()
+                        .graphicsLayer { alpha = dock.panelFill() }
+                        .background(PanelFallbackFill, shape),
+                )
+            }
             Box(Modifier.fillMaxSize().clip(shape)) {
                 Box(
                     (if (dock != null) Modifier.windowSized(dock) { full } else Modifier.fillMaxSize())
@@ -271,7 +279,6 @@ private fun PanelMiniRow(
     dock: PlayerDock? = null,
 ) {
     val haptics = rememberHaptics()
-    val rowPlaced = remember { arrayOfNulls<LayoutCoordinates>(1) }
     val contentColor = glassContentColor()
     val secondary = contentColor.copy(alpha = 0.7f)
     val titleStyle = MaterialTheme.typography.titleMedium.copy(
@@ -285,7 +292,6 @@ private fun PanelMiniRow(
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
-            .onGloballyPositioned { rowPlaced[0] = it }
             .miniPlayerGestures(
                 pull = motion,
                 onNext = {
@@ -329,25 +335,7 @@ private fun PanelMiniRow(
                 )
             }
             Spacer(Modifier.width(if (showNext) 9.dp else 8.dp))
-            Column(
-                Modifier
-                    .weight(1f)
-                    .onGloballyPositioned { c ->
-                        val row = rowPlaced[0]
-                        if (dock != null && row != null && row.isAttached && c.isAttached) {
-                            dock.reportMiniText(
-                                androidx.compose.ui.geometry.Rect(
-                                    row.localPositionOf(c, Offset.Zero),
-                                    Size(c.size.width.toFloat(), c.size.height.toFloat()),
-                                ),
-                            )
-                        }
-                    }
-                    // The player's title and artist fly here instead.
-                    .graphicsLayer {
-                        alpha = if (dock != null && dock.attached && dock.creditsDocking && dock.hasMiniText()) 0f else 1f
-                    },
-            ) {
+            Column(Modifier.weight(1f)) {
                 ExplicitSongTitle(
                     song = song,
                     style = titleStyle,
