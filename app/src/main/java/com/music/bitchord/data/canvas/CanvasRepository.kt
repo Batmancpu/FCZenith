@@ -119,7 +119,11 @@ object CanvasRepository {
             base = "song|${song.videoId}",
             spotifyFirst = AppSettings.prioritizeSpotifyCanvas.value,
         )
-        return synchronized(cache) { cache[key]?.artwork }
+        synchronized(cache) { cache[key]?.artwork }?.let { return it }
+        // Offline (no active network) the lookup cannot run at all, so the
+        // clip already worked out in an earlier session is the only answer.
+        if (AppSettings.meteredConnection.value != null) return null
+        return CanvasIndex.get("song|${song.videoId}")
     }
 
     /**
@@ -159,6 +163,9 @@ object CanvasRepository {
     private fun cacheKey(base: String, spotifyFirst: Boolean): String =
         "$base|spotifyFirst=$spotifyFirst"
 
+    /** The question without its priority order — what the on-disk index is keyed on. */
+    private fun baseKey(key: String): String = key.substringBeforeLast("|spotifyFirst=")
+
     private suspend fun resolve(
         key: String,
         withAlbum: Boolean,
@@ -167,7 +174,15 @@ object CanvasRepository {
         synchronized(cache) {
             cache[key]?.let { if (it.reusable(withAlbum)) return@withLock it.artwork }
         }
-        val found = withContext(Dispatchers.IO) { lookUp() }
+        val saved = CanvasIndex.get(baseKey(key))
+        // Offline there is nothing to ask. Answer from the on-disk index and
+        // do not remember a miss: it would outlive the outage and keep the
+        // canvas off after the network is back.
+        if (AppSettings.meteredConnection.value == null) return@withLock saved
+        // A lookup that fails online (no internet behind the Wi-Fi, provider
+        // down) falls back to the clip that was found before.
+        val found = withContext(Dispatchers.IO) { lookUp() } ?: saved
+        if (found != null) CanvasIndex.put(baseKey(key), found)
         synchronized(cache) { cache[key] = Entry(found, withAlbum) }
         found
     }

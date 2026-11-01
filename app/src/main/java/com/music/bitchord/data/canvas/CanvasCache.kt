@@ -57,6 +57,7 @@ object CanvasCache {
 
     /** Opened once per process, alongside [com.music.bitchord.playback.AudioCache.init]. */
     fun init(context: Context) {
+        CanvasIndex.init(context)
         // Must run after AppSettings.init: opening the cache replays every
         // stored span through the evictor, and a ceiling still at its
         // default would evict clips the listener's larger limit allows.
@@ -84,6 +85,7 @@ object CanvasCache {
     fun clear() {
         if (!::cache.isInitialized) return
         cache.keys.toList().forEach { runCatching { cache.removeResource(it) } }
+        CanvasIndex.clear()
     }
 
     /**
