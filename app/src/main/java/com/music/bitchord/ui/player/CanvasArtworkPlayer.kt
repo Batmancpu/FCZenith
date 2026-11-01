@@ -657,17 +657,30 @@ private fun TextureView.captureAt(
     if (viewWidth <= 0 || viewHeight <= 0) return null
     val scale = maxPx.toFloat() / maxOf(viewWidth, viewHeight)
     return runCatching {
-        // TextureView.getBitmap copies its texture layer, before the view's
-        // RenderEffect; the pre-31 mask is on the parent frame instead.
-        // Neither display-only fade is baked into the mesh's sampled frame.
-        val frame = if (scale >= 1f) {
-            getBitmap()
-        } else {
-            getBitmap(
-                (viewWidth * scale).roundToInt().coerceAtLeast(1),
-                (viewHeight * scale).roundToInt().coerceAtLeast(1),
-            )
-        } ?: return null
+        // getBitmap hands back the texture as the decoder painted it, stretched
+        // to the view's bounds. The view's setTransform (cover/contain) is a
+        // display-only matrix and is not part of that readback, so read with an
+        // identity transform and run the very same matrix over the result
+        // (see shownFrame). Otherwise the frame comes out stretched, or cropped
+        // from the wrong place, compared with what is on screen.
+        // The pre-31 bottom mask is on the parent frame and the RenderEffect
+        // fade is on the view's node; neither is baked into the sampled frame.
+        val viewTransform = getTransform(null)
+        setTransform(Matrix())
+        val raw: Bitmap? = try {
+            if (scale >= 1f) {
+                getBitmap()
+            } else {
+                getBitmap(
+                    (viewWidth * scale).roundToInt().coerceAtLeast(1),
+                    (viewHeight * scale).roundToInt().coerceAtLeast(1),
+                )
+            }
+        } finally {
+            setTransform(viewTransform)
+        }
+        if (raw == null) return null
+        val frame = shownFrame(raw, clipAspect, contentMode, alignPortraitTop)
         if (contentMode != CanvasContentMode.FIT_PORTRAIT || clipAspect >= 1f || clipAspect <= 0f) {
             return frame
         }
@@ -762,17 +775,35 @@ private fun TextureView.applyContentTransform(
     contentMode: CanvasContentMode,
     alignPortraitTop: Boolean,
 ): Boolean {
-    val bounds = IntSize(width, height)
-    if (bounds.width <= 0 || bounds.height <= 0 || !clipAspect.isFinite() || clipAspect <= 0f) {
+    val matrix = contentMatrix(width, height, clipAspect, contentMode, alignPortraitTop)
+    if (matrix == null) {
         setTransform(Matrix())
         return false
     }
-    val viewAspect = bounds.width.toFloat() / bounds.height
-    val pivotX = bounds.width / 2f
+    setTransform(matrix)
+    return true
+}
+
+/**
+ * The cover/contain matrix for content of [clipAspect] in a [width] x [height]
+ * box, or null while the size or aspect is unknown. One definition for the live
+ * view and for [shownFrame], so a captured frame can never disagree with the
+ * picture on screen. Every term scales with the box, so it holds at any size.
+ */
+private fun contentMatrix(
+    width: Int,
+    height: Int,
+    clipAspect: Float,
+    contentMode: CanvasContentMode,
+    alignPortraitTop: Boolean,
+): Matrix? {
+    if (width <= 0 || height <= 0 || !clipAspect.isFinite() || clipAspect <= 0f) return null
+    val viewAspect = width.toFloat() / height
+    val pivotX = width / 2f
     val pivotY = if (alignPortraitTop && contentMode == CanvasContentMode.FIT_PORTRAIT && clipAspect < 1f) {
         0f
-    } else bounds.height / 2f
-    val matrix = Matrix().apply {
+    } else height / 2f
+    return Matrix().apply {
         val fit = contentMode == CanvasContentMode.FIT_PORTRAIT && clipAspect < 1f
         if (fit && clipAspect > viewAspect) {
             setScale(1f, viewAspect / clipAspect, pivotX, pivotY)
@@ -784,8 +815,25 @@ private fun TextureView.applyContentTransform(
             setScale(1f, viewAspect / clipAspect, pivotX, pivotY)
         }
     }
-    setTransform(matrix)
-    return true
+}
+
+/**
+ * [raw] (the decoder's frame stretched to the view's bounds) as the view shows
+ * it: through the same matrix, same size, with transparent contain margins.
+ * Returned as is while the clip's aspect is not known yet.
+ */
+private fun shownFrame(
+    raw: Bitmap,
+    clipAspect: Float,
+    contentMode: CanvasContentMode,
+    alignPortraitTop: Boolean,
+): Bitmap {
+    val matrix = contentMatrix(raw.width, raw.height, clipAspect, contentMode, alignPortraitTop)
+        ?: return raw
+    val shown = Bitmap.createBitmap(raw.width, raw.height, Bitmap.Config.ARGB_8888)
+    Canvas(shown).drawBitmap(raw, matrix, Paint(Paint.FILTER_BITMAP_FLAG))
+    raw.recycle()
+    return shown
 }
 
 /**
