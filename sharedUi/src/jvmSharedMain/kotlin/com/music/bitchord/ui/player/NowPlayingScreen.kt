@@ -505,6 +505,8 @@ private class DockFrame {
     var landscapeArt: LayoutCoordinates? = null
     /** The title and menu row, as last placed — drawn above the flying artwork. */
     var titleRow: LayoutCoordinates? = null
+    /** The handle strip at the top, as last placed — drawn above the flying artwork too. */
+    var strip: LayoutCoordinates? = null
 }
 
 /**
@@ -1839,6 +1841,8 @@ fun NowPlayingScreen(
     // The title row, recorded while docking so it can be drawn over the flying
     // artwork instead of under it.
     val titleLayer = rememberGraphicsLayer()
+    // The handle strip (grabber, origin caption, status-bar scrim), likewise.
+    val stripLayer = rememberGraphicsLayer()
 
     // The player's own end of the docking, for whichever shape it takes: where
     // it sits on screen, the fade, and the artwork drawn over that fade.
@@ -1888,6 +1892,12 @@ fun NowPlayingScreen(
                     val at = titleHost.localPositionOf(titleAt, Offset.Zero)
                     titleLayer.alpha = ((dockT() - DOCK_TITLE_GONE) / DOCK_TITLE_SOLID_SPAN).coerceIn(0f, 1f)
                     translate(at.x, at.y) { drawLayer(titleLayer) }
+                }
+                val stripAt = dockFrame.strip?.takeIf { it.isAttached }
+                if (stripAt != null && titleHost != null && stripLayer.size.width > 0) {
+                    val at = titleHost.localPositionOf(stripAt, Offset.Zero)
+                    stripLayer.alpha = ((dockT() - DOCK_TITLE_GONE) / DOCK_TITLE_SOLID_SPAN).coerceIn(0f, 1f)
+                    translate(at.x, at.y) { drawLayer(stripLayer) }
                 }
 
             }
@@ -2585,6 +2595,16 @@ fun NowPlayingScreen(
                             .zIndex(1f)
                             .fillMaxWidth()
                             .height(topStrip)
+                            .onGloballyPositioned { dockFrame.strip = it }
+                            // While docking, drawn by the player's own draw above the
+                            // artwork rather than here beneath it.
+                            .drawWithContent {
+                                if (docking()) {
+                                    stripLayer.record { this@drawWithContent.drawContent() }
+                                } else {
+                                    drawContent()
+                                }
+                            }
                             .drawBehind {
                                 // Translated rather than offset: the gradient is laid
                                 // out from the canvas origin, not from the rect's.
