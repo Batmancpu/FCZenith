@@ -103,9 +103,11 @@ fun ThinSlider(
     var dragging by remember { mutableStateOf(false) }
     val height by animateDpAsState(
         targetValue = if (dragging) activeHeight else idleHeight,
+        // Stiff enough to answer the touch at once; a slow spring made a quick
+        // tap lift its finger before the bar had finished thickening.
         animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMediumLow,
+            dampingRatio = 0.65f,
+            stiffness = Spring.StiffnessMedium,
         ),
         label = "sliderHeight",
     )

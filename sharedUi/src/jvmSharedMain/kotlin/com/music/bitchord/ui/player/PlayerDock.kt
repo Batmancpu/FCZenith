@@ -1,6 +1,8 @@
 package com.music.bitchord.ui.player
 
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -15,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toSize
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
@@ -292,4 +295,41 @@ fun Modifier.playerMorph(dock: PlayerDock?): Modifier {
             val morph = dock.morph(size) ?: return@drawBehind
             drawRect(Color(0xFF151517).copy(alpha = (morph.progress * 4f).coerceIn(0f, 1f)))
         }
+}
+
+/** How small the page behind the player gets while the player is fully up. */
+private const val PAGE_RECEDE_SCALE = 0.94f
+
+/**
+ * Leaves the page undrawn while the portrait player fully covers it: its own
+ * background is opaque, so everything drawn under it (glass bars, blur, lists)
+ * would be paid for every frame for nobody to see. Layout, composition and
+ * input are untouched; only drawing stops.
+ *
+ * Put on the page, never on a parent of the player panel, or the panel would
+ * be skipped with it. The flag is derived, so the draw is invalidated twice
+ * per open or close — when it flips — and not on every frame of the travel.
+ */
+@Composable
+fun Modifier.skipDrawWhenPlayerCovers(dock: PlayerDock?): Modifier {
+    val covered by remember(dock) {
+        derivedStateOf { dock != null && dock.attached && dock.openFraction() >= 1f }
+    }
+    return drawWithContent { if (!covered) drawContent() }
+}
+
+/**
+ * The page shrinks a little as the player comes up over it, and grows back as
+ * it goes. Read in the graphics layer only, so a frame of the player's travel
+ * costs no recomposition and no layout.
+ */
+fun Modifier.recedeBehindPlayer(dock: PlayerDock?): Modifier {
+    if (dock == null) return this
+    return graphicsLayer {
+        if (dock.attached) {
+            val scale = 1f - (1f - PAGE_RECEDE_SCALE) * dock.openFraction()
+            scaleX = scale
+            scaleY = scale
+        }
+    }
 }

@@ -326,6 +326,8 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.ui.layout.onSizeChanged
 import com.music.bitchord.ui.player.LocalPlayerDock
 import com.music.bitchord.ui.player.playerMorph
+import com.music.bitchord.ui.player.recedeBehindPlayer
+import com.music.bitchord.ui.player.skipDrawWhenPlayerCovers
 import com.music.bitchord.ui.player.PlayerDock
 import com.music.bitchord.ui.screens.DetailScreen
 import com.music.bitchord.ui.screens.sortedForDetail
@@ -2784,7 +2786,14 @@ private fun BitChordApp(
         //
         // Everything a page's menu floats over, and so what [pageBackdrop]
         // takes its still of; the menus themselves are drawn outside it.
-        Row(Modifier.fillMaxSize().snapshotBackdropSource(pageBackdrop)) {
+        Row(
+            Modifier
+                .fillMaxSize()
+                // Not drawn while a portrait player fully covers it. On the
+                // page's own Row, so the player panel (a sibling) is not skipped.
+                .skipDrawWhenPlayerCovers(activeDock)
+                .snapshotBackdropSource(pageBackdrop),
+        ) {
             Box(Modifier.weight(1f).fillMaxHeight()) {
                 AnimatedContent(
                     // Whatever is on top of the back stack — see [AppNavigator].
@@ -2853,7 +2862,11 @@ private fun BitChordApp(
                             } else {
                                 Modifier
                             },
-                        ),
+                        )
+                        // Innermost, so the haze and backdrop sources record the
+                        // page as it is drawn, and the bars (siblings) stay put:
+                        // the mini player's rect is what the panel grows from.
+                        .recedeBehindPlayer(activeDock),
                     label = "content",
                 ) { destination ->
                     // Every branch below reads `destination` rather than the
