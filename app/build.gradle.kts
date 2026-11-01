@@ -77,6 +77,9 @@ android {
         // Haze falls back to a translucent scrim below that.
         minSdk = 26
         targetSdk = 36
+        ndk {
+            abiFilters += "arm64-v8a"
+        }
         versionCode = rootProject.extra["bitchordVersionCode"] as Int
         versionName = rootProject.extra["bitchordVersionName"] as String
 
@@ -97,14 +100,7 @@ android {
         buildConfigField("String", "UPDATE_REPO", "\"${updateRepo.replace("\\", "\\\\").replace("\"", "\\\"")}\"")
     }
 
-    splits {
-        abi {
-            isEnable = true
-            reset()
-            include("armeabi-v7a", "arm64-v8a", "x86_64")
-            isUniversalApk = true
-        }
-    }
+
 
     // The phone <-> watch protocol, one file shared with the watch app so the
     // two cannot drift. See wearos/protocol/.../WearProtocol.kt.

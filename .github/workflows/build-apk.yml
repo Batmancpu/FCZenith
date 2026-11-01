@@ -65,7 +65,7 @@ jobs:
       - name: Build release APK
         run: |
           chmod +x gradlew
-          ./gradlew :app:assembleProdRelease --no-daemon --stacktrace \
+          ./gradlew :app:assembleProdRelease --parallel --build-cache --stacktrace \
             -Dorg.gradle.jvmargs="-Xmx5g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8"
 
       - name: Rename APK
@@ -76,15 +76,7 @@ jobs:
             VER="build-$GITHUB_RUN_NUMBER"
           fi
           mkdir -p dist
-          for f in app/build/outputs/apk/prod/release/*.apk; do
-            n=$(basename "$f")
-            case "$n" in
-              *universal*)    cp "$f" "dist/BitChord-${VER}.apk" ;;
-              *arm64-v8a*)    cp "$f" "dist/BitChord-${VER}_arm64-v8a.apk" ;;
-              *armeabi-v7a*)  cp "$f" "dist/BitChord-${VER}_armeabi-v7a.apk" ;;
-              *x86_64*)       cp "$f" "dist/BitChord-${VER}_x86_64.apk" ;;
-            esac
-          done
+          cp app/build/outputs/apk/prod/release/*.apk "dist/BitChord-${VER}.apk"
           ls -lh dist
 
       - name: Upload artifact
