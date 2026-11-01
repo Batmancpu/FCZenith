@@ -86,6 +86,7 @@ class AndroidPlayerHost(context: Context) : PlayerHost {
         override val automixDetail get() = AppSettings.automixDetail
         override val smartFadeEnabled get() = AppSettings.smartFadeEnabled
         override val smartMixInProgress get() = AppSettings.smartMixInProgress
+        override val crossfadeRunning get() = AppSettings.crossfadeRunning
         override val smartMixBlend get() = AppSettings.smartMixBlend
         override val smartMixView get() = AppSettings.smartMixView
         override val smartMixProgress get() = AppSettings.smartMixProgress

@@ -806,6 +806,13 @@ object AppSettings {
     val smartMixInProgress = MutableStateFlow(false)
 
     /**
+     * True selama sebuah transisi berjalan, termasuk crossfade biasa yang
+     * sengaja tidak menyalakan [smartMixInProgress]. Dipakai UI untuk
+     * memadamkan clip animasi cover sebelum cover berganti.
+     */
+    val crossfadeRunning = MutableStateFlow(false)
+
+    /**
      * The Automix blend in flight — its progress and the beat it runs on — or
      * null between blends. Published by the crossfade controller every fade
      * tick; read it in draw, not in composition.

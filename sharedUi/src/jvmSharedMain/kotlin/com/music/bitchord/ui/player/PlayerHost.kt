@@ -267,6 +267,8 @@ interface PlayerSettingsSource {
     val smartFadeEnabled: StateFlow<Boolean>
     /** True only while an analysed Automix transition is audibly mixing two tracks. */
     val smartMixInProgress: StateFlow<Boolean>
+    /** True selama transisi apa pun (crossfade biasa maupun Automix) sedang berjalan. */
+    val crossfadeRunning: StateFlow<Boolean>
     /** The Automix blend in flight, for the scrubber's beat glow; null between blends. */
     val smartMixBlend: StateFlow<MixBlend?>
     /** The Automix blend in flight laid out for the mix popup; null between blends. */

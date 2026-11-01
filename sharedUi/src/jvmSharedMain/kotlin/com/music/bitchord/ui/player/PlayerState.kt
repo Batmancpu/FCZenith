@@ -9,6 +9,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
@@ -207,6 +208,12 @@ internal fun rememberPlayerArtwork(remoteArt: String?): PlayerArtwork {
 internal class ArtworkDissolve(first: PlayerArtwork) {
     private var current: PlayerArtwork = first
 
+    /**
+     * Apakah lagu sebelumnya sedang menampilkan clip animasi saat komposisi
+     * terakhir. Dibaca saat [retarget], sebelum komposisi baru menimpanya.
+     */
+    internal var lastClipShowing = false
+
     /** Cover yang sedang dipudarkan, atau null kalau tidak ada. */
     var outgoing by mutableStateOf<PlayerArtwork?>(null)
         private set
@@ -245,13 +252,20 @@ internal class ArtworkDissolve(first: PlayerArtwork) {
 }
 
 @Composable
-internal fun rememberArtworkDissolve(art: PlayerArtwork, mixing: Boolean): ArtworkDissolve {
+internal fun rememberArtworkDissolve(
+    art: PlayerArtwork,
+    mixing: Boolean,
+    clipShowing: Boolean = false,
+): ArtworkDissolve {
     val reduceAnimation by PlayerSettings.reduceAnimation.collectAsStateWithLifecycle()
     val dissolve = remember { ArtworkDissolve(art) }
     // Dilakukan saat komposisi, sebelum sleeve membacanya: frame pertama cover
     // baru harus sudah punya cover lama di atasnya, kalau tidak frame itu
     // adalah cut-nya.
-    remember(art) { dissolve.retarget(art, enabled = !reduceAnimation) }
+    // Lagu lama yang clip-nya sedang berputar lalu diganti (next/prev): langsung
+    // ke cover berikutnya, tanpa memunculkan thumbnail lama dulu.
+    remember(art) { dissolve.retarget(art, enabled = !reduceAnimation && !dissolve.lastClipShowing) }
+    SideEffect { dissolve.lastClipShowing = clipShowing }
     val mixingNow by rememberUpdatedState(mixing)
     LaunchedEffect(art) {
         if (dissolve.outgoing == null) return@LaunchedEffect

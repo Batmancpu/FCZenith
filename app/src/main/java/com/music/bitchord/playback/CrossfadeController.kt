@@ -805,6 +805,7 @@ class CrossfadeController(
         AppSettings.smartMixInProgress.value = false
         AppSettings.smartMixBlend.value = null
         clearMixView()
+        AppSettings.crossfadeRunning.value = false
         filters.open()
         filters.parkEchoes()
         onBlendHeadroom(1f)
@@ -1678,6 +1679,7 @@ class CrossfadeController(
         // the old sheen for a mix flag with no blend beside it, and would flash
         // it for a frame otherwise.
         publishBlend(out, into, force = true)
+        AppSettings.crossfadeRunning.value = true
         AppSettings.smartMixInProgress.value = isRealMix()
         if (isRealMix()) publishMixView(out, into)
         // The bar fills to the end through the first half of the blend, which
@@ -2761,6 +2763,7 @@ class CrossfadeController(
         AppSettings.smartMixInProgress.value = false
         AppSettings.smartMixBlend.value = null
         clearMixView()
+        AppSettings.crossfadeRunning.value = false
         if (!handedOff && phase != Phase.FADING) {
             // Nothing was ever audible; no ramp to run.
             finish()
@@ -2795,6 +2798,7 @@ class CrossfadeController(
         AppSettings.smartMixInProgress.value = false
         AppSettings.smartMixBlend.value = null
         clearMixView()
+        AppSettings.crossfadeRunning.value = false
         // Before anything else: a transition that never handed off leaves the
         // outgoing player as the session, and it must not pause at the end of
         // its track for a blend that is not coming.

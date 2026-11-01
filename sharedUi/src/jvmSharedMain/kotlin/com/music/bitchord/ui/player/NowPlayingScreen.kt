@@ -436,7 +436,11 @@ private const val DOCK_FADE_FLOOR = 1f / 255f
  * posisinya terasa terlalu ke atas). Banner baru mekar dari kartu setelah titik
  * ini, di ujung perjalanan.
  */
-private const val DOCK_BANNER_FROM = 0.7f
+private const val DOCK_BANNER_FROM = 0.15f
+
+/** Lama clip animasi cover (Apple/Spotify) padam ke thumbnail saat mix/crossfade mulai, dan kembali setelahnya. */
+private const val CLIP_MIX_FADE_OUT_MS = 900
+private const val CLIP_MIX_FADE_IN_MS = 500
 
 /**
  * Backdrop cover yang diburamkan baru mulai muncul setelah sleeve yang terbang
@@ -921,6 +925,19 @@ fun NowPlayingScreen(
     // track" check lives.
     val spotifyCanvasAutoHide by PlayerSettings.spotifyCanvasAutoHide.collectAsStateWithLifecycle()
     val mixing by PlayerSettings.smartMixInProgress.collectAsStateWithLifecycle()
+    val crossfading by PlayerSettings.crossfadeRunning.collectAsStateWithLifecycle()
+    // Begitu mix atau crossfade berjalan, clip animasi cover dipadamkan halus
+    // sehingga yang tersisa adalah cover thumbnail; transisi ke cover lagu
+    // berikutnya lalu berangkat dari gambar diam, bukan dari video yang masih
+    // berputar. Kembali menyala setelah transisi selesai.
+    val clipMixFade = animateFloatAsState(
+        targetValue = if (mixing || crossfading) 0f else 1f,
+        animationSpec = tween(
+            durationMillis = if (mixing || crossfading) CLIP_MIX_FADE_OUT_MS else CLIP_MIX_FADE_IN_MS,
+            easing = FastOutSlowInEasing,
+        ),
+        label = "clipMixFade",
+    )
     // A music video plays its own picture where the sleeve is — see
     // [MusicVideoSurface] — and takes the place of any animated cover.
     val showMusicVideo by PlayerSettings.showMusicVideo.collectAsStateWithLifecycle()
@@ -1384,7 +1401,15 @@ fun NowPlayingScreen(
     // never fires again. Keyed on the cover there is nothing to reset: the
     // bitmap really is still loaded, so the state stays true.
     val art = rememberPlayerArtwork(remoteArt)
-    val dissolve = rememberArtworkDissolve(art, mixing)
+    // clipShowing: lagu yang sedang tampil punya clip animasi yang benar-benar
+    // terlihat (bukan sedang dipadamkan oleh mix). Kalau begitu dan lagu diganti
+    // manual (next/prev), tidak ada dissolve lewat thumbnail: langsung ke cover
+    // lagu berikutnya.
+    val dissolve = rememberArtworkDissolve(
+        art = art,
+        mixing = mixing || crossfading,
+        clipShowing = canvas != null && canvasRendered && !mixing && !crossfading,
+    )
     // Sticky, unlike [PlayerArtwork.loaded]: the banner is the shape of the player rather
     // than a property of the track in it. Waiting on each new cover would
     // collapse the banner into a card and blow it back out on every skip —
@@ -2443,7 +2468,7 @@ fun NowPlayingScreen(
                             // Out of sight altogether while its still stands in for it.
                             presentationAlpha = {
                                 if (stillTakesOver()) 0f
-                                else (1f - 2f * p()).coerceIn(0f, 1f) * dockFade()
+                                else (1f - 2f * p()).coerceIn(0f, 1f) * dockFade() * clipMixFade.value
                             },
                             // A full-screen Spotify Canvas holds its frame for a beat
                             // once the player has come all the way up, rather than
@@ -3164,7 +3189,8 @@ fun NowPlayingScreen(
                                         } else {
                                             val bloom = ((dockT() - DOCK_BANNER_FROM) / (1f - DOCK_BANNER_FROM))
                                                 .coerceIn(0f, 1f)
-                                            lerp(cardRect(), full, smootherStep(bloom))
+                                            // Ease-out: cepat membesar di awal drag, bukan lambat.
+                                            lerp(cardRect(), full, 1f - (1f - bloom) * (1f - bloom))
                                         }
                                     }
                                     // Which way the sheet is going, from its last movement:
@@ -3500,7 +3526,7 @@ fun NowPlayingScreen(
                                             collapseStarted || dockMoving || overlayOpen.value,
                                         // The same stand-in as the banner's clip; here
                                         // the still is drawn by the sleeve around it.
-                                        presentationAlpha = { if (stillTakesOver()) 0f else 1f },
+                                        presentationAlpha = { if (stillTakesOver()) 0f else clipMixFade.value },
                                         startPositionMs = stillStart?.positionMs ?: 0L,
                                         revealInstantly = stillStart != null,
                                         captureStill = stillMoving,
