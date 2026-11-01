@@ -319,6 +319,51 @@ private fun DrawScope.drawFrameTopAligned(image: ImageBitmap) {
     drawContext.canvas.restore()
 }
 
+/** Bentuk klip hero yang sedang tampil, ditulis tiap komposisi dan dibaca saat skip. */
+private class HeroClipGeometry {
+    var portrait = false
+    var bannerHeightPx = 0f
+    var fade = 0f
+}
+
+/**
+ * Frame klip hero di tempat klipnya tadi: scope ini seukuran player, sama dengan view klip.
+ * Portrait: selebar isi klip, rata atas, rasio aslinya. Lainnya: selebar player setinggi
+ * banner. Tepi bawah dipudarkan seperti klip hidupnya (smootherstep sampai tepi bawah isi).
+ */
+private fun DrawScope.drawHeldClipFrame(image: ImageBitmap, clip: HeldClipFrame) {
+    if (size.width <= 0f || size.height <= 0f || image.width <= 0 || image.height <= 0) return
+    val aspect = image.width.toFloat() / image.height
+    val width: Float
+    val height: Float
+    if (clip.portrait) {
+        width = minOf(size.width, size.height * aspect)
+        height = width / aspect
+    } else {
+        width = size.width
+        height = minOf(clip.bannerHeightPx, size.height)
+    }
+    if (height <= 0f) return
+    drawImage(
+        image = image,
+        dstOffset = IntOffset(((size.width - width) / 2f).roundToInt(), 0),
+        dstSize = IntSize(width.roundToInt().coerceAtLeast(1), height.roundToInt().coerceAtLeast(1)),
+    )
+    if (clip.fade > 0.001f) {
+        drawRect(
+            brush = Brush.verticalGradient(
+                colorStops = Array(FADE_CURVE_STOPS + 1) { i ->
+                    val t = i / FADE_CURVE_STOPS.toFloat()
+                    t to Color.Black.copy(alpha = 1f - smootherStep(t))
+                },
+                startY = height * (1f - clip.fade.coerceAtMost(1f)),
+                endY = height,
+            ),
+            blendMode = BlendMode.DstIn,
+        )
+    }
+}
+
 /** [image] filling this scope, centred and cropped as [ContentScale.Crop] would. */
 private fun DrawScope.drawCropped(image: ImageBitmap) {
     if (size.width <= 0f || size.height <= 0f) return
@@ -1447,16 +1492,38 @@ fun NowPlayingScreen(
     // Pegangan terpisah untuk Spotify Canvas layar penuh: frame-nya tidak
     // dianimasikan di sleeve, tapi di lapisan setinggi layar.
     val fullFrameGrab = remember { CanvasFrameGrab() }
+    // Bentuk klip hero yang sedang tampil; diisi tiap komposisi di bawah (setelah
+    // clipFadeFraction), dibaca saat skip menahan frame-nya.
+    val heroClipGeometry = remember { HeroClipGeometry() }
     val grabClipFrame: () -> Unit = {
         val panelsUp = lyricsOpen || queueOpen
-        dissolve.holdFrame(if (panelsUp) null else canvasFrameGrab.grab?.invoke())
-        dissolve.holdFullFrame(
-            if (panelsUp) null else fullFrameGrab.grab?.invoke(),
-            spotifyCanvasControlsOpen,
-        )
+        // Klip hero (Apple dsb.): frame ditahan di lapisan seukuran player, lapisan yang
+        // sama dengan tempat klipnya, jadi posisi dan ukurannya persis sama. Di kotak
+        // sleeve ia di-crop atau meloncat ukuran saat klip dilepas.
+        val heroGrab = if (panelsUp || !heroMode) null else canvasFrameGrab.grab?.invoke()
+        dissolve.holdFrame(if (panelsUp || heroMode) null else canvasFrameGrab.grab?.invoke())
+        if (heroGrab != null) {
+            dissolve.holdFullFrame(
+                heroGrab,
+                false,
+                HeldClipFrame(
+                    heroClipGeometry.portrait,
+                    heroClipGeometry.bannerHeightPx,
+                    heroClipGeometry.fade,
+                ),
+            )
+        } else {
+            dissolve.holdFullFrame(
+                if (panelsUp) null else fullFrameGrab.grab?.invoke(),
+                spotifyCanvasControlsOpen,
+            )
+        }
     }
     // Lagu baru masuk: frame layar penuh yang tadi ditahan memudar (blur + zoom)
     // menuju layar lagu berikutnya.
+    // Di komposisi lagu baru, bukan di efek: frame yang ditahan sudah menutup di frame
+    // pertama lagu itu, tepat saat klip lama dilepas.
+    remember(song.videoId) { dissolve.showHeldFullFrame() }
     val artNow by rememberUpdatedState(art)
     val canvasRenderedNow by rememberUpdatedState(canvasRenderedState)
     LaunchedEffect(song.videoId) {
@@ -1623,6 +1690,9 @@ fun NowPlayingScreen(
     val clipFadeFraction = if (clipBottom > 0.dp) {
         (heroHeight.value * HERO_FADE_FRACTION / clipBottom.value).coerceIn(0f, 1f)
     } else 0f
+    heroClipGeometry.portrait = clipPortrait
+    heroClipGeometry.bannerHeightPx = with(density) { heroHeight.toPx() }
+    heroClipGeometry.fade = if (clipPortrait) clipFadeFraction else HERO_FADE_FRACTION
     val statusBarTop = stableStatusBarInsets().asPaddingValues().calculateTopPadding()
     // What sits between the status bar and the artwork: the drag strip. Read
     // in three places — the strip itself,
@@ -2651,7 +2721,12 @@ fun NowPlayingScreen(
                         .drawWithContent {
                             val grabbed = dissolve.fullFrame
                             if (grabbed != null && dissolve.fullProgress < 1f) {
-                                drawCropped(grabbed)
+                                val heldClip = dissolve.fullFrameClip
+                                if (heldClip != null) {
+                                    drawHeldClipFrame(grabbed, heldClip)
+                                } else {
+                                    drawCropped(grabbed)
+                                }
                                 drawContent()
                             }
                         },

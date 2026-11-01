@@ -273,6 +273,13 @@ internal class ArtworkDissolve(first: PlayerArtwork) {
     var fullFrameDeck by mutableStateOf(false)
         private set
 
+    /**
+     * Bentuk klip hero (Apple dsb.) yang membuat [fullFrame]; null untuk frame layar
+     * penuh Spotify. Dengan ini frame digambar di tempat yang sama persis dengan klipnya.
+     */
+    var fullFrameClip by mutableStateOf<HeldClipFrame?>(null)
+        private set
+
     /** Blur backdrop yang sedang tampil; diisi layar tiap komposisi, dibaca saat [retarget]. */
     var shownBlur: ImageBitmap? = null
 
@@ -330,11 +337,24 @@ internal class ArtworkDissolve(first: PlayerArtwork) {
     }
 
     /** Tahan frame canvas layar penuh; tersembunyi sampai [runFullTransition] jalan. */
-    internal fun holdFullFrame(image: ImageBitmap?, deckUp: Boolean = false) {
+    internal fun holdFullFrame(image: ImageBitmap?, deckUp: Boolean = false, clip: HeldClipFrame? = null) {
         if (image == null) return
         fullFrame = image
         fullFrameDeck = deckUp
+        fullFrameClip = clip
         fullProgress = 1f
+    }
+
+    /**
+     * Dipanggil saat komposisi lagu baru. Frame yang ditahan langsung menutup di frame
+     * pertama lagu itu juga, bukan satu frame kemudian lewat efek; selisih satu frame itu
+     * adalah kedipan antara klip yang dilepas dan frame yang tampil.
+     */
+    internal fun showHeldFullFrame() {
+        val waiting = androidx.compose.runtime.snapshots.Snapshot.withoutReadObservation {
+            fullFrame != null && fullProgress >= 1f
+        }
+        if (waiting) fullProgress = 0f
     }
 
     /** Lepas frame layar penuh yang tidak pernah dipakai, kecuali transisinya sedang jalan. */
@@ -442,6 +462,13 @@ internal fun rememberArtworkDissolve(
 }
 
 private const val ART_DISSOLVE_WAIT_MS = 2_500L
+
+/**
+ * Bentuk klip hero saat frame-nya ditahan: [portrait] bila klip dimuat portrait rata atas
+ * (tinggi = lebar / rasio), selain itu setinggi [bannerHeightPx]; [fade] porsi tepi bawah
+ * yang dipudarkan, sama seperti klip hidupnya.
+ */
+internal class HeldClipFrame(val portrait: Boolean, val bannerHeightPx: Float, val fade: Float)
 
 /** Selama progres sapuan masih di bawah ini, cover lama dianggap masih penuh terlihat. */
 private const val RETARGET_KEEP_PROGRESS = 0.3f
