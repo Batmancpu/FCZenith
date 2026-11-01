@@ -24,6 +24,7 @@ import coil3.compose.LocalPlatformContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImagePainter
 import coil3.request.ImageRequest
+import coil3.request.crossfade
 import com.music.bitchord.data.canvas.CanvasArtwork
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.model.artworkAt
@@ -145,6 +146,13 @@ internal class PlayerArtwork(val url: String?, private val context: PlatformCont
         ImageRequest.Builder(context)
             .data(url)
             .size(ART_PX)
+            // Dissolve antar cover sudah ditangani ArtworkDissolve. Crossfade
+            // 200ms bawaan ImageLoader membuat cover lama (layer outgoing) fade-in
+            // dari transparan dan cover baru fade-in dari kosong, sementara
+            // dissolve memudarkan cover lama: dua fade bertumpuk = alpha gabungan
+            // turun sebentar, dan itulah "blink"-nya. Tidak memengaruhi memory
+            // cache key, jadi tetap berbagi entry dengan mesh dan palette.
+            .crossfade(false)
             // What makes a retry a new request as far as Coil's model comparison
             // is concerned. Only from the second go onwards, so the ordinary
             // request stays byte-identical to the one the mesh and the palette
