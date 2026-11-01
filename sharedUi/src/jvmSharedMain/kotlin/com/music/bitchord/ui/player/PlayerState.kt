@@ -253,6 +253,18 @@ internal class ArtworkDissolve(first: PlayerArtwork) {
     var frame by mutableStateOf<ImageBitmap?>(null)
         private set
 
+    /**
+     * Frame terakhir Spotify Canvas layar penuh, diambil saat next/prev ditekan.
+     * Ditahan tersembunyi sampai lagu benar-benar pindah, lalu menutup layar dan
+     * memudar dengan blur + zoom (lihat [runFullTransition]).
+     */
+    var fullFrame by mutableStateOf<ImageBitmap?>(null)
+        private set
+
+    /** 0f = frame menutup layar, 1f = hilang (juga saat frame hanya ditahan menunggu lagu pindah). */
+    var fullProgress by mutableFloatStateOf(1f)
+        private set
+
     internal fun retarget(next: PlayerArtwork, enabled: Boolean, queueIndex: Int = -1) {
         val old = current
         if (old === next) return
@@ -289,6 +301,33 @@ internal class ArtworkDissolve(first: PlayerArtwork) {
     internal fun dropFrame() {
         if (outgoing == null) frame = null
     }
+
+    /** Tahan frame canvas layar penuh; tersembunyi sampai [runFullTransition] jalan. */
+    internal fun holdFullFrame(image: ImageBitmap?) {
+        if (image == null) return
+        fullFrame = image
+        fullProgress = 1f
+    }
+
+    /** Lepas frame layar penuh yang tidak pernah dipakai, kecuali transisinya sedang jalan. */
+    internal fun dropFullFrame() {
+        if (fullProgress >= 1f) fullFrame = null
+    }
+
+    /**
+     * Dipanggil saat lagu berganti. Kalau ada frame yang ditahan, frame itu
+     * langsung menutup layar lalu memudar menuju layar lagu baru. Bila transisi
+     * sebelumnya terpotong di tengah, dilanjutkan dari titik itu, bukan diulang.
+     */
+    internal suspend fun runFullTransition() {
+        if (fullFrame == null) return
+        val from = if (fullProgress < 1f) fullProgress else 0f
+        fullProgress = from
+        animate(from, 1f, animationSpec = tween(FRAME_DISSOLVE_MS, easing = ARTWORK_FLOW_EASING)) { value, _ ->
+            fullProgress = value
+        }
+        fullFrame = null
+    }
 }
 
 @Composable
@@ -324,6 +363,13 @@ internal fun rememberArtworkDissolve(
             if (held == null) return@collectLatest
             delay(FRAME_HOLD_TIMEOUT_MS)
             dissolve.dropFrame()
+        }
+    }
+    LaunchedEffect(dissolve) {
+        snapshotFlow { dissolve.fullFrame }.collectLatest { held ->
+            if (held == null) return@collectLatest
+            delay(FRAME_HOLD_TIMEOUT_MS)
+            dissolve.dropFullFrame()
         }
     }
     val mixingNow by rememberUpdatedState(mixing)

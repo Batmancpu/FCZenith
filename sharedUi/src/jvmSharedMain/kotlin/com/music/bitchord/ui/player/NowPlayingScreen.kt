@@ -1424,10 +1424,17 @@ fun NowPlayingScreen(
     // diambil sesaat sebelum skip, lalu sleeve menganimasikannya keluar menuju
     // cover lagu berikutnya — lihat [ArtworkDissolve.frame].
     val canvasFrameGrab = remember { CanvasFrameGrab() }
+    // Pegangan terpisah untuk Spotify Canvas layar penuh: frame-nya tidak
+    // dianimasikan di sleeve, tapi di lapisan setinggi layar.
+    val fullFrameGrab = remember { CanvasFrameGrab() }
     val grabClipFrame: () -> Unit = {
-        val grabbed = if (lyricsOpen || queueOpen) null else canvasFrameGrab.grab?.invoke()
-        dissolve.holdFrame(grabbed)
+        val panelsUp = lyricsOpen || queueOpen
+        dissolve.holdFrame(if (panelsUp) null else canvasFrameGrab.grab?.invoke())
+        dissolve.holdFullFrame(if (panelsUp) null else fullFrameGrab.grab?.invoke())
     }
+    // Lagu baru masuk: frame layar penuh yang tadi ditahan memudar (blur + zoom)
+    // menuju layar lagu berikutnya.
+    LaunchedEffect(song.videoId) { dissolve.runFullTransition() }
     val skipNext: () -> Unit = {
         grabClipFrame()
         onNext()
@@ -2518,7 +2525,7 @@ fun NowPlayingScreen(
                             captureStill = stillMoving && !clipFullscreen,
                             onStillCaptured = onStillCaptured,
                             onResumed = onClipResumed,
-                            frameGrab = if (clipFullscreen) null else canvasFrameGrab,
+                            frameGrab = if (clipFullscreen) fullFrameGrab else canvasFrameGrab,
                             onRenderedChanged = { canvasRendered = it },
                             // Frames only for the legacy mesh, the one backdrop still
                             // tinted off the clip.
@@ -2557,6 +2564,33 @@ fun NowPlayingScreen(
                         )
                     }
                 }
+
+                // Frame terakhir Spotify Canvas layar penuh, di atas latar dan di
+                // bawah kontrol. Tak terlihat sampai lagu berganti; lalu menutup
+                // layar dan memudar dengan zoom + blur. Tidak menangkap sentuhan.
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            val p = dissolve.fullProgress
+                            val active = dissolve.fullFrame != null && p < 1f
+                            alpha = if (active) 1f - p else 0f
+                            val zoom = if (active) 1f + 0.09f * p else 1f
+                            scaleX = zoom
+                            scaleY = zoom
+                            renderEffect = if (active && renderEffectBlurSupported) {
+                                val radius = 30f * smootherStep((p * 1.4f).coerceIn(0f, 1f))
+                                if (radius > 0.5f) BlurEffect(radius, radius, TileMode.Clamp) else null
+                            } else {
+                                null
+                            }
+                            compositingStrategy = CompositingStrategy.Offscreen
+                        }
+                        .drawWithContent {
+                            val grabbed = dissolve.fullFrame
+                            if (grabbed != null && dissolve.fullProgress < 1f) drawCropped(grabbed)
+                        },
+                )
 
                 // This transparent top gradient is always present while the modal
                 // player owns the system bar. Its opacity follows the actual top-band
