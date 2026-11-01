@@ -1392,6 +1392,10 @@
     <string name="download_addon_needs_lossless_output">%1$s hanya menyajikan musik saat headphone kabel, USB, atau kelas LDAC terhubung. Unduhan melewatinya sampai ada yang terhubung, jadi lagu Anda disimpan dari sumber Anda yang lain.</string>
     <string name="show_listen_together_button">Tampilkan tombol Dengar bersama</string>
     <string name="listen_together_tab">Bersama</string>
+    <string name="clear_canvas_cache_title">Bersihkan cache animasi cover?</string>
+    <string name="clear_canvas_cache_warning">Semua klip cover yang tersimpan akan dihapus. Klip akan diunduh lagi saat diputar berikutnya.</string>
+    <string name="clear_image_cache_title">Bersihkan cache gambar?</string>
+    <string name="clear_image_cache_warning">Semua sampul album yang tersimpan akan dihapus. Sampul akan diunduh lagi saat dibutuhkan.</string>
     <string name="show_listen_together_tab">Tampilkan tab Dengar bersama</string>
     <string name="show_listen_together_tab_subtitle">Menambahkan tab Bersama di bilah navigasi, di kanan Explore</string>
     <string name="show_listen_together_button_subtitle">Jika nonaktif, pemutar hanya menampilkan tombol output audio di antara lirik dan antrean</string>

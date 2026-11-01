@@ -322,6 +322,10 @@
     <string name="show_nerd_stats_subtitle">Codec, bitrate and sample rate on the player</string>
     <string name="show_listen_together_button">Show Listen Together button</string>
     <string name="listen_together_tab">Together</string>
+    <string name="clear_canvas_cache_title">Clear animated cover cache?</string>
+    <string name="clear_canvas_cache_warning">All stored cover clips will be deleted. They will be downloaded again the next time they play.</string>
+    <string name="clear_image_cache_title">Clear image cache?</string>
+    <string name="clear_image_cache_warning">All stored album artwork will be deleted. It will be downloaded again when needed.</string>
     <string name="show_listen_together_tab">Show Listen Together tab</string>
     <string name="show_listen_together_tab_subtitle">Adds a Together tab to the navigation bar, right of Explore</string>
     <string name="show_listen_together_button_subtitle">Off, the player shows only the audio output button between lyrics and the queue</string>

@@ -345,6 +345,8 @@ fun SettingsScreen(
     var importStatus by remember { mutableStateOf<String?>(null) }
     var confirmImport by remember { mutableStateOf(false) }
     var confirmClearSongCache by remember { mutableStateOf(false) }
+    var confirmClearCanvasCache by remember { mutableStateOf(false) }
+    var confirmClearImageCache by remember { mutableStateOf(false) }
     var showPerformanceWarning by remember { mutableStateOf(false) }
     var showPerformanceConfirmation by remember { mutableStateOf(false) }
     val backupScope = rememberCoroutineScope()
@@ -1396,16 +1398,7 @@ fun SettingsScreen(
                     icon = SfIcons.DeleteSweep,
                     title = clearCanvasCacheTitle,
                     subtitle = stringResource(R.string.clear_canvas_cache_subtitle),
-                    onClick = {
-                        backupScope.launch {
-                            withContext(Dispatchers.IO) { CanvasCache.clear() }
-                            Toast.makeText(
-                                context,
-                                context.getString(R.string.canvas_cache_cleared),
-                                Toast.LENGTH_SHORT,
-                            ).show()
-                        }
-                    },
+                    onClick = { confirmClearCanvasCache = true },
                 )
             }
             val clearSongCacheTitle = stringResource(R.string.clear_song_cache)
@@ -1423,12 +1416,7 @@ fun SettingsScreen(
                     icon = SfIcons.DeleteSweep,
                     title = clearImageCacheTitle,
                     subtitle = stringResource(R.string.clear_image_cache_subtitle),
-                    onClick = {
-                        val loader = SingletonImageLoader.get(context)
-                        loader.memoryCache?.clear()
-                        loader.diskCache?.clear()
-                        Toast.makeText(context, context.getString(R.string.image_cache_cleared), Toast.LENGTH_SHORT).show()
-                    },
+                    onClick = { confirmClearImageCache = true },
                 )
             }
         }
@@ -1803,6 +1791,58 @@ fun SettingsScreen(
                 .padding(top = 24.dp, bottom = 8.dp),
         )
         }
+    }
+
+    if (confirmClearCanvasCache) {
+        AlertDialog(
+            onDismissRequest = { confirmClearCanvasCache = false },
+            title = { Text(stringResource(R.string.clear_canvas_cache_title)) },
+            text = { Text(stringResource(R.string.clear_canvas_cache_warning)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmClearCanvasCache = false
+                    backupScope.launch {
+                        withContext(Dispatchers.IO) { CanvasCache.clear() }
+                        Toast.makeText(
+                            context,
+                            context.getString(R.string.canvas_cache_cleared),
+                            Toast.LENGTH_SHORT,
+                        ).show()
+                    }
+                }) {
+                    Text(stringResource(R.string.clear))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmClearCanvasCache = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
+        )
+    }
+
+    if (confirmClearImageCache) {
+        AlertDialog(
+            onDismissRequest = { confirmClearImageCache = false },
+            title = { Text(stringResource(R.string.clear_image_cache_title)) },
+            text = { Text(stringResource(R.string.clear_image_cache_warning)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmClearImageCache = false
+                    val loader = SingletonImageLoader.get(context)
+                    loader.memoryCache?.clear()
+                    loader.diskCache?.clear()
+                    Toast.makeText(context, context.getString(R.string.image_cache_cleared), Toast.LENGTH_SHORT).show()
+                }) {
+                    Text(stringResource(R.string.clear))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmClearImageCache = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
+        )
     }
 
     // Everything in the Cached songs folder goes with it, so say so first.
