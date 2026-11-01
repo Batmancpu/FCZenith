@@ -344,6 +344,7 @@ private fun GlassNowPlaying(
         // in, and a pull started in the strip above or below it went nowhere —
         // on a bar only 48dp tall to begin with.
         modifier = Modifier
+            .playerDockPill(dock)
             // Outside the press scale, which it lifts along with everything else.
             .miniPlayerGestures(
                 pull = pull,

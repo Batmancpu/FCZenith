@@ -13,6 +13,18 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toSize
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 
 /**
  * The mini player the expanded player docks into, for a host that has one.
@@ -86,6 +98,75 @@ class PlayerDock {
 
     internal fun miniArtCorner(): Dp = miniArtCorner
 
+    // ---- Morph: the mini player's pill and the full player are ONE surface ----
+    // The pill's rect (at rest, without the pull lift) is where the player
+    // starts and ends; the player is clipped to a rounded rect that grows from
+    // that pill to the whole window — see [playerMorph].
+    private var miniPill: LayoutCoordinates? = null
+    private var originW = -1
+    private var originH = -1
+
+    /** Where the player's window starts on screen. Measured once the sheet is laid out. */
+    internal var windowOrigin: Offset = Offset.Zero
+
+    fun reportMiniPill(coordinates: LayoutCoordinates) {
+        miniPill = coordinates
+    }
+
+    fun releaseMiniPill(coordinates: LayoutCoordinates) {
+        if (miniPill === coordinates) miniPill = null
+    }
+
+    /** The pill in the player window's own pixels, or null with no pill on screen. */
+    internal fun miniPillInWindow(): Rect? {
+        val c = miniPill?.takeIf { it.isAttached } ?: return null
+        val size = c.size.toSize()
+        return Rect(
+            c.localToScreen(Offset.Zero) - windowOrigin,
+            c.localToScreen(Offset(size.width, size.height)) - windowOrigin,
+        )
+    }
+
+    /**
+     * How far the player travels between fully open and docked on the pill:
+     * the pill's top edge. Falls back to the whole window with no pill.
+     */
+    fun travel(): Float {
+        val top = miniPillInWindow()?.top
+        return if (top != null && top > 1f) top else sheetTravel
+    }
+
+    internal fun measureWindow(coordinates: LayoutCoordinates) {
+        if (originW == coordinates.size.width && originH == coordinates.size.height) return
+        val offset = offset() ?: return
+        originW = coordinates.size.width
+        originH = coordinates.size.height
+        windowOrigin = coordinates.localToScreen(Offset.Zero) - Offset(0f, offset.toInt().toFloat())
+    }
+
+    /**
+     * The player's visible rect this frame, in the player box's own pixels, or
+     * null when it is fully open (no clip at all) or there is no pill to grow
+     * from. Left and right close in on the pill, the bottom rises to meet it,
+     * and the corners round off to the pill's: one shape changing size.
+     */
+    internal fun morph(size: Size): PlayerMorph? {
+        val pill = miniPillInWindow() ?: return null
+        val offset = offset() ?: return null
+        val travel = pill.top
+        if (travel <= 1f) return null
+        val progress = (1f - offset / travel).coerceIn(0f, 1f)
+        if (progress >= 1f) return null
+        val left = pill.left * (1f - progress)
+        val right = size.width - (size.width - pill.right) * (1f - progress)
+        val bottom = (pill.bottom + (size.height - pill.bottom) * progress - offset).coerceAtLeast(1f)
+        return PlayerMorph(
+            rect = Rect(left, 0f, right.coerceAtLeast(left + 1f), bottom),
+            corner = pill.height / 2f * (1f - progress),
+            progress = progress,
+        )
+    }
+
     /** The sheet's offset this frame, or null with no sheet laid out. */
     internal fun offset(): Float? = sheetOffset?.invoke()?.takeUnless { it.isNaN() }
 
@@ -94,7 +175,7 @@ class PlayerDock {
      * there is no sheet yet, which is where an opening player starts.
      */
     fun openFraction(): Float {
-        val travel = sheetTravel
+        val travel = travel()
         val offset = offset() ?: return 0f
         if (travel <= 0f) return 0f
         return (1f - offset / travel).coerceIn(0f, 1f)
@@ -120,3 +201,40 @@ class PlayerDock {
 
 /** The [PlayerDock] around the player, if its host has a mini player to dock into. */
 val LocalPlayerDock = staticCompositionLocalOf<PlayerDock?> { null }
+
+internal class PlayerMorph(val rect: Rect, val corner: Float, val progress: Float)
+
+private class MorphShape(private val rect: Rect, private val corner: Float) : Shape {
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline =
+        Outline.Rounded(RoundRect(rect, CornerRadius(corner, corner)))
+}
+
+/**
+ * Clips the player to a rounded rect that grows from the mini player's pill to
+ * the whole window as the sheet opens (and shrinks back as it closes), with a
+ * dark fill that comes up quickly so the pill reads as turning into the player.
+ * Read in the graphics layer and draw only: no recomposition per frame.
+ * No-op without a dock, and once the player is fully open.
+ */
+fun Modifier.playerMorph(dock: PlayerDock?): Modifier {
+    if (dock == null) return this
+    return this
+        .onGloballyPositioned { dock.measureWindow(it) }
+        .graphicsLayer {
+            val morph = dock.morph(size)
+            if (morph != null) {
+                shape = MorphShape(morph.rect, morph.corner)
+                clip = true
+                // Until the player has placed itself, its first frame would
+                // show full-size UI inside the pill.
+                alpha = if (!dock.attached && morph.progress < 0.02f) 0f else 1f
+            } else {
+                clip = false
+                alpha = 1f
+            }
+        }
+        .drawBehind {
+            val morph = dock.morph(size) ?: return@drawBehind
+            drawRect(Color(0xFF151517).copy(alpha = (morph.progress * 4f).coerceIn(0f, 1f)))
+        }
+}

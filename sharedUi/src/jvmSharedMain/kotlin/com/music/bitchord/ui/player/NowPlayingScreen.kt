@@ -3006,7 +3006,7 @@ fun NowPlayingScreen(
                         // Worked out off the sleeve, once a frame, and shared with the
                         // tile inside it so the two travel together.
                         fun dockRide(sleeve: Rect, mini: Rect): Float {
-                            val travel = dock?.sheetTravel ?: return 0f
+                            val travel = dock?.travel() ?: return 0f
                             if (travel <= 0f) return 0f
                             // The cover's distance below where the sleeve sits with the
                             // sheet fully open, as a share of the sheet's travel.

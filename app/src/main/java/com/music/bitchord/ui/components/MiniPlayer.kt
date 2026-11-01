@@ -341,6 +341,24 @@ internal fun Modifier.playerDockArt(dock: PlayerDock?, corner: Dp): Modifier {
         .graphicsLayer { alpha = if (dock.coversMiniArt) 0f else 1f }
 }
 
+/**
+ * The mini player's whole pill as the START of the player's morph — see
+ * [PlayerDock.morph]. Placed ahead of the pull lift on purpose, so it reports
+ * the pill at rest rather than the bar rising under the finger.
+ */
+@Composable
+internal fun Modifier.playerDockPill(dock: PlayerDock?): Modifier {
+    if (dock == null) return this
+    val placed = remember { arrayOfNulls<LayoutCoordinates>(1) }
+    DisposableEffect(dock) {
+        onDispose { placed[0]?.let(dock::releaseMiniPill) }
+    }
+    return this.onPlaced { coordinates ->
+        placed[0] = coordinates
+        dock.reportMiniPill(coordinates)
+    }
+}
+
 /** The mini player's cover for a music video: 16:9 at the cover's 40dp height. */
 private val VIDEO_ART_WIDTH = 71.dp
 
@@ -375,6 +393,7 @@ fun MiniPlayer(
     Box(
         modifier = modifier
             .padding(horizontal = BAR_GUTTER)
+            .playerDockPill(dock)
             // Ahead of the surface, so a pull lifts the whole of it, frost and all.
             .miniPlayerGestures(
                 pull = pull,

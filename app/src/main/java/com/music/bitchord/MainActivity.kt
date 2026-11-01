@@ -324,6 +324,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.ui.layout.onSizeChanged
 import com.music.bitchord.ui.player.LocalPlayerDock
+import com.music.bitchord.ui.player.playerMorph
 import com.music.bitchord.ui.player.PlayerDock
 import com.music.bitchord.ui.screens.DetailScreen
 import com.music.bitchord.ui.screens.sortedForDetail
@@ -4725,11 +4726,13 @@ private fun BitChordApp(
                         }
                     }
                     Box(
-                        when {
-                            reduceDynamicBlur -> Modifier
-                            playerLiveCanvas -> Modifier.layerBackdrop(livePlayerBackdrop)
-                            else -> Modifier.snapshotBackdropSource(playerBackdrop)
-                        },
+                        Modifier.playerMorph(activeDock).then(
+                            when {
+                                reduceDynamicBlur -> Modifier
+                                playerLiveCanvas -> Modifier.layerBackdrop(livePlayerBackdrop)
+                                else -> Modifier.snapshotBackdropSource(playerBackdrop)
+                            },
+                        ),
                     ) {
                         CompositionLocalProvider(LocalPlayerDock provides activeDock) {
                             nowPlaying(playerSong)
