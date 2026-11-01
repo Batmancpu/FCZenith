@@ -134,6 +134,25 @@ enum class ThemeMode(val label: String) {
 enum class AppFont { DEFAULT, LEGACY }
 
 /**
+ * The accent the user picked for the app: tab bar, active glyphs, sliders,
+ * links and selected states. [dark] and [light] are Apple's system colours for
+ * each appearance, as ARGB; [onAccent] is what text or a tick on top of the
+ * accent is drawn in. [RED] is Apple Music's own and the default.
+ */
+enum class AccentColor(val dark: Long, val light: Long, val onAccent: Long = 0xFFFFFFFF) {
+    RED(0xFFFA243C, 0xFFFA243C),
+    ORANGE(0xFFFF9F0A, 0xFFFF9500),
+    YELLOW(0xFFFFD60A, 0xFFE6B800, 0xFF000000),
+    GREEN(0xFF30D158, 0xFF34C759),
+    TEAL(0xFF40C8E0, 0xFF30B0C7),
+    BLUE(0xFF0A84FF, 0xFF007AFF),
+    INDIGO(0xFF5E5CE6, 0xFF5856D6),
+    PURPLE(0xFFBF5AF2, 0xFFAF52DE),
+    PINK(0xFFFF375F, 0xFFFF2D55),
+    GRAY(0xFF98989D, 0xFF8E8E93),
+}
+
+/**
  * Which of the equaliser's two tabs is driving the sound.
  *
  * One at a time rather than both at once: they are two ways of describing the
@@ -410,6 +429,7 @@ object AppSettings {
     val playbackSpeed = MutableStateFlow(1.0f)
     val themeMode = MutableStateFlow(ThemeMode.DARK)
     val appFont = MutableStateFlow(AppFont.DEFAULT)
+    val accentColor = MutableStateFlow(AccentColor.RED)
 
     /** Keep playing similar music once the queue runs out. */
     val autoplay = MutableStateFlow(true)
@@ -962,6 +982,9 @@ object AppSettings {
         appFont.value = runCatching {
             AppFont.valueOf(prefs.getString(KEY_APP_FONT, null) ?: AppFont.DEFAULT.name)
         }.getOrDefault(AppFont.DEFAULT)
+        accentColor.value = runCatching {
+            AccentColor.valueOf(prefs.getString(KEY_ACCENT_COLOR, null) ?: AccentColor.RED.name)
+        }.getOrDefault(AccentColor.RED)
         autoplay.value = prefs.getBoolean(KEY_AUTOPLAY, true)
         shuffleEnabled.value = prefs.getBoolean(KEY_SHUFFLE_ENABLED, false)
         repeatMode.value = prefs.getInt(KEY_REPEAT_MODE, Player.REPEAT_MODE_OFF)
@@ -1341,6 +1364,11 @@ object AppSettings {
     fun setAppFont(value: AppFont) {
         appFont.value = value
         prefs.edit().putString(KEY_APP_FONT, value.name).apply()
+    }
+
+    fun setAccentColor(value: AccentColor) {
+        accentColor.value = value
+        prefs.edit().putString(KEY_ACCENT_COLOR, value.name).apply()
     }
 
     fun setReduceAnimation(value: Boolean) {
@@ -2160,6 +2188,7 @@ object AppSettings {
     private const val KEY_SPEED = "playback_speed"
     private const val KEY_THEME = "theme_mode"
     private const val KEY_APP_FONT = "app_font"
+    private const val KEY_ACCENT_COLOR = "accent_color"
     private const val KEY_AUTOPLAY = "autoplay"
     private const val KEY_SHUFFLE_ENABLED = "shuffle_enabled"
     private const val KEY_REPEAT_MODE = "repeat_mode"

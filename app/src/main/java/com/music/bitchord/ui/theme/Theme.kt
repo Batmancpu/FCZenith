@@ -26,6 +26,10 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.music.bitchord.R
+import androidx.compose.material3.ColorScheme
+import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.lerp
+import com.music.bitchord.data.settings.AccentColor
 import com.music.bitchord.data.settings.AppFont
 
 // Apple Music's signature red. No longer the primary accent, but kept for the
@@ -110,11 +114,20 @@ private val AppleShapes = Shapes(
     extraLarge = RoundedCornerShape(28.dp).continuous(),
 )
 
-/** Cursor, handles and selection wash in the accent, as Apple Music sets them. */
-private val AppleSelectionColors = TextSelectionColors(
-    handleColor = AppleRed,
-    backgroundColor = AppleRed.copy(alpha = 0.3f),
-)
+/**
+ * This scheme with the user's accent in the places the accent lives: the primary
+ * and its container. Everything else keeps Apple's greys. For [AccentColor.RED]
+ * the result is the scheme as it always was.
+ */
+private fun ColorScheme.withAccent(accent: AccentColor, dark: Boolean): ColorScheme {
+    val tint = Color(if (dark) accent.dark else accent.light)
+    return copy(
+        primary = tint,
+        onPrimary = Color(accent.onAccent),
+        primaryContainer = if (dark) lerp(Color.Black, tint, 0.28f) else lerp(Color.White, tint, 0.16f),
+        onPrimaryContainer = if (dark) lerp(tint, Color.White, 0.8f) else lerp(tint, Color.Black, 0.65f),
+    )
+}
 
 /**
  * SF Pro Display, the face Apple Music itself is set in, drawn one weight
@@ -212,10 +225,20 @@ private fun Typography.withFamily(family: FontFamily) = Typography(
 fun BitChordTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     font: AppFont = AppFont.DEFAULT,
+    accent: AccentColor = AccentColor.RED,
     content: @Composable () -> Unit,
 ) {
+    val scheme = remember(darkTheme, accent) {
+        (if (darkTheme) DarkColors else LightColors).withAccent(accent, darkTheme)
+    }
+    val selection = remember(scheme.primary) {
+        TextSelectionColors(
+            handleColor = scheme.primary,
+            backgroundColor = scheme.primary.copy(alpha = 0.3f),
+        )
+    }
     MaterialTheme(
-        colorScheme = if (darkTheme) DarkColors else LightColors,
+        colorScheme = scheme,
         typography = when (font) {
             AppFont.DEFAULT -> BitChordTypography
             AppFont.LEGACY -> LegacyTypography
@@ -227,7 +250,7 @@ fun BitChordTheme(
         // already pass indication = null and keep their own press behaviour.
         CompositionLocalProvider(
             LocalRippleConfiguration provides null,
-            LocalTextSelectionColors provides AppleSelectionColors,
+            LocalTextSelectionColors provides selection,
             content = content,
         )
     }

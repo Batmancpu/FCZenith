@@ -168,6 +168,8 @@ import com.music.bitchord.data.sources.DeviceCodecs
 import com.music.bitchord.data.settings.AudioQuality
 import com.music.bitchord.data.settings.DownloadQuality
 import com.music.bitchord.data.settings.ThemeMode
+import androidx.compose.ui.graphics.luminance
+import com.music.bitchord.data.settings.AccentColor
 import com.music.bitchord.data.settings.AppFont
 import com.music.bitchord.data.stats.Backup
 import com.music.bitchord.playback.AudioCache
@@ -258,6 +260,7 @@ fun SettingsScreen(
     val translationLanguage by AppSettings.translationLanguage.collectAsStateWithLifecycle()
     val theme by AppSettings.themeMode.collectAsStateWithLifecycle()
     val appFont by AppSettings.appFont.collectAsStateWithLifecycle()
+    val accentColor by AppSettings.accentColor.collectAsStateWithLifecycle()
     val sessionId by AppSettings.audioSessionId.collectAsStateWithLifecycle()
     val outputPcmMode by AppSettings.outputPcmMode.collectAsStateWithLifecycle()
     val preferUsbDac by AppSettings.preferUsbDac.collectAsStateWithLifecycle()
@@ -906,6 +909,15 @@ fun SettingsScreen(
                     subtitle = appFont.description(),
                     value = appFont.localizedLabel(),
                     onClick = { onOpenChoice(SettingsChoiceKind.FONT) },
+                )
+            }
+            val accentTitle = stringResource(R.string.accent_color)
+            row(accentTitle, "accent", "color", "colour", "theme", "warna") {
+                SettingsRow(
+                    icon = SfIcons.BlurOn,
+                    title = accentTitle,
+                    value = accentColor.localizedLabel(),
+                    onClick = { onOpenChoice(SettingsChoiceKind.ACCENT) },
                 )
             }
             val reduceAnimationTitle = stringResource(R.string.reduce_animation)
@@ -1930,6 +1942,22 @@ private fun AppFont.localizedLabel(): String = stringResource(
     },
 )
 
+@Composable
+private fun AccentColor.localizedLabel(): String = stringResource(
+    when (this) {
+        AccentColor.RED -> R.string.accent_red
+        AccentColor.ORANGE -> R.string.accent_orange
+        AccentColor.YELLOW -> R.string.accent_yellow
+        AccentColor.GREEN -> R.string.accent_green
+        AccentColor.TEAL -> R.string.accent_teal
+        AccentColor.BLUE -> R.string.accent_blue
+        AccentColor.INDIGO -> R.string.accent_indigo
+        AccentColor.PURPLE -> R.string.accent_purple
+        AccentColor.PINK -> R.string.accent_pink
+        AccentColor.GRAY -> R.string.accent_gray
+    },
+)
+
 /** The typeface each [AppFont] sets, named under its label. */
 @Composable
 private fun AppFont.description(): String = stringResource(
@@ -2681,6 +2709,7 @@ enum class SettingsChoiceKind(@param:StringRes val title: Int) {
     AUTOMIX_PERFORMANCE(R.string.automix_performance),
     BIT_PERFECT(R.string.bit_perfect_output),
     FONT(R.string.font),
+    ACCENT(R.string.accent_color),
 }
 
 /** The main page's list of categories: a glyph and a name each, and a chevron into it. */
@@ -2800,6 +2829,13 @@ fun SettingsChoicePage(
                 }
             }
 
+            SettingsChoiceKind.ACCENT -> {
+                // No onChosen: the page stays up so the new accent can be seen
+                // taking hold behind the swatches before going back.
+                val selected by AppSettings.accentColor.collectAsStateWithLifecycle()
+                AccentColorPicker(selected = selected, onSelect = AppSettings::setAccentColor)
+            }
+
             SettingsChoiceKind.FONT -> {
                 val selected by AppSettings.appFont.collectAsStateWithLifecycle()
                 ChoiceGroup(
@@ -2815,6 +2851,59 @@ fun SettingsChoicePage(
             }
         }
         Spacer(Modifier.height(32.dp))
+    }
+}
+
+/** The accent colours as a grid of swatches, the one in force haloed and ticked. */
+@Composable
+private fun AccentColorPicker(
+    selected: AccentColor,
+    onSelect: (AccentColor) -> Unit,
+) {
+    val haptics = LocalHapticFeedback.current
+    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    SettingsGroup(footer = stringResource(R.string.accent_color_footer), topSpacing = 0.dp) {
+        Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+            AccentColor.entries.chunked(5).forEach { line ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = ROW_INSET, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    line.forEach { accent ->
+                        val tint = Color(if (isDark) accent.dark else accent.light)
+                        Box(
+                            modifier = Modifier
+                                .size(52.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (accent == selected) tint.copy(alpha = 0.25f) else Color.Transparent,
+                                    CircleShape,
+                                )
+                                .clickable {
+                                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    onSelect(accent)
+                                }
+                                .padding(6.dp)
+                                .background(tint, CircleShape),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            if (accent == selected) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Check,
+                                    contentDescription = accent.localizedLabel(),
+                                    tint = Color(accent.onAccent),
+                                    modifier = Modifier.size(24.dp),
+                                )
+                            }
+                        }
+                    }
+                    repeat(5 - line.size) { Spacer(Modifier.size(52.dp)) }
+                }
+            }
+        }
     }
 }
 

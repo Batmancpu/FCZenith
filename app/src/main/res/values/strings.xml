@@ -353,6 +353,18 @@
     <string name="font_default_subtitle">SF Pro Display · Apple Music weights</string>
     <string name="font_legacy_subtitle">SF Pro Display · Original heavy weights</string>
     <string name="font_footer">Legacy brings back the heavier, tighter type the app used before it was matched to Apple Music.</string>
+    <string name="accent_color" translatable="false">Accent color</string>
+    <string name="accent_color_footer" translatable="false">Sets the highlight color of the tab bar, buttons, sliders and selections. Hearts and Replay badges stay red.</string>
+    <string name="accent_red" translatable="false">Red</string>
+    <string name="accent_orange" translatable="false">Orange</string>
+    <string name="accent_yellow" translatable="false">Yellow</string>
+    <string name="accent_green" translatable="false">Green</string>
+    <string name="accent_teal" translatable="false">Teal</string>
+    <string name="accent_blue" translatable="false">Blue</string>
+    <string name="accent_indigo" translatable="false">Indigo</string>
+    <string name="accent_purple" translatable="false">Purple</string>
+    <string name="accent_pink" translatable="false">Pink</string>
+    <string name="accent_gray" translatable="false">Gray</string>
     <string name="reduce_animation">Reduce animation</string>
     <string name="reduce_animation_subtitle">Freezes the main player\'s gradient instead of drifting</string>
     <string name="reduce_dynamic_blur">Reduce dynamic blur</string>
