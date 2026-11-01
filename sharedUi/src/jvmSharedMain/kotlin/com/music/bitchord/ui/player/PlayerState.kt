@@ -319,10 +319,12 @@ internal class ArtworkDissolve(first: PlayerArtwork) {
      * langsung menutup layar lalu memudar menuju layar lagu baru. Bila transisi
      * sebelumnya terpotong di tengah, dilanjutkan dari titik itu, bukan diulang.
      */
-    internal suspend fun runFullTransition() {
+    internal suspend fun runFullTransition(ready: suspend () -> Unit = {}) {
         if (fullFrame == null) return
         val from = if (fullProgress < 1f) fullProgress else 0f
         fullProgress = from
+        // Frame lama sudah menutup layar; tunggu isi lagu baru siap baru memudar.
+        if (from == 0f) ready()
         animate(from, 1f, animationSpec = tween(FRAME_DISSOLVE_MS, easing = ARTWORK_FLOW_EASING)) { value, _ ->
             fullProgress = value
         }

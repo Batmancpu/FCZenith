@@ -91,6 +91,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.snapshots.Snapshot
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import org.jetbrains.compose.resources.stringResource
@@ -1434,7 +1435,18 @@ fun NowPlayingScreen(
     }
     // Lagu baru masuk: frame layar penuh yang tadi ditahan memudar (blur + zoom)
     // menuju layar lagu berikutnya.
-    LaunchedEffect(song.videoId) { dissolve.runFullTransition() }
+    val artNow by rememberUpdatedState(art)
+    val canvasRenderedNow by rememberUpdatedState(canvasRenderedState)
+    LaunchedEffect(song.videoId) {
+        dissolve.runFullTransition {
+            // Beri waktu clip lama dilepas, lalu tunggu cover atau frame pertama
+            // canvas lagu baru siap. Dibatasi, supaya tidak menahan layar terlalu lama.
+            delay(250L)
+            withTimeoutOrNull(2_000L) {
+                snapshotFlow { artNow.loaded || canvasRenderedNow.value }.first { it }
+            }
+        }
+    }
     val skipNext: () -> Unit = {
         grabClipFrame()
         onNext()
@@ -2574,7 +2586,13 @@ fun NowPlayingScreen(
                         .graphicsLayer {
                             val p = dissolve.fullProgress
                             val active = dissolve.fullFrame != null && p < 1f
-                            alpha = if (active) 1f - p else 0f
+                            // Tetap utuh di seperempat awal, supaya cover baru yang
+                            // masuk di atasnya tidak meninggalkan celah di antara keduanya.
+                            alpha = if (active) {
+                                1f - smootherStep(((p - 0.25f) / 0.75f).coerceIn(0f, 1f))
+                            } else {
+                                0f
+                            }
                             val zoom = if (active) 1f + 0.09f * p else 1f
                             scaleX = zoom
                             scaleY = zoom
@@ -3342,6 +3360,14 @@ fun NowPlayingScreen(
                                         else if (heroClip != null) 1f - canvasCover.floatValue
                                         else 1f
                                         ) *
+                                        // Selama frame Spotify Canvas lama masih menutup
+                                        // layar, sleeve lagu baru masuk perlahan di atasnya,
+                                        // bukan muncul penuh dengan gambar lama di bawahnya.
+                                        (if (dissolve.fullFrame != null && dissolve.fullProgress < 1f) {
+                                            smootherStep(dissolve.fullProgress)
+                                        } else {
+                                            1f
+                                        }) *
                                         // A music video has no square sleeve: its
                                         // picture box stands in, still frame first.
                                         // The sleeve is only the collapsed header's
