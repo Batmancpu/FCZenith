@@ -118,6 +118,8 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.BlurEffect
+import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.AwaitPointerEventScope
@@ -1418,6 +1420,22 @@ fun NowPlayingScreen(
         clipShowing = canvas != null && canvasRendered && !mixing && !crossfading,
         queueIndex = queueIndex,
     )
+    // Pegangan yang diisi clip canvas dengan pembaca frame hidupnya. Frame itu
+    // diambil sesaat sebelum skip, lalu sleeve menganimasikannya keluar menuju
+    // cover lagu berikutnya — lihat [ArtworkDissolve.frame].
+    val canvasFrameGrab = remember { CanvasFrameGrab() }
+    val grabClipFrame: () -> Unit = {
+        val grabbed = if (lyricsOpen || queueOpen) null else canvasFrameGrab.grab?.invoke()
+        dissolve.holdFrame(grabbed)
+    }
+    val skipNext: () -> Unit = {
+        grabClipFrame()
+        onNext()
+    }
+    val skipPrevious: () -> Unit = {
+        grabClipFrame()
+        onPrevious()
+    }
     // Sticky, unlike [PlayerArtwork.loaded]: the banner is the shape of the player rather
     // than a property of the track in it. Waiting on each new cover would
     // collapse the banner into a card and blow it back out on every skip —
@@ -1641,11 +1659,11 @@ fun NowPlayingScreen(
                     controlsLocked -> if (crossed) onBlockedControl()
                     total <= -swipeThreshold -> {
                         haptics.play(Haptic.SkipNext)
-                        onNext()
+                        skipNext()
                     }
                     total >= swipeThreshold -> {
                         haptics.play(Haptic.SkipPrevious)
-                        onPrevious()
+                        skipPrevious()
                     }
                 }
                 setSwipeOffset(0f)
@@ -2069,9 +2087,9 @@ fun NowPlayingScreen(
                             isLoading = isLoading || audioVersionSwitching,
                             previousEnabled = !controlsLocked && (hasPrevious || pastRestartPoint),
                             nextEnabled = !controlsLocked && hasNext,
-                            onPrevious = onPrevious,
+                            onPrevious = skipPrevious,
                             onPlayPause = onPlayPause,
-                            onNext = onNext,
+                            onNext = skipNext,
                             compact = true,
                         )
                     },
@@ -2293,9 +2311,9 @@ fun NowPlayingScreen(
                                     previousEnabled = !controlsLocked &&
                                         (hasPrevious || pastRestartPoint),
                                     nextEnabled = !controlsLocked && hasNext,
-                                    onPrevious = onPrevious,
+                                    onPrevious = skipPrevious,
                                     onPlayPause = onPlayPause,
-                                    onNext = onNext,
+                                    onNext = skipNext,
                                     compact = compact,
                                 )
                             },
@@ -2500,6 +2518,7 @@ fun NowPlayingScreen(
                             captureStill = stillMoving && !clipFullscreen,
                             onStillCaptured = onStillCaptured,
                             onResumed = onClipResumed,
+                            frameGrab = if (clipFullscreen) null else canvasFrameGrab,
                             onRenderedChanged = { canvasRendered = it },
                             // Frames only for the legacy mesh, the one backdrop still
                             // tinted off the clip.
@@ -3460,10 +3479,23 @@ fun NowPlayingScreen(
                                     .graphicsLayer {
                                         val left = 1f - dissolve.progress
                                         val ease = left * left
-                                        val settle = 1f + 0.12f * dissolve.punch * ease
+                                        // Setelah frame canvas: cover baru muncul dari
+                                        // blur + sedikit zoom ke tajam, tanpa geser.
+                                        val framed = dissolve.frame != null
+                                        val settle = 1f + (if (framed) 0.07f else 0.12f) * dissolve.punch * ease
                                         scaleX = settle
                                         scaleY = settle
-                                        translationX = dissolve.direction * dissolve.punch * size.width * 0.05f * ease
+                                        translationX = if (framed) {
+                                            0f
+                                        } else {
+                                            dissolve.direction * dissolve.punch * size.width * 0.05f * ease
+                                        }
+                                        renderEffect = if (framed && renderEffectBlurSupported && ease > 0.01f) {
+                                            val radius = 24f * dissolve.punch * ease
+                                            BlurEffect(radius, radius, TileMode.Clamp)
+                                        } else {
+                                            null
+                                        }
                                     }
                                     .drawWithContent {
                                         val frame = still()
@@ -3508,27 +3540,56 @@ fun NowPlayingScreen(
                                     .fillMaxSize()
                                     .graphicsLayer {
                                         val sweeping = dissolve.outgoing != null
-                                        alpha = if (sweeping) 1f else 0f
+                                        val framed = dissolve.frame != null
+                                        val t = dissolve.progress
+                                        // framed: frame canvas menahan layar sampai lagu
+                                        // pindah, lalu memudar (blur + zoom). Tanpa frame:
+                                        // sapuan geser, kini dengan ekor memudar halus.
+                                        alpha = when {
+                                            framed && sweeping -> 1f - t
+                                            framed -> 1f
+                                            sweeping -> 1f - smootherStep(((t - 0.62f) / 0.38f).coerceIn(0f, 1f))
+                                            else -> 0f
+                                        }
                                         // Cover lama ikut terbawa searah gerak (next ke
                                         // kiri, previous ke kanan), mengecil sedikit dan
                                         // miring seperti kartu yang dilepas.
                                         val move = dissolve.direction * dissolve.punch
-                                        translationX = if (sweeping) -move * size.width * 0.30f * dissolve.progress else 0f
-                                        val shrink = if (sweeping) 1f - 0.10f * dissolve.punch * dissolve.progress else 1f
+                                        translationX = if (sweeping && !framed) -move * size.width * 0.30f * t else 0f
+                                        val shrink = when {
+                                            sweeping && framed -> 1f + 0.09f * dissolve.punch * t
+                                            sweeping -> 1f - 0.08f * dissolve.punch * t
+                                            else -> 1f
+                                        }
                                         scaleX = shrink
                                         scaleY = shrink
-                                        rotationY = if (sweeping) move * 12f * dissolve.progress else 0f
+                                        rotationY = if (sweeping && !framed) move * 9f * t else 0f
+                                        renderEffect = if (sweeping && renderEffectBlurSupported) {
+                                            val radius = if (framed) {
+                                                30f * dissolve.punch * smootherStep((t * 1.4f).coerceIn(0f, 1f))
+                                            } else {
+                                                12f * dissolve.punch * 4f * t * (1f - t)
+                                            }
+                                            if (radius > 0.5f) BlurEffect(radius, radius, TileMode.Clamp) else null
+                                        } else {
+                                            null
+                                        }
                                         cameraDistance = 14f * this.density
-                                        compositingStrategy = if (sweeping) {
+                                        compositingStrategy = if (sweeping || framed) {
                                             CompositingStrategy.Offscreen
                                         } else {
                                             CompositingStrategy.Auto
                                         }
                                     }
                                     .drawWithContent {
+                                        val grabbed = dissolve.frame
+                                        if (grabbed != null) {
+                                            drawCropped(grabbed)
+                                            return@drawWithContent
+                                        }
                                         drawContent()
                                         if (dissolve.outgoing == null) return@drawWithContent
-                                        val feather = size.width * 0.55f
+                                        val feather = size.width * 0.75f
                                         val travel = size.width + feather
                                         val forward = dissolve.direction >= 0f
                                         // Tepi sapuan: next menyapu dari kanan ke kiri,
@@ -3595,6 +3656,7 @@ fun NowPlayingScreen(
                                         captureStill = stillMoving,
                                         onStillCaptured = onStillCaptured,
                                         onResumed = onClipResumed,
+                                        frameGrab = canvasFrameGrab,
                                         onRenderedChanged = { canvasRendered = it },
                                         frameCapturePx = if (legacyMesh) CANVAS_FRAME_CAPTURE_PX else 0,
                                         onFrameCaptured = {
@@ -4258,9 +4320,9 @@ fun NowPlayingScreen(
                         previousEnabled = !controlsLocked &&
                             (hasPrevious || pastRestartPoint),
                         nextEnabled = !controlsLocked && hasNext,
-                        onPrevious = onPrevious,
+                        onPrevious = skipPrevious,
                         onPlayPause = onPlayPause,
-                        onNext = onNext,
+                        onNext = skipNext,
                     )
 
                     // Keep the volume slot's full footprint when its contents are

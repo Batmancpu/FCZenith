@@ -1,6 +1,7 @@
 package com.music.bitchord.ui.player
 
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.runtime.snapshotFlow
 import com.music.bitchord.playback.PlaybackPosition
 import androidx.compose.animation.core.Animatable
@@ -8,6 +9,7 @@ import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.size
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -243,6 +245,14 @@ internal class ArtworkDissolve(first: PlayerArtwork) {
     /** 0f saat cover lama masih utuh, 1f saat hanya cover baru yang tersisa. */
     var progress by mutableFloatStateOf(1f)
 
+    /**
+     * Frame terakhir clip canvas, diambil tepat saat next/prev ditekan. Selama
+     * ada, layer cover lama menggambar frame ini (bukan thumbnail) dan
+     * transisinya memakai blur-zoom dissolve, bukan sapuan geser.
+     */
+    var frame by mutableStateOf<ImageBitmap?>(null)
+        private set
+
     internal fun retarget(next: PlayerArtwork, enabled: Boolean, queueIndex: Int = -1) {
         val old = current
         if (old === next) return
@@ -250,7 +260,8 @@ internal class ArtworkDissolve(first: PlayerArtwork) {
         // Indeks antrean mundur = previous. Selain itu (next, auto-advance)
         // dianggap maju.
         direction = if (queueIndex >= 0 && lastQueueIndex >= 0 && queueIndex < lastQueueIndex) -1f else 1f
-        if (enabled && old.url != null && next.url != null) {
+        val framed = frame != null
+        if (enabled && next.url != null && (old.url != null || framed)) {
             held = old
             outgoing = old
             progress = 0f
@@ -258,6 +269,7 @@ internal class ArtworkDissolve(first: PlayerArtwork) {
             held = next
             outgoing = null
             progress = 1f
+            frame = null
         }
     }
 
@@ -265,6 +277,17 @@ internal class ArtworkDissolve(first: PlayerArtwork) {
         progress = 1f
         outgoing = null
         held = current
+        frame = null
+    }
+
+    /** Simpan frame clip yang tampil sebelum skip; null membersihkan sisa sebelumnya. */
+    internal fun holdFrame(image: ImageBitmap?) {
+        frame = image
+    }
+
+    /** Lepas frame yang tidak pernah dipakai (lagu tidak jadi pindah atau cover sama). */
+    internal fun dropFrame() {
+        if (outgoing == null) frame = null
     }
 }
 
@@ -284,11 +307,24 @@ internal fun rememberArtworkDissolve(
     // ke cover berikutnya, tanpa memunculkan thumbnail lama dulu.
     remember(art) {
         dissolve.punch = if (mixing) 0.35f else 1f
-        dissolve.retarget(art, enabled = !reduceAnimation && !dissolve.lastClipShowing, queueIndex = queueIndex)
+        dissolve.retarget(
+            art,
+            enabled = !reduceAnimation && (dissolve.frame != null || !dissolve.lastClipShowing),
+            queueIndex = queueIndex,
+        )
     }
     SideEffect {
         dissolve.lastClipShowing = clipShowing
         dissolve.lastQueueIndex = queueIndex
+    }
+    // Frame yang ditahan tapi transisinya tak pernah mulai dilepas setelah jeda.
+    // Dibaca lewat snapshotFlow supaya layar tidak recompose karenanya.
+    LaunchedEffect(dissolve) {
+        snapshotFlow { dissolve.frame }.collectLatest { held ->
+            if (held == null) return@collectLatest
+            delay(FRAME_HOLD_TIMEOUT_MS)
+            dissolve.dropFrame()
+        }
     }
     val mixingNow by rememberUpdatedState(mixing)
     LaunchedEffect(art) {
@@ -296,7 +332,11 @@ internal fun rememberArtworkDissolve(
         // Cover baru harus sudah ada untuk dijadikan tujuan dissolve; cover
         // yang tidak kunjung datang ditinggalkan, bukan ditutupi yang lama.
         withTimeoutOrNull(ART_DISSOLVE_WAIT_MS) { snapshotFlow { art.loaded }.first { it } }
-        val duration = if (mixingNow) MIX_DISSOLVE_MS else SKIP_DISSOLVE_MS
+        val duration = when {
+            mixingNow -> MIX_DISSOLVE_MS
+            dissolve.frame != null -> FRAME_DISSOLVE_MS
+            else -> SKIP_DISSOLVE_MS
+        }
         animate(0f, 1f, animationSpec = tween(duration, easing = ARTWORK_FLOW_EASING)) { value, _ ->
             dissolve.progress = value
         }
@@ -307,10 +347,12 @@ internal fun rememberArtworkDissolve(
 
 private const val ART_DISSOLVE_WAIT_MS = 2_500L
 private const val MIX_DISSOLVE_MS = 1_800
-private const val SKIP_DISSOLVE_MS = 700
+private const val SKIP_DISSOLVE_MS = 950
+private const val FRAME_DISSOLVE_MS = 1_100
+private const val FRAME_HOLD_TIMEOUT_MS = 5_000L
 
 /** Mirip easeOutQuint: meluncur cepat di awal, lalu mengendap sangat halus. */
-private val ARTWORK_FLOW_EASING = CubicBezierEasing(0.22f, 1f, 0.36f, 1f)
+private val ARTWORK_FLOW_EASING = CubicBezierEasing(0.32f, 0.08f, 0.14f, 1f)
 
 /**
  * The seek bar's own state: a drag in progress, and where the handle was

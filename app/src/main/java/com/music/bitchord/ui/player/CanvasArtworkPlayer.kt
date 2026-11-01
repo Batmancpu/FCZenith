@@ -81,6 +81,9 @@ private const val REPAINT_TIMEOUT_MS = 700L
 /** How long after a clip leaves the screen its player is released — see its onDispose. */
 private const val DEFERRED_RELEASE_MS = 1_000L
 
+/** Sisi terpanjang frame yang diambil saat skip: cukup tajam untuk dianimasikan, murah dibaca dari GPU. */
+private const val LIVE_GRAB_PX = 720
+
 private val mainHandler = Handler(Looper.getMainLooper())
 
 /** Whether and when a clip plays on — see the playback gate and [onResumed]. */
@@ -215,6 +218,7 @@ internal fun AndroidCanvasArtworkPlayer(
     captureStill: Boolean = false,
     onStillCaptured: (ImageBitmap?, Long) -> Unit = { _, _ -> },
     onResumed: () -> Unit = {},
+    frameGrab: CanvasFrameGrab? = null,
 ) {
     val context = LocalContext.current
 
@@ -245,6 +249,25 @@ internal fun AndroidCanvasArtworkPlayer(
     val reportResumed by rememberUpdatedState(onResumed)
     val teardown = remember { Teardown() }
     val gate = remember { ResumeGate() }
+
+    // Pembaca frame hidup untuk pemanggil: dibaca sinkron di thread utama, hanya
+    // sekali per skip, jadi biayanya sebatas satu frame kecil. Null bila belum
+    // ada frame yang benar-benar tampil.
+    DisposableEffect(frameGrab, canvas) {
+        val grab: () -> ImageBitmap? = {
+            val view = textureView
+            if (!rendered || view == null) {
+                null
+            } else {
+                view.captureAt(LIVE_GRAB_PX, clipAspect, currentContentMode, currentAlignPortraitTop)
+                    ?.asImageBitmap()
+            }
+        }
+        frameGrab?.grab = grab
+        onDispose {
+            frameGrab?.let { if (it.grab === grab) it.grab = null }
+        }
+    }
 
     val player = remember {
         ExoPlayer.Builder(context)
@@ -966,6 +989,7 @@ internal fun AndroidCanvasVideo(spec: CanvasVideoSpec, modifier: Modifier) {
         captureStill = spec.captureStill,
         onStillCaptured = spec.onStillCaptured,
         onResumed = spec.onResumed,
+        frameGrab = spec.frameGrab,
     )
 }
 

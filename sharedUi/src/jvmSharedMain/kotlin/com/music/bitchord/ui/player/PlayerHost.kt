@@ -366,6 +366,14 @@ enum class CanvasContentMode {
     FIT_PORTRAIT,
 }
 
+/**
+ * Pegangan yang diisi clip yang sedang ter-mount dengan pembaca frame hidupnya,
+ * supaya layar bisa mengambil gambar yang sedang tampil sesaat sebelum lagu di-skip.
+ */
+class CanvasFrameGrab {
+    var grab: (() -> ImageBitmap?)? = null
+}
+
 /** Everything [CanvasArtworkPlayer] is asked, handed to the platform's decoder as one value. */
 class CanvasVideoSpec(
     val canvas: CanvasArtwork,
@@ -389,6 +397,7 @@ class CanvasVideoSpec(
     val captureStill: Boolean,
     val onStillCaptured: (ImageBitmap?, Long) -> Unit,
     val onResumed: () -> Unit,
+    val frameGrab: CanvasFrameGrab?,
 )
 
 /**
@@ -429,6 +438,8 @@ fun CanvasArtworkPlayer(
     onStillCaptured: (ImageBitmap?, Long) -> Unit = { _, _ -> },
     /** The clip has moved on from the frame it was last captured or started at. */
     onResumed: () -> Unit = {},
+    /** Diisi clip dengan pembaca frame hidupnya, untuk transisi saat skip. */
+    frameGrab: CanvasFrameGrab? = null,
 ) {
     PlayerPlatform.host.CanvasVideo(
         CanvasVideoSpec(
@@ -453,6 +464,7 @@ fun CanvasArtworkPlayer(
             captureStill = captureStill,
             onStillCaptured = onStillCaptured,
             onResumed = onResumed,
+            frameGrab = frameGrab,
         ),
         modifier,
     )
