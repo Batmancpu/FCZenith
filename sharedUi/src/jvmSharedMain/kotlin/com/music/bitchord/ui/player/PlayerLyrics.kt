@@ -5,6 +5,7 @@ import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animate
@@ -39,6 +40,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -47,6 +49,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -60,7 +63,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableIntState
 import androidx.compose.runtime.MutableLongState
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
@@ -93,6 +99,7 @@ import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.ui.graphics.drawscope.clipRect
@@ -143,6 +150,7 @@ import com.music.bitchord.ui.rememberIsForeground
 import java.util.Locale
 import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.exp
 import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.random.Random
@@ -433,30 +441,69 @@ private const val SCROLL_LEAD_MAX_MS = 500L
  * line handing over reads as a single movement rather than four that happen to
  * start together.
  */
-private val LYRIC_EASING = CubicBezierEasing(0.41f, 0f, 0.12f, 0.99f)
+// A critically damped spring from rest, read as a curve: it sets off at once and
+// settles in a long, soft tail, which is how Apple Music's lyrics move. Stretched
+// by what it has not quite covered at the end, so it still lands exactly on 1.
+private const val SPRING_RATE = 7f
+private val SPRING_REACHED = 1f - (1f + SPRING_RATE) * exp(-SPRING_RATE)
+private val LYRIC_EASING = Easing { fraction ->
+    val x = fraction.coerceIn(0f, 1f) * SPRING_RATE
+    (1f - (1f + x) * exp(-x)) / SPRING_REACHED
+}
 private const val LYRIC_SETTLE_MS = 400
 
 /**
  * How the rows fan out as the panel moves between lines.
  *
  * They do not travel as a block. Each row after the one being scrolled to sets
- * off slightly later than the row before it, up to a few rows back, so the
- * spacing opens as the panel leaves and closes as it arrives. A block of text
- * sliding rigidly is a list being scrolled; the same lines arriving one behind
- * another is the panel handing over.
+ * off a little later than the row before it, so the spacing opens as the panel
+ * leaves and closes as it arrives, and a handover runs down the screen as a
+ * ripple instead of a list sliding rigidly. Every row rides the same spring
+ * curve as the list, only later, so a row with no delay sits still against it.
  *
- * Deliberately under half of what the renderer this came from uses. Its lines
- * carry the whole scroll themselves, so a long delay only means arriving late;
- * here the list has already moved underneath them, and the same delay reads as
- * the rows being dragged rather than following.
+ * The step is a fixed number of milliseconds rather than a share of the move,
+ * and it shrinks for a quick line, so a fast verse is not still rippling when
+ * the next handover starts.
  */
-private const val STAGGER_STEPS = 3
-private const val STAGGER_FRACTION = 0.06f
+private const val STAGGER_STEPS = 7
+private const val STAGGER_STEP_MS = 34f
+
+/** How much longer the move takes than the run-up it starts in: the spring's tail. */
+private const val SCROLL_MOVE_STRETCH = 1.4f
 
 /** One handover: how far the panel is going, and how long it is taking. */
 private class ScrollRun(val id: Int, val delta: Float, val durationMs: Int) {
+    private val stepMs: Float get() = STAGGER_STEP_MS * (durationMs / 560f).coerceIn(0.6f, 1f)
+
+    /** How long a row [behind] rows after the target holds off before it follows. */
+    fun delayFor(behind: Int): Float = behind.coerceIn(0, STAGGER_STEPS) * stepMs
+
     /** The last row to arrive does so this long after the panel sets off. */
-    val spanMs: Float get() = durationMs * (1f + STAGGER_FRACTION * STAGGER_STEPS)
+    val spanMs: Float get() = durationMs + STAGGER_STEPS * stepMs
+}
+
+/** Where unsynced text is read, as a share of the viewport from its top. */
+private const val UNSYNCED_FOCUS_AT = 0.42f
+
+/** How far from that line, as a share of the viewport, text has fully dimmed. */
+private const val UNSYNCED_FOCUS_REACH = 0.7f
+private const val UNSYNCED_FLOOR = 0.5f
+
+/**
+ * Unsynced text has no line being sung to hold in focus, so the one being read
+ * is stood in for by wherever the list is: rows near a reading line a little
+ * above the middle stay full, and rows toward either edge settle back. Read in
+ * the draw phase, so a scroll redraws these layers without recomposing them.
+ */
+private fun readingFocus(state: LazyListState, index: Int): Float {
+    val info = state.layoutInfo
+    val item = info.visibleItemsInfo.firstOrNull { it.index == index } ?: return 1f
+    val viewport = (info.viewportEndOffset - info.viewportStartOffset).toFloat()
+    if (viewport <= 0f) return 1f
+    val middle = item.offset + item.size / 2f - info.viewportStartOffset
+    val away = (abs(middle - viewport * UNSYNCED_FOCUS_AT) / (viewport * UNSYNCED_FOCUS_REACH))
+        .coerceIn(0f, 1f)
+    return 1f - (1f - UNSYNCED_FLOOR) * (away * away * (3f - 2f * away))
 }
 
 /**
@@ -1756,7 +1803,7 @@ internal fun rememberPlayerControlsOnScroll(
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-internal fun LyricsPanel(
+private fun LyricsPanelList(
     lines: List<LyricLine>,
     /**
      * Romanized or translated copies of [lines], index for index, drawn small
@@ -1794,6 +1841,12 @@ internal fun LyricsPanel(
      * read from its top edge leaves most of the screen below the words.
      */
     centerFocus: Boolean = false,
+    /** Owned by [LyricsPanel], which draws the way back over this list. */
+    listState: LazyListState,
+    /** Whether the reader has taken the list into their own hands. */
+    browsingState: MutableState<Boolean>,
+    /** The line the panel follows, or -1 while there is none. */
+    followLine: MutableIntState,
     modifier: Modifier = Modifier,
 ) {
     val panelPlaying = isPlaying && active
@@ -1835,7 +1888,9 @@ internal fun LyricsPanel(
     // as the panel leaves it rather than when its last word ends, so the dim,
     // the blur and the movement are one gesture.
     val focusLine = if (leadLine >= 0) leadLine else scrollLine
-    val listState = rememberLazyListState()
+    SideEffect {
+        followLine.intValue = if (isSynced && focusLine in lines.indices) focusLine else -1
+    }
     LaunchedEffect(listState) {
         snapshotFlow { listState.isScrollInProgress }.collect(onScrollingChange)
     }
@@ -1845,7 +1900,7 @@ internal fun LyricsPanel(
         derivedStateOf { listState.layoutInfo.viewportSize.height }
     }
     val keepScroll = remember(listState) { keepScrollInList(listState) }
-    var browsingByDrag by remember { mutableStateOf(false) }
+    var browsingByDrag by browsingState
     // While picking lines, the panel must not auto-scroll — the reader needs
     // the list to stay put so they can tap the lines they want.
     val browsing = browsingByDrag || picking
@@ -1986,7 +2041,9 @@ internal fun LyricsPanel(
                 // given the run-up's own duration and curve instead of the
                 // list's default spring.
                 visible != null -> {
-                    val span = scrollLead(lines, clock.longValue).toInt()
+                    // The run-up stretched by the spring's tail: most of the move
+                    // is done inside the run-up, the rest settles under the line.
+                    val span = (scrollLead(lines, clock.longValue) * SCROLL_MOVE_STRETCH).toInt()
                     val distance = (visible.offset - focusOffset(visible.size)).toFloat()
                     run = ScrollRun(run.id + 1, distance, span)
                     // The same curve the rows catch up on. Two different
@@ -2115,12 +2172,19 @@ internal fun LyricsPanel(
             // the same floor rather than fading to nothing.
             val falloff = if (centerFocus) LINE_FALLOFF_ALPHA else LINE_FALLOFF_ALPHA_PHONE
             val step = distance.coerceAtMost(falloff.lastIndex)
+            // Rows after the one being scrolled to are the ones that fan out; the
+            // ones it is moving away from arrive together. The dim and the blur
+            // follow the same delay as the movement, so the ripple is one gesture,
+            // except under a finger: reading by hand answers at once.
+            val behind = if (run.delta >= 0f) index - focusLine else focusLine - index
+            val staggerDelay = if (run.id == 0) 0f else run.delayFor(behind)
+            val fadeDelay = if (browsing) 0 else staggerDelay.toInt()
             val blur by animateDpAsState(
                 targetValue = when {
                     !isSynced || reduceDynamicBlur || !lyricsBlur || browsing || isActive -> 0.dp
                     else -> LINE_FALLOFF_BLUR[step.coerceAtMost(LINE_FALLOFF_BLUR.lastIndex)]
                 },
-                animationSpec = tween(LYRIC_SETTLE_MS, easing = LYRIC_EASING),
+                animationSpec = tween(LYRIC_SETTLE_MS, delayMillis = fadeDelay, easing = LYRIC_EASING),
                 label = "lyricBlur",
             )
             val lineAlpha by animateFloatAsState(
@@ -2132,7 +2196,7 @@ internal fun LyricsPanel(
                     browsing -> BROWSING_ALPHA
                     else -> falloff[step]
                 },
-                animationSpec = tween(LYRIC_SETTLE_MS, easing = LYRIC_EASING),
+                animationSpec = tween(LYRIC_SETTLE_MS, delayMillis = fadeDelay, easing = LYRIC_EASING),
                 label = "lyricAlpha",
             )
             if (line.isGap) {
@@ -2249,11 +2313,6 @@ internal fun LyricsPanel(
                 // brightness as it leaves rather than when the last syllable
                 // lands — the dim, the blur and the movement together.
                 val sung = offset < 0
-                // Rows behind the one being scrolled to are the ones that
-                // fan out; the ones it is moving away from arrive together.
-                val behind = if (run.delta >= 0f) index - focusLine else focusLine - index
-                val staggerDelay = behind.coerceIn(0, STAGGER_STEPS) *
-                    STAGGER_FRACTION * run.durationMs
                 val interaction = remember { MutableInteractionSource() }
                 val pressed by interaction.collectIsPressedAsState()
                 val scale by animateFloatAsState(
@@ -2292,7 +2351,7 @@ internal fun LyricsPanel(
                         scaleX = scale
                         scaleY = scale
                         transformOrigin = TransformOrigin(if (alignEnd) 1f else 0f, 0.5f)
-                        alpha = lineAlpha
+                        alpha = if (isSynced) lineAlpha else lineAlpha * readingFocus(listState, index)
                         // Held back against the list's own movement: the list
                         // has already taken this row part of the way, so giving
                         // back what it has not earned yet is what leaves it
@@ -2537,7 +2596,123 @@ internal fun LyricsPanel(
 }
 
 /**
- * One voice of a row in [LyricsPanel] — the lead, or the answering line drawn
+ * The lyrics as the player mounts them: [LyricsPanelList], and over it the way
+ * back to the line being sung for a reader who has scrolled it out of sight.
+ */
+@Composable
+internal fun LyricsPanel(
+    lines: List<LyricLine>,
+    subLines: List<LyricLine>? = null,
+    trackKey: String,
+    playhead: LyricPlayhead,
+    looking: Boolean,
+    isPlaying: Boolean,
+    active: Boolean = true,
+    onSeekToLine: (Long) -> Unit,
+    controlsOpen: Boolean,
+    onRevealControls: () -> Unit,
+    onHideControls: () -> Unit,
+    translationProgress: State<Float>? = null,
+    onScrollingChange: (Boolean) -> Unit = {},
+    canPick: Boolean = false,
+    picking: Boolean = false,
+    picked: Set<Int> = emptySet(),
+    onPickLine: (Int) -> Unit = {},
+    onTogglePick: (Int) -> Unit = {},
+    centerFocus: Boolean = false,
+    modifier: Modifier = Modifier,
+) {
+    val listState = rememberLazyListState()
+    val browsingState = remember { mutableStateOf(false) }
+    val followLine = remember { mutableIntStateOf(-1) }
+    // Only worth showing while the line being sung is off screen: with it in
+    // view the panel hands itself back on its own within a moment.
+    val away by remember(listState) {
+        derivedStateOf {
+            val line = followLine.intValue
+            line >= 0 && listState.layoutInfo.visibleItemsInfo.none { it.index == line }
+        }
+    }
+    val lineAbove by remember(listState) {
+        derivedStateOf { followLine.intValue < listState.firstVisibleItemIndex }
+    }
+    val returnShown by animateFloatAsState(
+        targetValue = if (browsingState.value && away && !picking) 1f else 0f,
+        animationSpec = tween(durationMillis = 260, easing = LYRIC_EASING),
+        label = "lyricReturn",
+    )
+    val returnDescription = stringResource(Res.string.now_playing)
+    Box(modifier) {
+        LyricsPanelList(
+            lines = lines,
+            subLines = subLines,
+            trackKey = trackKey,
+            playhead = playhead,
+            looking = looking,
+            isPlaying = isPlaying,
+            active = active,
+            onSeekToLine = onSeekToLine,
+            controlsOpen = controlsOpen,
+            onRevealControls = onRevealControls,
+            onHideControls = onHideControls,
+            translationProgress = translationProgress,
+            onScrollingChange = onScrollingChange,
+            canPick = canPick,
+            picking = picking,
+            picked = picked,
+            onPickLine = onPickLine,
+            onTogglePick = onTogglePick,
+            centerFocus = centerFocus,
+            listState = listState,
+            browsingState = browsingState,
+            followLine = followLine,
+            modifier = Modifier.fillMaxSize(),
+        )
+        if (returnShown > 0.01f) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 28.dp)
+                    .graphicsLayer {
+                        alpha = returnShown
+                        val pop = 0.82f + 0.18f * returnShown
+                        scaleX = pop
+                        scaleY = pop
+                    }
+                    .size(46.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.22f))
+                    .clickable { browsingState.value = false }
+                    .semantics { contentDescription = returnDescription }
+                    .drawBehind {
+                        // A chevron pointing the way the line is: up when it has
+                        // been scrolled past, down when it is still to come.
+                        val half = size.minDimension * 0.17f
+                        val rise = size.minDimension * 0.09f * (if (lineAbove) 1f else -1f)
+                        val stroke = 2.6.dp.toPx()
+                        val mid = center
+                        drawLine(
+                            color = Color.White,
+                            start = Offset(mid.x - half, mid.y + rise),
+                            end = Offset(mid.x, mid.y - rise),
+                            strokeWidth = stroke,
+                            cap = StrokeCap.Round,
+                        )
+                        drawLine(
+                            color = Color.White,
+                            start = Offset(mid.x, mid.y - rise),
+                            end = Offset(mid.x + half, mid.y + rise),
+                            strokeWidth = stroke,
+                            cap = StrokeCap.Round,
+                        )
+                    },
+            )
+        }
+    }
+}
+
+/**
+ * One voice of a row in [LyricsPanelList] — the lead, or the answering line drawn
  * under it.
  *
  * Both go through the same sweep. A backing vocal carries its own word
