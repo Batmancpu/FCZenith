@@ -3180,7 +3180,7 @@ fun NowPlayingScreen(
                         // or coming back from the lyrics panel, where the strip is
                         // rebuilt from scratch) was pocketed for good. The gaps
                         // ratcheted open a little at a time and the sleeve paid for it.
-                        val roomy = maxHeight + controlSpread
+                        val roomy = maxHeight + (if (heroMode) controlSpread else 0.dp)
                         // The sleeve is square, so it is bounded by whichever of the
                         // two axes runs out first: the player's width on a phone, or —
                         // on a tablet, where there is width to spare — the height left
