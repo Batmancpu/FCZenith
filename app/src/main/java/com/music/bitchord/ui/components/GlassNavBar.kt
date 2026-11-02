@@ -279,9 +279,10 @@ fun GlassNavBar(
                                 overflow = TextOverflow.Ellipsis,
                             // The library's Tab stacks the glyph and the label
                             // with nothing between them; the plain bar spaces
-                            // them, and this is where that gap goes.
-                            modifier = Modifier.padding(top = TAB_ICON_LABEL_GAP),
-                        )
+                                // them, and this is where that gap goes.
+                                modifier = Modifier.padding(top = TAB_ICON_LABEL_GAP),
+                            )
+                        }
                     },
                     onClick = onClick,
                 )
