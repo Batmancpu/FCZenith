@@ -78,6 +78,12 @@ private const val TAG = "CanvasArtworkPlayer"
  */
 private const val REPAINT_TIMEOUT_MS = 700L
 
+/**
+ * Sisi terpanjang frame yang disalin tiap frame selagi cover terbang ke/dari mini
+ * player dan klip tetap berjalan: cukup tajam untuk gerakan, murah untuk disalin.
+ */
+private const val LIVE_STILL_MAX_SIDE = 640
+
 /** How long after a clip leaves the screen its player is released — see its onDispose. */
 private const val DEFERRED_RELEASE_MS = 1_000L
 
@@ -398,6 +404,21 @@ internal fun AndroidCanvasArtworkPlayer(
         if (still != null) gate.holdingStill = true
         Log.d(TAG, "still captured: ${still?.let { "${it.width}x${it.height}" }} at $position")
         reportStill(still?.asImageBitmap(), position)
+        // Klip yang tidak dijeda (perjalanan ke/dari mini player) terus berjalan,
+        // jadi frame yang dipakai sleeve ikut diperbarui tiap frame dan cover
+        // yang terbang tetap bergerak. Untuk collapse lyrics/queue klip dijeda,
+        // sehingga satu salinan di atas sudah cukup.
+        while (!currentPausedForTransition) {
+            withFrameMillis { }
+            val live = view.copyStill(
+                player.videoSize,
+                clipAspect,
+                contentMode,
+                alignPortraitTop,
+                LIVE_STILL_MAX_SIDE,
+            ) ?: continue
+            reportStill(live.asImageBitmap(), player.currentPosition)
+        }
     }
 
     // Repaint onto a surface that has just been handed back. A TextureView's
@@ -716,6 +737,7 @@ private suspend fun TextureView.copyStill(
     clipAspect: Float,
     contentMode: CanvasContentMode,
     alignPortraitTop: Boolean,
+    maxSide: Int = 0,
 ): Bitmap? {
     val texture = surfaceTexture ?: return null
     val videoWidth = (video.width * video.pixelWidthHeightRatio).roundToInt()
@@ -732,9 +754,10 @@ private suspend fun TextureView.copyStill(
             maxOf(width.toFloat() / videoWidth, height.toFloat() / videoHeight)
         },
     )
+    val shrink = if (maxSide > 0) minOf(1f, maxSide.toFloat() / maxOf(videoWidth, videoHeight)) else 1f
     val bitmap = Bitmap.createBitmap(
-        (videoWidth * scale).roundToInt().coerceAtLeast(1),
-        (videoHeight * scale).roundToInt().coerceAtLeast(1),
+        (videoWidth * scale * shrink).roundToInt().coerceAtLeast(1),
+        (videoHeight * scale * shrink).roundToInt().coerceAtLeast(1),
         Bitmap.Config.ARGB_8888,
     )
     val result = runCatching {
