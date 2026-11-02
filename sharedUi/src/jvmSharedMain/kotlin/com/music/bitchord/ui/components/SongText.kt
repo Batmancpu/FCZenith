@@ -37,6 +37,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.ui.graphics.fadingEdges
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.ui.draw.clipToBounds
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.music.bitchord.ui.player.PlayerSettings
 
 fun Modifier.thumbnailBorder(shape: Shape): Modifier = composed {
     this.border(
@@ -83,6 +94,59 @@ fun ExplicitSongTitle(
             )
         }
     }
+}
+
+/**
+ * Which way the change that brought a song on screen went. Every text that
+ * shows the song asks it, so the big player and the mini player slide the
+ * same way: back to the song before the last one is Previous, anything else
+ * is Next.
+ */
+private object TrackFlow {
+    private var current: String? = null
+    private var before: String? = null
+    private var forward = true
+
+    fun forwardTo(id: String): Boolean {
+        if (id != current) {
+            forward = id != before
+            before = current
+            current = id
+        }
+        return forward
+    }
+}
+
+/**
+ * Title and artist that slide out and in, sideways and faded, when the song
+ * changes: to the left on Next, to the right on Previous, as Apple Music's
+ * players do. A cut that keeps the same words stays put. With reduced
+ * animation it is a plain cross-fade.
+ */
+@Composable
+fun TrackTextSwitch(song: Song, modifier: Modifier = Modifier, content: @Composable (Song) -> Unit) {
+    val reduceAnimation by PlayerSettings.reduceAnimation.collectAsStateWithLifecycle()
+    val forward = TrackFlow.forwardTo(song.videoId)
+    AnimatedContent(
+        targetState = song,
+        contentKey = { it.title to it.artist },
+        transitionSpec = {
+            if (reduceAnimation) {
+                fadeIn(tween(150)) togetherWith fadeOut(tween(150))
+            } else {
+                val sign = if (forward) 1 else -1
+                (
+                    slideInHorizontally(tween(340, easing = FastOutSlowInEasing)) { width -> sign * width / 4 } +
+                        fadeIn(tween(260, delayMillis = 60))
+                    ) togetherWith (
+                    slideOutHorizontally(tween(340, easing = FastOutSlowInEasing)) { width -> -sign * width / 4 } +
+                        fadeOut(tween(160))
+                    )
+            }
+        },
+        modifier = modifier.clipToBounds(),
+        label = "trackText",
+    ) { shown -> content(shown) }
 }
 
 /**

@@ -14,6 +14,7 @@ import com.music.bitchord.sharedui.resources.*
 
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.animation.Crossfade
+import com.music.bitchord.ui.components.TrackTextSwitch
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -4245,37 +4246,29 @@ fun NowPlayingScreen(
                                 // ("… (Live)") dissolves into the new one instead of
                                 // snapping while the rest of the switch moves around
                                 // it.
-                                Crossfade(
-                                    targetState = song.title to song.artist,
-                                    animationSpec = tween(durationMillis = 300),
-                                    label = "playerCredits",
-                                ) {
+                                TrackTextSwitch(song, Modifier.fillMaxWidth()) { shown ->
                                     val scrolling = scrolls()
                                     val artistColor = LocalPlayerTint.current.copy(alpha = 0.55f)
                                     Column {
                                         MarqueeText(
-                                            text = song.title,
+                                            text = shown.title,
                                             style = MaterialTheme.typography.titleLarge.copy(
                                                 fontSize = 20.sp,
                                             ),
                                             color = Color.White,
                                             enabled = scrolling,
-                                            // Before the title, in the artist line's
-                                            // colour.
-                                            leading = if (song.isExplicit == true) {
+                                            leading = if (shown.isExplicit == true) {
                                                 { ExplicitBadge(color = artistColor) }
                                             } else {
                                                 null
                                             },
                                             onOverflowChange = { titleOverflowing = it },
-                                            // Only the tracks YouTube hands us a browse id for
-                                            // lead anywhere; the rest stay plain text.
-                                            modifier = Modifier.opensPage(song.albumId, onOpenAlbum),
+                                            modifier = Modifier.opensPage(shown.albumId, onOpenAlbum),
                                         )
                                         ArtistCreditsMarquee(
-                                            text = song.artist,
-                                            credits = remember(song.artist, song.artists, song.artistId) {
-                                                artistCredits(song.artist, song.artists, song.artistId)
+                                            text = shown.artist,
+                                            credits = remember(shown.artist, shown.artists, shown.artistId) {
+                                                artistCredits(shown.artist, shown.artists, shown.artistId)
                                             },
                                             style = MaterialTheme.typography.titleLarge.copy(
                                                 fontWeight = FontWeight.W500,
@@ -4283,9 +4276,6 @@ fun NowPlayingScreen(
                                             ),
                                             color = artistColor,
                                             enabled = scrolling,
-                                            // A title that's also scrolling gets to go first —
-                                            // starting together reads as clutter, so the artist
-                                            // waits a beat before it joins in.
                                             startDelayMillis = if (titleOverflowing) MARQUEE_ARTIST_STAGGER_MS else 0L,
                                             onOpenArtist = onOpenArtist,
                                         )

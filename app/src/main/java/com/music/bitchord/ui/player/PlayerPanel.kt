@@ -67,6 +67,7 @@ import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.model.artworkAt
 import com.music.bitchord.ui.components.ExplicitSongTitle
 import com.music.bitchord.ui.components.FadingLine
+import com.music.bitchord.ui.components.TrackTextSwitch
 import com.music.bitchord.ui.components.LocalLiquidGlassEnabled
 import com.music.bitchord.ui.components.MiniPlayerNextGlyph
 import com.music.bitchord.ui.components.glassContentColor
@@ -384,15 +385,17 @@ private fun PanelMiniRow(
                 )
             }
             Spacer(Modifier.width(if (!glass) 10.dp else if (showNext) 9.dp else 8.dp))
-            Column(Modifier.weight(1f)) {
-                ExplicitSongTitle(
-                    song = song,
-                    style = titleStyle,
-                    color = contentColor,
-                    badgeColor = secondary,
-                    fadeOverflow = true,
-                )
-                FadingLine(text = song.artist, style = artistStyle, color = secondary)
+            TrackTextSwitch(song, Modifier.weight(1f)) { shown ->
+                Column {
+                    ExplicitSongTitle(
+                        song = shown,
+                        style = titleStyle,
+                        color = contentColor,
+                        badgeColor = secondary,
+                        fadeOverflow = true,
+                    )
+                    FadingLine(text = shown.artist, style = artistStyle, color = secondary)
+                }
             }
             if (isLoading) {
                 Box(Modifier.size(glyphSlot), contentAlignment = Alignment.Center) {

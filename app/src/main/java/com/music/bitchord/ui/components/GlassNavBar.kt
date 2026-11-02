@@ -428,20 +428,22 @@ private fun GlassNowPlaying(
             // small, openly spaced type (see [ACCESSORY_TITLE_SIZE]). The inline
             // row shares its width with the tab pill and the Search circle, so
             // a long line fades out at its end, as Apple's does.
-            Column(Modifier.weight(1f)) {
-                val secondary = contentColor.copy(alpha = 0.7f)
-                ExplicitSongTitle(
-                    song = song,
-                    style = titleStyle,
-                    color = contentColor,
-                    badgeColor = secondary,
-                    fadeOverflow = true,
-                )
-                FadingLine(
-                    text = song.artist,
-                    style = artistStyle,
-                    color = secondary,
-                )
+            TrackTextSwitch(song, Modifier.weight(1f)) { shown ->
+                Column {
+                    val secondary = contentColor.copy(alpha = 0.7f)
+                    ExplicitSongTitle(
+                        song = shown,
+                        style = titleStyle,
+                        color = contentColor,
+                        badgeColor = secondary,
+                        fadeOverflow = true,
+                    )
+                    FadingLine(
+                        text = shown.artist,
+                        style = artistStyle,
+                        color = secondary,
+                    )
+                }
             }
             if (isLoading) {
                 Box(Modifier.size(glyphSlot), contentAlignment = Alignment.Center) {
