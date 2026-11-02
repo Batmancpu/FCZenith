@@ -3509,16 +3509,10 @@ fun NowPlayingScreen(
                                     // Stashed for the tile inside, which is measured
                                     // within this, and for the player's own draw.
                                     val mini = miniInBox()
-                                    val open = sleeveRect().let { full ->
-                                        if (mini == null) {
-                                            full
-                                        } else {
-                                            val bloom = ((dockEase(dockT()) - DOCK_BANNER_FROM) / (1f - DOCK_BANNER_FROM))
-                                                .coerceIn(0f, 1f)
-                                            // Ease-out: cepat membesar di awal drag, bukan lambat.
-                                            lerp(cardRect(), full, 1f - (1f - bloom) * (1f - bloom))
-                                        }
-                                    }
+                                    // Langsung dari cover mini ke rect tujuan (banner full-bleed),
+                                    // tanpa mampir ke kartu di tengah: cover tetap menempel di tepi
+                                    // kiri dan membesar ke kanan/atas sampai full bleed.
+                                    val open = sleeveRect()
                                     // Which way the sheet is going, from its last movement:
                                     // opening rides the sheet as it always did, closing keeps
                                     // to the straighter path (see [DOCK_RIDE_SHARE]).
