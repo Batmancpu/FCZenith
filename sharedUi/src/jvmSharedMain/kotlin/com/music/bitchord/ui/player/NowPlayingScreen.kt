@@ -3243,7 +3243,7 @@ fun NowPlayingScreen(
                         if (!lyricsOpen && !queueOpen && !queueDragging && collapseAtRest && controlDeckIsMeasured) {
                             val target = with(density) {
                                 val half = slack
-                                    .coerceAtMost(CONTROL_GAP_SPREAD_MAX * 2)
+                                    .coerceAtMost(if (heroMode) CONTROL_GAP_SPREAD_MAX * 2 else 0.dp)
                                     .toPx()
                                     .div(2f)
                                     .roundToInt()
