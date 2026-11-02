@@ -516,6 +516,15 @@ private const val DOCK_BACKDROP_FROM = 0.15f
 /** Seberapa jauh drag (0..1 dari mini ke penuh) saat cover sudah selebar panel dan menutup sudutnya. */
 private const val DOCK_COVER_FULL_AT = 0.4f
 
+/** Untuk cover kartu (bukan full-bleed): drag sejauh ini sebelum cover mencapai ukuran penuh. */
+private const val DOCK_CARD_FULL_AT = 0.9f
+
+/** Smoothstep: membesar bertahap, tidak melonjak di awal drag. */
+private fun dockEaseCard(t: Float): Float {
+    val x = (t / DOCK_CARD_FULL_AT).coerceIn(0f, 1f)
+    return x * x * (3f - 2f * x)
+}
+
 /** Ease-out: 0 di mini player, 1 begitu drag melewati [DOCK_COVER_FULL_AT], naik cepat di awal. */
 private fun dockEase(t: Float): Float {
     val x = (t / DOCK_COVER_FULL_AT).coerceIn(0f, 1f)
@@ -3459,8 +3468,12 @@ fun NowPlayingScreen(
                         // the sheet has gone.
                         fun towardsDock(rect: Rect, mini: Rect?): Rect {
                             if (mini == null) return rect
-                            val unridden = dockFrame.offset * (1f - dockFrame.ride)
-                            return lerp(mini, rect.translate(0f, -unridden), dockEase(dockT()))
+                            // Cover kartu ikut panel sepenuhnya (tidak ditarik ke atas) dan
+                            // membesar bertahap, supaya margin atasnya terjaga dan tidak
+                            // terpotong tepi panel. Banner full-bleed tetap seperti semula.
+                            val unridden = if (heroMode) dockFrame.offset * (1f - dockFrame.ride) else 0f
+                            val ease = if (heroMode) dockEase(dockT()) else dockEaseCard(dockT())
+                            return lerp(mini, rect.translate(0f, -unridden), ease)
                         }
                         // The banner's dissolve, firmed up into the cover's hard edge as
                         // it docks.
