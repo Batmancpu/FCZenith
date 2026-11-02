@@ -4033,7 +4033,10 @@ fun NowPlayingScreen(
                                         .align(Alignment.BottomCenter)
                                         .padding(horizontal = 10.dp, vertical = 8.dp)
                                         .graphicsLayer {
-                                            alpha = (1f - p() * 2f) * spotifyChromeAlpha
+                                            // Tidak tampil selama cover terbang: cover digambar di
+                                            // atas semuanya dan akan menutupi teks ini.
+                                            val dockShown = ((dockT() - 0.85f) / 0.15f).coerceIn(0f, 1f)
+                                            alpha = (1f - p() * 2f) * spotifyChromeAlpha * dockShown
                                         },
                                 )
                             }
