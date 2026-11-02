@@ -3199,6 +3199,13 @@ fun NowPlayingScreen(
                         // failure than a credits row overhanging the lyric strip.
                         val fullArt = minOf(wantArt, maxHeight - ART_TITLE_GAP - HEADER_HEIGHT)
                             .coerceAtLeast(THUMB_SIZE)
+                        // Slot yang sama di mode full-bleed maupun kartu, supaya judul dan
+                        // tombol tidak bergeser saat lagu berpindah antar dua mode itu.
+                        val slotArt = minOf(
+                            maxWidth + 48.dp,
+                            roomy - ART_TITLE_GAP - HEADER_HEIGHT,
+                            maxHeight - ART_TITLE_GAP - HEADER_HEIGHT,
+                        ).coerceAtLeast(fullArt)
                         // What's left over once the sleeve, the gap and the credits have
                         // had theirs. A few dp on a phone; the better part of a
                         // centimetre on anything taller, and since the group is centred,
@@ -3244,7 +3251,7 @@ fun NowPlayingScreen(
                         // listened for here at all.
                         if (!lyricsOpen && !queueOpen && !queueDragging && collapseAtRest && controlDeckIsMeasured) {
                             val target = with(density) {
-                                val half = slack
+                                val half = 0.dp
                                     .coerceAtMost(if (heroMode) CONTROL_GAP_SPREAD_MAX * 2 else 0.dp)
                                     .toPx()
                                     .div(2f)
@@ -3273,17 +3280,17 @@ fun NowPlayingScreen(
                         // the pair sits centred while the queue is closed — in whatever
                         // the controls couldn't take, which on all but the tallest
                         // screens is nothing.
-                        val groupTop = (maxHeight - fullArt - ART_TITLE_GAP - HEADER_HEIGHT)
+                        val groupTop = (maxHeight - slotArt - ART_TITLE_GAP - HEADER_HEIGHT)
                             .coerceAtLeast(0.dp) / 2
                         // Functions of the collapse, called at placement and measure
                         // — see [p]. Composition never reads them.
                         fun artSize(): Dp = lerp(fullArt, THUMB_SIZE, p())
-                        fun artTop(): Dp = lerp(groupTop, 0.dp, p())
+                        fun artTop(): Dp = lerp(groupTop + (slotArt - fullArt), 0.dp, p())
                         // Expanded and height-bound, the sleeve is narrower than the
                         // player and has to be centred in it; collapsed, it belongs
                         // hard against the left edge with the credits beside it.
                         fun artStart(): Dp = lerp((maxWidth - fullArt) / 2, 0.dp, p())
-                        fun regularTitleTop(): Dp = lerp(groupTop + fullArt + ART_TITLE_GAP, 0.dp, p())
+                        fun regularTitleTop(): Dp = lerp(groupTop + slotArt + ART_TITLE_GAP, 0.dp, p())
                         // Once Spotify's control deck has left, keep the only remaining
                         // player chrome against the bottom edge instead of stranding it
                         // where the artwork's title normally sits near mid-screen.
@@ -3316,7 +3323,7 @@ fun NowPlayingScreen(
                         // screen's top and this box's own top is fixed padding, so it
                         // can simply be added back up rather than measured.
                         val bannerBottom = statusBarTop + topStrip + ART_BOX_TOP_PAD +
-                            groupTop + fullArt + ART_TITLE_GAP / 2
+                            groupTop + slotArt + ART_TITLE_GAP / 2
                         // Frozen while lyrics are up. The controls now retain their full
                         // footprint across the transition, so this answer is identical
                         // on both sides; avoiding writes during the panel keeps the

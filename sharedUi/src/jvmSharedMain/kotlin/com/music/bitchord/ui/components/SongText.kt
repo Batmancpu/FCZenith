@@ -119,7 +119,6 @@ object TrackFlow {
     fun forwardTo(id: String): Boolean {
         if (id != current) {
             val hinted = hintForward?.takeIf { System.currentTimeMillis() - hintAt < HINT_VALID_MS }
-            hintForward = null
             forward = hinted ?: (id != before)
             before = current
             current = id
@@ -140,7 +139,7 @@ fun TrackTextSwitch(song: Song, modifier: Modifier = Modifier, content: @Composa
     val forward = TrackFlow.forwardTo(song.videoId)
     AnimatedContent(
         targetState = song,
-        contentKey = { it.title to it.artist },
+        contentKey = { it.videoId },
         transitionSpec = {
             if (reduceAnimation) {
                 fadeIn(tween(150)) togetherWith fadeOut(tween(150))
