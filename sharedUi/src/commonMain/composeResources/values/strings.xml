@@ -214,6 +214,8 @@
     <string name="top_pick_your_station">Your Station</string>
     <string name="top_pick_discovery_station">Discovery Station</string>
     <string name="top_pick_new_from">New from %1$s</string>
+    <string name="top_pick_label_new_release">New Release</string>
+    <string name="top_pick_label_listen_again">Listen Again</string>
     <string name="mood_energy">Energy</string>
     <string name="mood_energy_line">High-voltage tracks to keep you moving.</string>
     <string name="mood_relax">Relax</string>

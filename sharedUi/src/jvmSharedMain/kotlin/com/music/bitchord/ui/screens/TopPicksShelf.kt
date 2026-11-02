@@ -179,13 +179,23 @@ internal fun TopPicksShelf(
                                 onClipFound = { found -> hasClip[index] = found },
                             ),
                         ) {
-                            TopPickCard(
-                                pick = pick,
-                                listenerName = listenerName,
-                                onClick = onClick,
-                                onLongPress = onLongPress?.takeIf { pick.kind == TopPickKind.LATEST_RELEASE },
-                                modifier = Modifier.width(cardWidth),
-                            )
+                            Column(Modifier.width(cardWidth)) {
+                                Text(
+                                    text = topPickLabel(pick),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.padding(bottom = 6.dp),
+                                )
+                                TopPickCard(
+                                    pick = pick,
+                                    listenerName = listenerName,
+                                    onClick = onClick,
+                                    onLongPress = onLongPress?.takeIf { pick.kind == TopPickKind.LATEST_RELEASE },
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
                         }
                     }
                 }
@@ -207,15 +217,26 @@ fun LazyListScope.topPicksSkeleton() {
                     userScrollEnabled = false,
                 ) {
                     items(2) {
-                        ShimmerBox(
-                            modifier = Modifier.width(cardWidth).aspectRatio(TOP_PICK_RATIO),
-                            shape = TopPickShape,
-                        )
+                        Column(Modifier.width(cardWidth)) {
+                            Spacer(Modifier.height(26.dp))
+                            ShimmerBox(
+                                modifier = Modifier.fillMaxWidth().aspectRatio(TOP_PICK_RATIO),
+                                shape = TopPickShape,
+                            )
+                        }
                     }
                 }
             }
         }
     }
+}
+
+/** The small grey label above a card, as Apple Music has it. */
+@Composable
+private fun topPickLabel(pick: TopPick): String = when (pick.kind) {
+    TopPickKind.LATEST_RELEASE -> stringResource(Res.string.top_pick_label_new_release)
+    TopPickKind.FEATURED_ARTIST -> stringResource(Res.string.top_pick_label_listen_again)
+    else -> stringResource(Res.string.top_pick_made_for_you)
 }
 
 /** What a card says: the small coloured line, the title, and an optional line under it. */
