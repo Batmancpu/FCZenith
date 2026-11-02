@@ -3384,7 +3384,13 @@ private fun BitChordApp(
                                 topPicks = topPicks,
                                 topPicksLoading = topPicksLoading,
                                 listenerName = account?.name,
-                                onTopPickClick = openTopPick,
+                                onTopPickClick = { pick, label ->
+                                    if (pick.kind == TopPickKind.MOOD) {
+                                        navigator.push(AppRoute.Moods)
+                                    } else {
+                                        openTopPick(pick, label)
+                                    }
+                                },
                                 onMoodClick = playMood,
                                 onMoodsShowAll = { navigator.push(AppRoute.Moods) },
                                 artworkMotion = artworkMotion,
