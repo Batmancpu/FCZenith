@@ -2576,7 +2576,9 @@ fun NowPlayingScreen(
                     .fillMaxSize()
                     .onSizeChanged { playerBounds = it }
                     .then(dockHost)
-                    .background(Color.Black),
+                    .background(
+                        if (fullArtworkBlurImage == null || legacyMesh) Color.Black else Color.Transparent,
+                    ),
             ) {
                 // The same blurred still cover the lyrics and queue use, under the
                 // main player as well — square or portrait clip, or still art. The
@@ -2621,7 +2623,7 @@ fun NowPlayingScreen(
                     )
                 }
                 fullArtworkBlurContent(
-                    Modifier.graphicsLayer { alpha = fullArtworkBackdropAlpha * dockBackdropAlpha() },
+                    Modifier.graphicsLayer { alpha = fullArtworkBackdropAlpha },
                 )
 
                 // Mount once, behind the controls. A known portrait aspect changes the
