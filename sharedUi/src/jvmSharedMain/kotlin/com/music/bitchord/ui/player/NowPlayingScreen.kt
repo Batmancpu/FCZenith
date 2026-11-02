@@ -1437,7 +1437,11 @@ fun NowPlayingScreen(
             )
         }
     }
-    val fullBleedArt by PlayerSettings.fullBleedArtwork.collectAsStateWithLifecycle()
+    val fullBleedSetting by PlayerSettings.fullBleedArtwork.collectAsStateWithLifecycle()
+    // Lagu tipe video yang tidak punya canvas hanya punya frame 16:9 sebagai
+    // cover. Dibentangkan full screen hasilnya buruk, jadi tetap jadi kartu
+    // walau pengaturan full-bleed menyala. Dengan canvas, aturannya tidak berubah.
+    val fullBleedArt = fullBleedSetting && !(song.isVideo && canvas == null)
     // Full-bleed is a phone idiom. What the width has to rule out is a player
     // running a foot wider than the column of controls under it — edge to edge
     // meaning "a picture, and separately some controls" rather than "the
