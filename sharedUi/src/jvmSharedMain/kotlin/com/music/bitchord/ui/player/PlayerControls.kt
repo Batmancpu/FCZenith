@@ -479,7 +479,7 @@ internal fun TransportRow(
     compact: Boolean = false,
 ) {
     val playSize = if (compact) 58.dp else 78.dp
-    val playTouch = if (compact) 76.dp else 92.dp
+    val playTouch = if (compact) 76.dp else 84.dp
     val skipSize = if (compact) 44.dp else PLAYER_SKIP_ICON_SIZE
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -609,7 +609,7 @@ internal fun PlayerActionRow(
         // two-up capsule held it — closer in, without crowding — and they part
         // again as the queue opens to make room.
         val edgeInset = ((maxWidth - BOTTOM_ACTION_SIZE * 2 - pillWidth(3)) / 4).coerceAtLeast(0.dp)
-        val compactInset = ((maxWidth - BOTTOM_ACTION_SIZE * 2 - pillWidth(2)) / 4).coerceAtLeast(0.dp)
+        val compactInset = ((maxWidth - BOTTOM_ACTION_SIZE * 2 - pillWidth(2)) / 4 + 3.dp).coerceAtLeast(0.dp)
         val closeIn = compactInset - edgeInset
         // Held as State and read only in the glyphs' placement, so the slide
         // re-places two glyphs a frame rather than recomposing and remeasuring
@@ -867,7 +867,7 @@ private const val PLAYER_SKIP_HEIGHT_SCALE = 0.85f
 private val BOTTOM_ACTION_SIZE = 44.dp
 
 /** What the lyrics and queue glyphs are drawn at inside [BOTTOM_ACTION_SIZE]. */
-private val BOTTOM_ICON_SIZE = 24.dp
+private val BOTTOM_ICON_SIZE = 26.dp
 
 /**
  * The lit lyrics/queue tile, measured off Apple Music's: the glyph fills about
@@ -900,7 +900,7 @@ private val PILL_OUTPUT_SIZE = 23.dp
 private val PILL_PARTY_SIZE = 22.dp
 
 /** Cast and Tv run 92% of their box wide; at 23dp they read bigger than the rest. */
-private val PILL_OUTPUT_WIDE_SIZE = 21.dp
+private val PILL_OUTPUT_WIDE_SIZE = 22.dp
 
 /** Watch is drawn the full height of its box. */
 private val PILL_OUTPUT_TALL_SIZE = 17.dp

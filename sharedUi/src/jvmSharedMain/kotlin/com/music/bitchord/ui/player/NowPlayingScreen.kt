@@ -1827,18 +1827,7 @@ fun NowPlayingScreen(
             onListenTogether = onListenTogether,
             onOpenListenTogetherMembers = openListenTogetherMembers,
         )
-        // Keep the current output caption visible in every state.
-        Spacer(Modifier.height(18.dp))
-        Box(
-            modifier = Modifier.fillMaxWidth().height(20.dp),
-            contentAlignment = Alignment.TopCenter,
-        ) {
-            OutputCaption(
-                accountName = accountName,
-                onOpenOutput = openAudioOutput,
-                onOpenMembers = openListenTogetherMembers,
-            )
-        }
+        // Output name caption removed: the controls sit lower without it.
     }
 
     // The drawers and dialogs the player raises over itself. Mounted beside
@@ -3169,7 +3158,10 @@ fun NowPlayingScreen(
                         // over once the credits row and the gap above it have had
                         // theirs. Sizing it off the width alone is what pushed the
                         // credits down across the scrubber on anything but a phone.
-                        val wantArt = minOf(maxWidth, roomy - ART_TITLE_GAP - HEADER_HEIGHT)
+                        val wantArt = minOf(
+                            if (heroMode) maxWidth + 48.dp else maxWidth,
+                            roomy - ART_TITLE_GAP - HEADER_HEIGHT,
+                        )
                         // Held to what the box has actually got, for the single frame it
                         // takes the gaps below to catch up with a change in their own
                         // height: a sleeve a few dp under for one frame is a better
@@ -4579,7 +4571,7 @@ fun NowPlayingScreen(
                     // which sit close enough together to read as one. Both of its own
                     // gaps take half the spread, so on a tall screen it holds the
                     // centre rather than drifting up under the seek bar.
-                    Spacer(Modifier.height(20.dp + controlSpread / 2))
+                    Spacer(Modifier.height(28.dp + controlSpread / 2))
 
                     TransportRow(
                         isPlaying = isPlaying,
@@ -4610,10 +4602,10 @@ fun NowPlayingScreen(
 
                     // The volume slider already has 13dp below its drawn track.
                     // Balance that invisible inset with the caption gap below the icons.
-                    Spacer(Modifier.height(6.dp))
+                    Spacer(Modifier.height(0.dp))
 
                     playerActions()
-                    Spacer(Modifier.height(18.dp))
+                    Spacer(Modifier.height(20.dp))
                     }
                     }
                     }
