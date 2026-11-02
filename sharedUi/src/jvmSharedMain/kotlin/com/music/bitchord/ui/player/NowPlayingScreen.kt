@@ -564,8 +564,8 @@ private const val DOCK_TITLE_SOLID_SPAN = 0.15f
  * plain thumbnail the mini player's cover shows, and how much of the trip the
  * dissolve takes. Whole thumbnail by the time the cover is reached.
  */
-private const val DOCK_ART_SWAP_FROM = 0.4f
-private const val DOCK_ART_SWAP_SPAN = 0.4f
+private const val DOCK_ART_SWAP_FROM = 0.15f
+private const val DOCK_ART_SWAP_SPAN = 0.15f
 
 /** Arah membuka (mini ke big): thumbnail cepat berganti ke frame canvas selagi cover masih kecil. */
 private const val DOCK_ART_SWAP_OPEN_FROM = 0.2f
