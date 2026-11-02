@@ -395,7 +395,7 @@ internal object CanvasStills {
 }
 
 /** The player's side margin. Scrollable panels reach back across it. */
-internal val PLAYER_GUTTER = 30.dp
+internal val PLAYER_GUTTER = 32.dp
 /**
  * How wide the player's content is ever allowed to get. A sleeve and a volume
  * slider stretched right across a tablet aren't a bigger player, just a coarser
@@ -4248,8 +4248,9 @@ fun NowPlayingScreen(
                                     onClick = onToggleLike,
                                     active = liked,
                                     haptic = if (liked) Haptic.ToggleOff else Haptic.ToggleOn,
+                                    size = 28.dp,
                                 )
-                                Spacer(Modifier.width(8.dp))
+                                Spacer(Modifier.width(16.dp))
                             }
                             // While the lyrics are up the menu glyph becomes the share
                             // entry: the same pick mode a long-press on a line opens,
@@ -4290,6 +4291,7 @@ fun NowPlayingScreen(
                                 } else {
                                     Haptic.Tap
                                 },
+                                size = 28.dp,
                                 modifier = Modifier.menuAnchor(),
                             )
                         }

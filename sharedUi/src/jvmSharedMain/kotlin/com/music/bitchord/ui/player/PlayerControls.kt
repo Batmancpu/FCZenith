@@ -238,7 +238,7 @@ internal fun PlayerScrubber(
                 .fillMaxWidth()
                 // The slider's touch target extends well past the drawn bar,
                 // so pull the labels back up under it.
-                .offset(y = (-9).dp),
+                .offset(y = (-2).dp),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -478,7 +478,7 @@ internal fun TransportRow(
     onNext: () -> Unit,
     compact: Boolean = false,
 ) {
-    val playSize = if (compact) 58.dp else 74.dp
+    val playSize = if (compact) 58.dp else 78.dp
     val playTouch = if (compact) 76.dp else 92.dp
     val skipSize = if (compact) 44.dp else PLAYER_SKIP_ICON_SIZE
     Row(
@@ -736,6 +736,7 @@ internal fun CircleGlyph(
     onClick: () -> Unit,
     active: Boolean = false,
     haptic: Haptic = Haptic.Tap,
+    size: Dp = 34.dp,
     modifier: Modifier = Modifier,
 ) {
     val haptics = rememberHaptics()
@@ -745,7 +746,7 @@ internal fun CircleGlyph(
     )
     Box(
         modifier = modifier
-            .size(34.dp)
+            .size(size)
             .clip(CircleShape)
             .background(LocalPlayerTint.current.copy(alpha = discAlpha))
             .clickable(
@@ -866,7 +867,7 @@ private const val PLAYER_SKIP_HEIGHT_SCALE = 0.85f
 private val BOTTOM_ACTION_SIZE = 44.dp
 
 /** What the lyrics and queue glyphs are drawn at inside [BOTTOM_ACTION_SIZE]. */
-private val BOTTOM_ICON_SIZE = 26.dp
+private val BOTTOM_ICON_SIZE = 24.dp
 
 /**
  * The lit lyrics/queue tile, measured off Apple Music's: the glyph fills about
