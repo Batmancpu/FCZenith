@@ -667,7 +667,12 @@ internal fun CurrentLyricStrip(
                 // the strip reads as further off it than it is. Nudged down into
                 // that dead space, the same way the timestamps below are pulled
                 // back up into it.
-                .offset(y = 6.dp),
+                .offset(y = 6.dp)
+                .height(
+                    with(androidx.compose.ui.platform.LocalDensity.current) {
+                        STRIP_LINE_HEIGHT.toDp()
+                    } + 8.dp,
+                ),
         ) {
             if (lines.isNotEmpty()) {
                 CurrentLyricLine(

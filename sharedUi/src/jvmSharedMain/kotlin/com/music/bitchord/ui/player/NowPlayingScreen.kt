@@ -1193,7 +1193,7 @@ fun NowPlayingScreen(
         if (opening) closeLyrics()
     }
     val lyricsLoadingLines = stringArrayResource(Res.array.lyrics_loading_lines)
-    val lyricsLoadingText = remember(song.videoId) { lyricsLoadingLines.random() }
+    val lyricsLoadingText = remember(lyricsLoadingLines.size) { lyricsLoadingLines.random() }
     val lyricsTranslation = rememberLyricsTranslation(
         trackId = song.videoId,
         lyrics = lyrics,
