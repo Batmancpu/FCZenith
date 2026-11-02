@@ -514,7 +514,7 @@ private const val CLIP_MIX_FADE_IN_MS = 500
 private const val DOCK_BACKDROP_FROM = 0.15f
 
 /** Seberapa jauh drag (0..1 dari mini ke penuh) saat cover sudah selebar panel dan menutup sudutnya. */
-private const val DOCK_COVER_FULL_AT = 0.5f
+private const val DOCK_COVER_FULL_AT = 0.4f
 
 /** Ease-out: 0 di mini player, 1 begitu drag melewati [DOCK_COVER_FULL_AT], naik cepat di awal. */
 private fun dockEase(t: Float): Float {
@@ -527,7 +527,7 @@ private fun dockEase(t: Float): Float {
  * of it bowed the path below the straight line and cut the cover's foot off at
  * the panel's edge; a quarter keeps it close to a straight line.
  */
-private const val DOCK_RIDE_SHARE = 0.25f
+private const val DOCK_RIDE_SHARE = 1f
 
 /**
  * How much of the way to its target the artwork's ride share moves each frame.
@@ -3438,6 +3438,23 @@ fun NowPlayingScreen(
                             // sheet fully open, as a share of the sheet's travel.
                             return ((mini.top + dockFrame.offset - sleeve.top) / travel).coerceIn(0f, 1f)
                         }
+                        // Menahan cover tetap di dalam panel selama terbang ke/dari mini
+                        // player: tidak lewat tepi atas panel (yang memotong bagian atas
+                        // cover) dan tidak keluar dari kiri/kanan. Tepi atas panel di
+                        // koordinat kotak ini adalah bannerTopPx.
+                        fun fitToPanel(rect: Rect, active: Boolean): Rect {
+                            if (!active) return rect
+                            val minTop = bannerTopPx.toFloat()
+                            val minLeft = -boxLeftPx.toFloat()
+                            val maxRight = (playerBounds.width - boxLeftPx).toFloat()
+                            val dy = if (rect.top < minTop) minTop - rect.top else 0f
+                            val dx = when {
+                                rect.left < minLeft -> minLeft - rect.left
+                                rect.right > maxRight -> maxRight - rect.right
+                                else -> 0f
+                            }
+                            return if (dx == 0f && dy == 0f) rect else rect.translate(dx, dy)
+                        }
                         // A rect of the sleeve's, carried as far towards the cover as
                         // the sheet has gone.
                         fun towardsDock(rect: Rect, mini: Rect?): Rect {
@@ -3499,7 +3516,7 @@ fun NowPlayingScreen(
                                     } else {
                                         dockFrame.rideShare = 1f
                                     }
-                                    val rect = towardsDock(open, mini)
+                                    val rect = fitToPanel(towardsDock(open, mini), mini != null)
                                     dockFrame.miniInBox = mini
                                     dockFrame.sleeve = rect
                                     val placeable = measurable.measure(
@@ -3644,7 +3661,10 @@ fun NowPlayingScreen(
                                     // As wide as the sleeve, for the same reason the
                                     // sleeve is as wide as its box: right to left.
                                     .layout { measurable, constraints ->
-                                        val card = towardsDock(cardRect(), dockFrame.miniInBox)
+                                        val card = fitToPanel(
+                                            towardsDock(cardRect(), dockFrame.miniInBox),
+                                            dockFrame.miniInBox != null,
+                                        )
                                         val sleeve = dockFrame.sleeve
                                         val placeable = measurable.measure(
                                             Constraints.fixed(card.width.roundToInt(), card.height.roundToInt()),
