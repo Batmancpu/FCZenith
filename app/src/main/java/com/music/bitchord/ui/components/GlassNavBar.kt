@@ -61,7 +61,12 @@ import com.music.bitchord.data.model.artworkAt
 import com.music.bitchord.ui.components.floatingtabbar.FloatingTabBar
 import com.music.bitchord.ui.components.floatingtabbar.FloatingTabBarDefaults
 import com.music.bitchord.ui.components.floatingtabbar.FloatingTabBarScrollConnection
-import com.music.bitchord.ui.components.floatingtabbar.LocalTabPillCoverage
+import androidx.compose.foundation.layout.Box
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import com.music.bitchord.ui.components.floatingtabbar.LocalTabPillGeometry
 import com.music.bitchord.ui.haptics.Haptic
 import com.music.bitchord.ui.haptics.rememberHaptics
 import com.music.bitchord.ui.player.PlayerDock
@@ -240,12 +245,14 @@ fun GlassNavBar(
                 standaloneTab(
                     key = index,
                     icon = {
-                        Icon(
-                            imageVector = tab.icon,
-                            contentDescription = tab.label,
-                            tint = tabTint(isSelected, selectedColor, unselectedColor),
-                            modifier = Modifier.size(TAB_ICON_SIZE),
-                        )
+                        PillTinted(isSelected, selectedColor, unselectedColor) { tint ->
+                            Icon(
+                                imageVector = tab.icon,
+                                contentDescription = tab.label,
+                                tint = tint,
+                                modifier = Modifier.size(TAB_ICON_SIZE),
+                            )
+                        }
                     },
                     onClick = onClick,
                 )
@@ -253,20 +260,23 @@ fun GlassNavBar(
                 tab(
                     key = index,
                     icon = {
-                        Icon(
-                            imageVector = tab.icon,
-                            contentDescription = tab.label,
-                            tint = tabTint(isSelected, selectedColor, unselectedColor),
-                            modifier = Modifier.size(TAB_ICON_SIZE),
-                        )
+                        PillTinted(isSelected, selectedColor, unselectedColor) { tint ->
+                            Icon(
+                                imageVector = tab.icon,
+                                contentDescription = tab.label,
+                                tint = tint,
+                                modifier = Modifier.size(TAB_ICON_SIZE),
+                            )
+                        }
                     },
                     title = {
-                        Text(
-                            text = tab.label,
-                            style = tabLabelStyle(),
-                            color = tabTint(isSelected, selectedColor, unselectedColor),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
+                        PillTinted(isSelected, selectedColor, unselectedColor) { tint ->
+                            Text(
+                                text = tab.label,
+                                style = tabLabelStyle(),
+                                color = tint,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                             // The library's Tab stacks the glyph and the label
                             // with nothing between them; the plain bar spaces
                             // them, and this is where that gap goes.
@@ -529,16 +539,43 @@ private val ACCESSORY_ART_CORNER = 5.7.dp
 private val EXPANDED_GLYPH_SIZE = 29.dp
 
 /**
- * A tab's colour from where the glass pill is: blends unselected -> selected by how
- * much the pill covers it, so icons change colour as the pill slides over them.
- * Without a pill (inline bar) it is just the selected/unselected colour.
+ * A tab's content drawn in the unselected colour, with the selected colour masked
+ * in over exactly the part the glass pill covers: the pixels under the pill's edge
+ * switch colour at once as it slides, with no blend. Without a pill (inline bar)
+ * it is just the selected/unselected colour.
  */
 @Composable
-private fun tabTint(isSelected: Boolean, selected: Color, unselected: Color): Color {
-    val coverage = LocalTabPillCoverage.current()
-    return if (coverage.isNaN()) {
-        if (isSelected) selected else unselected
-    } else {
-        lerp(unselected, selected, coverage)
+private fun PillTinted(
+    isSelected: Boolean,
+    selected: Color,
+    unselected: Color,
+    content: @Composable (Color) -> Unit,
+) {
+    val geometry = LocalTabPillGeometry.current
+    val hasPill by remember(geometry) { derivedStateOf { !geometry().isUnspecified } }
+    if (!hasPill) {
+        content(if (isSelected) selected else unselected)
+        return
+    }
+    Box {
+        content(unselected)
+        Box(
+            Modifier
+                .matchParentSize()
+                .clearAndSetSemantics {}
+                .drawWithContent {
+                    val g = geometry()
+                    if (g.isUnspecified) return@drawWithContent
+                    val centre = size.width / 2f + g.x
+                    val left = centre - g.y / 2f
+                    val right = centre + g.y / 2f
+                    if (right <= 0f || left >= size.width) return@drawWithContent
+                    clipRect(left = left, top = -size.height, right = right, bottom = size.height * 2f) {
+                        this@drawWithContent.drawContent()
+                    }
+                },
+        ) {
+            content(selected)
+        }
     }
 }

@@ -134,6 +134,15 @@ import kotlin.math.roundToInt
  */
 val LocalTabPillCoverage = compositionLocalOf<() -> Float> { { Float.NaN } }
 
+/**
+ * Where the glass pill is relative to the tab being drawn, in pixels: `x` is the
+ * pill centre's signed distance from the tab's centre (already flipped for RTL),
+ * `y` is the pill's width. Lets a tab's icon/title be masked by the pill's real
+ * horizontal extent, so the part under the pill changes colour at once.
+ * [Offset.Unspecified] where no pill is involved (the inline bar).
+ */
+val LocalTabPillGeometry = compositionLocalOf<() -> Offset> { { Offset.Unspecified } }
+
 private val DefaultTabBarContentModifier: @Composable () -> Modifier = { Modifier }
 
 /**
@@ -799,6 +808,7 @@ private fun SharedTransitionScope.ExpandedTabs(
     // and would otherwise keep the step from its first touch.
     val currentTabStepPx by rememberUpdatedState(tabStepPx)
     val currentIsRtl by rememberUpdatedState(isRtl)
+    val currentTabWidthPx by rememberUpdatedState(tabWidthPx)
 
     // The pill rests in its tab's cell and lifts to stand [PILL_GROW_HEIGHT]
     // taller than the whole bar, keeping the cell's proportions as it grows.
@@ -946,6 +956,17 @@ private fun SharedTransitionScope.ExpandedTabs(
                                 }
                             }
                         }
+                        val tabPillGeometry = remember(tabIndex) {
+                            {
+                                if (currentSelectedTabIndex < 0) {
+                                    // Pill hidden: far enough away to cover nothing.
+                                    Offset(1_000_000f, 0f)
+                                } else {
+                                    val dx = (pill.position - tabIndex) * currentTabStepPx
+                                    Offset(if (currentIsRtl) -dx else dx, currentTabWidthPx)
+                                }
+                            }
+                        }
                         val iconScale by animateFloatAsState(
                             targetValue = if (isSelected) 1.08f else 1f,
                             animationSpec = selectionSpec,
@@ -970,7 +991,10 @@ private fun SharedTransitionScope.ExpandedTabs(
                                         scaleY = iconScale
                                     }
                                 ) {
-                                    CompositionLocalProvider(LocalTabPillCoverage provides tabCoverage) {
+                                    CompositionLocalProvider(
+                                        LocalTabPillCoverage provides tabCoverage,
+                                        LocalTabPillGeometry provides tabPillGeometry,
+                                    ) {
                                         tab.icon()
                                     }
                                 }
@@ -982,7 +1006,10 @@ private fun SharedTransitionScope.ExpandedTabs(
                                         animatedVisibilityScope = animatedVisibilityScope
                                     )
                                 ) {
-                                    CompositionLocalProvider(LocalTabPillCoverage provides tabCoverage) {
+                                    CompositionLocalProvider(
+                                        LocalTabPillCoverage provides tabCoverage,
+                                        LocalTabPillGeometry provides tabPillGeometry,
+                                    ) {
                                         tab.title()
                                     }
                                 }
