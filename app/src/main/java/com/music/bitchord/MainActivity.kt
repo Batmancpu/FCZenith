@@ -1715,11 +1715,19 @@ private fun BitChordApp(
      * does, and AutoPlay carries it on past its last track.
      */
     val openTopPick: (TopPick, String) -> Unit = { pick, label ->
-        val browseId = pick.browseId
-        if (pick.kind == TopPickKind.LATEST_RELEASE && browseId != null) {
+        val pageId = when (pick.kind) {
+            TopPickKind.LATEST_RELEASE -> pick.browseId
+            TopPickKind.FEATURED_ARTIST, TopPickKind.ARTIST_AND_SIMILAR -> pick.artistBrowseId
+            TopPickKind.PERSONAL_STATION, TopPickKind.NEW_RELEASE_MIX, TopPickKind.DISCOVERY_STATION ->
+                pick.watch?.playlistId
+                    ?.takeIf { it.isNotBlank() && !it.startsWith("RDAMVM") }
+                    ?.let { if (it.startsWith("VL")) it else "VL$it" }
+            else -> null
+        }
+        if (pageId != null) {
             viewModel.openDetail(
-                browseId = browseId,
-                title = pick.title,
+                browseId = pageId,
+                title = pick.title.ifBlank { label },
                 subtitle = pick.artistName.orEmpty(),
                 thumbnailUrl = pick.images.firstOrNull(),
             )
