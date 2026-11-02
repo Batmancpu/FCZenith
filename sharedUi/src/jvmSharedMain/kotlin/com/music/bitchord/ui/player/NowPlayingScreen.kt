@@ -1461,8 +1461,12 @@ fun NowPlayingScreen(
     // still-art full-bleed preference. Other providers and static artwork keep
     // answering to that preference exactly as before.
     // A music video sits in the card's place at its own 16:9, never full bleed.
+    // Canvas aktif (sumber apa pun) = cover full screen di ponsel, walau
+    // pengaturan full-bleed dimatikan. Tanpa canvas, tetap ikut pengaturan.
+    val canvasHero = canvas != null && playerFillsWindow(windowWidth)
     val heroMode = !videoMode && (
         spotifyCanvasOnPhone ||
+            canvasHero ||
             (fullBleedArt && playerFillsWindow(windowWidth))
         )
 
