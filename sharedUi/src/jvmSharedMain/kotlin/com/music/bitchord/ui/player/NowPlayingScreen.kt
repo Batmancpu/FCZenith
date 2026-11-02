@@ -514,7 +514,7 @@ private const val CLIP_MIX_FADE_IN_MS = 500
 private const val DOCK_BACKDROP_FROM = 0.15f
 
 /** Seberapa jauh drag (0..1 dari mini ke penuh) saat cover sudah selebar panel dan menutup sudutnya. */
-private const val DOCK_COVER_FULL_AT = 0.4f
+private const val DOCK_COVER_FULL_AT = 0.6f
 
 /** Untuk cover kartu (bukan full-bleed): drag sejauh ini sebelum cover mencapai ukuran penuh. */
 private const val DOCK_CARD_FULL_AT = 0.9f
@@ -2638,7 +2638,7 @@ fun NowPlayingScreen(
                             // full-screen Spotify Canvas, though: that is the whole
                             // screen, and keeps playing under them, blurred live.
                             pausedForTransition = lyricsOpen || queueOpen || queueDragging ||
-                                collapseStarted || dockMoving || (overlayOpen.value && !clipFullscreen),
+                                collapseStarted || (overlayOpen.value && !clipFullscreen),
                             // Spotify's 9:16 Canvas is the phone background, so it
                             // covers every edge. Other providers retain the contained
                             // portrait treatment introduced for motion cover art.
@@ -3457,8 +3457,24 @@ fun NowPlayingScreen(
                         // player: tidak lewat tepi atas panel (yang memotong bagian atas
                         // cover) dan tidak keluar dari kiri/kanan. Tepi atas panel di
                         // koordinat kotak ini adalah bannerTopPx.
-                        fun fitToPanel(rect: Rect, active: Boolean): Rect {
-                            if (!active) return rect
+                        fun fitToPanel(source: Rect, active: Boolean): Rect {
+                            if (!active) return source
+                            // Tepi bawah panel di koordinat kotak ini: cover diangkat supaya
+                            // bagian bawahnya tidak tertutup panel yang masih setinggi pill.
+                            val panelBottom = if (dock != null && playerBounds.height > 0) {
+                                bannerTopPx + (
+                                    dock.panelBounds(
+                                        Size(playerBounds.width.toFloat(), playerBounds.height.toFloat()),
+                                    ).bottom - dockFrame.offset
+                                    )
+                            } else {
+                                Float.MAX_VALUE
+                            }
+                            val rect = if (source.bottom > panelBottom) {
+                                source.translate(0f, panelBottom - source.bottom)
+                            } else {
+                                source
+                            }
                             val minTop = bannerTopPx.toFloat()
                             val minLeft = -boxLeftPx.toFloat()
                             val maxRight = (playerBounds.width - boxLeftPx).toFloat()

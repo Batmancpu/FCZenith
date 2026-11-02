@@ -463,7 +463,7 @@ internal fun AndroidCanvasArtworkPlayer(
 
     val alpha by animateFloatAsState(
         targetValue = if (rendered) 1f else 0f,
-        animationSpec = if (revealInstantly) snap() else tween(durationMillis = 320),
+        animationSpec = if (revealInstantly) snap() else tween(durationMillis = 160),
         label = "canvasAlpha",
     )
 
