@@ -205,8 +205,12 @@ class PlayerDock {
             return Rect(0f, offset, window.width, window.height + offset)
         }
         val progress = (1f - offset / pill.top).coerceIn(0f, 1f)
-        val left = pill.left * (1f - progress)
-        val right = window.width - (window.width - pill.right) * (1f - progress)
+        // Lebar panel menyusul lebih cepat dari naiknya, seperti Apple Music:
+        // sudut layar sudah tertutup sebelum setengah jalan.
+        val wideX = (progress / PANEL_WIDE_AT).coerceIn(0f, 1f)
+        val wide = 1f - (1f - wideX) * (1f - wideX)
+        val left = pill.left * (1f - wide)
+        val right = window.width - (window.width - pill.right) * (1f - wide)
         val bottom = pill.bottom + (window.height - pill.bottom) * progress
         return Rect(left, offset, right.coerceAtLeast(left + 1f), bottom.coerceAtLeast(offset + 1f))
     }
@@ -215,11 +219,17 @@ class PlayerDock {
     fun panelFill(until: Float = PANEL_FILL_UNTIL): Float = (openFraction() / until).coerceIn(0f, 1f)
 
     /** The panel's corner radius this frame: the pill's, rounding off to square. */
-    fun panelCornerPx(): Float {
+    fun panelCornerPx(sheetCornerPx: Float = 0f): Float {
         val pill = miniPillInWindow() ?: return 0f
         if (pill.top <= 1f) return 0f
         val progress = (1f - (offset() ?: 0f) / pill.top).coerceIn(0f, 1f)
-        return pill.height / 2f * (1f - progress)
+        val pillCorner = pill.height / 2f * (1f - progress)
+        // Seperti sheet Apple Music: sudut atas tetap membulat selagi panel
+        // naik, baru rata di ujung ketika panel menutupi seluruh layar.
+        val sheetCorner = sheetCornerPx *
+            (progress / PANEL_WIDE_AT).coerceIn(0f, 1f) *
+            (1f - ((progress - 0.9f) / 0.1f).coerceIn(0f, 1f))
+        return maxOf(pillCorner, sheetCorner)
     }
 
     /** The sheet's offset this frame, or null with no sheet laid out. */
@@ -263,6 +273,9 @@ val LocalPlayerDock = staticCompositionLocalOf<PlayerDock?> { null }
 
 /** The share of the opening over which the glass gives way to the plain panel. */
 private const val PANEL_FILL_UNTIL = 0.2f
+
+/** Seberapa jauh panel terbuka saat lebarnya sudah penuh selebar layar. */
+private const val PANEL_WIDE_AT = 0.35f
 
 internal class PlayerMorph(val rect: Rect, val corner: Float, val progress: Float)
 

@@ -100,7 +100,8 @@ private val MINI_ART_CORNER = 5.7.dp
 
 /** The pill's own radius, shrinking with the panel's progress — read at draw. */
 private class PanelCorner(private val dock: PlayerDock) : CornerSize {
-    override fun toPx(shapeSize: Size, density: Density): Float = dock.panelCornerPx()
+    override fun toPx(shapeSize: Size, density: Density): Float =
+        dock.panelCornerPx(22f * density.density)
 }
 
 /**

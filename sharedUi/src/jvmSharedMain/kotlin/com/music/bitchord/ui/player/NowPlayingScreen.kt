@@ -511,7 +511,16 @@ private const val CLIP_MIX_FADE_IN_MS = 500
  * sheet dan terlihat sebagai salinan cover ukuran penuh di belakang cover kecil
  * yang masih terbang (tampak seperti dua cover).
  */
-private const val DOCK_BACKDROP_FROM = 0.55f
+private const val DOCK_BACKDROP_FROM = 0.15f
+
+/** Seberapa jauh drag (0..1 dari mini ke penuh) saat cover sudah selebar panel dan menutup sudutnya. */
+private const val DOCK_COVER_FULL_AT = 0.5f
+
+/** Ease-out: 0 di mini player, 1 begitu drag melewati [DOCK_COVER_FULL_AT], naik cepat di awal. */
+private fun dockEase(t: Float): Float {
+    val x = (t / DOCK_COVER_FULL_AT).coerceIn(0f, 1f)
+    return 1f - (1f - x) * (1f - x)
+}
 
 /**
  * The share of the sheet's travel the artwork rides on its way to the cover. All
@@ -1979,7 +1988,7 @@ fun NowPlayingScreen(
         if (!docking()) {
             1f
         } else {
-            ((dockT() - DOCK_BACKDROP_FROM) / (1f - DOCK_BACKDROP_FROM)).coerceIn(0f, 1f)
+            ((dockT() - DOCK_BACKDROP_FROM) / (DOCK_COVER_FULL_AT - DOCK_BACKDROP_FROM)).coerceIn(0f, 1f)
         }
     }
     // The same, for composition: derived, so it recomposes the player twice a
@@ -3434,11 +3443,11 @@ fun NowPlayingScreen(
                         fun towardsDock(rect: Rect, mini: Rect?): Rect {
                             if (mini == null) return rect
                             val unridden = dockFrame.offset * (1f - dockFrame.ride)
-                            return lerp(mini, rect.translate(0f, -unridden), dockT())
+                            return lerp(mini, rect.translate(0f, -unridden), dockEase(dockT()))
                         }
                         // The banner's dissolve, firmed up into the cover's hard edge as
                         // it docks.
-                        fun sleeveShown(): Float = bannerShown() * dockT()
+                        fun sleeveShown(): Float = bannerShown() * dockEase(dockT())
                         fun sleeveCorner(): Dp {
                             val corner = 8.dp * (1f - sleeveShown())
                             val t = dockT()
@@ -3468,7 +3477,7 @@ fun NowPlayingScreen(
                                         if (mini == null) {
                                             full
                                         } else {
-                                            val bloom = ((dockT() - DOCK_BANNER_FROM) / (1f - DOCK_BANNER_FROM))
+                                            val bloom = ((dockEase(dockT()) - DOCK_BANNER_FROM) / (1f - DOCK_BANNER_FROM))
                                                 .coerceIn(0f, 1f)
                                             // Ease-out: cepat membesar di awal drag, bukan lambat.
                                             lerp(cardRect(), full, 1f - (1f - bloom) * (1f - bloom))
