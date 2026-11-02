@@ -2664,7 +2664,7 @@ fun NowPlayingScreen(
                             //
                             // Out of sight altogether while its still stands in for it.
                             presentationAlpha = {
-                                if (stillTakesOver()) 0f
+                                if (stillTakesOver() || (dockMoving && !clipFullscreen)) 0f
                                 else (1f - 2f * p()).coerceIn(0f, 1f) * dockFade() * clipMixFade.value
                             },
                             // A full-screen Spotify Canvas holds its frame for a beat

@@ -390,7 +390,7 @@ internal fun AndroidCanvasArtworkPlayer(
     // it moves — see [captureStill]. Read off the decoder's own output, not the
     // view: the copy runs on the render thread and leaves this one free.
     val reportStill by rememberUpdatedState(onStillCaptured)
-    LaunchedEffect(captureStill) {
+    LaunchedEffect(captureStill, rendered) {
         if (!captureStill) return@LaunchedEffect
         // The pause was asked for this frame. Let the decoder's last frame land.
         withFrameMillis { }
