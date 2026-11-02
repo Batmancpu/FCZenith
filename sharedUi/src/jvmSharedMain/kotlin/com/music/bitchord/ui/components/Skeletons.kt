@@ -104,7 +104,7 @@ private fun SkeletonLine(fraction: Float, height: Dp, modifier: Modifier = Modif
 @Composable
 fun SectionHeaderSkeleton(index: Int = 0) {
     Column(Modifier.padding(horizontal = PAGE_GUTTER, vertical = 10.dp)) {
-        SkeletonLine(fraction = TitleWidths[index % TitleWidths.size] * 0.7f, height = 18.dp)
+        SkeletonLine(fraction = TitleWidths[index % TitleWidths.size] * 0.7f, height = 22.dp)
     }
 }
 
