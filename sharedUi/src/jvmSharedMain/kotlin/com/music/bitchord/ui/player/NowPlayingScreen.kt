@@ -1574,10 +1574,12 @@ fun NowPlayingScreen(
         }
     }
     val skipNext: () -> Unit = {
+        com.music.bitchord.ui.components.TrackFlow.hint(true)
         grabClipFrame()
         onNext()
     }
     val skipPrevious: () -> Unit = {
+        com.music.bitchord.ui.components.TrackFlow.hint(false)
         grabClipFrame()
         onPrevious()
     }

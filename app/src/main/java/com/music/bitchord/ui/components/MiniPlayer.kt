@@ -404,10 +404,12 @@ fun MiniPlayer(
                 pull = pull,
                 onNext = {
                     haptics.play(Haptic.SkipNext)
+                    com.music.bitchord.ui.components.TrackFlow.hint(true)
                     onNext()
                 },
                 onPrevious = {
                     haptics.play(Haptic.SkipPrevious)
+                    com.music.bitchord.ui.components.TrackFlow.hint(false)
                     onPrevious()
                 },
                 locked = controlsLocked,
@@ -521,6 +523,7 @@ fun MiniPlayer(
             IconButton(
                 onClick = {
                     haptics.play(Haptic.SkipNext)
+                    com.music.bitchord.ui.components.TrackFlow.hint(true)
                     onNext()
                 },
                 enabled = !controlsLocked,

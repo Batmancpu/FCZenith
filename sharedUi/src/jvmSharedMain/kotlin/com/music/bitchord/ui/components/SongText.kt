@@ -102,14 +102,25 @@ fun ExplicitSongTitle(
  * same way: back to the song before the last one is Previous, anything else
  * is Next.
  */
-private object TrackFlow {
+object TrackFlow {
+    private const val HINT_VALID_MS = 3_000L
     private var current: String? = null
     private var before: String? = null
     private var forward = true
+    private var hintForward: Boolean? = null
+    private var hintAt = 0L
+
+    /** Dipanggil saat Next/Previous ditekan, supaya arah animasi pasti. */
+    fun hint(forward: Boolean) {
+        hintForward = forward
+        hintAt = System.currentTimeMillis()
+    }
 
     fun forwardTo(id: String): Boolean {
         if (id != current) {
-            forward = id != before
+            val hinted = hintForward?.takeIf { System.currentTimeMillis() - hintAt < HINT_VALID_MS }
+            hintForward = null
+            forward = hinted ?: (id != before)
             before = current
             current = id
         }
