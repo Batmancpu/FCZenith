@@ -525,10 +525,16 @@ private fun dockEaseCard(t: Float): Float {
     return x * x * (3f - 2f * x)
 }
 
-/** Ease-out: 0 di mini player, 1 begitu drag melewati [DOCK_COVER_FULL_AT], naik cepat di awal. */
+/** Drag sejauh ini cover masih seukuran cover mini, supaya muat di panel yang baru setinggi pill. */
+private const val DOCK_COVER_START_AT = 0.05f
+
+/**
+ * Smoothstep: 0 di mini player dan sampai [DOCK_COVER_START_AT], 1 begitu drag melewati
+ * [DOCK_COVER_FULL_AT]. Tertunda di awal supaya cover tidak lebih besar dari panelnya.
+ */
 private fun dockEase(t: Float): Float {
-    val x = (t / DOCK_COVER_FULL_AT).coerceIn(0f, 1f)
-    return 1f - (1f - x) * (1f - x)
+    val x = ((t - DOCK_COVER_START_AT) / (DOCK_COVER_FULL_AT - DOCK_COVER_START_AT)).coerceIn(0f, 1f)
+    return x * x * (3f - 2f * x)
 }
 
 /**
