@@ -63,6 +63,7 @@ import com.music.bitchord.ui.components.floatingtabbar.FloatingTabBarDefaults
 import com.music.bitchord.ui.components.floatingtabbar.FloatingTabBarScrollConnection
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.ui.geometry.isUnspecified
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.semantics.clearAndSetSemantics
