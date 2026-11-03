@@ -135,7 +135,7 @@ fun <T : Any> HeldContextMenu(
             )
         } else {
             val holdForFlight = launched && coverFlightPending()
-            if (holdForFlight) cardHeld = true
+            cardHeld = holdForFlight
             coroutineScope {
                 // The page behind and the menu leave at once; only the card waits.
                 launch {
@@ -234,6 +234,10 @@ fun <T : Any> HeldContextMenu(
                             Modifier.clickable(enabled = open) {
                                 launched = true
                                 onPreviewClick(menuItem)
+                                // Penerbangan sudah terdaftar di sini: kartu tetap tampil
+                                // sejak frame ini juga, tanpa celah alpha 0 sebelum
+                                // LaunchedEffect sempat menahan kartu.
+                                cardHeld = coverFlightPending()
                             }
                         } else {
                             Modifier

@@ -167,8 +167,14 @@ private object CoverFlightState {
 
     fun hidesSource(token: Any): Boolean = flying && flight?.token === token
 
-    fun hidesTarget(browseId: String): Boolean =
-        flying && !holding && flight?.browseId == browseId
+    fun hidesTarget(browseId: String): Boolean {
+        val f = flight ?: return false
+        if (holding || f.browseId != browseId) return false
+        // Jalan masuk: sleeve minggir begitu posisinya dilaporkan, tidak menunggu
+        // gambar terbang selesai dimuat, supaya sleeve tidak sempat muncul lalu
+        // hilang lagi di tujuan.
+        return if (f.reverse) flying else f.token != null && target != null
+    }
 
     /**
      * A sleeve standing aside for a flight that carries a clip stays all but
@@ -510,6 +516,15 @@ private fun FlightLayer(flight: Flight) {
     val fade = remember(flight) { Animatable(1f) }
     // Never held up for long by a picture that is slow or will not load.
     LaunchedEffect(flight) {
+        // Gambar baru diminta setelah tujuan diketahui, jadi masa tunggunya
+        // dihitung sejak saat itu. Kalau dihitung dari awal, halaman yang lambat
+        // menjawab menghabiskan 150 ms dan kartu diangkat sebelum gambar
+        // terbang tampil satu frame pun.
+        if (!flight.reverse) {
+            withTimeoutOrNull(TARGET_TIMEOUT_MS) {
+                snapshotFlow { CoverFlightState.target }.filterNotNull().first()
+            }
+        }
         delay(150)
         flight.imageReady = true
     }
