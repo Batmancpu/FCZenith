@@ -195,6 +195,17 @@ private const val MAX_ARTIST_SONGS = 20
 private const val SONGS_PER_COLUMN = 4
 private const val ARTIST_ROW_MAX_ITEMS = 5
 
+/** Content that arrives after the page is already up fades in instead of popping in. */
+private fun androidx.compose.foundation.lazy.LazyItemScope.arriveFade(): Modifier =
+    Modifier.animateItem(
+        fadeInSpec = androidx.compose.animation.core.tween(
+            durationMillis = 380,
+            easing = androidx.compose.animation.core.FastOutSlowInEasing,
+        ),
+        placementSpec = null,
+        fadeOutSpec = null,
+    )
+
 /** The artist photo, very slightly taller than it is wide. */
 private const val ARTIST_PHOTO_RATIO = 0.95f
 
@@ -616,6 +627,7 @@ fun DetailScreen(
 
             if (songs.isNotEmpty() && isArtist) {
                 item(key = "actions") {
+                    Column(arriveFade()) {
                     ActionRow(
                         onPlay = { onSongClick(songs, 0) },
                         onShuffle = { onShuffle(songs) },
@@ -624,6 +636,7 @@ fun DetailScreen(
                         bottomSpace = 22.dp,
                         playColor = appleArt?.keyColor?.let { Color(it) },
                     )
+                    }
                 }
             }
 
@@ -631,6 +644,7 @@ fun DetailScreen(
             val topRelease = if (isArtist) page.sections.topRelease() else null
             if (topRelease != null) {
                 item(key = "top-release") {
+                    Column(arriveFade()) {
                     TopReleaseCard(
                         item = topRelease,
                         palette = palette,
@@ -641,6 +655,7 @@ fun DetailScreen(
                             topRelease.browseId?.let { id -> { toggle(id) } }
                         },
                     )
+                    }
                 }
             }
 
@@ -718,9 +733,10 @@ fun DetailScreen(
                 } else if (isArtist) {
                     // An artist's full song list would bury the album shelves, so
                     // it pages sideways four at a time and stops at twenty.
-                    item {
+                    item(key = "artist-songs") {
                         val top = state.data.take(MAX_ARTIST_SONGS)
                         val isCurrentRow = playingRowMatcher(top, currentSong)
+                        Column(arriveFade()) {
                         SectionHeading(
                             title = stringResource(R.string.top_songs),
                             palette = palette,
@@ -751,6 +767,7 @@ fun DetailScreen(
                                     }
                                 }
                             }
+                        }
                         }
                     }
                 } else {
@@ -1337,7 +1354,7 @@ private fun ArtistHeader(
             val sizeFactor = if (isSignature) SIGNATURE_SCALE else 1f
             val maxLogoHeight = artHeight * ARTIST_LOGO_MAX_HEIGHT * sizeFactor
             Column(
-                modifier = Modifier.align(Alignment.BottomCenter).enterReveal(150),
+                modifier = Modifier.align(Alignment.BottomCenter).enterReveal(500),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
             AsyncImage(
@@ -1387,7 +1404,7 @@ private fun ArtistHeader(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .enterReveal(150)
+                .enterReveal(500)
                 // Bottom is half the top inset — the stats pills (or, absent
                 // those, the action row) sit closer under the name than the
                 // name sits under the artwork.
@@ -1549,7 +1566,7 @@ private fun ActionRow(
 ) {
     Row(
         modifier = Modifier
-            .enterReveal(240)
+            .enterReveal(540)
             .fillMaxWidth()
             .padding(horizontal = HEADER_GUTTER),
         horizontalArrangement = Arrangement.spacedBy(ARTIST_ACTION_GAP, Alignment.CenterHorizontally),
@@ -2186,7 +2203,7 @@ private fun TopReleaseCard(
     val openWithCover = rememberCoverFlightTap(item.browseId, coverToken, onClick)
     Row(
         modifier = Modifier
-            .enterReveal(300)
+            .enterReveal(600)
             .fillMaxWidth()
             .padding(horizontal = ARTIST_CONTENT_GUTTER)
             .padding(bottom = 22.dp)

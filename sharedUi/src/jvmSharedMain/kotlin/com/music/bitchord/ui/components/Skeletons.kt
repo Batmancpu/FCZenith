@@ -308,16 +308,24 @@ private fun DetailActionsSkeleton(isArtist: Boolean) {
  * An album, playlist or artist page below its header — the header itself is
  * drawn from what the row that was tapped already knew, so it never waits.
  */
+/** The skeleton dissolves when the real rows land, rather than vanishing. */
+private fun androidx.compose.foundation.lazy.LazyItemScope.skeletonLeave(): Modifier =
+    Modifier.animateItem(
+        fadeInSpec = null,
+        placementSpec = null,
+        fadeOutSpec = androidx.compose.animation.core.tween(durationMillis = 200),
+    )
+
 fun LazyListScope.detailSkeleton(isArtist: Boolean) {
     if (isArtist) {
         item(key = "skeleton:detail:actions") {
-            Column(Modifier.enterReveal(240).graphicsLayer { alpha = 0.4f }) {
+            Column(skeletonLeave().enterReveal(540).graphicsLayer { alpha = 0.4f }) {
                 DetailActionsSkeleton(isArtist = true)
                 Spacer(Modifier.height(22.dp))
             }
         }
         item(key = "skeleton:detail:top") {
-            Column(Modifier.enterReveal(300).graphicsLayer { alpha = 0.4f }) {
+            Column(skeletonLeave().enterReveal(600).graphicsLayer { alpha = 0.4f }) {
                 SectionHeaderSkeleton()
                 // Top songs page four at a time — see [trackColumnWidth] for how
                 // wide a page lands.
@@ -338,7 +346,7 @@ fun LazyListScope.detailSkeleton(isArtist: Boolean) {
             }
         }
         item(key = "skeleton:detail:sections") {
-            Box(Modifier.enterReveal(340).graphicsLayer { alpha = 0.4f }) {
+            Box(skeletonLeave().enterReveal(660).graphicsLayer { alpha = 0.4f }) {
                 ShelfSkeleton(index = 2, cardCorner = 10.dp)
             }
         }
