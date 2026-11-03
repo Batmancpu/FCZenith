@@ -760,7 +760,7 @@ private fun HeroShelf(
         BoxWithConstraints {
             val cardWidth = heroCardWidth(maxWidth)
             ShelfRow(
-                state = rememberLazyListState(),
+                state = rememberShelfListState("hero:${shelf.title}"),
                 contentPadding = PaddingValues(horizontal = PAGE_GUTTER),
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
             ) {
@@ -868,6 +868,7 @@ internal fun Shelf(
         SectionHeader(shelf.title, shelf.subtitle)
         val isCurrentItem = shelf.items.playingItemMatcher(currentSong)
         ShelfRow(
+            state = rememberShelfListState("shelf:${shelf.title}"),
             contentPadding = PaddingValues(horizontal = PAGE_GUTTER),
             horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {

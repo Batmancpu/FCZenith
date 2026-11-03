@@ -157,7 +157,7 @@ internal fun TopPicksShelf(
     onClick: (TopPick, String) -> Unit,
     onLongPress: ((TopPick) -> Unit)?,
 ) {
-    val rowState = rememberLazyListState()
+    val rowState = rememberShelfListState("top-picks")
     // Which cards turned out to have a clip, by index, and which one plays.
     val hasClip = remember(picks) { mutableStateMapOf<Int, Boolean>() }
     var owner by remember(picks) { mutableIntStateOf(-1) }
