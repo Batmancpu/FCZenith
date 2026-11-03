@@ -15,6 +15,8 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
@@ -39,12 +41,26 @@ private object NoShelfRowChrome : ShelfRowChrome {
 
 val LocalShelfRowChrome = staticCompositionLocalOf<ShelfRowChrome> { NoShelfRowChrome }
 
+/** What a shelf's row is doing right now, in plain fields: read as a card enters composition. */
+internal class ShelfScrollFlow {
+    var scrolling = false
+    var forward = false
+}
+
+internal val LocalShelfScrollFlow = staticCompositionLocalOf<ShelfScrollFlow?> { null }
+
 /**
  * A shelf card's entrance: slides in from the right and fades up, each card a
  * step after the one before it, so a row swiped left arrives in sequence.
  */
 @Composable
 fun Modifier.shelfStagger(index: Int): Modifier {
+    val flow = LocalShelfScrollFlow.current
+    // Decided once, as the card enters composition: only a card that arrives
+    // while its row is being swiped left animates. A tab coming back, a page
+    // closing or a swipe to the right shows its cards as they are.
+    val animate = remember { flow != null && flow.scrolling && flow.forward }
+    if (!animate) return this
     val progress = remember { Animatable(0f) }
     LaunchedEffect(Unit) {
         delay((index % 3) * 70L)
@@ -71,14 +87,29 @@ fun ShelfRow(
     state: LazyListState = rememberLazyListState(),
     content: LazyListScope.() -> Unit,
 ) {
+    val flow = remember(state) { ShelfScrollFlow() }
+    LaunchedEffect(state) {
+        fun position() = state.firstVisibleItemIndex.toLong() * 1_000_000L + state.firstVisibleItemScrollOffset
+        var last = position()
+        snapshotFlow { state.isScrollInProgress to position() }.collect { (scrolling, pos) ->
+            if (pos != last) {
+                flow.forward = pos > last
+                last = pos
+            }
+            flow.scrolling = scrolling
+            if (!scrolling) flow.forward = false
+        }
+    }
     LocalShelfRowChrome.current.Wrap(state) {
-        LazyRow(
-            modifier = modifier,
-            state = state,
-            contentPadding = contentPadding,
-            horizontalArrangement = horizontalArrangement,
-            flingBehavior = rememberSnapFlingBehavior(lazyListState = state),
-            content = content,
-        )
+        CompositionLocalProvider(LocalShelfScrollFlow provides flow) {
+            LazyRow(
+                modifier = modifier,
+                state = state,
+                contentPadding = contentPadding,
+                horizontalArrangement = horizontalArrangement,
+                flingBehavior = rememberSnapFlingBehavior(lazyListState = state),
+                content = content,
+            )
+        }
     }
 }
