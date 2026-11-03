@@ -16,7 +16,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitHorizontalTouchSlopOrCancellation
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.gestures.horizontalDrag
+import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.runtime.withFrameNanos
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.isActive
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -145,6 +150,10 @@ fun LiquidSegmentedControl(
     enabled: Boolean = true,
     draggable: Boolean = true,
     dragOnlyFromPill: Boolean = false,
+    /** Untuk track yang bisa digeser: drag pill yang mentok di tepi viewport ikut menggeser track. */
+    edgeScroll: ScrollState? = null,
+    /** Lebar viewport track (px); dibutuhkan bersama [edgeScroll]. */
+    viewportPx: Float = 0f,
     content: @Composable (index: Int, color: Color) -> Unit,
 ) {
     val modes = remember(count) { List(count) { it } }
@@ -425,7 +434,7 @@ fun LiquidSegmentedControl(
         Row(
             Modifier
                 .matchParentSize()
-                .pointerInput(slotPx, isLtr, reduceAnimation, enabled, draggable, dragOnlyFromPill) {
+                .pointerInput(slotPx, isLtr, reduceAnimation, enabled, draggable, dragOnlyFromPill, edgeScroll, viewportPx) {
                     if (!enabled || !draggable) return@pointerInput
                     val dir = if (isLtr) 1f else -1f
                     val maxIndex = (modes.size - 1).toFloat()
@@ -433,6 +442,77 @@ fun LiquidSegmentedControl(
                     var origin = 0f
                     var travelled = 0f
                     var lastIndex = 0
+                    // Posisi jari di dalam viewport (bukan di dalam track yang bergeser).
+                    var fingerView = 0f
+                    var autoJob: Job? = null
+                    val maxSpeedPx = 520.dp.toPx()
+
+                    fun applyTarget() {
+                        val target = rubberBand(origin + travelled, maxIndex)
+                        val idx = target.roundToInt().coerceIn(0, modes.lastIndex)
+                        if (idx != lastIndex) {
+                            lastIndex = idx
+                            dragIndex = idx
+                            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        }
+                        scope.launch {
+                            if (reduceAnimation) {
+                                position.snapTo(target)
+                            } else {
+                                // Spring kaku mengejar jari: pill sedikit tertinggal
+                                // (liquid) dan velocity-nya memicu regangan.
+                                position.animateTo(
+                                    target,
+                                    spring(
+                                        dampingRatio = 0.9f,
+                                        stiffness = 1000f,
+                                        visibilityThreshold = 0.001f,
+                                    ),
+                                )
+                            }
+                        }
+                    }
+
+                    // -1..1: seberapa dalam jari masuk zona tepi viewport (negatif = tepi kiri).
+                    fun edgePush(): Float {
+                        if (edgeScroll == null || !isLtr || viewportPx <= 0f) return 0f
+                        val edge = minOf(slotPx * 0.9f, viewportPx * 0.25f)
+                        if (edge <= 0f) return 0f
+                        return when {
+                            fingerView < edge -> -((edge - fingerView) / edge).coerceIn(0f, 1f)
+                            fingerView > viewportPx - edge ->
+                                ((fingerView - (viewportPx - edge)) / edge).coerceIn(0f, 1f)
+                            else -> 0f
+                        }
+                    }
+
+                    fun stopAuto() {
+                        autoJob?.cancel()
+                        autoJob = null
+                    }
+
+                    // Menggeser track sendiri selama jari berada di zona tepi. Pill ikut maju
+                    // sebesar jarak yang digeser, jadi tetap di bawah jari walau jarinya diam.
+                    fun startAuto() {
+                        val sc = edgeScroll ?: return
+                        if (autoJob?.isActive == true) return
+                        autoJob = scope.launch {
+                            var last = withFrameNanos { it }
+                            while (isActive) {
+                                val now = withFrameNanos { it }
+                                val dt = ((now - last) / 1e9f).coerceAtMost(0.05f)
+                                last = now
+                                val push = edgePush()
+                                if (push == 0f) break
+                                val consumed = sc.scrollBy(push * maxSpeedPx * dt)
+                                // Track sudah mentok: tidak ada lagi yang bisa digeser.
+                                if (consumed == 0f) break
+                                travelled += consumed / slotPx
+                                applyTarget()
+                            }
+                            autoJob = null
+                        }
+                    }
 
                     fun settleTo(idx: Int) {
                         scope.launch {
@@ -469,6 +549,8 @@ fun LiquidSegmentedControl(
                         },
                         onDragStart = {
                             tracker.resetTracking()
+                            stopAuto()
+                            fingerView = it.x - (edgeScroll?.value ?: 0)
                             origin = position.value
                             travelled = 0f
                             lastIndex = position.value.roundToInt().coerceIn(0, modes.lastIndex)
@@ -479,31 +561,13 @@ fun LiquidSegmentedControl(
                             change.consume()
                             tracker.addPosition(change.uptimeMillis, change.position)
                             travelled += dragAmount * dir / slotPx
-                            val target = rubberBand(origin + travelled, maxIndex)
-                            val idx = target.roundToInt().coerceIn(0, modes.lastIndex)
-                            if (idx != lastIndex) {
-                                lastIndex = idx
-                                dragIndex = idx
-                                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            }
-                            scope.launch {
-                                if (reduceAnimation) {
-                                    position.snapTo(target)
-                                } else {
-                                    // Spring kaku mengejar jari: pill sedikit tertinggal
-                                    // (liquid) dan velocity-nya memicu regangan.
-                                    position.animateTo(
-                                        target,
-                                        spring(
-                                            dampingRatio = 0.9f,
-                                            stiffness = 1000f,
-                                            visibilityThreshold = 0.001f,
-                                        ),
-                                    )
-                                }
-                            }
+                            fingerView = change.position.x - (edgeScroll?.value ?: 0)
+                            applyTarget()
+                            // Jari mentok di tepi viewport: track menggeser sendiri dan pill ikut.
+                            if (edgePush() != 0f) startAuto()
                         },
                         onDragEnd = {
+                            stopAuto()
                             val v = tracker.calculateVelocity().x * dir / slotPx
                             val idx = (position.value + v * 0.12f)
                                 .roundToInt()
@@ -518,6 +582,7 @@ fun LiquidSegmentedControl(
                             settleTo(idx)
                         },
                         onDragCancel = {
+                            stopAuto()
                             isDragging = false
                             dragIndex = -1
                             settleTo(modes.indexOf(currentSelected).coerceAtLeast(0))
@@ -630,6 +695,8 @@ fun LiquidScrollSegmentedControl(
                 modifier = Modifier.width(natural),
                 enabled = enabled,
                 dragOnlyFromPill = true,
+                edgeScroll = scroll,
+                viewportPx = viewportPx,
                 content = content,
             )
         }
