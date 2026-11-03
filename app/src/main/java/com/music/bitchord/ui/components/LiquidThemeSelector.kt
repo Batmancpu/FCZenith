@@ -45,6 +45,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -230,25 +231,17 @@ fun LiquidSegmentedControl(
                         // pill dilubangi supaya tidak terlihat dobel selama pill bergerak.
                         // Rekaman backdrop tetap utuh, hanya gambar yang terlihat yang dilubangi.
                         Modifier.drawWithContent {
-                            val stretch = (abs(position.velocity) / 8f).coerceIn(0f, 1f)
-                            val pop = 1f + 0.05f * pressProgress.value
-                            val inset = SELECTOR_INSET.toPx()
-                            val pillW = slotPx * pop * (1f + 0.16f * stretch)
-                            val pillH = (size.height - inset * 2f) * pop * (1f - 0.07f * stretch)
-                            val left = if (isLtr) {
-                                inset + position.value * slotPx
-                            } else {
-                                size.width - inset - (position.value + 1f) * slotPx
-                            }
-                            val cx = left + slotPx / 2f
-                            val cy = size.height / 2f
+                            val r = liquidPillRect(
+                                size = size,
+                                slotPx = slotPx,
+                                insetPx = SELECTOR_INSET.toPx(),
+                                position = position.value,
+                                velocity = position.velocity,
+                                press = pressProgress.value,
+                                isLtr = isLtr,
+                            )
                             val hole = Path().apply {
-                                addRoundRect(
-                                    RoundRect(
-                                        Rect(cx - pillW / 2f, cy - pillH / 2f, cx + pillW / 2f, cy + pillH / 2f),
-                                        CornerRadius(pillH / 2f),
-                                    ),
-                                )
+                                addRoundRect(RoundRect(r, CornerRadius(r.height / 2f)))
                             }
                             clipPath(hole, ClipOp.Difference) {
                                 this@drawWithContent.drawContent()
@@ -260,6 +253,33 @@ fun LiquidSegmentedControl(
                 )
                 .layerBackdrop(trackBackdrop)
                 .background(trackBrush)
+                // Isi pill digambar DI BAWAH label dan ikut terekam ke backdrop, seperti
+                // navbar (halaman, bar, isi pill, lalu tab): salinan di dalam lensa sudah
+                // lengkap, jadi tidak ada lapisan label tajam kedua yang bisa terlihat dobel.
+                .then(
+                    if (glassOn) {
+                        Modifier.drawBehind {
+                            val r = liquidPillRect(
+                                size = size,
+                                slotPx = slotPx,
+                                insetPx = SELECTOR_INSET.toPx(),
+                                position = position.value,
+                                velocity = position.velocity,
+                                press = pressProgress.value,
+                                isLtr = isLtr,
+                            )
+                            val e = energy()
+                            drawRoundRect(
+                                color = pillTint.copy(alpha = pillRestAlpha * (1f - 0.85f * e)),
+                                topLeft = r.topLeft,
+                                size = r.size,
+                                cornerRadius = CornerRadius(r.height / 2f),
+                            )
+                        }
+                    } else {
+                        Modifier
+                    },
+                )
                 .padding(SELECTOR_INSET),
         ) {
             Row(Modifier.fillMaxWidth().fillMaxHeight()) {
@@ -330,7 +350,7 @@ fun LiquidSegmentedControl(
                 },
                 onDrawSurface = {
                     val e = energy()
-                    drawRect(pillTint.copy(alpha = pillRestAlpha * (1f - 0.85f * e)))
+                    // Isi pill sudah ada di bawah label (terekam di backdrop track).
                     val w = 1.dp.toPx()
                     drawRoundRect(
                         color = Color.White.copy(alpha = 0.45f * e),
@@ -505,7 +525,11 @@ fun LiquidSegmentedControl(
                     )
                 }
                 .padding(SELECTOR_INSET)
-                .graphicsLayer { alpha = (1f - energy() * 4f).coerceIn(0f, 1f) },
+                // Dengan glass, salinan label di lensa sudah lengkap; lapisan ini hanya
+                // menangani klik dan semantik (tidak digambar). Tanpa glass tetap tampil.
+                .graphicsLayer {
+                    alpha = if (glassOn) 0f else (1f - energy() * 4f).coerceIn(0f, 1f)
+                },
         ) {
             modes.forEachIndexed { index, mode ->
                 val selected = index == (if (dragIndex >= 0) dragIndex else selectedIndex)
@@ -734,6 +758,33 @@ private fun rubberBand(x: Float, maxIndex: Float): Float {
     }
     val eased = over * 0.25f / (1f + 2f * over)
     return if (x < 0f) -eased else maxIndex + eased
+}
+
+/**
+ * Persegi pill pada frame ini (pop + regangan mengikuti kecepatan), dalam koordinat track.
+ * Dipakai oleh lubang di track dan oleh isi pill, supaya keduanya selalu persis sama.
+ */
+private fun liquidPillRect(
+    size: Size,
+    slotPx: Float,
+    insetPx: Float,
+    position: Float,
+    velocity: Float,
+    press: Float,
+    isLtr: Boolean,
+): Rect {
+    val stretch = (abs(velocity) / 8f).coerceIn(0f, 1f)
+    val pop = 1f + 0.05f * press
+    val w = slotPx * pop * (1f + 0.16f * stretch)
+    val h = (size.height - insetPx * 2f) * pop * (1f - 0.07f * stretch)
+    val left = if (isLtr) {
+        insetPx + position * slotPx
+    } else {
+        size.width - insetPx - (position + 1f) * slotPx
+    }
+    val cx = left + slotPx / 2f
+    val cy = size.height / 2f
+    return Rect(cx - w / 2f, cy - h / 2f, cx + w / 2f, cy + h / 2f)
 }
 
 private val SELECTOR_HEIGHT = 50.dp
