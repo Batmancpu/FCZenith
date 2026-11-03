@@ -45,17 +45,21 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.PathOperation
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -220,6 +224,40 @@ fun LiquidSegmentedControl(
             Modifier
                 .matchParentSize()
                 .clip(shape)
+                .then(
+                    if (glassOn) {
+                        // Lensa menggambar salinan label dari backdrop; label asli di bawah
+                        // pill dilubangi supaya tidak terlihat dobel selama pill bergerak.
+                        // Rekaman backdrop tetap utuh, hanya gambar yang terlihat yang dilubangi.
+                        Modifier.drawWithContent {
+                            val stretch = (abs(position.velocity) / 8f).coerceIn(0f, 1f)
+                            val pop = 1f + 0.05f * pressProgress.value
+                            val inset = SELECTOR_INSET.toPx()
+                            val pillW = slotPx * pop * (1f + 0.16f * stretch)
+                            val pillH = (size.height - inset * 2f) * pop * (1f - 0.07f * stretch)
+                            val left = if (isLtr) {
+                                inset + position.value * slotPx
+                            } else {
+                                size.width - inset - (position.value + 1f) * slotPx
+                            }
+                            val cx = left + slotPx / 2f
+                            val cy = size.height / 2f
+                            val hole = Path().apply {
+                                addRoundRect(
+                                    RoundRect(
+                                        Rect(cx - pillW / 2f, cy - pillH / 2f, cx + pillW / 2f, cy + pillH / 2f),
+                                        CornerRadius(pillH / 2f),
+                                    ),
+                                )
+                            }
+                            clipPath(hole, ClipOp.Difference) {
+                                this@drawWithContent.drawContent()
+                            }
+                        }
+                    } else {
+                        Modifier
+                    },
+                )
                 .layerBackdrop(trackBackdrop)
                 .background(trackBrush)
                 .padding(SELECTOR_INSET),
