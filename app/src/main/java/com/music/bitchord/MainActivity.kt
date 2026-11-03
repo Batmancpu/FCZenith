@@ -2823,6 +2823,22 @@ private fun BitChordApp(
                 .snapshotBackdropSource(pageBackdrop),
         ) {
             CoverFlightHost(Modifier.weight(1f).fillMaxHeight(), overlay = false) {
+                // The page and the flying cover are one source for the glass: the
+                // bars sample both, so a cover passing under the nav bar or the
+                // mini player is blurred and refracted live, not only once it has
+                // landed and become part of the page.
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .hazeSource(hazeState)
+                        .then(
+                            if (glassActive && glassSamplesBackdrop) {
+                                Modifier.layerBackdrop(appBackdrop)
+                            } else {
+                                Modifier
+                            },
+                        ),
+                ) {
                 AnimatedContent(
                     // Whatever is on top of the back stack — see [AppNavigator].
                     targetState = when {
@@ -2875,21 +2891,9 @@ private fun BitChordApp(
                         }
                     },
                     modifier = Modifier
-                        .hazeSource(hazeState)
                         .then(
                             if (glassActive) {
                                 Modifier
-                                    // Not under "reduce dynamic blur": nothing
-                                    // samples the layer then, and recording a
-                                    // whole page into one for no reader is the
-                                    // cost that setting exists to remove.
-                                    .then(
-                                        if (glassSamplesBackdrop) {
-                                            Modifier.layerBackdrop(appBackdrop)
-                                        } else {
-                                            Modifier
-                                        },
-                                    )
                                     // Every page's scroll passes through here, so
                                     // the glass bar collapses on all of them
                                     // without each one having to know about it.
@@ -3703,8 +3707,10 @@ private fun BitChordApp(
                 }
 
                 // The flying cover goes over the page but under the bars, so it
-                // never rides above the tab bar or the mini player.
+                // never rides above the tab bar or the mini player. Inside the
+                // glass source above, so the bars see it while it flies.
                 CoverFlightLayer()
+                }
 
                 // The top-bar footprint is transparent on every page so the
                 // shared app-level gradient is continuous; its controls float
