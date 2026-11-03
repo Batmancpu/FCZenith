@@ -193,7 +193,21 @@ import com.music.bitchord.ui.player.CanvasArtworkPlayer
 import com.music.bitchord.ui.theme.ArtworkPalette
 import com.music.bitchord.ui.theme.rememberArtworkPalette
 import kotlin.math.roundToInt
+import kotlin.math.PI
+import kotlin.math.ceil
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlin.random.Random
 import java.util.Locale
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.ui.graphics.Shape
+import com.music.bitchord.data.YtMusicRepository
 
 private const val MAX_ARTIST_SONGS = 20
 private const val SONGS_PER_COLUMN = 4
@@ -614,6 +628,7 @@ fun DetailScreen(
                         page = page,
                         palette = palette,
                         sleeveSize = sleeveSize,
+                        heroHeight = artHeight * 0.92f,
                         canvas = canvas,
                         songs = songs,
                         onPlay = { onSongClick(songs, 0) },
@@ -956,8 +971,12 @@ private fun ReleaseHeader(
     onToggleLibrary: (() -> Unit)?,
     /** The Cached songs folder's: saves every track on it to Downloads. Null hides it. */
     onDownloadAll: (() -> Unit)? = null,
+    /** Tinggi hero full-bleed, hanya dipakai halaman Liked Music. */
+    heroHeight: Dp = sleeveSize * 1.2f,
 ) {
     val (credit, meta) = page.headerLines(songs.size, songs.playtime())
+    // Liked Music tidak memakai sleeve berbingkai: seninya full-bleed.
+    val fullBleed = page.isLikedMusic()
     // Every row on a release carries the same credit — see [pageCredit] — so
     // the first one speaks for the whole page, the same source the rows'
     // own long-press "Open artist" already reads from.
@@ -967,10 +986,18 @@ private fun ReleaseHeader(
         modifier = Modifier
             .fillMaxWidth()
             // Clear of the floating bar, which the sleeve no longer runs under.
-            .padding(top = topBarContentPadding(), bottom = 18.dp),
+            // Hero full-bleed justru naik sampai di bawah bar.
+            .padding(top = if (fullBleed) 0.dp else topBarContentPadding(), bottom = 18.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Box(
+        if (fullBleed) {
+            LikedMusicHero(
+                page = page,
+                palette = palette,
+                songs = songs,
+                height = heroHeight,
+            )
+        } else Box(
             Modifier
                 .coverFlightTarget(page.browseId, 12.dp)
                 .size(sleeveSize)
@@ -2464,6 +2491,297 @@ private fun DetailPage.headerLines(trackCount: Int, playtime: String? = null): P
         playtime,
     ).joinToString(" · ")
     return credit to meta
+}
+
+/** Liked Music di YouTube Music (VLLM) atau Liked milik perangkat. */
+private fun DetailPage.isLikedMusic(): Boolean =
+    browseId == YtMusicRepository.LIKED_MUSIC || OfflinePlaylists.isLikedPage(browseId)
+
+/** Seberapa jauh blok judul naik menimpa kaki hero. */
+private val LIKED_HERO_OVERLAP = 88.dp
+private const val LIKED_COLUMNS = 3
+private const val LIKED_MAX_COVERS = 21
+private const val LIKED_DRIFT_MS = 70_000
+private const val LIKED_PULSE_MS = 9_000
+private val LIKED_GAP = 12.dp
+private val LIKED_FOOT_BLUR = 36.dp
+
+/** Lebar relatif, arah geser, dan jumlah minimal tile per kolom. */
+private val LIKED_COLUMN_SIZE = floatArrayOf(0.86f, 1.12f, 0.92f)
+private val LIKED_COLUMN_DIR = floatArrayOf(1f, -1f, 1f)
+private val LIKED_COLUMN_COUNT = intArrayOf(6, 5, 7)
+
+private val LIKED_COLORS = listOf(Color(0xFF7B5CF0), Color(0xFFB45FDB), Color(0xFFFF5FA8))
+private val LIKED_BASE = Brush.verticalGradient(LIKED_COLORS)
+
+/** Kaki hero: detail hilang lebih dulu daripada warnanya. */
+private val LIKED_FOOT_MASK = Brush.verticalGradient(
+    0.28f to Color.Transparent,
+    0.62f to Color.Black.copy(alpha = 0.85f),
+    1.00f to Color.Black,
+)
+
+/**
+ * Header Liked Music: full-bleed sampai di bawah bar, isinya mosaik abstrak
+ * dari cover lagu yang ada di playlist, urutannya diacak setiap halaman dibuka
+ * dan bergeser pelan. Bagian bawahnya di-blur lalu larut ke warna halaman.
+ * Judul dan meta di bawahnya naik menimpa kaki hero, lihat [LIKED_HERO_OVERLAP].
+ */
+@Composable
+private fun LikedMusicHero(
+    page: DetailPage,
+    palette: ArtworkPalette,
+    songs: List<Song>,
+    height: Dp,
+    modifier: Modifier = Modifier,
+) {
+    val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
+    val blurFoot = !reduceDynamicBlur && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+
+    // Satu seed per pembukaan: acak, tapi tidak berubah saat list di-scroll
+    // keluar dan kembali, atau saat urutan lagu diganti.
+    val seed = rememberSaveable { System.nanoTime() }
+    val covers = remember(songs.isNotEmpty(), seed) {
+        songs.mapNotNull { it.thumbnailUrl }
+            .distinct()
+            .shuffled(Random(seed))
+            .take(LIKED_MAX_COVERS)
+    }
+
+    // Satu jam untuk semua lapisan, dibaca hanya lewat lambda (fase layout/draw),
+    // jadi tidak ada recomposition per frame dan salinan blur tetap sinkron.
+    val transition = rememberInfiniteTransition(label = "likedHero")
+    val drift by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(LIKED_DRIFT_MS, easing = LinearEasing)),
+        label = "likedDrift",
+    )
+    val pulse by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(LIKED_PULSE_MS, easing = LinearEasing)),
+        label = "likedPulse",
+    )
+
+    Box(
+        modifier
+            // Paling luar: tinggi yang dilaporkan lebih pendek, sehingga
+            // judul di bawahnya tergambar di atas kaki hero.
+            .layout { measurable, constraints ->
+                val placeable = measurable.measure(constraints)
+                val overlap = LIKED_HERO_OVERLAP.roundToPx().coerceAtMost(placeable.height)
+                layout(placeable.width, placeable.height - overlap) { placeable.place(0, 0) }
+            }
+            .fillMaxWidth()
+            .height(height)
+            .clipToBounds()
+            .coverFlightTarget(page.browseId, 0.dp, palette.background),
+    ) {
+        LikedArt(
+            covers = covers,
+            drift = { drift },
+            pulse = { pulse },
+            modifier = Modifier.matchParentSize(),
+        )
+
+        // Salinan yang di-blur, dimunculkan di separuh bawah lewat mask.
+        if (blurFoot) {
+            LikedArt(
+                covers = covers,
+                drift = { drift },
+                pulse = { pulse },
+                modifier = Modifier
+                    .matchParentSize()
+                    // Offscreen agar mask memotong hasil blur, bukan tiap gambar di bawahnya.
+                    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                    .drawWithContent {
+                        drawContent()
+                        drawRect(LIKED_FOOT_MASK, blendMode = BlendMode.DstIn)
+                    }
+                    .blur(LIKED_FOOT_BLUR, BlurredEdgeTreatment.Rectangle),
+            )
+        }
+
+        // Berakhir di warna halaman penuh, jadi tidak ada tepi tempat seni berhenti.
+        val page0 = palette.background.copy(alpha = 0f)
+        Box(
+            Modifier
+                .matchParentSize()
+                .background(
+                    Brush.verticalGradient(
+                        0.00f to page0,
+                        0.56f to page0,
+                        0.66f to palette.background.copy(alpha = 0.20f),
+                        0.76f to palette.background.copy(alpha = 0.52f),
+                        0.86f to palette.background.copy(alpha = 0.82f),
+                        0.94f to palette.background.copy(alpha = 0.96f),
+                        1.00f to palette.background,
+                    ),
+                ),
+        )
+
+        // Sedikit gelap di atas supaya ikon bar kaca tetap terbaca.
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(height * 0.28f)
+                .background(
+                    Brush.verticalGradient(
+                        0f to Color.Black.copy(alpha = 0.22f),
+                        1f to Color.Transparent,
+                    ),
+                ),
+        )
+    }
+}
+
+/**
+ * Isi hero: gradien ungu ke pink, blob cahaya yang melayang, dan tiga kolom
+ * cover berbentuk beragam yang miring dan bergeser terus (kolom 2 berlawanan arah).
+ * Tiap tile juga bernapas pelan dan masuk bergantian saat halaman dibuka.
+ */
+@Composable
+private fun LikedArt(
+    covers: List<String>,
+    drift: () -> Float,
+    pulse: () -> Float,
+    modifier: Modifier = Modifier,
+) {
+    BoxWithConstraints(
+        modifier.drawBehind {
+            drawRect(LIKED_BASE)
+            val t = pulse() * 2f * PI.toFloat()
+            val w = size.width
+            val h = size.height
+            fun blob(color: Color, cx: Float, cy: Float, r: Float) {
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        listOf(color.copy(alpha = 0.75f), color.copy(alpha = 0f)),
+                        center = Offset(cx, cy),
+                        radius = r,
+                    ),
+                    radius = r,
+                    center = Offset(cx, cy),
+                )
+            }
+            blob(Color(0xFF5CC8FF), w * (0.22f + 0.14f * sin(t)), h * (0.22f + 0.10f * cos(t)), w * 0.75f)
+            blob(Color(0xFFFF7AB8), w * (0.82f + 0.12f * cos(t)), h * (0.68f + 0.10f * sin(t)), w * 0.80f)
+            blob(Color(0xFF9B6CFF), w * (0.45f + 0.18f * sin(2f * t)), h * (0.95f + 0.05f * cos(2f * t)), w * 0.70f)
+        },
+    ) {
+        val width = maxWidth
+        val height = maxHeight
+
+        if (covers.isEmpty()) {
+            // Belum ada cover (daftar belum datang, atau lagu tanpa gambar).
+            Icon(
+                imageVector = Icons.Rounded.Favorite,
+                contentDescription = null,
+                tint = Color.White.copy(alpha = 0.85f),
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(width * 0.34f)
+                    .graphicsLayer {
+                        val s = 1f + 0.06f * sin(pulse() * 2f * PI.toFloat())
+                        scaleX = s
+                        scaleY = s
+                    },
+            )
+            return@BoxWithConstraints
+        }
+
+        // Digambar lebih besar dari hero lalu diputar, supaya sudut-sudutnya
+        // tetap terisi setelah miring.
+        val mosaicW = width * 1.5f
+        val mosaicH = height * 1.5f
+        val base = (mosaicW - LIKED_GAP * (LIKED_COLUMNS - 1)) / LIKED_COLUMN_SIZE.sum()
+
+        Box(
+            Modifier
+                .align(Alignment.Center)
+                .requiredSize(mosaicW, mosaicH)
+                .graphicsLayer { rotationZ = -11f },
+        ) {
+            var x = 0.dp
+            for (c in 0 until LIKED_COLUMNS) {
+                val s = base * LIKED_COLUMN_SIZE[c]
+                val colX = x
+                // Cukup tile agar kolom selalu menutup tinggi mosaik.
+                val n = maxOf(
+                    LIKED_COLUMN_COUNT[c],
+                    ceil(mosaicH / (s + LIKED_GAP)).toInt() + 2,
+                )
+                for (i in 0 until n) {
+                    val k = c * 16 + i
+                    LikedTile(
+                        url = covers[(c + i * LIKED_COLUMNS) % covers.size],
+                        index = k,
+                        size = s,
+                        pulse = pulse,
+                        modifier = Modifier.offset {
+                            val step = (s + LIKED_GAP).toPx()
+                            val cycle = step * n
+                            val raw = (i * step + LIKED_COLUMN_DIR[c] * drift() * cycle + c * 0.37f * step) % cycle
+                            val y = (if (raw < 0f) raw + cycle else raw) - step
+                            IntOffset(colX.roundToPx(), y.roundToInt())
+                        },
+                    )
+                }
+                x += s + LIKED_GAP
+            }
+        }
+    }
+}
+
+private fun likedTileShape(k: Int): Shape = when (k % 4) {
+    0 -> RoundedCornerShape(26.dp)
+    1 -> CircleShape
+    2 -> RoundedCornerShape(topStart = 70.dp, topEnd = 10.dp, bottomEnd = 70.dp, bottomStart = 10.dp)
+    else -> RoundedCornerShape(topStart = 10.dp, topEnd = 60.dp, bottomEnd = 10.dp, bottomStart = 60.dp)
+}
+
+/** Satu cover: masuk bergantian, lalu membesar-mengecil dan miring tipis. */
+@Composable
+private fun LikedTile(
+    url: String,
+    index: Int,
+    size: Dp,
+    pulse: () -> Float,
+    modifier: Modifier = Modifier,
+) {
+    var shown by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { shown = true }
+    val enter by animateFloatAsState(
+        targetValue = if (shown) 1f else 0f,
+        animationSpec = tween(
+            durationMillis = 800,
+            delayMillis = (index % 9) * 70,
+            easing = FastOutSlowInEasing,
+        ),
+        label = "likedTileEnter",
+    )
+    val tileShape = remember(index) { likedTileShape(index) }
+
+    AsyncImage(
+        model = url.artworkAt(CARD_ART_PX),
+        contentDescription = null,
+        contentScale = ContentScale.Crop,
+        modifier = modifier
+            .size(size)
+            .graphicsLayer {
+                val a = sin((pulse() + index * 0.173f) * 2f * PI.toFloat())
+                val s = (0.82f + 0.18f * enter) * (1f + 0.035f * a)
+                scaleX = s
+                scaleY = s
+                rotationZ = 2.5f * a * (if (index % 2 == 0) 1f else -1f)
+                alpha = 0.94f * enter
+                shape = tileShape
+                clip = true
+            }
+            .background(Color.White.copy(alpha = 0.12f), tileShape)
+            .border(1.dp, Color.White.copy(alpha = 0.22f), tileShape),
+    )
 }
 
 /** The glyph on a release page's placeholder sleeve: what kind of thing has no cover. */
