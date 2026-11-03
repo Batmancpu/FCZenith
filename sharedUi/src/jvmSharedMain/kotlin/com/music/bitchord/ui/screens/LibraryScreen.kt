@@ -375,6 +375,7 @@ internal fun LibraryGridShelf(
             onShowAll = onShowAll.takeIf { shelf.items.size + leadingCount > LIBRARY_ROW_MAX_ITEMS },
         )
         ShelfRow(
+            state = rememberShelfListState("library:${shelf.title}"),
             contentPadding = PaddingValues(horizontal = PAGE_GUTTER),
             horizontalArrangement = Arrangement.spacedBy(LIBRARY_GRID_SPACING),
         ) {
