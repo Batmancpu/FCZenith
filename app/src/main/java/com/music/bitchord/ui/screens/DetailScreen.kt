@@ -75,6 +75,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.rememberOverscrollEffect
+import com.music.bitchord.ui.utils.rememberIosOverscrollEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -595,6 +597,13 @@ fun DetailScreen(
                 // A folder's grid view: the same column count the Library's
                 // "Show all" grids reach at this width.
                 val gridColumns = libraryGrid(maxWidth - PAGE_GUTTER * 2).columns
+                // Liked Music: tarikan ke bawah dibatasi kecil, jadi seni ekstra di
+                // atas hero cukup tipis dan lubang tidak pernah terlihat.
+                val listOverscroll = if (page.isLikedMusic()) {
+                    rememberIosOverscrollEffect(LIKED_MAX_PULL)
+                } else {
+                    rememberOverscrollEffect()
+                }
 
                 // The artist photo is drawn behind the list rather than in it, so
                 // both need to agree on its height without being able to ask each
@@ -616,6 +625,7 @@ fun DetailScreen(
                     reorder(palette)
                 } else LazyColumn(
                     state = listState,
+                    overscrollEffect = listOverscroll,
                     modifier = Modifier.fillMaxSize(),
                     // The artist photo runs edge-to-edge up under the glass bar;
                     // a release header clears the bar itself, see [ReleaseHeader].
@@ -2519,7 +2529,10 @@ private val LIKED_BASE = Brush.verticalGradient(LIKED_COLORS)
  * Seberapa jauh seni hero menjulur ke atas, melewati tepi atasnya. Di luar layar
  * saat diam; terlihat ketika halaman ditarik ke bawah, supaya tidak ada lubang.
  */
-private val LIKED_OVERSCROLL = 320.dp
+private val LIKED_OVERSCROLL = 48.dp
+
+/** Batas tarikan ke bawah halaman Liked Music; harus lebih kecil dari [LIKED_OVERSCROLL]. */
+private val LIKED_MAX_PULL = 40.dp
 
 /**
  * Header Liked Music: full-bleed sampai di bawah bar, isinya mosaik abstrak
@@ -2600,6 +2613,7 @@ private fun LikedMusicHero(
                 covers = covers,
                 drift = { drift },
                 pulse = { pulse },
+                topInset = LIKED_OVERSCROLL,
                 modifier = Modifier.matchParentSize(),
             )
 
@@ -2609,6 +2623,7 @@ private fun LikedMusicHero(
                     covers = covers,
                     drift = { drift },
                     pulse = { pulse },
+                    topInset = LIKED_OVERSCROLL,
                     modifier = Modifier
                         .matchParentSize()
                         // Offscreen agar mask memotong hasil blur, bukan tiap gambar di bawahnya.
@@ -2676,6 +2691,9 @@ private fun LikedArt(
     covers: List<String>,
     drift: () -> Float,
     pulse: () -> Float,
+    // Bagian seni yang menjulur di atas tepi hero; icon digeser turun setengahnya
+    // supaya tetap di tengah area yang terlihat.
+    topInset: Dp = 0.dp,
     modifier: Modifier = Modifier,
 ) {
     BoxWithConstraints(
@@ -2713,6 +2731,7 @@ private fun LikedArt(
                     .align(Alignment.Center)
                     .size(width * 0.34f)
                     .graphicsLayer {
+                        translationY = topInset.toPx() / 2f
                         val s = 1f + 0.06f * sin(pulse() * 2f * PI.toFloat())
                         scaleX = s
                         scaleY = s

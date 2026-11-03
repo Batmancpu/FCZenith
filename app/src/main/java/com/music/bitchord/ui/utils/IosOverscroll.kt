@@ -25,6 +25,7 @@ import androidx.compose.ui.node.LayoutModifierNode
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.Velocity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -58,7 +59,10 @@ private fun rubberBand(rawDistance: Float, containerPx: Float): Float {
  * It replaces Android's stretch/glow with a UIScrollView-like rubber band during a
  * drag, then critically damps the content back to its resting position on release.
  */
-private class IosOverscrollEffect : OverscrollEffect {
+private class IosOverscrollEffect(
+    // Batas tarikan ke bawah (px). 0 = tanpa batas, ikut tinggi kontainer.
+    private val maxPullDownPx: Float = 0f,
+) : OverscrollEffect {
     private val rawPullX = mutableFloatStateOf(0f)
     private val rawPullY = mutableFloatStateOf(0f)
     private var containerWidthPx = 0f
@@ -164,7 +168,16 @@ private class IosOverscrollEffect : OverscrollEffect {
 
     override val node: DelegatableNode = IosOverscrollNode(
         offsetX = { rubberBand(rawPullX.floatValue, containerWidthPx) },
-        offsetY = { rubberBand(rawPullY.floatValue, containerHeightPx) },
+        offsetY = {
+            val raw = rawPullY.floatValue
+            // Tarikan ke bawah dibatasi supaya tidak pernah melewati seni ekstra
+            // di atas hero. Tarikan ke atas tetap memakai kurva biasa.
+            if (maxPullDownPx > 0f && raw > 0f) {
+                rubberBand(raw, maxPullDownPx * rubberBandConstant)
+            } else {
+                rubberBand(raw, containerHeightPx)
+            }
+        },
         onMeasured = { width, height ->
             containerWidthPx = width
             containerHeightPx = height
@@ -213,4 +226,13 @@ fun rememberIosOverscrollFactory(): OverscrollFactory {
     val density = LocalDensity.current
     val scope = rememberCoroutineScope()
     return remember(density, scope) { IosOverscrollFactory(density, scope) }
+}
+
+/** Efek iOS yang tarikan ke bawahnya tidak pernah melewati [maxPullDown]. */
+@Composable
+fun rememberIosOverscrollEffect(maxPullDown: Dp): OverscrollEffect {
+    val density = LocalDensity.current
+    return remember(density, maxPullDown) {
+        IosOverscrollEffect(with(density) { maxPullDown.toPx() })
+    }
 }
