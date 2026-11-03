@@ -167,6 +167,31 @@ private object CoverFlightState {
 
     fun hidesSource(token: Any): Boolean = flying && flight?.token === token
 
+    /**
+     * Seberapa terlihat cover kartu. Saat pulang ia memudar masuk di separuh
+     * akhir penerbangan, bersilang dengan gambar terbang yang memudar keluar,
+     * jadi tidak ada lompatan ketika penerbangan selesai. Dibaca hanya di blok draw.
+     */
+    fun sourceAlpha(token: Any): Float {
+        if (!hidesSource(token)) return 1f
+        val f = flight ?: return 1f
+        return if (f.reverse) revealAt(flightProgress) else 0f
+    }
+
+    /**
+     * Teks di sekitar cover: memudar pelan saat berangkat dan muncul pelan
+     * saat pulang, mengikuti kemajuan penerbangan. Dibaca hanya di blok draw.
+     */
+    fun captionAlpha(token: Any): Float {
+        val f = flight ?: return 1f
+        if (f.token !== token) return 1f
+        return if (f.reverse) {
+            if (flying) revealAt(flightProgress) else 1f
+        } else {
+            1f - smooth(flightProgress / DEPART_FADE_SPAN)
+        }
+    }
+
     fun hidesTarget(browseId: String): Boolean {
         val f = flight ?: return false
         if (holding || f.browseId != browseId) return false
@@ -244,6 +269,8 @@ private fun startFlight(
     if (clip != null) CoverFlightState.clips[browseId] = clip else CoverFlightState.clips.remove(browseId)
     CoverFlightState.clipRendered = null
     CoverFlightState.holding = false
+    // Sisa 1f dari penerbangan sebelumnya membuat teks berkedip satu frame.
+    CoverFlightState.flightProgress = 0f
     CoverFlightState.flight = Flight(browseId, false, from ?: source.bounds, fromCornerPx ?: source.cornerPx).also {
         it.model = source.model
         it.footFade = source.footFade
@@ -290,6 +317,8 @@ private fun startReturn(browseId: String, from: Rect, cornerPx: Float, wash: Col
     // The card is usually still there: hide it from this very frame so it does
     // not show for a moment and blink out as the cover leaves.
     CoverFlightState.resolveReturn(next)
+    // Sisa 1f dari penerbangan masuk membuat teks kartu berkedip penuh satu frame.
+    CoverFlightState.flightProgress = 0f
     CoverFlightState.flight = next
 }
 
@@ -366,7 +395,7 @@ fun Modifier.coverFlightSource(
         onDispose { CoverFlightState.sources.remove(token) }
     }
     return this
-        .drawWithContent { if (!CoverFlightState.hidesSource(token)) drawContent() }
+        .graphicsLayer { alpha = CoverFlightState.sourceAlpha(token) }
         // Whole, not clipped to what shows: a card half off the row still flies as itself.
         .onGloballyPositioned { info.bounds = it.whole() }
 }
@@ -414,21 +443,20 @@ fun Modifier.coverFlightTarget(
 
 /** Whatever sits on a card around its cover (captions) leaves with it. */
 fun Modifier.hideDuringCoverFlight(token: Any): Modifier =
-    this.graphicsLayer {
-        alpha = if (!CoverFlightState.hidesSource(token)) {
-            1f
-        } else {
-            val flight = CoverFlightState.flight
-            // Gone at once on the way out; on the way back it returns with the
-            // cover's last stretch instead of popping in when it lands.
-            if (flight != null && flight.reverse) captionReveal(CoverFlightState.flightProgress) else 0f
-        }
-    }
+    this.graphicsLayer { alpha = CoverFlightState.captionAlpha(token) }
 
-private fun captionReveal(progress: Float): Float {
-    val t = ((progress - 0.45f) / 0.55f).coerceIn(0f, 1f)
-    return t * t * (3f - 2f * t)
+/** Pulang: teks dan cover kartu mulai muncul di sini (0..1 dari penerbangan). */
+private const val REVEAL_START = 0.5f
+
+/** Berangkat: teks sudah hilang sepenuhnya setelah sekian bagian awal penerbangan. */
+private const val DEPART_FADE_SPAN = 0.22f
+
+private fun smooth(t: Float): Float {
+    val x = t.coerceIn(0f, 1f)
+    return x * x * (3f - 2f * x)
 }
+
+private fun revealAt(progress: Float): Float = smooth((progress - REVEAL_START) / (1f - REVEAL_START))
 
 /** The clip the card was playing when its cover took off for [browseId]'s page, for the page to start from. */
 fun coverFlightClip(browseId: String?): CanvasArtwork? =
@@ -623,7 +651,10 @@ private fun FlightLayer(flight: Flight) {
                 val toCorner = if (flight.reverse) flight.toCornerPx else CoverFlightState.targetCornerPx
                 shape = RoundedCornerShape(lerpF(flight.fromCornerPx, toCorner, progress.value))
                 clip = true
-                alpha = fade.value
+                // Pulang: gambar terbang memudar keluar selagi kartu di bawahnya
+                // (cover dan teks) memudar masuk, jadi teks tidak tertutup lalu muncul tiba-tiba.
+                val reveal = if (flight.reverse) revealAt(progress.value) else 0f
+                alpha = fade.value * (1f - reveal * reveal)
             },
         // The picture is a square of the card's size inside a frame that grows
         // past it: left to the corner it sat up-left of the frame's centre and
