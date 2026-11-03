@@ -109,6 +109,7 @@ import com.music.bitchord.ui.components.PAGE_GUTTER
 import com.music.bitchord.ui.components.rememberBlurredBackdrop
 import com.music.bitchord.ui.components.ShelfRow
 import com.music.bitchord.ui.components.shelfStagger
+import com.music.bitchord.ui.components.instantPressClickable
 import com.music.bitchord.ui.components.SectionHeaderSkeleton
 import com.music.bitchord.ui.components.ShimmerBox
 import com.music.bitchord.ui.components.contextClick
@@ -1727,6 +1728,12 @@ private fun MoodTile(mood: TopPickMood, onClick: (TopPickMood, String) -> Unit, 
             Modifier
                 .fillMaxWidth()
                 .aspectRatio(1f)
+                // Sinks, dims and ripples the moment a finger lands, rim and
+                // all: the scale is drawn outside the clip below.
+                .instantPressClickable(
+                    shape = RoundedCornerShape(12.dp),
+                    onClick = { onClick(mood, title) },
+                )
                 .clip(RoundedCornerShape(12.dp))
                 .thumbnailBorder(RoundedCornerShape(12.dp)),
         ) {
