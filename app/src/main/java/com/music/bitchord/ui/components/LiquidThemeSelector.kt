@@ -73,7 +73,6 @@ import com.music.bitchord.ui.components.backdrop.backdrops.emptyBackdrop
 import com.music.bitchord.ui.components.backdrop.backdrops.layerBackdrop
 import com.music.bitchord.ui.components.backdrop.backdrops.rememberLayerBackdrop
 import com.music.bitchord.ui.components.backdrop.drawBackdrop
-import com.music.bitchord.ui.components.backdrop.effects.blur
 import com.music.bitchord.ui.components.backdrop.effects.colorControls
 import com.music.bitchord.ui.components.backdrop.effects.lens
 import com.music.bitchord.ui.components.backdrop.highlight.Highlight
@@ -190,9 +189,20 @@ fun LiquidThemeSelector(
                 .padding(SELECTOR_INSET),
         ) {
             Row(Modifier.fillMaxWidth().fillMaxHeight()) {
-                modes.forEach { mode ->
+                modes.forEachIndexed { index, mode ->
+                    // Label aktif ikut direkam tajam ke backdrop, jadi lensa pill
+                    // membiaskan ikon + teks aslinya (bukan hanya yang redup).
+                    val trackColor by animateColorAsState(
+                        targetValue = if (index == (if (dragIndex >= 0) dragIndex else selectedIndex)) {
+                            labelColor
+                        } else {
+                            dimColor
+                        },
+                        animationSpec = if (reduceAnimation) snap() else tween(180),
+                        label = "themeTrackLabelColor",
+                    )
                     SegmentBox(Modifier.weight(1f)) {
-                        SegmentContent(mode, dimColor, labelStyle)
+                        SegmentContent(mode, trackColor, labelStyle)
                     }
                 }
             }
@@ -213,10 +223,10 @@ fun LiquidThemeSelector(
                     val e = energy()
                     val g = max(e, REST_GLASS)
                     colorControls(saturation = 1f + 0.35f * g)
-                    blur(1.dp.toPx() * e)
+
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                         lens(
-                            refractionHeight = 8.dp.toPx() * g,
+                            refractionHeight = 12.dp.toPx() * g,
                             refractionAmount = 14.dp.toPx() * g,
                             depthEffect = true,
                             chromaticAberration = e > 0.5f,
@@ -248,7 +258,7 @@ fun LiquidThemeSelector(
                 },
                 onDrawSurface = {
                     val e = energy()
-                    drawRect(pillTint.copy(alpha = pillRestAlpha * (1f - 0.55f * e)))
+                    drawRect(pillTint.copy(alpha = pillRestAlpha * (1f - 0.85f * e)))
                     val w = 1.dp.toPx()
                     drawRoundRect(
                         color = Color.White.copy(alpha = 0.45f * e),
@@ -409,7 +419,7 @@ fun LiquidThemeSelector(
                     )
                 }
                 .padding(SELECTOR_INSET)
-                .graphicsLayer { alpha = 1f - 0.55f * energy() },
+                .graphicsLayer { alpha = 1f - energy() },
         ) {
             modes.forEachIndexed { index, mode ->
                 val selected = index == (if (dragIndex >= 0) dragIndex else selectedIndex)
