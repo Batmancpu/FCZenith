@@ -507,7 +507,7 @@ private fun HomeTitle(title: String, modifier: Modifier = Modifier) {
                 .aspectRatio(LOGO_ASPECT),
         )
         HorizontalDivider(
-            thickness = 0.5.dp,
+            thickness = 1.dp,
             color = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),
         )
         // "Listen now" is hidden for now; the wordmark above stays.
