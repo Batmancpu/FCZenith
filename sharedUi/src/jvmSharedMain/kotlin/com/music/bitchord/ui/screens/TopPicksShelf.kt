@@ -189,7 +189,13 @@ internal fun TopPicksShelf(
                                 // A label is only said once for a run of cards that share it,
                                 // so the row doesn't repeat "Made for You" over every card.
                                 // The line keeps its height so the cards stay aligned.
-                                val label = topPickLabel(pick)
+                                val baseLabel = topPickLabel(pick)
+                                // A label already used by an earlier card is swapped for the artist's name, so none repeats.
+                                val label = if (picks.take(index).any { sharesTopPickLabel(it, pick) }) {
+                                    pick.artistName?.takeIf { it.isNotBlank() } ?: baseLabel
+                                } else {
+                                    baseLabel
+                                }
                                 Text(
                                     text = label,
                                     style = MaterialTheme.typography.bodyMedium,
@@ -256,6 +262,13 @@ private fun topPickLabel(pick: TopPick): String = when (pick.kind) {
 
 /** What a card says: the small coloured line, the title, and an optional line under it. */
 private class CardText(val eyebrow: String, val title: String, val subtitle: String)
+
+/** Whether two cards would show the same small label above them. */
+private fun sharesTopPickLabel(a: TopPick, b: TopPick): Boolean {
+    fun isArtist(kind: TopPickKind) =
+        kind == TopPickKind.FEATURED_ARTIST || kind == TopPickKind.ARTIST_AND_SIMILAR
+    return a.kind == b.kind || (isArtist(a.kind) && isArtist(b.kind))
+}
 
 @Composable
 private fun cardText(pick: TopPick, listenerName: String?): CardText {

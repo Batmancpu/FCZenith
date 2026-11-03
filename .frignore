@@ -18,3 +18,7 @@ import kotlinx.coroutines.launch
 :file sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/components/CoverTransition.kt
 boundsTransform = { _, _ -> tween(durationMillis = 780, easing = CoverEasing) },
 tween(durationMillis = 380, delayMillis = delayMs, easing = FastOutSlowInEasing)
+text = label,
+val baseLabel = topPickLabel(pick)
+val label = if (picks.take(index).any { sharesTopPickLabel(it, pick) }) {
+pick.artistName?.takeIf { it.isNotBlank() } ?: baseLabel
