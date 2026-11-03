@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import coil3.compose.AsyncImagePainter
 import com.music.bitchord.data.canvas.CanvasArtwork
 import com.music.bitchord.ui.player.CanvasArtworkPlayer
 import kotlin.math.max
@@ -119,6 +120,9 @@ private class Flight(
 
     /** The card the cover leaves from or returns to. Set last: the layer waits on it. */
     var token by mutableStateOf<Any?>(null)
+
+    /** The flying picture has been drawn: only then do the card and the sleeve stand aside for it. */
+    var imageReady by mutableStateOf(false)
 }
 
 private object CoverFlightState {
@@ -158,7 +162,7 @@ private object CoverFlightState {
     val flying: Boolean
         get() {
             val f = flight ?: return false
-            return f.token != null && (f.reverse || target != null)
+            return f.token != null && f.imageReady && (f.reverse || target != null)
         }
 
     fun hidesSource(token: Any): Boolean = flying && flight?.token === token
@@ -239,6 +243,7 @@ private fun startFlight(
         it.footFade = source.footFade
         it.canvas = source.canvas
         it.frame = frame
+        it.imageReady = frame != null
         it.token = token
     }
 }
@@ -261,6 +266,7 @@ private fun startReturn(browseId: String, from: Rect, cornerPx: Float, wash: Col
     // What the page is showing right now, read before its sleeve steps aside;
     // a turn-back mid-flight carries on with the frame already in the air.
     next.frame = (if (inAir) air?.frame else null) ?: CoverFlightState.grabs[browseId]?.grab?.invoke()
+    next.imageReady = next.frame != null
     CoverFlightState.holding = false
     // The card is usually still there: hide it from this very frame so it does
     // not show for a moment and blink out as the cover leaves.
@@ -483,6 +489,11 @@ private fun FlightLayer(flight: Flight) {
     val chase = remember(flight) { mutableStateOf<Rect?>(null) }
     // How much of the flying cover is left once it has landed: it dissolves into the page's own clip.
     val fade = remember(flight) { Animatable(1f) }
+    // Never held up for long by a picture that is slow or will not load.
+    LaunchedEffect(flight) {
+        delay(150)
+        flight.imageReady = true
+    }
     LaunchedEffect(flight) {
         CoverFlightState.flightProgress = 0f
         val ready = if (flight.reverse) {
@@ -624,6 +635,11 @@ private fun FlightLayer(flight: Flight) {
                 model = flight.model,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
+                onState = {
+                    if (it is AsyncImagePainter.State.Success || it is AsyncImagePainter.State.Error) {
+                        flight.imageReady = true
+                    }
+                },
                 modifier = pictureModifier,
             )
         }
