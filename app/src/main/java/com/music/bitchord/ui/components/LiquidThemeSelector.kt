@@ -257,7 +257,52 @@ fun LiquidThemeSelector(
         }
         Box(pill.size(slot, SELECTOR_HEIGHT - SELECTOR_INSET * 2))
 
-        // 3) Hanya label terpilih yang digambar tajam di atas pill (yang lain sudah ada di track);
+        // 3) Tepi kaca: rim ambient, bayangan luar, inner shadow tipis, border putih transparan.
+        //    Hanya dekorasi (tanpa input); konten yang terbaca selalu digambar paling akhir.
+        if (glassOn) {
+            Box(
+                Modifier
+                    .drawBackdrop(
+                        backdrop = emptyBackdrop(),
+                        shape = { shape },
+                        effects = {},
+                        highlight = { Highlight.Ambient },
+                        shadow = {
+                            Shadow(
+                                radius = 10.dp,
+                                color = Color.Black.copy(alpha = if (light) 0.06f else 0.25f),
+                            )
+                        },
+                        innerShadow = {
+                            InnerShadow(
+                                radius = 6.dp,
+                                offset = DpOffset(0.dp, 2.dp),
+                                color = Color.Black.copy(alpha = if (light) 0.14f else 0.35f),
+                                alpha = 0.6f,
+                            )
+                        },
+                        onDrawFront = {
+                            val w = 0.75f.dp.toPx()
+                            drawRoundRect(
+                                color = Color.White.copy(alpha = if (light) 0.55f else 0.16f),
+                                topLeft = Offset(w / 2f, w / 2f),
+                                size = Size(size.width - w, size.height - w),
+                                cornerRadius = CornerRadius((size.height - w) / 2f),
+                                style = Stroke(w),
+                            )
+                        },
+                    )
+                    .matchParentSize(),
+            )
+        } else {
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .border(GLASS_EDGE_WIDTH, GLASS_EDGE_COLOR, shape),
+            )
+        }
+
+        // 4) Hanya label terpilih yang digambar tajam di atas pill (yang lain sudah ada di track);
         //    memudar sebagian selagi kaca menyala supaya refraksi label di bawah pill terlihat.
         Row(
             Modifier
@@ -308,49 +353,6 @@ fun LiquidThemeSelector(
             }
         }
 
-        // 4) Tepi kaca: rim ambient, bayangan luar, inner shadow tipis, border putih transparan.
-        if (glassOn) {
-            Box(
-                Modifier
-                    .matchParentSize()
-                    .drawBackdrop(
-                        backdrop = emptyBackdrop(),
-                        shape = { shape },
-                        effects = {},
-                        highlight = { Highlight.Ambient },
-                        shadow = {
-                            Shadow(
-                                radius = 10.dp,
-                                color = Color.Black.copy(alpha = if (light) 0.06f else 0.25f),
-                            )
-                        },
-                        innerShadow = {
-                            InnerShadow(
-                                radius = 6.dp,
-                                offset = DpOffset(0.dp, 2.dp),
-                                color = Color.Black.copy(alpha = if (light) 0.14f else 0.35f),
-                                alpha = 0.6f,
-                            )
-                        },
-                        onDrawFront = {
-                            val w = 0.75f.dp.toPx()
-                            drawRoundRect(
-                                color = Color.White.copy(alpha = if (light) 0.55f else 0.16f),
-                                topLeft = Offset(w / 2f, w / 2f),
-                                size = Size(size.width - w, size.height - w),
-                                cornerRadius = CornerRadius((size.height - w) / 2f),
-                                style = Stroke(w),
-                            )
-                        },
-                    ),
-            )
-        } else {
-            Box(
-                Modifier
-                    .matchParentSize()
-                    .border(GLASS_EDGE_WIDTH, GLASS_EDGE_COLOR, shape),
-            )
-        }
     }
 }
 
