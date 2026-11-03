@@ -96,6 +96,9 @@ fun <T : Any> HeldContextMenu(
     val shown = requested ?: last ?: return
     val (menuItem, heldItem) = shown
     val open = requested != null
+    // Set by a tap on the lifted card: its plate and menu go at once, so the
+    // cover flying out of it is all that is left of it.
+    var launched by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     val appReduceAnimation by AppSettings.reduceAnimation.collectAsStateWithLifecycle()
@@ -110,6 +113,7 @@ fun <T : Any> HeldContextMenu(
     val progress = remember { Animatable(0f) }
     LaunchedEffect(open) {
         if (open) {
+            launched = false
             progress.animateTo(
                 1f,
                 if (reduceMotion) {
@@ -123,7 +127,10 @@ fun <T : Any> HeldContextMenu(
         } else {
             progress.animateTo(
                 0f,
-                tween(durationMillis = if (reduceMotion) 110 else 230, easing = FastOutSlowInEasing),
+                tween(
+                    durationMillis = if (reduceMotion) 110 else if (launched) 150 else 230,
+                    easing = FastOutSlowInEasing,
+                ),
             )
             last = null
         }
@@ -202,7 +209,10 @@ fun <T : Any> HeldContextMenu(
                     .border(0.5.dp, hairline, cardShape)
                     .then(
                         if (onPreviewClick != null) {
-                            Modifier.clickable(enabled = open) { onPreviewClick(menuItem) }
+                            Modifier.clickable(enabled = open) {
+                                launched = true
+                                onPreviewClick(menuItem)
+                            }
                         } else {
                             Modifier
                         },
@@ -282,6 +292,10 @@ fun <T : Any> HeldContextMenu(
         LiftedPreview.pictureLeft = overlayOffset.x + visualLeft + pad * liftScale
         LiftedPreview.pictureTop = overlayOffset.y + visualTop + pad * liftScale
         LiftedPreview.scale = liftScale
+        LiftedPreview.held = heldItem.bounds
+        LiftedPreview.pictureLeft = overlayOffset.x + visualLeft + pad * liftScale
+        LiftedPreview.pictureTop = overlayOffset.y + visualTop + pad * liftScale
+        LiftedPreview.scale = liftScale
 
         // The menu hangs off the item's nearer edge: its start for an item on
         // the left of the screen, its end for one on the right — a grid's
@@ -311,7 +325,7 @@ fun <T : Any> HeldContextMenu(
                 if (reduceMotion) {
                     scaleX = liftScale
                     scaleY = liftScale
-                    alpha = p.coerceIn(0f, 1f)
+                    alpha = if (launched) 0f else p.coerceIn(0f, 1f)
                 } else {
                     val scale = lerp(1f, liftScale, p)
                     scaleX = scale
@@ -320,12 +334,12 @@ fun <T : Any> HeldContextMenu(
                     translationY = lerp(fromDy, 0f, p)
                     // Quick, because it starts over the very item it copies:
                     // only the plate and shadow arriving are new.
-                    alpha = (p * 3f).coerceIn(0f, 1f)
+                    alpha = if (launched) 0f else (p * 3f).coerceIn(0f, 1f)
                 }
             }
             menu.placeWithLayer(menuX, menuY) {
                 val p = progress.value
-                alpha = ((p - 0.1f) / 0.9f).coerceIn(0f, 1f)
+                alpha = if (launched) 0f else ((p - 0.1f) / 0.9f).coerceIn(0f, 1f)
                 if (!reduceMotion) {
                     // Grows out of the corner nearest the item, and travels
                     // with it.
