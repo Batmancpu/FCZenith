@@ -218,7 +218,13 @@ private fun visibleShare(r: Rect): Float {
     return (i.width * i.height) / (r.width * r.height)
 }
 
-private fun startFlight(browseId: String, token: Any, frame: ImageBitmap? = null) {
+private fun startFlight(
+    browseId: String,
+    token: Any,
+    frame: ImageBitmap? = null,
+    from: Rect? = null,
+    fromCornerPx: Float? = null,
+) {
     val source = CoverFlightState.sources[token] ?: return
     if (source.bounds.isEmpty) return
     CoverFlightState.target = null
@@ -228,7 +234,7 @@ private fun startFlight(browseId: String, token: Any, frame: ImageBitmap? = null
     if (clip != null) CoverFlightState.clips[browseId] = clip else CoverFlightState.clips.remove(browseId)
     CoverFlightState.clipRendered = null
     CoverFlightState.holding = false
-    CoverFlightState.flight = Flight(browseId, false, source.bounds, source.cornerPx).also {
+    CoverFlightState.flight = Flight(browseId, false, from ?: source.bounds, fromCornerPx ?: source.cornerPx).also {
         it.model = source.model
         it.footFade = source.footFade
         it.canvas = source.canvas
@@ -269,7 +275,31 @@ private fun startReturn(browseId: String, from: Rect, cornerPx: Float, wash: Col
 fun startCoverFlightFor(browseId: String?) {
     if (browseId.isNullOrEmpty()) return
     val token = CoverFlightState.ids.entries.firstOrNull { it.value == browseId }?.key ?: return
-    startFlight(browseId, token)
+    val source = CoverFlightState.sources[token] ?: return
+    if (source.bounds.isEmpty) return
+    val lift = LiftedPreview
+    if (lift.held.isEmpty) {
+        startFlight(browseId, token)
+        return
+    }
+    // The card's cover, mapped onto where the lifted picture of the card sits.
+    val b = source.bounds
+    val s = lift.scale
+    val from = Rect(
+        lift.pictureLeft + (b.left - lift.held.left) * s,
+        lift.pictureTop + (b.top - lift.held.top) * s,
+        lift.pictureLeft + (b.right - lift.held.left) * s,
+        lift.pictureTop + (b.bottom - lift.held.top) * s,
+    )
+    startFlight(browseId, token, null, from, source.cornerPx * s)
+}
+
+/** Where the held-item menu has lifted the card to, written by that menu's layout. */
+object LiftedPreview {
+    var held: Rect = Rect.Zero
+    var pictureLeft: Float = 0f
+    var pictureTop: Float = 0f
+    var scale: Float = 1f
 }
 
 private fun lerpF(a: Float, b: Float, p: Float): Float = a + (b - a) * p

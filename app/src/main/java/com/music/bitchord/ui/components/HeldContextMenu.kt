@@ -278,6 +278,10 @@ fun <T : Any> HeldContextMenu(
         }
         val visualCenterX = visualLeft + visualW / 2f
         val visualCenterY = visualTop + visualH / 2f
+        LiftedPreview.held = heldItem.bounds
+        LiftedPreview.pictureLeft = overlayOffset.x + visualLeft + pad * liftScale
+        LiftedPreview.pictureTop = overlayOffset.y + visualTop + pad * liftScale
+        LiftedPreview.scale = liftScale
 
         // The menu hangs off the item's nearer edge: its start for an item on
         // the left of the screen, its end for one on the right — a grid's
