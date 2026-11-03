@@ -35,7 +35,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.ui.components.backdrop.backdrops.layerBackdrop
 import com.music.bitchord.ui.components.backdrop.backdrops.rememberLayerBackdrop
-import com.music.bitchord.ui.player.PlayerSettings
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -72,7 +71,7 @@ fun GlassSegmentedControl(
     val trackColor = GLASS_TRACK_FILL.copy(alpha = if (light) 0.12f else 0.24f)
     val pillColor = if (light) Color.White else GLASS_DARK_PILL
     val labelColor = if (light) Color.Black else Color.White
-    val reduceAnimation by PlayerSettings.reduceAnimation.collectAsStateWithLifecycle()
+    val reduceAnimation by AppSettings.reduceAnimation.collectAsStateWithLifecycle()
     val selected = selectedIndex.takeIf { it in options.indices }
     val backdrop = rememberLayerBackdrop()
 
