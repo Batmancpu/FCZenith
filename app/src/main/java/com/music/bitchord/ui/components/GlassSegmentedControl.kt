@@ -41,6 +41,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.ui.components.backdrop.backdrops.layerBackdrop
@@ -71,38 +72,10 @@ fun GlassSegmentedControl(
     liquid: Boolean = false,
 ) {
     if (options.isEmpty()) return
-    val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
-    if (!isGlassSupported() || reduceDynamicBlur) {
-        PillSegmentedControl(options, selectedIndex, onSelect, modifier, enabled)
-        return
-    }
-    val haptics = LocalHapticFeedback.current
     val density = LocalDensity.current
-    val style = MaterialTheme.typography.labelMedium
     val measurer = rememberTextMeasurer()
-    val light = MaterialTheme.colorScheme.surface.luminance() > 0.5f
-    val trackColor = GLASS_TRACK_FILL.copy(alpha = if (light) 0.12f else 0.24f)
-    // Mode liquid mengikuti toggle Liquid Glass aplikasi; bila mati, tampilan lama dipakai.
-    val liquidOn = liquid && LocalLiquidGlassEnabled.current
-    val trackShape: Shape = if (liquidOn) LiquidTrackShape else GlassTrackShape
-    val trackBrush = Brush.verticalGradient(
-        listOf(
-            GLASS_TRACK_FILL.copy(alpha = if (light) 0.20f else 0.34f),
-            GLASS_TRACK_FILL.copy(alpha = if (light) 0.09f else 0.18f),
-        ),
-    )
-    val trackRim = if (liquidOn) Modifier.liquidGlassRim(LiquidTrackShape) else Modifier
-    val pillColor = if (light) Color.White else GLASS_DARK_PILL
-    val labelColor = if (light) Color.Black else Color.White
-    val reduceAnimation by AppSettings.reduceAnimation.collectAsStateWithLifecycle()
-    val selected = selectedIndex.takeIf { it in options.indices }
-    val backdrop = rememberLayerBackdrop()
-
-    BoxWithConstraints(
-        modifier = modifier
-            .fillMaxWidth()
-            .then(if (liquidOn) Modifier else Modifier.clip(trackShape)),
-    ) {
+    val style = MaterialTheme.typography.labelMedium.copy(fontSize = 13.5.sp)
+    BoxWithConstraints(modifier.fillMaxWidth()) {
         val inset = with(density) { GLASS_TRACK_PADDING.toPx() }
         val labelPadding = with(density) { GLASS_LABEL_PADDING.toPx() }
         val room = constraints.maxWidth.toFloat() - inset * 2f
@@ -115,129 +88,25 @@ fun GlassSegmentedControl(
             PillSegmentedControl(options, selectedIndex, onSelect, Modifier, enabled)
             return@BoxWithConstraints
         }
-
-        val slot = room / options.size
-        val targetStart = if (selected != null) inset + slot * selected else 0f
-        val motion: AnimationSpec<Float> =
-            if (reduceAnimation) snap() else spring(GLASS_PILL_DAMPING, Spring.StiffnessMediumLow)
-        val scope = rememberCoroutineScope()
-        val pillAnim = remember { Animatable(targetStart) }
-        LaunchedEffect(targetStart) { pillAnim.animateTo(targetStart, motion) }
-        var dragging by remember { mutableStateOf(false) }
-        // 0 diam, 1 pill sedang dipegang/digeser: pill membesar dan kacanya menyala penuh.
-        val lift by animateFloatAsState(if (dragging) 1f else 0f, motion, label = "glassSegmentLift")
-        // Kaca menyala penuh selama pill jauh dari tujuan atau sedang dipegang, padam saat mendarat.
-        // Dibaca saat draw/layout, jadi satu frame animasi bukan rekomposisi.
-        val moving = {
-            if (selected == null) {
-                0f
-            } else {
-                maxOf((abs(pillAnim.value - targetStart) / (slot * 0.5f)).coerceIn(0f, 1f), lift)
-            }
-        }
-        // Liquid: pill tetap kaca saat diam (lensa menyala), makin bening saat berpindah.
-        val glass = { if (liquidOn) maxOf(moving(), LIQUID_REST_GLASS) else moving() }
-
-        val maxStart = inset + slot * (options.size - 1)
-        val dragPos = remember { floatArrayOf(0f) }
-        val dragModifier = if (liquidOn && enabled && selected != null) {
-            Modifier.pointerInput(options.size, slot, inset, selected, targetStart) {
-                detectHorizontalDragGestures(
-                    onDragStart = {
-                        dragging = true
-                        dragPos[0] = pillAnim.value
-                    },
-                    onDragCancel = {
-                        dragging = false
-                        scope.launch { pillAnim.animateTo(targetStart, motion) }
-                    },
-                    onDragEnd = {
-                        dragging = false
-                        val index = ((dragPos[0] - inset) / slot).roundToInt().coerceIn(0, options.lastIndex)
-                        if (index != selected) {
-                            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onSelect(index)
-                        }
-                        scope.launch { pillAnim.animateTo(inset + slot * index, motion) }
-                    },
-                    onHorizontalDrag = { change, dragAmount ->
-                        change.consume()
-                        dragPos[0] = (dragPos[0] + dragAmount).coerceIn(inset, maxStart)
-                        scope.launch { pillAnim.snapTo(dragPos[0]) }
-                    },
-                )
-            }
-        } else {
-            Modifier
-        }
-
-        Box(Modifier.fillMaxWidth().then(dragModifier)) {
-            // Yang dilihat kaca: track beserta label-labelnya.
-            Box(
-                Modifier
-                    .clip(trackShape)
-                    .layerBackdrop(backdrop)
-                    .fillMaxWidth()
-                    .then(if (liquidOn) Modifier.background(trackBrush) else Modifier.background(trackColor))
-                    .padding(GLASS_TRACK_PADDING),
-            ) {
-                GlassLabels(options, style, labelColor, Modifier.fillMaxWidth())
-            }
-
-            if (selected != null) {
-                Box(Modifier.matchParentSize().padding(vertical = GLASS_TRACK_PADDING)) {
-                    LiquidGlassThumb(
-                        backdrop = backdrop,
-                        glass = glass,
-                        restColor = pillColor,
-                        modifier = Modifier
-                            .matchParentSize()
-                            .layout { measurable, constraints ->
-                                val placeable = measurable.measure(
-                                    Constraints.fixed(slot.roundToInt(), constraints.maxHeight),
-                                )
-                                layout(constraints.maxWidth, constraints.maxHeight) {
-                                    placeable.place(pillAnim.value.roundToInt(), 0)
-                                }
-                            }
-                            .graphicsLayer {
-                                // Pill membesar saat dipegang, meluber sedikit keluar track seperti iOS 26.
-                                val s = if (liquidOn) lift else 0f
-                                scaleX = 1f + 0.10f * s
-                                scaleY = 1f + 0.16f * s
-                            },
-                    )
-                }
-            }
-
-            // Label di atas pill; memudar selagi kaca menyala supaya tidak dobel.
-            GlassLabels(
-                options = options,
+        LiquidSegmentedControl(
+            count = options.size,
+            selection = selectedIndex,
+            onSelect = onSelect,
+            enabled = enabled,
+        ) { index, color ->
+            Text(
+                text = options[index],
                 style = style,
-                color = labelColor,
-                modifier = Modifier
-                    .matchParentSize()
-                    .padding(GLASS_TRACK_PADDING)
-                    .graphicsLayer { alpha = 1f - if (liquidOn) 0.5f * moving() else moving() },
-                onClick = if (enabled) {
-                    { index ->
-                        if (index != selected) {
-                            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onSelect(index)
-                        }
-                    }
-                } else {
-                    null
-                },
+                color = color,
+                maxLines = 1,
+                softWrap = false,
             )
-
-            // Rim highlight kaca di tepi track, di atas semua lapisan dan tidak menangkap sentuhan.
-            if (liquidOn) {
-                Box(Modifier.matchParentSize().then(trackRim))
-            }
         }
     }
 }
+
+private val GLASS_TRACK_PADDING = 4.dp
+private val GLASS_LABEL_PADDING = 18.dp
 
 @Composable
 private fun GlassLabels(

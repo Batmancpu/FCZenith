@@ -105,9 +105,35 @@ fun LiquidThemeSelector(
     modifier: Modifier = Modifier,
 ) {
     val modes = remember { ThemeMode.entries.toList() }
-    val selectedIndex = modes.indexOf(selectedTheme).coerceAtLeast(0)
-    val currentSelected by rememberUpdatedState(selectedTheme)
-    val currentOnSelected by rememberUpdatedState(onThemeSelected)
+    val labelStyle = MaterialTheme.typography.labelMedium.copy(fontSize = 13.5.sp)
+    LiquidSegmentedControl(
+        count = modes.size,
+        selection = modes.indexOf(selectedTheme),
+        onSelect = { onThemeSelected(modes[it]) },
+        modifier = modifier,
+    ) { index, color ->
+        SegmentContent(modes[index], color, labelStyle)
+    }
+}
+
+/**
+ * Segmented control liquid generik: track kaca + pill lens yang bisa di-drag.
+ * Isi tiap segmen digambar oleh [content] dengan warna yang sudah mengikuti
+ * posisi pill. Dipakai LiquidThemeSelector dan GlassSegmentedControl.
+ */
+@Composable
+fun LiquidSegmentedControl(
+    count: Int,
+    selection: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    content: @Composable (index: Int, color: Color) -> Unit,
+) {
+    val modes = remember(count) { List(count) { it } }
+    val selectedIndex = selection.coerceIn(0, (count - 1).coerceAtLeast(0))
+    val currentSelected by rememberUpdatedState(selectedIndex)
+    val currentOnSelected by rememberUpdatedState(onSelect)
 
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
     val reduceAnimation by AppSettings.reduceAnimation.collectAsStateWithLifecycle()
@@ -119,8 +145,6 @@ fun LiquidThemeSelector(
     val isLtr = LocalLayoutDirection.current == LayoutDirection.Ltr
     val haptics = LocalHapticFeedback.current
     val density = LocalDensity.current
-    val labelStyle = MaterialTheme.typography.labelMedium.copy(fontSize = 13.5.sp)
-
     val shape = remember { RoundedCornerShape(percent = 50) }
     val trackBackdrop = rememberLayerBackdrop()
 
@@ -149,7 +173,7 @@ fun LiquidThemeSelector(
     var dragIndex by remember { mutableIntStateOf(-1) }
     LaunchedEffect(selectedIndex) { dragIndex = -1 }
 
-    val sources = remember { List(modes.size) { MutableInteractionSource() } }
+    val sources = remember(count) { List(modes.size) { MutableInteractionSource() } }
     val pressedStates = sources.map { it.collectIsPressedAsState() }
     val anyPressed = pressedStates.any { it.value }
     val pressProgress = animateFloatAsState(
@@ -197,7 +221,7 @@ fun LiquidThemeSelector(
                     val near = (1f - abs(position.value - index)).coerceIn(0f, 1f)
                     val trackColor = androidx.compose.ui.graphics.lerp(dimColor, labelColor, near)
                     SegmentBox(Modifier.weight(1f)) {
-                        SegmentContent(mode, trackColor, labelStyle)
+                        content(index, trackColor)
                     }
                 }
             }
@@ -328,7 +352,8 @@ fun LiquidThemeSelector(
         Row(
             Modifier
                 .matchParentSize()
-                .pointerInput(slotPx, isLtr, reduceAnimation) {
+                .pointerInput(slotPx, isLtr, reduceAnimation, enabled) {
+                    if (!enabled) return@pointerInput
                     val dir = if (isLtr) 1f else -1f
                     val maxIndex = (modes.size - 1).toFloat()
                     val tracker = VelocityTracker()
@@ -435,6 +460,7 @@ fun LiquidThemeSelector(
                         .clip(shape)
                         .selectable(
                             selected = selected,
+                            enabled = enabled,
                             interactionSource = sources[index],
                             indication = null,
                             role = Role.RadioButton,
@@ -453,7 +479,7 @@ fun LiquidThemeSelector(
                             scaleY = s
                         },
                     ) {
-                        SegmentContent(mode, color, labelStyle)
+                        content(index, color)
                     }
                 }
             }
