@@ -13,7 +13,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitHorizontalTouchSlopOrCancellation
+import androidx.compose.foundation.gestures.horizontalDrag
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -56,7 +59,10 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.PointerInputChange
+import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -133,6 +139,7 @@ fun LiquidSegmentedControl(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     draggable: Boolean = true,
+    dragOnlyFromPill: Boolean = false,
     content: @Composable (index: Int, color: Color) -> Unit,
 ) {
     val modes = remember(count) { List(count) { it } }
@@ -248,10 +255,13 @@ fun LiquidSegmentedControl(
                     val g = max(e, REST_GLASS)
                     colorControls(saturation = 1f + 0.35f * g)
 
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    // Lensa hanya menyala saat pill bergerak/ditekan. Saat diam, label tajam
+                    // di atas pill sudah menutupi label di bawahnya; kalau lensa tetap
+                    // membiaskan, salinan yang bergeser terlihat sebagai teks dan ikon dobel.
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && e > 0.02f) {
                         lens(
-                            refractionHeight = 12.dp.toPx() * g,
-                            refractionAmount = 14.dp.toPx() * g,
+                            refractionHeight = 12.dp.toPx() * e,
+                            refractionAmount = 14.dp.toPx() * e,
                             depthEffect = true,
                             chromaticAberration = e > 0.5f,
                         )
@@ -357,7 +367,7 @@ fun LiquidSegmentedControl(
         Row(
             Modifier
                 .matchParentSize()
-                .pointerInput(slotPx, isLtr, reduceAnimation, enabled, draggable) {
+                .pointerInput(slotPx, isLtr, reduceAnimation, enabled, draggable, dragOnlyFromPill) {
                     if (!enabled || !draggable) return@pointerInput
                     val dir = if (isLtr) 1f else -1f
                     val maxIndex = (modes.size - 1).toFloat()
@@ -385,7 +395,20 @@ fun LiquidSegmentedControl(
                         }
                     }
 
-                    detectHorizontalDragGestures(
+                    detectPillDragGestures(
+                        startAllowed = { p ->
+                            if (!dragOnlyFromPill) {
+                                true
+                            } else {
+                                val centre = (position.value + 0.5f) * slotPx
+                                val centreX = if (isLtr) {
+                                    SELECTOR_INSET.toPx() + centre
+                                } else {
+                                    size.width - SELECTOR_INSET.toPx() - centre
+                                }
+                                abs(p.x - centreX) <= slotPx / 2f
+                            }
+                        },
                         onDragStart = {
                             tracker.resetTracking()
                             origin = position.value
@@ -444,7 +467,7 @@ fun LiquidSegmentedControl(
                     )
                 }
                 .padding(SELECTOR_INSET)
-                .graphicsLayer { alpha = 1f - energy() },
+                .graphicsLayer { alpha = (1f - energy() * 4f).coerceIn(0f, 1f) },
         ) {
             modes.forEachIndexed { index, mode ->
                 val selected = index == (if (dragIndex >= 0) dragIndex else selectedIndex)
@@ -544,7 +567,7 @@ fun LiquidScrollSegmentedControl(
                 onSelect = onSelect,
                 modifier = Modifier.width(natural),
                 enabled = enabled,
-                draggable = false,
+                dragOnlyFromPill = true,
                 content = content,
             )
         }
@@ -631,6 +654,36 @@ private fun ThemeGlyph(mode: ThemeMode, color: Color) {
                 drawPath(Path.combine(PathOperation.Difference, outer, cutter), color, style = stroke)
             }
         }
+    }
+}
+
+/**
+ * Seperti detectHorizontalDragGestures, tapi gesture yang tidak lolos [startAllowed]
+ * tidak disentuh sama sekali (tidak di-consume), jadi parent yang bisa scroll tetap
+ * menggeser track saat sentuhan dimulai di luar pill.
+ */
+private suspend fun PointerInputScope.detectPillDragGestures(
+    startAllowed: (Offset) -> Boolean,
+    onDragStart: (Offset) -> Unit,
+    onDragEnd: () -> Unit,
+    onDragCancel: () -> Unit,
+    onHorizontalDrag: (change: PointerInputChange, dragAmount: Float) -> Unit,
+) {
+    awaitEachGesture {
+        val down = awaitFirstDown(requireUnconsumed = false)
+        if (!startAllowed(down.position)) return@awaitEachGesture
+        var overSlop = 0f
+        val first = awaitHorizontalTouchSlopOrCancellation(down.id) { change, over ->
+            change.consume()
+            overSlop = over
+        } ?: return@awaitEachGesture
+        onDragStart(first.position)
+        onHorizontalDrag(first, overSlop)
+        val completed = horizontalDrag(first.id) { change ->
+            onHorizontalDrag(change, change.positionChange().x)
+            change.consume()
+        }
+        if (completed) onDragEnd() else onDragCancel()
     }
 }
 
