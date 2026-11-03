@@ -244,6 +244,7 @@ import com.music.bitchord.ui.components.menuAnchor
 import com.music.bitchord.ui.components.IosMenuPopover
 import com.music.bitchord.ui.components.SongActionsMenu
 import com.music.bitchord.ui.components.HeldContextMenu
+import com.music.bitchord.ui.components.startCoverFlightFor
 import com.music.bitchord.ui.components.HeldItem
 import androidx.media3.session.MediaController
 import com.music.bitchord.playback.QualityUpgrade
@@ -5199,6 +5200,7 @@ private fun BitChordApp(
                 // would have. Not for a Local Music grouping, which has no page.
                 onPreviewClick = { target ->
                     target.browseId?.let { id ->
+                        startCoverFlightFor(id)
                         browseActions = null
                         viewModel.openDetail(
                             browseId = id,

@@ -262,6 +262,16 @@ private fun startReturn(browseId: String, from: Rect, cornerPx: Float, wash: Col
     CoverFlightState.flight = next
 }
 
+/**
+ * Flies the cover of the card on screen that stands for [browseId], for a tap
+ * that did not land on the card itself — the lifted copy in a hold's menu.
+ */
+fun startCoverFlightFor(browseId: String?) {
+    if (browseId.isNullOrEmpty()) return
+    val token = CoverFlightState.ids.entries.firstOrNull { it.value == browseId }?.key ?: return
+    startFlight(browseId, token)
+}
+
 private fun lerpF(a: Float, b: Float, p: Float): Float = a + (b - a) * p
 
 private fun lerpRect(a: Rect, b: Rect, p: Float): Rect = Rect(
