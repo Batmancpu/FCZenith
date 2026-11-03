@@ -658,6 +658,8 @@ private fun BitChordApp(
     var showAppLanguage by remember { mutableStateOf(false) }
     var showTranslationLanguage by remember { mutableStateOf(false) }
     var showAccountSelector by remember { mutableStateOf(false) }
+    // The popup has started leaving: the header's profile button returns with it.
+    var accountSelectorLeaving by remember { mutableStateOf(false) }
     var showListenBrainzLogin by remember { mutableStateOf(false) }
     var showLastfmLogin by remember { mutableStateOf(false) }
     var showWebDavEditor by remember { mutableStateOf(false) }
@@ -4135,6 +4137,7 @@ private fun BitChordApp(
                                     } else navigator.push(AppRoute.Settings)
                                 },
                                 onSwipeProfile = { forward -> viewModel.stepProfile(forward) },
+                                hidden = showAccountSelector && !accountSelectorLeaving,
                             )
                         }
                     },
@@ -5460,6 +5463,9 @@ private fun BitChordApp(
             )
         }
 
+        LaunchedEffect(showAccountSelector) {
+            if (!showAccountSelector) accountSelectorLeaving = false
+        }
         if (showAccountSelector) {
             BackHandler { showAccountSelector = false }
             AccountProfileSelector(
@@ -5481,6 +5487,7 @@ private fun BitChordApp(
                     navigator.push(AppRoute.Settings)
                 },
                 onDismiss = { showAccountSelector = false },
+                onClosing = { accountSelectorLeaving = true },
             )
         }
 

@@ -565,16 +565,27 @@ fun TopBarAccountButton(
     account: Account?,
     onClick: () -> Unit,
     onSwipeProfile: ((forward: Boolean) -> Boolean)? = null,
+    /** True while the account popup is up: the button steps aside for the card that grows out of it. */
+    hidden: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val translation = remember { Animatable(0f) }
+    // Gone at once as the card opens over it; back with a short fade as the card leaves.
+    val visibility = animateFloatAsState(
+        targetValue = if (hidden) 0f else 1f,
+        animationSpec = tween(durationMillis = if (hidden) 70 else 180),
+        label = "accountButtonVisibility",
+    )
     val scope = rememberCoroutineScope()
     // Wrapped in an IconButton so it keeps the touch target, the ripple and the
     // spacing every other action in this bar has.
     IconButton(
         onClick = onClick,
         modifier = modifier
-            .graphicsLayer { translationY = translation.value }
+            .graphicsLayer {
+                translationY = translation.value
+                alpha = visibility.value
+            }
             .pointerInput(onSwipeProfile) {
                 if (onSwipeProfile == null) return@pointerInput
                 var drag = 0f

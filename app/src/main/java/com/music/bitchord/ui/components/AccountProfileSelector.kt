@@ -79,6 +79,8 @@ fun AccountProfileSelector(
     onRemoveAccount: (GoogleAccountSession) -> Unit,
     onOpenSettings: () -> Unit,
     onDismiss: () -> Unit,
+    /** Called the moment the exit starts, so what the card covered can come back with it. */
+    onClosing: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var managing by remember { mutableStateOf(false) }
@@ -131,6 +133,7 @@ fun AccountProfileSelector(
     val close: (() -> Unit) -> Unit = { after ->
         if (!closing) {
             closing = true
+            onClosing()
             scope.launch {
                 if (reduceMotion) {
                     fade.animateTo(0f, tween(110))
