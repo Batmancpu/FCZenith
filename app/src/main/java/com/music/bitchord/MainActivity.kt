@@ -3754,6 +3754,11 @@ private fun BitChordApp(
                     )
                 }
 
+                // Home: the account pill sits level with the wordmark and rides up
+                // with the feed for that short distance, then stays pinned in the bar.
+                val homeLogoHalf = with(androidx.compose.ui.platform.LocalDensity.current) {
+                    (MaterialTheme.typography.displayLarge.fontSize * 0.9f).toDp()
+                } / 2
                 FrostedTopBar(
                     title = when (route) {
                         AppRoute.Spotify -> stringResource(R.string.spotify)
@@ -3809,7 +3814,19 @@ private fun BitChordApp(
                         route != null || detail != null || selectedMoodGenre != null -> goBack
                         else -> null
                     },
-                    modifier = Modifier.align(Alignment.TopCenter),
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .graphicsLayer {
+                            if (homeHeadingVisible) {
+                                val rest = (18.dp + homeLogoHalf).toPx()
+                                val scrolledPx = if (homeListState.firstVisibleItemIndex > 0) {
+                                    rest
+                                } else {
+                                    homeListState.firstVisibleItemScrollOffset.toFloat()
+                                }
+                                translationY = (rest - scrolledPx).coerceAtLeast(0f)
+                            }
+                        },
                     // Only on the Search tab itself, not on anything pushed over it.
                     accessory = if (
                         selectedTab == TAB_SEARCH && route == null && detail == null && selectedMoodGenre == null

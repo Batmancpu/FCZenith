@@ -35,6 +35,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -499,6 +500,10 @@ private fun HomeTitle(title: String, modifier: Modifier = Modifier) {
                 .padding(bottom = 14.dp)
                 .height(logoHeight)
                 .aspectRatio(LOGO_ASPECT),
+        )
+        HorizontalDivider(
+            thickness = 0.5.dp,
+            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),
         )
         // "Listen now" is hidden for now; the wordmark above stays.
         // Text(
