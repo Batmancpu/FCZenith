@@ -118,6 +118,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.music.bitchord.ui.components.coverFlightSource
 import com.music.bitchord.ui.components.coverFlightTarget
+import com.music.bitchord.ui.components.coverFlightClip
+import com.music.bitchord.ui.components.coverFlightClipRendered
 import com.music.bitchord.ui.components.rememberCoverFlightTap
 import com.music.bitchord.ui.components.enterReveal
 import androidx.compose.animation.animateColorAsState
@@ -494,7 +496,11 @@ fun DetailScreen(
     // services are concerned. A browse card's subtitle sometimes omits it, in
     // which case the tracks themselves know who it is.
     val credit = page.headerLines(songs.size).first.ifBlank { songs.firstOrNull()?.artist.orEmpty() }
-    var canvas by remember(page.browseId) { mutableStateOf<CanvasArtwork?>(null) }
+    // Starts from the clip the card was playing when it was tapped, so the page
+    // has it from its first frame instead of looking it up after the cover lands.
+    var canvas by remember(page.browseId) {
+        mutableStateOf<CanvasArtwork?>(coverFlightClip(page.browseId)?.takeIf { canvasEnabled })
+    }
     LaunchedEffect(page.browseId, page.title, credit, canvasEnabled, prioritizeSpotifyCanvas) {
         // An artist's clip is set below, by the lookup that finds it.
         if (isArtist) return@LaunchedEffect
@@ -505,12 +511,21 @@ fun DetailScreen(
         // As on the player: the credit fills in once the tracks load, so this
         // can run twice. Keep a clip that is already playing if the second
         // pass comes back empty.
-        canvas = CanvasRepository.canvasForAlbum(page.title, credit) ?: canvas
+        // The same clip as the one handed over is left running, not rebuilt.
+        val found = CanvasRepository.canvasForAlbum(page.title, credit)
+        if (found != null && found.url != canvas?.url) canvas = found
     }
     // An artist's clip comes with the same Apple lookup as its photograph.
     val artistVideo = appleArt?.videoUrl
     LaunchedEffect(artistVideo, canvasEnabled) {
-        if (isArtist) canvas = artistVideo?.takeIf { canvasEnabled }?.let { CanvasArtwork(url = it) }
+        if (!isArtist) return@LaunchedEffect
+        canvas = when {
+            !canvasEnabled -> null
+            // Not found yet: keep the clip the card handed over.
+            artistVideo == null -> canvas
+            artistVideo == canvas?.url -> canvas
+            else -> CanvasArtwork(url = artistVideo)
+        }
     }
 
     // Opening the search carries the page up to it, so the field lands just
@@ -999,6 +1014,7 @@ private fun ReleaseHeader(
                     canvas = clip,
                     isPlaying = true,
                     modifier = Modifier.matchParentSize(),
+                    onRenderedChanged = { if (it) coverFlightClipRendered(page.browseId) },
                 )
             }
         }
@@ -1473,6 +1489,7 @@ private fun PageBackground(
                     canvas = clip,
                     isPlaying = true,
                     modifier = Modifier.matchParentSize(),
+                    onRenderedChanged = { if (it) coverFlightClipRendered(page.browseId) },
                 )
             }
 
