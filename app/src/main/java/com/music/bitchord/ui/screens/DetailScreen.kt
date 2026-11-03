@@ -120,6 +120,8 @@ import com.music.bitchord.ui.components.coverFlightSource
 import com.music.bitchord.ui.components.coverFlightTarget
 import com.music.bitchord.ui.components.coverFlightClip
 import com.music.bitchord.ui.components.coverFlightClipRendered
+import com.music.bitchord.ui.components.RegisterCoverFlightGrab
+import com.music.bitchord.ui.player.CanvasFrameGrab
 import com.music.bitchord.ui.components.rememberCoverFlightTap
 import com.music.bitchord.ui.components.enterReveal
 import androidx.compose.animation.animateColorAsState
@@ -1010,11 +1012,14 @@ private fun ReleaseHeader(
             // unlike the player's sleeve there is no transport here to follow,
             // and the page is only up while it's being read.
             canvas?.let { clip ->
+                val frameGrab = remember(clip) { CanvasFrameGrab() }
+                RegisterCoverFlightGrab(page.browseId, frameGrab)
                 CanvasArtworkPlayer(
                     canvas = clip,
                     isPlaying = true,
                     modifier = Modifier.matchParentSize(),
                     onRenderedChanged = { if (it) coverFlightClipRendered(page.browseId) },
+                    frameGrab = frameGrab,
                 )
             }
         }
@@ -1485,11 +1490,14 @@ private fun PageBackground(
             // running: unlike the player's sleeve there is no transport here
             // to follow, and the page is only up while it's being read.
             canvas?.let { clip ->
+                val frameGrab = remember(clip) { CanvasFrameGrab() }
+                RegisterCoverFlightGrab(page.browseId, frameGrab)
                 CanvasArtworkPlayer(
                     canvas = clip,
                     isPlaying = true,
                     modifier = Modifier.matchParentSize(),
                     onRenderedChanged = { if (it) coverFlightClipRendered(page.browseId) },
+                    frameGrab = frameGrab,
                 )
             }
 

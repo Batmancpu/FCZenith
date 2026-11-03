@@ -4,6 +4,7 @@ import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
@@ -36,6 +37,9 @@ import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.ImageBitmap
+import com.music.bitchord.ui.player.CanvasFrameGrab
+import kotlinx.coroutines.delay
 import androidx.compose.runtime.withFrameNanos
 import kotlin.math.exp
 import kotlinx.coroutines.coroutineScope
@@ -68,8 +72,11 @@ private const val FLIGHT_MS = 780
 private const val TARGET_TIMEOUT_MS = 700L
 private const val RETURN_TIMEOUT_MS = 900L
 
-/** How long take-off waits for the flying clip's first frame while the card keeps playing its own. */
-private const val CLIP_WARMUP_MS = 600L
+/** How long a landed cover waits, once the page's clip shows, for that clip's own fade-in to finish under it. */
+private const val CLIP_REVEAL_MS = 180L
+
+/** How long the cover takes to dissolve into the page's clip. */
+private const val CLIP_DISSOLVE_MS = 220
 
 /** How long a landed cover waits on the page's own clip before it lets go anyway. */
 private const val CLIP_HANDOFF_TIMEOUT_MS = 1500L
@@ -89,7 +96,10 @@ private class FlightSource(
     var cornerPx: Float = 0f,
     var footFade: Boolean = false,
     /** The clip the card is playing right now, if any: it flies with the cover. */
-    var canvas: CanvasArtwork? = null,
+    var canvas: CanvasArtwork? = null
+
+    /** The frame the clip was showing when the cover took off: it flies instead of the still. */
+    var frame: ImageBitmap? = null,
 )
 
 private class Flight(
@@ -130,8 +140,8 @@ private object CoverFlightState {
     /** The cover has landed and waits on the page's clip: the sleeve below may draw meanwhile. */
     var holding by mutableStateOf(false)
 
-    /** The flying clip is still being built: the card or page keeps showing its own until it is ready. */
-    var awaitingClip by mutableStateOf(false)
+    /** The pages' live frame readers, so a cover flying back starts from what the page is showing. */
+    val grabs = HashMap<String, CanvasFrameGrab>()
 
     /** Where the cover is right now while it flies in (plain fields: only a turn-back mid-flight reads them). */
     var airFlight: Flight? = null
@@ -151,10 +161,21 @@ private object CoverFlightState {
             return f.token != null && (f.reverse || target != null)
         }
 
-    fun hidesSource(token: Any): Boolean = flying && !awaitingClip && flight?.token === token
+    fun hidesSource(token: Any): Boolean = flying && flight?.token === token
 
     fun hidesTarget(browseId: String): Boolean =
-        flying && !holding && !awaitingClip && flight?.browseId == browseId
+        flying && !holding && flight?.browseId == browseId
+
+    /**
+     * A sleeve standing aside for a flight that carries a clip stays all but
+     * invisible rather than undrawn, so its own clip goes on decoding under the
+     * cover and is already playing when the cover lands.
+     */
+    fun targetAlpha(browseId: String): Float = when {
+        !hidesTarget(browseId) -> 1f
+        flight?.canvas != null -> 0.01f
+        else -> 0f
+    }
 
     fun destination(f: Flight): Rect? =
         if (f.reverse) {
@@ -197,7 +218,7 @@ private fun visibleShare(r: Rect): Float {
     return (i.width * i.height) / (r.width * r.height)
 }
 
-private fun startFlight(browseId: String, token: Any) {
+private fun startFlight(browseId: String, token: Any, frame: ImageBitmap? = null) {
     val source = CoverFlightState.sources[token] ?: return
     if (source.bounds.isEmpty) return
     CoverFlightState.target = null
@@ -207,11 +228,11 @@ private fun startFlight(browseId: String, token: Any) {
     if (clip != null) CoverFlightState.clips[browseId] = clip else CoverFlightState.clips.remove(browseId)
     CoverFlightState.clipRendered = null
     CoverFlightState.holding = false
-    CoverFlightState.awaitingClip = clip != null
     CoverFlightState.flight = Flight(browseId, false, source.bounds, source.cornerPx).also {
         it.model = source.model
         it.footFade = source.footFade
         it.canvas = source.canvas
+        it.frame = frame
         it.token = token
     }
 }
@@ -231,11 +252,13 @@ private fun startReturn(browseId: String, from: Rect, cornerPx: Float, wash: Col
     val startCorner = air?.takeIf { inAir }?.let { lerpF(it.fromCornerPx, cornerPx, settled) } ?: cornerPx
     val next = Flight(browseId, true, start, startCorner, wash, settled)
     next.canvas = CoverFlightState.clips[browseId]
+    // What the page is showing right now, read before its sleeve steps aside;
+    // a turn-back mid-flight carries on with the frame already in the air.
+    next.frame = (if (inAir) air?.frame else null) ?: CoverFlightState.grabs[browseId]?.grab?.invoke()
     CoverFlightState.holding = false
     // The card is usually still there: hide it from this very frame so it does
     // not show for a moment and blink out as the cover leaves.
     CoverFlightState.resolveReturn(next)
-    CoverFlightState.awaitingClip = next.canvas != null
     CoverFlightState.flight = next
 }
 
@@ -305,7 +328,7 @@ fun Modifier.coverFlightTarget(
         onDispose { lastBounds[0]?.let { startReturn(browseId, it, cornerPx, wash) } }
     }
     return this
-        .drawWithContent { if (!CoverFlightState.hidesTarget(browseId)) drawContent() }
+        .graphicsLayer { alpha = CoverFlightState.targetAlpha(browseId) }
         .onGloballyPositioned { coordinates ->
             holder[0] = coordinates
             lastBounds[0] = coordinates.whole()
@@ -345,9 +368,25 @@ fun coverFlightClipRendered(browseId: String?) {
     if (!browseId.isNullOrEmpty()) CoverFlightState.clipRendered = browseId
 }
 
+/** Lets a flight back to the card read the frame the page's clip is showing. */
+@Composable
+fun RegisterCoverFlightGrab(browseId: String?, grab: CanvasFrameGrab) {
+    if (browseId.isNullOrEmpty()) return
+    DisposableEffect(browseId, grab) {
+        CoverFlightState.grabs[browseId] = grab
+        onDispose { if (CoverFlightState.grabs[browseId] === grab) CoverFlightState.grabs.remove(browseId) }
+    }
+}
+
 /** A card's tap that opens a page: starts the flight, then runs [action]. */
 @Composable
-fun rememberCoverFlightTap(browseId: String?, token: Any, action: () -> Unit): () -> Unit {
+fun rememberCoverFlightTap(
+    browseId: String?,
+    token: Any,
+    /** The frame the card's clip is showing at the moment of the tap, if it has one. */
+    grabFrame: (() -> ImageBitmap?)? = null,
+    action: () -> Unit,
+): () -> Unit {
     val latest = rememberUpdatedState(action)
     // Lets a flight back find the card again, which is a new composition after the page closes.
     DisposableEffect(token, browseId) {
@@ -355,7 +394,7 @@ fun rememberCoverFlightTap(browseId: String?, token: Any, action: () -> Unit): (
         onDispose { CoverFlightState.ids.remove(token) }
     }
     return {
-        if (!browseId.isNullOrEmpty()) startFlight(browseId, token)
+        if (!browseId.isNullOrEmpty()) startFlight(browseId, token, grabFrame?.invoke())
         latest.value()
     }
 }
@@ -402,8 +441,8 @@ private fun FlightLayer(flight: Flight) {
     // little, so a page that settles or shifts while the cover is in the air
     // bends the path instead of making the picture jump.
     val chase = remember(flight) { mutableStateOf<Rect?>(null) }
-    // The flying clip has its first frame up.
-    val clipReady = remember(flight) { mutableStateOf(false) }
+    // How much of the flying cover is left once it has landed: it dissolves into the page's own clip.
+    val fade = remember(flight) { Animatable(1f) }
     LaunchedEffect(flight) {
         CoverFlightState.flightProgress = 0f
         val ready = if (flight.reverse) {
@@ -419,12 +458,6 @@ private fun FlightLayer(flight: Flight) {
             }
         }
         if (ready != null) {
-            if (flight.canvas != null) {
-                // The card (or page) keeps playing its own clip until the flying one has a
-                // frame up, so the cover never dips to the still before it moves.
-                withTimeoutOrNull(CLIP_WARMUP_MS) { snapshotFlow { clipReady.value }.first { it } }
-            }
-            CoverFlightState.awaitingClip = false
             var current = CoverFlightState.destination(flight) ?: flight.from
             chase.value = current
             coroutineScope {
@@ -444,19 +477,24 @@ private fun FlightLayer(flight: Flight) {
                 }
                 follower.cancel()
             }
-            // Landed with a clip aboard: stay on the sleeve, still playing, until the
-            // page's own clip has its first frame up, so it never drops back to the still.
+            // Landed with a clip aboard: stay on the sleeve, as the frame it was, until
+            // the page's own clip has its first frame up, then dissolve into it.
             if (!flight.reverse && flight.canvas != null) {
                 CoverFlightState.holding = true
-                withTimeoutOrNull(CLIP_HANDOFF_TIMEOUT_MS) {
+                val shown = withTimeoutOrNull(CLIP_HANDOFF_TIMEOUT_MS) {
                     snapshotFlow { CoverFlightState.clipRendered }.first { it == flight.browseId }
                 }
+                // The clip's own fade-in finishes under the cover before the cover lifts.
+                if (shown != null) delay(CLIP_REVEAL_MS)
+                fade.animateTo(0f, tween(durationMillis = CLIP_DISSOLVE_MS))
+            } else if (flight.frame != null) {
+                // Back on the card with the page's frame: it dissolves into the card's own picture.
+                fade.animateTo(0f, tween(durationMillis = CLIP_DISSOLVE_MS))
             }
         }
         if (flight.reverse) CoverFlightState.clips.remove(flight.browseId)
         if (CoverFlightState.flight === flight) {
             CoverFlightState.holding = false
-            CoverFlightState.awaitingClip = false
             CoverFlightState.flight = null
             CoverFlightState.target = null
         }
@@ -500,61 +538,53 @@ private fun FlightLayer(flight: Flight) {
                 val toCorner = if (flight.reverse) flight.toCornerPx else CoverFlightState.targetCornerPx
                 shape = RoundedCornerShape(lerpF(flight.fromCornerPx, toCorner, progress.value))
                 clip = true
+                alpha = fade.value
             },
         // The picture is a square of the card's size inside a frame that grows
         // past it: left to the corner it sat up-left of the frame's centre and
         // only snapped to the middle when the real sleeve took over.
         contentAlignment = Alignment.Center,
     ) {
-        AsyncImage(
-            model = flight.model,
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .requiredSize(sideDp)
-                .graphicsLayer {
-                    val rect = rectAt(progress.value)
-                    val scale = max(rect.width, rect.height) / sidePx
-                    scaleX = scale
-                    scaleY = scale
-                    // Out of the way while the card's own clip is still the one on show.
-                    alpha = if (CoverFlightState.awaitingClip) 0f else 1f
-                    if (flight.footFade) compositingStrategy = CompositingStrategy.Offscreen
+        val pictureModifier = Modifier
+            .requiredSize(sideDp)
+            .graphicsLayer {
+                val rect = rectAt(progress.value)
+                val scale = max(rect.width, rect.height) / sidePx
+                scaleX = scale
+                scaleY = scale
+                if (flight.footFade) compositingStrategy = CompositingStrategy.Offscreen
+            }
+            .drawWithContent {
+                drawContent()
+                if (flight.footFade) {
+                    // The card's own cover dissolves into the blur under it;
+                    // the picture keeps that foot at the card and loses it on the page.
+                    val fade = if (flight.reverse) 1f - flight.settled * (1f - progress.value) else 1f - progress.value
+                    drawRect(
+                        Brush.verticalGradient(
+                            0.78f to Color.Black,
+                            1f to Color.Black.copy(alpha = 1f - fade),
+                        ),
+                        blendMode = BlendMode.DstIn,
+                    )
                 }
-                .drawWithContent {
-                    drawContent()
-                    if (flight.footFade) {
-                        // The card's own cover dissolves into the blur under it;
-                        // the picture keeps that foot at the card and loses it on the page.
-                        val fade = if (flight.reverse) 1f - flight.settled * (1f - progress.value) else 1f - progress.value
-                        drawRect(
-                            Brush.verticalGradient(
-                                0.78f to Color.Black,
-                                1f to Color.Black.copy(alpha = 1f - fade),
-                            ),
-                            blendMode = BlendMode.DstIn,
-                        )
-                    }
-                },
-        )
-        // The card's clip flies with the cover: a second player, built while the
-        // card's own is still on screen, takes over the very frame it sits on.
-        flight.canvas?.let { clip ->
-            CanvasArtworkPlayer(
-                canvas = clip,
-                isPlaying = true,
-                modifier = Modifier
-                    .requiredSize(sideDp)
-                    .graphicsLayer {
-                        val rect = rectAt(progress.value)
-                        val scale = max(rect.width, rect.height) / sidePx
-                        scaleX = scale
-                        scaleY = scale
-                    },
-                onRenderedChanged = { if (it) clipReady.value = true },
-                bottomFade = if (flight.footFade) 0.22f else 0f,
-                frameCapturePx = 0,
-                revealInstantly = true,
+            }
+        val frame = flight.frame
+        if (frame != null) {
+            // The frame the clip was showing when the cover took off, not the
+            // still behind it: nothing but the clip's own picture is ever seen.
+            Image(
+                bitmap = frame,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = pictureModifier,
+            )
+        } else {
+            AsyncImage(
+                model = flight.model,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = pictureModifier,
             )
         }
         if (wash != Color.Unspecified) {

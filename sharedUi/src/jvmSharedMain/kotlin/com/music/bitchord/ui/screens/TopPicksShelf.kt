@@ -51,6 +51,7 @@ import kotlinx.coroutines.flow.first
 import com.music.bitchord.data.canvas.CanvasArtwork
 import com.music.bitchord.ui.AppUi
 import com.music.bitchord.ui.player.CanvasArtworkPlayer
+import com.music.bitchord.ui.player.CanvasFrameGrab
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -318,6 +319,8 @@ private fun TopPickCard(
     val coverToken = remember { Any() }
     // The clip this card is playing, handed to the cover flight so it flies too.
     var flightCanvas by remember { mutableStateOf<CanvasArtwork?>(null) }
+    // Reads the frame the clip is showing, at the moment of the tap.
+    val frameGrab = remember { CanvasFrameGrab() }
     val openCard = rememberCoverFlightTap(
         browseId = when (pick.kind) {
             TopPickKind.LATEST_RELEASE -> pick.browseId
@@ -325,6 +328,7 @@ private fun TopPickCard(
             else -> null
         },
         token = coverToken,
+        grabFrame = { frameGrab.grab?.invoke() },
     ) { onClick(pick, text.title) }
     Box(
         modifier = modifier
@@ -381,6 +385,7 @@ private fun TopPickCard(
                     },
                     coverHide = Modifier.hideDuringCoverFlight(coverToken),
                     onClip = { flightCanvas = it },
+                    frameGrab = frameGrab,
                     // A New Release Mix is a playlist; only a real release has a sleeve that moves.
                     motion = pick.takeIf { it.kind == TopPickKind.LATEST_RELEASE }?.let { release ->
                         CardMotionSource(release.browseId ?: release.title) {
@@ -407,6 +412,7 @@ private fun TopPickCard(
                     pick.artistMotion(),
                     Modifier.fillMaxSize().hideDuringCoverFlight(coverToken),
                     onCanvas = { flightCanvas = it },
+                    frameGrab = frameGrab,
                 )
                 // The caption sits on the picture's own darkened foot, as on
                 // Apple's photo cards, rather than on a band of flat black.
@@ -503,6 +509,7 @@ private fun ReleaseArt(
     coverHide: Modifier = Modifier,
     motion: CardMotionSource? = null,
     onClip: (CanvasArtwork?) -> Unit = {},
+    frameGrab: CanvasFrameGrab? = null,
 ) {
     // How much of the still the clip has covered. Two faded layers stacked
     // would leave the still showing through the clip's own fade, so the still
@@ -559,6 +566,7 @@ private fun ReleaseArt(
             bottomFade = 0.22f,
             onCover = { covered = it },
             onCanvas = onClip,
+            frameGrab = frameGrab,
         )
     }
 }
@@ -594,6 +602,7 @@ private fun CardMotion(
     bottomFade: Float = 0f,
     onCover: (Float) -> Unit = {},
     onCanvas: (CanvasArtwork?) -> Unit = {},
+    frameGrab: CanvasFrameGrab? = null,
 ) {
     if (source == null || !LocalArtworkImages.current) return
     // Looked up whether or not the clip may play yet, so the answer is to hand
@@ -649,6 +658,7 @@ private fun CardMotion(
         bottomFade = bottomFade,
         onCoverChanged = onCover,
         pausedForTransition = !motion || scrolling(),
+        frameGrab = frameGrab,
     )
 }
 
