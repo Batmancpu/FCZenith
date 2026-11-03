@@ -190,17 +190,12 @@ fun LiquidThemeSelector(
         ) {
             Row(Modifier.fillMaxWidth().fillMaxHeight()) {
                 modes.forEachIndexed { index, mode ->
-                    // Label aktif ikut direkam tajam ke backdrop, jadi lensa pill
-                    // membiaskan ikon + teks aslinya (bukan hanya yang redup).
-                    val trackColor by animateColorAsState(
-                        targetValue = if (index == (if (dragIndex >= 0) dragIndex else selectedIndex)) {
-                            labelColor
-                        } else {
-                            dimColor
-                        },
-                        animationSpec = if (reduceAnimation) snap() else tween(180),
-                        label = "themeTrackLabelColor",
-                    )
+                    // Label di dekat pill ikut direkam tajam ke backdrop, jadi lensa pill
+                    // membiaskan ikon + teks aslinya. Terangnya mengikuti posisi pill
+                    // (bukan indeks + tween), jadi saat drag cepat tidak ada dua label
+                    // terang sekaligus.
+                    val near = (1f - abs(position.value - index)).coerceIn(0f, 1f)
+                    val trackColor = androidx.compose.ui.graphics.lerp(dimColor, labelColor, near)
                     SegmentBox(Modifier.weight(1f)) {
                         SegmentContent(mode, trackColor, labelStyle)
                     }
