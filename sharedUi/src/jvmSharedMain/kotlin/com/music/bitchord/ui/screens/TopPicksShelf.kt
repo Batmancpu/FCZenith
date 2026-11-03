@@ -180,8 +180,13 @@ internal fun TopPicksShelf(
                             ),
                         ) {
                             Column(Modifier.width(cardWidth)) {
+                                // A label is only said once for a run of cards that share it,
+                                // so the row doesn't repeat "Made for You" over every card.
+                                // The line keeps its height so the cards stay aligned.
+                                val label = topPickLabel(pick)
+                                val previousLabel = picks.getOrNull(index - 1)?.let { topPickLabel(it) }
                                 Text(
-                                    text = topPickLabel(pick),
+                                    text = if (label == previousLabel) " " else label,
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 1,
@@ -235,7 +240,9 @@ fun LazyListScope.topPicksSkeleton() {
 @Composable
 private fun topPickLabel(pick: TopPick): String = when (pick.kind) {
     TopPickKind.LATEST_RELEASE -> stringResource(Res.string.top_pick_label_new_release)
-    TopPickKind.FEATURED_ARTIST -> stringResource(Res.string.top_pick_label_listen_again)
+    TopPickKind.FEATURED_ARTIST,
+    TopPickKind.ARTIST_AND_SIMILAR,
+    -> stringResource(Res.string.top_pick_label_listen_again)
     else -> stringResource(Res.string.top_pick_made_for_you)
 }
 
