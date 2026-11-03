@@ -920,6 +920,7 @@ fun SettingsScreen(
                     options = ThemeMode.entries.map { it.localizedLabel() },
                     selectedIndex = ThemeMode.entries.indexOf(theme),
                     onSelect = { AppSettings.setThemeMode(ThemeMode.entries[it]) },
+                    liquid = true,
                     modifier = Modifier.padding(start = ROW_INSET, end = ROW_INSET, bottom = 14.dp),
                 )
             }
@@ -2798,8 +2799,9 @@ internal fun SegmentedControl(
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    liquid: Boolean = false,
 ) {
-    GlassSegmentedControl(options, selectedIndex, onSelect, modifier, enabled)
+    GlassSegmentedControl(options, selectedIndex, onSelect, modifier, enabled, liquid)
 }
 
 // ---- Pages ------------------------------------------------------------------

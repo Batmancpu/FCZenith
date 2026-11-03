@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -20,7 +21,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -56,6 +59,8 @@ fun GlassSegmentedControl(
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    /** Mode Liquid Glass penuh: track kaca bergradasi dan pill yang selalu berupa lensa kaca. */
+    liquid: Boolean = false,
 ) {
     if (options.isEmpty()) return
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
@@ -69,6 +74,16 @@ fun GlassSegmentedControl(
     val measurer = rememberTextMeasurer()
     val light = MaterialTheme.colorScheme.surface.luminance() > 0.5f
     val trackColor = GLASS_TRACK_FILL.copy(alpha = if (light) 0.12f else 0.24f)
+    // Mode liquid mengikuti toggle Liquid Glass aplikasi; bila mati, tampilan lama dipakai.
+    val liquidOn = liquid && LocalLiquidGlassEnabled.current
+    val trackShape: Shape = if (liquidOn) LiquidTrackShape else GlassTrackShape
+    val trackBrush = Brush.verticalGradient(
+        listOf(
+            GLASS_TRACK_FILL.copy(alpha = if (light) 0.20f else 0.34f),
+            GLASS_TRACK_FILL.copy(alpha = if (light) 0.09f else 0.18f),
+        ),
+    )
+    val trackRim = if (liquidOn) Modifier.liquidGlassRim(LiquidTrackShape) else Modifier
     val pillColor = if (light) Color.White else GLASS_DARK_PILL
     val labelColor = if (light) Color.Black else Color.White
     val reduceAnimation by AppSettings.reduceAnimation.collectAsStateWithLifecycle()
@@ -78,7 +93,7 @@ fun GlassSegmentedControl(
     BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
-            .clip(GlassTrackShape),
+            .clip(trackShape),
     ) {
         val inset = with(density) { GLASS_TRACK_PADDING.toPx() }
         val labelPadding = with(density) { GLASS_LABEL_PADDING.toPx() }
@@ -100,9 +115,11 @@ fun GlassSegmentedControl(
         val pillStart by animateFloatAsState(targetStart, motion, label = "glassSegmentStart")
         // Kaca menyala penuh selama pill masih jauh dari tujuan, padam saat mendarat.
         // Dibaca saat draw/layout, jadi satu frame animasi bukan rekomposisi.
-        val glass = {
+        val motion = {
             if (selected == null) 0f else (abs(pillStart - targetStart) / (slot * 0.5f)).coerceIn(0f, 1f)
         }
+        // Liquid: pill tetap kaca saat diam (lensa menyala), makin bening saat berpindah.
+        val glass = { if (liquidOn) maxOf(motion(), LIQUID_REST_GLASS) else motion() }
 
         Box(Modifier.fillMaxWidth()) {
             // Yang dilihat kaca: track beserta label-labelnya.
@@ -110,7 +127,7 @@ fun GlassSegmentedControl(
                 Modifier
                     .layerBackdrop(backdrop)
                     .fillMaxWidth()
-                    .background(trackColor)
+                    .then(if (liquidOn) Modifier.background(trackBrush) else Modifier.background(trackColor))
                     .padding(GLASS_TRACK_PADDING),
             ) {
                 GlassLabels(options, style, labelColor, Modifier.fillMaxWidth())
@@ -144,7 +161,7 @@ fun GlassSegmentedControl(
                 modifier = Modifier
                     .matchParentSize()
                     .padding(GLASS_TRACK_PADDING)
-                    .graphicsLayer { alpha = 1f - glass() },
+                    .graphicsLayer { alpha = 1f - if (liquidOn) 0.5f * motion() else motion() },
                 onClick = if (enabled) {
                     { index ->
                         if (index != selected) {
@@ -156,6 +173,11 @@ fun GlassSegmentedControl(
                     null
                 },
             )
+
+            // Rim highlight kaca di tepi track, di atas semua lapisan dan tidak menangkap sentuhan.
+            if (liquidOn) {
+                Box(Modifier.matchParentSize().then(trackRim))
+            }
         }
     }
 }
@@ -196,9 +218,11 @@ private fun GlassLabels(
 }
 
 private val GlassTrackShape = SquirclePillShape()
+private val LiquidTrackShape = RoundedCornerShape(percent = 50)
 private val GLASS_TRACK_FILL = Color(0xFF767680)
 private val GLASS_DARK_PILL = Color(0xFF636366)
 private val GLASS_TRACK_PADDING = 4.dp
 private val GLASS_LABEL_PADDING = 18.dp
 private val GLASS_LABEL_VERTICAL_PADDING = 9.dp
 private const val GLASS_PILL_DAMPING = 0.8f
+private const val LIQUID_REST_GLASS = 0.8f
