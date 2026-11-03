@@ -314,7 +314,11 @@ private fun TopPickCard(
     val longPress = onLongPress?.let { { it(pick) } }
     val coverToken = remember { Any() }
     val openCard = rememberCoverFlightTap(
-        browseId = pick.browseId.takeIf { pick.kind == TopPickKind.LATEST_RELEASE },
+        browseId = when (pick.kind) {
+            TopPickKind.LATEST_RELEASE -> pick.browseId
+            TopPickKind.FEATURED_ARTIST -> pick.artistBrowseId
+            else -> null
+        },
         token = coverToken,
     ) { onClick(pick, text.title) }
     Box(
@@ -357,18 +361,19 @@ private fun TopPickCard(
             TopPickKind.LATEST_RELEASE, TopPickKind.NEW_RELEASE_MIX -> {
                 ReleaseArt(
                     pick.images.firstOrNull(),
-                    if (pick.kind == TopPickKind.LATEST_RELEASE) {
-                        Modifier
-                            .coverFlightSource(
-                                coverToken,
-                                pick.images.firstOrNull().croppedAt(HEADER_ART_PX).whenArtworkReady(),
-                                12.dp,
-                            )
-                            .fillMaxSize()
-                            .clip(TopPickShape)
+                    Modifier.fillMaxSize(),
+                    // Only the square cover flies, not the whole card around it.
+                    coverModifier = if (pick.kind == TopPickKind.LATEST_RELEASE) {
+                        Modifier.coverFlightSource(
+                            coverToken,
+                            pick.images.firstOrNull().croppedAt(HEADER_ART_PX).whenArtworkReady(),
+                            12.dp,
+                            footFade = true,
+                        )
                     } else {
-                        Modifier.fillMaxSize()
+                        Modifier
                     },
+                    coverHide = Modifier.hideDuringCoverFlight(coverToken),
                     // A New Release Mix is a playlist; only a real release has a sleeve that moves.
                     motion = pick.takeIf { it.kind == TopPickKind.LATEST_RELEASE }?.let { release ->
                         CardMotionSource(release.browseId ?: release.title) {
@@ -380,18 +385,24 @@ private fun TopPickCard(
                 branded = false
             }
             TopPickKind.FEATURED_ARTIST -> {
+                val artistPhoto = pick.images.firstOrNull()
+                    .croppedAt(HEADER_ART_PX * 3 / 4, HEADER_ART_PX)
+                    .whenArtworkReady()
                 AsyncImage(
-                    model = pick.images.firstOrNull().croppedAt(HEADER_ART_PX * 3 / 4, HEADER_ART_PX).whenArtworkReady(),
+                    model = artistPhoto,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .coverFlightSource(coverToken, artistPhoto, 12.dp)
+                        .fillMaxSize(),
                 )
-                CardMotion(pick.artistMotion(), Modifier.fillMaxSize())
+                CardMotion(pick.artistMotion(), Modifier.fillMaxSize().hideDuringCoverFlight(coverToken))
                 // The caption sits on the picture's own darkened foot, as on
                 // Apple's photo cards, rather than on a band of flat black.
                 Box(
                     Modifier
                         .fillMaxSize()
+                        .hideDuringCoverFlight(coverToken)
                         .background(
                             Brush.verticalGradient(
                                 0.45f to Color.Transparent,
@@ -474,7 +485,13 @@ private val PhotoEyebrow = Color.White.copy(alpha = 0.62f)
  * once found, dissolving into the blur the same way the still does.
  */
 @Composable
-private fun ReleaseArt(url: String?, modifier: Modifier, motion: CardMotionSource? = null) {
+private fun ReleaseArt(
+    url: String?,
+    modifier: Modifier,
+    coverModifier: Modifier = Modifier,
+    coverHide: Modifier = Modifier,
+    motion: CardMotionSource? = null,
+) {
     // How much of the still the clip has covered. Two faded layers stacked
     // would leave the still showing through the clip's own fade, so the still
     // steps out as the clip comes in.
@@ -505,7 +522,7 @@ private fun ReleaseArt(url: String?, modifier: Modifier, motion: CardMotionSourc
             model = url.croppedAt(HEADER_ART_PX).whenArtworkReady(),
             contentDescription = null,
             contentScale = ContentScale.Crop,
-            modifier = Modifier
+            modifier = coverModifier
                 .fillMaxWidth()
                 .aspectRatio(1f)
                 // Faded out over its last stretch, so the cover runs into the
@@ -526,7 +543,7 @@ private fun ReleaseArt(url: String?, modifier: Modifier, motion: CardMotionSourc
         )
         CardMotion(
             motion,
-            Modifier.fillMaxWidth().aspectRatio(1f),
+            Modifier.fillMaxWidth().aspectRatio(1f).then(coverHide),
             bottomFade = 0.22f,
             onCover = { covered = it },
         )

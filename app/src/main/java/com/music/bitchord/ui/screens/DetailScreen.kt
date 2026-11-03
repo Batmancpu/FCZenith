@@ -1431,7 +1431,9 @@ private fun PageBackground(
             Modifier
                 .fillMaxWidth()
                 .height(artHeight)
-                .offset { IntOffset(0, listState.headerTop(artHeight.toPx()).roundToInt()) },
+                .offset { IntOffset(0, listState.headerTop(artHeight.toPx()).roundToInt()) }
+                // After the offset, so the flight lands on where the photo really is.
+                .coverFlightTarget(page.browseId, 0.dp, palette.wash),
         ) {
             AsyncImage(
                 model = art,
