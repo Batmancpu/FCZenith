@@ -17,6 +17,11 @@ import androidx.compose.animation.core.tween
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
@@ -61,16 +66,23 @@ fun Modifier.shelfStagger(index: Int): Modifier {
     // closing or a swipe to the right shows its cards as they are.
     val animate = remember { flow != null && flow.scrolling && flow.forward }
     if (!animate) return this
-    val progress = remember { Animatable(0f) }
-    LaunchedEffect(Unit) {
-        delay((index % 3) * 70L)
-        progress.animateTo(1f, tween(420, easing = FastOutSlowInEasing))
-    }
-    return this.graphicsLayer {
-        val p = progress.value
-        alpha = p
-        translationX = (1f - p) * 56.dp.toPx()
-    }
+    // How much of the card has been revealed. Follows where the card sits in
+    // the row as it comes in from the right edge, and only ever grows: swiping
+    // back to the right leaves it as it is.
+    var revealed by remember { mutableFloatStateOf(0f) }
+    return this
+        .onGloballyPositioned { coordinates ->
+            val parent = coordinates.parentLayoutCoordinates ?: return@onGloballyPositioned
+            val entered = parent.size.width - coordinates.positionInParent().x
+            val t = (entered / (coordinates.size.width * 0.35f)).coerceIn(0f, 1f)
+            val eased = t * t * (3f - 2f * t)
+            if (eased > revealed) revealed = eased
+        }
+        .graphicsLayer {
+            val p = revealed
+            alpha = p
+            translationX = (1f - p) * 40.dp.toPx()
+        }
 }
 
 /** A sideways-scrolling shelf, in whatever the platform wraps one in — see [ShelfRowChrome].
