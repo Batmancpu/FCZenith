@@ -168,14 +168,15 @@ private object CoverFlightState {
     fun hidesSource(token: Any): Boolean = flying && flight?.token === token
 
     /**
-     * Seberapa terlihat cover kartu. Saat pulang ia memudar masuk di separuh
-     * akhir penerbangan, bersilang dengan gambar terbang yang memudar keluar,
-     * jadi tidak ada lompatan ketika penerbangan selesai. Dibaca hanya di blok draw.
+     * Seberapa terlihat cover kartu. Selama terbang hanya ada SATU gambar: kartu
+     * tetap tersembunyi, lalu muncul utuh tepat di bawah gambar terbang ketika
+     * penerbangan pulang hampir mendarat (tanpa crossfade dua cover).
+     * Dibaca hanya di blok draw.
      */
     fun sourceAlpha(token: Any): Float {
         if (!hidesSource(token)) return 1f
         val f = flight ?: return 1f
-        return if (f.reverse) revealAt(flightProgress) else 0f
+        return if (f.reverse && flightProgress >= LAND_AT) 1f else 0f
     }
 
     /**
@@ -448,6 +449,9 @@ fun Modifier.hideDuringCoverFlight(token: Any): Modifier =
 /** Pulang: teks dan cover kartu mulai muncul di sini (0..1 dari penerbangan). */
 private const val REVEAL_START = 0.5f
 
+/** Pulang: kemajuan penerbangan (eased) saat cover kartu boleh muncul di bawah gambar terbang. */
+private const val LAND_AT = 0.98f
+
 /** Berangkat: teks sudah hilang sepenuhnya setelah sekian bagian awal penerbangan. */
 private const val DEPART_FADE_SPAN = 0.22f
 
@@ -651,10 +655,9 @@ private fun FlightLayer(flight: Flight) {
                 val toCorner = if (flight.reverse) flight.toCornerPx else CoverFlightState.targetCornerPx
                 shape = RoundedCornerShape(lerpF(flight.fromCornerPx, toCorner, progress.value))
                 clip = true
-                // Pulang: gambar terbang memudar keluar selagi kartu di bawahnya
-                // (cover dan teks) memudar masuk, jadi teks tidak tertutup lalu muncul tiba-tiba.
-                val reveal = if (flight.reverse) revealAt(progress.value) else 0f
-                alpha = fade.value * (1f - reveal * reveal)
+                // Gambar terbang tetap utuh selama di udara; hanya memudar
+                // setelah mendarat (lihat [fade]), bukan bersilang dengan kartu.
+                alpha = fade.value
             },
         // The picture is a square of the card's size inside a frame that grows
         // past it: left to the corner it sat up-left of the frame's centre and
