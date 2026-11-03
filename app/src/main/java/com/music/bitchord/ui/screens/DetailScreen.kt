@@ -117,6 +117,9 @@ import androidx.compose.foundation.border
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.music.bitchord.ui.components.coverSharedElement
+import com.music.bitchord.ui.components.enterReveal
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.ui.draw.drawBehind
 import coil3.compose.LocalPlatformContext
 import coil3.compose.AsyncImagePainter
 import coil3.request.ImageRequest
@@ -525,8 +528,15 @@ fun DetailScreen(
             // release's sleeve sits framed on one flat colour with nothing to
             // dissolve, so it takes the same [ArtworkPalette.background] the
             // bars at either end of the screen are already fading into.
-            val pageColor = if (isArtist) palette.wash else palette.background
-            BoxWithConstraints(Modifier.fillMaxSize().background(pageColor)) {
+            val targetPageColor = if (isArtist) palette.wash else palette.background
+            // The palette arrives after the artwork does; ease to it instead of
+            // popping. Read only while drawing, so the list isn't recomposed per frame.
+            val pageColor by animateColorAsState(
+                targetValue = targetPageColor,
+                animationSpec = tween(450),
+                label = "detailPageColor",
+            )
+            BoxWithConstraints(Modifier.fillMaxSize().drawBehind { drawRect(pageColor) }) {
                 // Measured rather than read off the window. The player runs
                 // full-screen at every window size, so this page's own width in
                 // landscape is the *whole* window. Straight off that width, the ratio hands back
@@ -756,6 +766,9 @@ fun DetailScreen(
                         items = matches,
                         key = { _, entry -> "${entry.index}_${entry.value.videoId}" },
                     ) { position, entry ->
+                        // The first rows arrive one after another; later ones, composed
+                        // while scrolling, are already visible and draw as they are.
+                        Column(Modifier.enterReveal(340 + position.coerceAtMost(8) * 30)) {
                         val song = entry.value
                         val isCurrent = isCurrentRow(song)
                         SongRow(
@@ -788,6 +801,7 @@ fun DetailScreen(
                                 thickness = 0.5.dp,
                                 color = palette.divider,
                             )
+                        }
                         }
                     }
                 }
@@ -969,7 +983,7 @@ private fun ReleaseHeader(
             textAlign = TextAlign.Center,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = HEADER_GUTTER),
+            modifier = Modifier.enterReveal(150).padding(horizontal = HEADER_GUTTER),
         )
         if (credit.isNotBlank()) {
             Spacer(Modifier.height(2.dp))
@@ -984,6 +998,7 @@ private fun ReleaseHeader(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier
+                    .enterReveal(200)
                     .padding(horizontal = HEADER_GUTTER)
                     .let { m ->
                         val id = artist?.artistId
@@ -1005,7 +1020,7 @@ private fun ReleaseHeader(
                 textAlign = TextAlign.Center,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(horizontal = HEADER_GUTTER),
+                modifier = Modifier.enterReveal(240).padding(horizontal = HEADER_GUTTER),
             )
         }
 
@@ -1016,6 +1031,7 @@ private fun ReleaseHeader(
             Spacer(Modifier.height(18.dp))
             Row(
                 modifier = Modifier
+                    .enterReveal(290)
                     .widthIn(max = RELEASE_ACTIONS_MAX_WIDTH)
                     .fillMaxWidth()
                     .padding(horizontal = HEADER_GUTTER),

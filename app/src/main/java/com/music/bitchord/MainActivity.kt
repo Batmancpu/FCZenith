@@ -2860,8 +2860,15 @@ private fun BitChordApp(
                             (this as? AppDestination.Route)?.entry?.route is AppRoute.LibraryShowAll
                         val libraryShowAllSwap = (initial.isShowAll() && target == libraryTab) ||
                             (target.isShowAll() && initial == libraryTab)
+                        val releaseMove = initial is AppDestination.Release || target is AppDestination.Release
                         if (tabSwap || libraryShowAllSwap) {
                             EnterTransition.None togetherWith ExitTransition.None
+                        } else if (releaseMove) {
+                            // A release page brings its own colour: let it come in over
+                            // the cover's flight instead of snapping, while the page it
+                            // replaces clears a little faster so the two don't ghost.
+                            fadeIn(tween(420, easing = androidx.compose.animation.core.LinearOutSlowInEasing)) togetherWith
+                                fadeOut(tween(260))
                         } else {
                             fadeIn(tween(180)) togetherWith fadeOut(tween(180))
                         }

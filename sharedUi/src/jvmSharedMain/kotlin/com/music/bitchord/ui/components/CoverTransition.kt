@@ -6,7 +6,14 @@ import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.SharedTransitionScope
-import androidx.compose.animation.core.spring
+import androidx.compose.animation.EnterExitState
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
@@ -68,8 +75,36 @@ fun Modifier.coverSharedElement(browseId: String?, token: Any? = null): Modifier
         this@coverSharedElement.sharedElement(
             sharedContentState = rememberSharedContentState(key = "cover:$browseId"),
             animatedVisibilityScope = visibility,
-            boundsTransform = { _, _ -> spring(dampingRatio = 0.86f, stiffness = 380f) },
+            boundsTransform = { _, _ -> tween(durationMillis = 520, easing = CoverEasing) },
         )
+    }
+}
+
+/** Long, soft landing: the cover is easy to follow and settles without a bounce. */
+private val CoverEasing = CubicBezierEasing(0.32f, 0.72f, 0f, 1f)
+
+/**
+ * Fades and lifts a piece of a page in while its page is entering, after
+ * [delayMs], so text and buttons arrive behind the cover rather than with it.
+ * A page that is already on screen (or outside [CoverTransitionBox]) is drawn
+ * as it is, with no animation. Runs on the draw layer only: no recomposition.
+ */
+@Composable
+fun Modifier.enterReveal(delayMs: Int = 0, rise: Dp = 14.dp): Modifier {
+    val visibility = LocalCoverVisibilityScope.current ?: return this
+    val progress by visibility.transition.animateFloat(
+        transitionSpec = {
+            if (targetState == EnterExitState.Visible) {
+                tween(durationMillis = 380, delayMillis = delayMs, easing = FastOutSlowInEasing)
+            } else {
+                tween(durationMillis = 160)
+            }
+        },
+        label = "enterReveal",
+    ) { state -> if (state == EnterExitState.Visible) 1f else 0f }
+    return this.graphicsLayer {
+        alpha = progress
+        translationY = (1f - progress) * rise.toPx()
     }
 }
 
