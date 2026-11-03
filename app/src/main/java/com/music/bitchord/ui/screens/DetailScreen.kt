@@ -1337,7 +1337,7 @@ private fun ArtistHeader(
             val sizeFactor = if (isSignature) SIGNATURE_SCALE else 1f
             val maxLogoHeight = artHeight * ARTIST_LOGO_MAX_HEIGHT * sizeFactor
             Column(
-                modifier = Modifier.align(Alignment.BottomCenter),
+                modifier = Modifier.align(Alignment.BottomCenter).enterReveal(150),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
             AsyncImage(
@@ -1387,6 +1387,7 @@ private fun ArtistHeader(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
+                .enterReveal(150)
                 // Bottom is half the top inset — the stats pills (or, absent
                 // those, the action row) sit closer under the name than the
                 // name sits under the artwork.
@@ -1548,6 +1549,7 @@ private fun ActionRow(
 ) {
     Row(
         modifier = Modifier
+            .enterReveal(240)
             .fillMaxWidth()
             .padding(horizontal = HEADER_GUTTER),
         horizontalArrangement = Arrangement.spacedBy(ARTIST_ACTION_GAP, Alignment.CenterHorizontally),
@@ -2184,6 +2186,7 @@ private fun TopReleaseCard(
     val openWithCover = rememberCoverFlightTap(item.browseId, coverToken, onClick)
     Row(
         modifier = Modifier
+            .enterReveal(300)
             .fillMaxWidth()
             .padding(horizontal = ARTIST_CONTENT_GUTTER)
             .padding(bottom = 22.dp)

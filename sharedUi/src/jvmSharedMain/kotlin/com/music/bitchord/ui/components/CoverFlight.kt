@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -63,13 +64,16 @@ import kotlinx.coroutines.withTimeoutOrNull
 private val FlightEasing = CubicBezierEasing(0.32f, 0.72f, 0f, 1f)
 private const val FLIGHT_MS = 780
 private const val TARGET_TIMEOUT_MS = 700L
-private const val RETURN_TIMEOUT_MS = 450L
+private const val RETURN_TIMEOUT_MS = 900L
 
 /** How fast the flight's idea of its destination follows the real one, per second. */
 private const val CHASE_RATE = 16f
 
 /** A card or sleeve must be at least this much on screen to be flown to or from. */
 private const val MIN_VISIBLE = 0.5f
+
+/** A return is let off more: the card it lands on may sit half under the bars. */
+private const val MIN_RETURN_VISIBLE = 0.25f
 
 private class FlightSource(
     var bounds: Rect = Rect.Zero,
@@ -85,6 +89,8 @@ private class Flight(
     val from: Rect,
     val fromCornerPx: Float,
     val fromWash: Color = Color.Unspecified,
+    /** How far the cover had settled on its page when a return began: 1 from rest, less if it turned back mid-flight. */
+    val settled: Float = 1f,
 ) {
     var model: Any? = null
     var toCornerPx: Float = 0f
@@ -103,6 +109,14 @@ private object CoverFlightState {
     var targetWash by mutableStateOf(Color.Unspecified)
     var origin by mutableStateOf(Offset.Zero)
     var host: Rect = Rect.Zero
+
+    /** Where the cover is right now while it flies in (plain fields: only a turn-back mid-flight reads them). */
+    var airFlight: Flight? = null
+    var airRect: Rect = Rect.Zero
+    var airProgress: Float = 0f
+
+    /** 0 to 1 over the current flight. Read only inside draw and graphicsLayer blocks. */
+    var flightProgress by mutableFloatStateOf(0f)
 
     /** The page last flown into: only that page is flown back out of. */
     var landed: String? = null
@@ -128,7 +142,7 @@ private object CoverFlightState {
     /** Finds the card the page was opened from (the new one, after a back), if it is on screen. */
     fun resolveReturn(f: Flight): Boolean {
         var bestToken: Any? = null
-        var bestShare = MIN_VISIBLE
+        var bestShare = MIN_RETURN_VISIBLE
         for ((token, source) in sources) {
             if (ids[token] != f.browseId) continue
             val share = visibleShare(source.bounds)
@@ -174,8 +188,21 @@ private fun startFlight(browseId: String, token: Any) {
 private fun startReturn(browseId: String, from: Rect, cornerPx: Float, wash: Color) {
     if (CoverFlightState.landed != browseId) return
     CoverFlightState.landed = null
-    if (visibleShare(from) < MIN_VISIBLE) return
-    CoverFlightState.flight = Flight(browseId, true, from, cornerPx, wash)
+    // Out again before the cover has landed: it turns round where it is in the
+    // air instead of jumping to the sleeve it was heading for.
+    val air = CoverFlightState.airFlight?.takeIf {
+        it === CoverFlightState.flight && !it.reverse && it.browseId == browseId
+    }
+    val inAir = air != null && !CoverFlightState.airRect.isEmpty
+    if (!inAir && visibleShare(from) < MIN_RETURN_VISIBLE) return
+    val settled = if (inAir) CoverFlightState.airProgress.coerceIn(0f, 1f) else 1f
+    val start = if (inAir) CoverFlightState.airRect else from
+    val startCorner = air?.takeIf { inAir }?.let { lerpF(it.fromCornerPx, cornerPx, settled) } ?: cornerPx
+    val next = Flight(browseId, true, start, startCorner, wash, settled)
+    // The card is usually still there: hide it from this very frame so it does
+    // not show for a moment and blink out as the cover leaves.
+    CoverFlightState.resolveReturn(next)
+    CoverFlightState.flight = next
 }
 
 private fun lerpF(a: Float, b: Float, p: Float): Float = a + (b - a) * p
@@ -257,7 +284,21 @@ fun Modifier.coverFlightTarget(
 
 /** Whatever sits on a card around its cover (captions) leaves with it. */
 fun Modifier.hideDuringCoverFlight(token: Any): Modifier =
-    this.drawWithContent { if (!CoverFlightState.hidesSource(token)) drawContent() }
+    this.graphicsLayer {
+        alpha = if (!CoverFlightState.hidesSource(token)) {
+            1f
+        } else {
+            val flight = CoverFlightState.flight
+            // Gone at once on the way out; on the way back it returns with the
+            // cover's last stretch instead of popping in when it lands.
+            if (flight != null && flight.reverse) captionReveal(CoverFlightState.flightProgress) else 0f
+        }
+    }
+
+private fun captionReveal(progress: Float): Float {
+    val t = ((progress - 0.45f) / 0.55f).coerceIn(0f, 1f)
+    return t * t * (3f - 2f * t)
+}
 
 /** A card's tap that opens a page: starts the flight, then runs [action]. */
 @Composable
@@ -276,11 +317,22 @@ fun rememberCoverFlightTap(browseId: String?, token: Any, action: () -> Unit): (
 
 /** The area the page lives in, with the flying cover drawn over it. */
 @Composable
-fun CoverFlightHost(modifier: Modifier = Modifier, content: @Composable BoxScope.() -> Unit) {
+fun CoverFlightHost(
+    modifier: Modifier = Modifier,
+    /** False when the host places [CoverFlightLayer] itself, under its own bars. */
+    overlay: Boolean = true,
+    content: @Composable BoxScope.() -> Unit,
+) {
     Box(modifier) {
         content()
-        CoverFlightOverlay()
+        if (overlay) CoverFlightOverlay()
     }
+}
+
+/** The flying cover, for a host that draws it between its page and its bars. */
+@Composable
+fun CoverFlightLayer() {
+    CoverFlightOverlay()
 }
 
 @Composable
@@ -306,9 +358,10 @@ private fun FlightLayer(flight: Flight) {
     // bends the path instead of making the picture jump.
     val chase = remember(flight) { mutableStateOf<Rect?>(null) }
     LaunchedEffect(flight) {
+        CoverFlightState.flightProgress = 0f
         val ready = if (flight.reverse) {
             withTimeoutOrNull(RETURN_TIMEOUT_MS) {
-                while (!CoverFlightState.resolveReturn(flight)) withFrameNanos { }
+                while (flight.token == null && !CoverFlightState.resolveReturn(flight)) withFrameNanos { }
                 true
             }
         } else {
@@ -333,7 +386,9 @@ private fun FlightLayer(flight: Flight) {
                         chase.value = current
                     }
                 }
-                progress.animateTo(1f, tween(durationMillis = FLIGHT_MS, easing = FlightEasing))
+                progress.animateTo(1f, tween(durationMillis = FLIGHT_MS, easing = FlightEasing)) {
+                    CoverFlightState.flightProgress = value
+                }
                 follower.cancel()
             }
         }
@@ -361,6 +416,11 @@ private fun FlightLayer(flight: Flight) {
         Modifier
             .layout { measurable, _ ->
                 val rect = rectAt(progress.value)
+                if (!flight.reverse) {
+                    CoverFlightState.airFlight = flight
+                    CoverFlightState.airRect = rect
+                    CoverFlightState.airProgress = progress.value
+                }
                 val w = rect.width.roundToInt().coerceAtLeast(1)
                 val h = rect.height.roundToInt().coerceAtLeast(1)
                 val placeable = measurable.measure(Constraints.fixed(w, h))
@@ -400,7 +460,7 @@ private fun FlightLayer(flight: Flight) {
                     if (flight.footFade) {
                         // The card's own cover dissolves into the blur under it;
                         // the picture keeps that foot at the card and loses it on the page.
-                        val fade = if (flight.reverse) progress.value else 1f - progress.value
+                        val fade = if (flight.reverse) 1f - flight.settled * (1f - progress.value) else 1f - progress.value
                         drawRect(
                             Brush.verticalGradient(
                                 0.78f to Color.Black,
@@ -416,7 +476,7 @@ private fun FlightLayer(flight: Flight) {
                 Modifier
                     .matchParentSize()
                     .drawBehind {
-                        val a = if (flight.reverse) 1f - progress.value else progress.value
+                        val a = if (flight.reverse) flight.settled * (1f - progress.value) else progress.value
                         drawRect(
                             Brush.verticalGradient(
                                 0.45f to Color.Transparent,

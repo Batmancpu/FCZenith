@@ -167,6 +167,7 @@ import com.music.bitchord.ui.components.handleDacVolumeKey
 import com.music.bitchord.ui.components.VolumeHud
 import com.music.bitchord.ui.navigation.AppDestination
 import com.music.bitchord.ui.components.CoverFlightHost
+import com.music.bitchord.ui.components.CoverFlightLayer
 import com.music.bitchord.ui.components.LocalCoverVisibilityScope
 import com.music.bitchord.ui.navigation.AppRoute
 import com.music.bitchord.ui.screens.EqualizerPresetPage
@@ -2821,7 +2822,7 @@ private fun BitChordApp(
                 .skipDrawWhenPlayerCovers(activeDock)
                 .snapshotBackdropSource(pageBackdrop),
         ) {
-            CoverFlightHost(Modifier.weight(1f).fillMaxHeight()) {
+            CoverFlightHost(Modifier.weight(1f).fillMaxHeight(), overlay = false) {
                 AnimatedContent(
                     // Whatever is on top of the back stack — see [AppNavigator].
                     targetState = when {
@@ -3700,6 +3701,10 @@ private fun BitChordApp(
                         }
                     }
                 }
+
+                // The flying cover goes over the page but under the bars, so it
+                // never rides above the tab bar or the mini player.
+                CoverFlightLayer()
 
                 // The top-bar footprint is transparent on every page so the
                 // shared app-level gradient is continuous; its controls float

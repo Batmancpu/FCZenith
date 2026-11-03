@@ -311,13 +311,13 @@ private fun DetailActionsSkeleton(isArtist: Boolean) {
 fun LazyListScope.detailSkeleton(isArtist: Boolean) {
     if (isArtist) {
         item(key = "skeleton:detail:actions") {
-            Column(Modifier.graphicsLayer { alpha = 0.4f }) {
+            Column(Modifier.enterReveal(240).graphicsLayer { alpha = 0.4f }) {
                 DetailActionsSkeleton(isArtist = true)
                 Spacer(Modifier.height(22.dp))
             }
         }
         item(key = "skeleton:detail:top") {
-            Column(Modifier.graphicsLayer { alpha = 0.4f }) {
+            Column(Modifier.enterReveal(300).graphicsLayer { alpha = 0.4f }) {
                 SectionHeaderSkeleton()
                 // Top songs page four at a time — see [trackColumnWidth] for how
                 // wide a page lands.
@@ -338,7 +338,7 @@ fun LazyListScope.detailSkeleton(isArtist: Boolean) {
             }
         }
         item(key = "skeleton:detail:sections") {
-            Box(Modifier.graphicsLayer { alpha = 0.4f }) {
+            Box(Modifier.enterReveal(340).graphicsLayer { alpha = 0.4f }) {
                 ShelfSkeleton(index = 2, cardCorner = 10.dp)
             }
         }
