@@ -11,6 +11,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -23,6 +25,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -61,6 +64,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -128,6 +132,7 @@ fun LiquidSegmentedControl(
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    draggable: Boolean = true,
     content: @Composable (index: Int, color: Color) -> Unit,
 ) {
     val modes = remember(count) { List(count) { it } }
@@ -352,8 +357,8 @@ fun LiquidSegmentedControl(
         Row(
             Modifier
                 .matchParentSize()
-                .pointerInput(slotPx, isLtr, reduceAnimation, enabled) {
-                    if (!enabled) return@pointerInput
+                .pointerInput(slotPx, isLtr, reduceAnimation, enabled, draggable) {
+                    if (!enabled || !draggable) return@pointerInput
                     val dir = if (isLtr) 1f else -1f
                     val maxIndex = (modes.size - 1).toFloat()
                     val tracker = VelocityTracker()
@@ -485,6 +490,64 @@ fun LiquidSegmentedControl(
             }
         }
 
+    }
+}
+
+/**
+ * [LiquidSegmentedControl] untuk segmen yang tidak muat sama lebar: tiap segmen
+ * selebar [minSegmentWidth] dan track-nya bisa digeser. Selama ada ruang, sama
+ * persis dengan versi biasa. Saat menggeser, pill tidak bisa di-drag (drag
+ * dipakai untuk scroll); pindah segmen lewat tap, dan segmen terpilih dijaga
+ * tetap di tengah.
+ */
+@Composable
+fun LiquidScrollSegmentedControl(
+    count: Int,
+    selection: Int,
+    onSelect: (Int) -> Unit,
+    minSegmentWidth: Dp,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    content: @Composable (index: Int, color: Color) -> Unit,
+) {
+    val density = LocalDensity.current
+    val reduceAnimation by AppSettings.reduceAnimation.collectAsStateWithLifecycle()
+    val scroll = rememberScrollState()
+    val placed = remember { booleanArrayOf(false) }
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+        val natural = minSegmentWidth * count + SELECTOR_INSET * 2
+        if (natural <= maxWidth) {
+            LiquidSegmentedControl(
+                count = count,
+                selection = selection,
+                onSelect = onSelect,
+                enabled = enabled,
+                content = content,
+            )
+            return@BoxWithConstraints
+        }
+        val segmentPx = with(density) { minSegmentWidth.toPx() }
+        val insetPx = with(density) { SELECTOR_INSET.toPx() }
+        val viewportPx = with(density) { maxWidth.toPx() }
+        LaunchedEffect(selection, segmentPx, viewportPx, reduceAnimation) {
+            val maxScroll = (segmentPx * count + insetPx * 2f - viewportPx).coerceAtLeast(0f)
+            val target = (insetPx + segmentPx * (selection + 0.5f) - viewportPx / 2f)
+                .coerceIn(0f, maxScroll)
+                .roundToInt()
+            if (placed[0] && !reduceAnimation) scroll.animateScrollTo(target) else scroll.scrollTo(target)
+            placed[0] = true
+        }
+        Box(Modifier.clip(RoundedCornerShape(percent = 50)).horizontalScroll(scroll)) {
+            LiquidSegmentedControl(
+                count = count,
+                selection = selection,
+                onSelect = onSelect,
+                modifier = Modifier.width(natural),
+                enabled = enabled,
+                draggable = false,
+                content = content,
+            )
+        }
     }
 }
 

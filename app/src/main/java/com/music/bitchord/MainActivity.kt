@@ -248,7 +248,9 @@ import com.music.bitchord.ui.components.floatingtabbar.rememberFloatingTabBarScr
 import com.music.bitchord.ui.components.FrostedTopBar
 import com.music.bitchord.ui.components.LastfmLoginAlert
 import com.music.bitchord.ui.components.LocalAppBackdrop
+import com.music.bitchord.ui.components.AppSegmentedControlStyle
 import com.music.bitchord.ui.components.LocalLiquidGlassEnabled
+import com.music.bitchord.ui.components.LocalSegmentedControlStyle
 import com.music.bitchord.ui.components.backdrop.backdrops.LayerBackdrop
 import com.music.bitchord.ui.components.backdrop.backdrops.layerBackdrop
 import com.music.bitchord.ui.components.backdrop.backdrops.rememberLayerBackdrop
@@ -411,6 +413,7 @@ class MainActivity : AppCompatActivity() {
                 CompositionLocalProvider(
                     LocalOverscrollFactory provides iosOverscrollFactory,
                     LocalLiquidGlassEnabled provides liquidGlassEnabled,
+                    LocalSegmentedControlStyle provides AppSegmentedControlStyle,
                     LocalAppBackdrop provides appBackdrop,
                 ) {
                 // The window's width, measured rather than asked for.

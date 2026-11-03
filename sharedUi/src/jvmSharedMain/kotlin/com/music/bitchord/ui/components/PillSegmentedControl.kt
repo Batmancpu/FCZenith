@@ -21,6 +21,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,6 +40,47 @@ import com.music.bitchord.ui.graphics.fadingEdges
 import com.music.bitchord.ui.player.PlayerSettings
 import kotlinx.coroutines.flow.first
 import kotlin.math.roundToInt
+
+/**
+ * How a "pick one of these" row is drawn. The flat [PillSegmentedControl] by
+ * default; the phone app swaps in its liquid glass one through
+ * [LocalSegmentedControlStyle], since shared code can't reach it directly.
+ */
+interface SegmentedControlStyle {
+    @Composable
+    fun Render(
+        options: List<String>,
+        selectedIndex: Int,
+        onSelect: (Int) -> Unit,
+        modifier: Modifier,
+        enabled: Boolean,
+    )
+}
+
+private object FlatSegmentedControlStyle : SegmentedControlStyle {
+    @Composable
+    override fun Render(
+        options: List<String>,
+        selectedIndex: Int,
+        onSelect: (Int) -> Unit,
+        modifier: Modifier,
+        enabled: Boolean,
+    ) = PillSegmentedControl(options, selectedIndex, onSelect, modifier, enabled)
+}
+
+val LocalSegmentedControlStyle = staticCompositionLocalOf<SegmentedControlStyle> { FlatSegmentedControlStyle }
+
+/** A segmented control in whatever style the app provided. */
+@Composable
+fun StyledSegmentedControl(
+    options: List<String>,
+    selectedIndex: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    LocalSegmentedControlStyle.current.Render(options, selectedIndex, onSelect, modifier, enabled)
+}
 
 /**
  * Apple's segmented control: a squircle track in the tertiary fill, and the

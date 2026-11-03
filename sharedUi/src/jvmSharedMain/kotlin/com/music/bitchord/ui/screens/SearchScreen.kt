@@ -16,7 +16,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import com.music.bitchord.ui.components.PillSegmentedControl
+import com.music.bitchord.ui.components.StyledSegmentedControl
 import com.music.bitchord.ui.components.longPressMenuClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -249,7 +249,7 @@ fun SearchScreen(
             // The same selector as the sources above it and a folder's tabs, so
             // the app has one look for "pick one of these".
             if (results != null && !suggesting && !searchingLibrary && !searchingAddons) {
-                PillSegmentedControl(
+                StyledSegmentedControl(
                     options = SearchFilter.entries.map { it.label },
                     selectedIndex = filter.ordinal,
                     onSelect = { onFilterChange(SearchFilter.entries[it]) },

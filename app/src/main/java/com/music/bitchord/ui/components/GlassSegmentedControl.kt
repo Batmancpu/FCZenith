@@ -84,16 +84,7 @@ fun GlassSegmentedControl(
                 measurer.measure(label, style, maxLines = 1, softWrap = false).size.width + labelPadding * 2f
             }
         }
-        if (widest * options.size > room) {
-            PillSegmentedControl(options, selectedIndex, onSelect, Modifier, enabled)
-            return@BoxWithConstraints
-        }
-        LiquidSegmentedControl(
-            count = options.size,
-            selection = selectedIndex,
-            onSelect = onSelect,
-            enabled = enabled,
-        ) { index, color ->
+        val label: @Composable (Int, Color) -> Unit = { index, color ->
             Text(
                 text = options[index],
                 style = style,
@@ -102,7 +93,38 @@ fun GlassSegmentedControl(
                 softWrap = false,
             )
         }
+        if (widest * options.size > room) {
+            // Tidak muat sama lebar: tetap liquid, tapi track-nya bisa digeser.
+            LiquidScrollSegmentedControl(
+                count = options.size,
+                selection = selectedIndex,
+                onSelect = onSelect,
+                minSegmentWidth = with(density) { widest.toDp() },
+                enabled = enabled,
+                content = label,
+            )
+            return@BoxWithConstraints
+        }
+        LiquidSegmentedControl(
+            count = options.size,
+            selection = selectedIndex,
+            onSelect = onSelect,
+            enabled = enabled,
+            content = label,
+        )
     }
+}
+
+/** Gaya segmented control app, dipasang ke komponen bersama lewat [LocalSegmentedControlStyle]. */
+object AppSegmentedControlStyle : SegmentedControlStyle {
+    @Composable
+    override fun Render(
+        options: List<String>,
+        selectedIndex: Int,
+        onSelect: (Int) -> Unit,
+        modifier: Modifier,
+        enabled: Boolean,
+    ) = GlassSegmentedControl(options, selectedIndex, onSelect, modifier, enabled)
 }
 
 private val GLASS_TRACK_PADDING = 4.dp
