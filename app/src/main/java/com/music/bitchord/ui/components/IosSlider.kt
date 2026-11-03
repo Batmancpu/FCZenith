@@ -40,6 +40,22 @@ import androidx.compose.foundation.layout.requiredHeight
 import com.music.bitchord.ui.components.backdrop.backdrops.layerBackdrop
 import com.music.bitchord.ui.components.backdrop.backdrops.rememberLayerBackdrop
 import kotlin.math.roundToInt
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.util.lerp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.music.bitchord.data.settings.AppSettings
+import com.music.bitchord.ui.components.backdrop.backdrops.rememberBackdrop
+import com.music.bitchord.ui.components.backdrop.drawBackdrop
+import com.music.bitchord.ui.components.backdrop.effects.blur
+import com.music.bitchord.ui.components.backdrop.effects.lens
+import com.music.bitchord.ui.components.backdrop.highlight.Highlight
+import com.music.bitchord.ui.components.backdrop.shadow.InnerShadow
+import com.music.bitchord.ui.components.backdrop.shadow.Shadow
+import kotlin.math.abs
 
 /**
  * The iOS 26 slider: a thin capsule track with a pill of a thumb. Touched, the
@@ -67,41 +83,79 @@ fun IosSlider(
     val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val active = activeColor ?: MaterialTheme.colorScheme.primary
     val inactive = inactiveColor ?: Color(0xFF8E8E93).copy(alpha = if (dark) 0.36f else 0.24f)
+    val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
+    val glassOk = isGlassSupported() && !reduceDynamicBlur
 
-    val span = valueRange.endInclusive - valueRange.start
-    val fraction = if (span > 0f) ((value - valueRange.start) / span).coerceIn(0f, 1f) else 0f
-    // Eased, so the stops of a stepped slider glide instead of jumping.
-    val shown by animateFloatAsState(
-        targetValue = fraction,
-        animationSpec = spring(dampingRatio = 0.9f, stiffness = 700f),
-        label = "iosSliderFraction",
-    )
-
-    var widthPx by remember { mutableFloatStateOf(0f) }
-    var pressing by remember { mutableStateOf(false) }
-    var dragging by remember { mutableStateOf(false) }
-    val lift by animateFloatAsState(
-        targetValue = if (pressing || dragging) 1f else 0f,
-        animationSpec = spring(dampingRatio = 0.62f, stiffness = 520f),
-        label = "iosSliderLift",
-    )
-    // The glass and the recording of the track exist only while it is lifted.
-    val glassActive by remember { derivedStateOf { pressing || dragging || lift > 0.002f } }
-    val trackBackdrop = rememberLayerBackdrop()
+    val rangeStart = valueRange.start
+    val rangeEnd = valueRange.endInclusive
+    val span = rangeEnd - rangeStart
+    val thumbWidthPx = with(density) { SliderThumbWidth.toPx() }
+    val scope = rememberCoroutineScope()
     val latestOnValueChange by rememberUpdatedState(onValueChange)
 
-    // The thumb's centre travels between half a resting thumb in from each end,
-    // so the mapping does not change while the thumb grows under the finger.
-    fun valueAt(x: Float): Float {
-        val inset = with(density) { SliderThumbWidth.toPx() } / 2f
-        val usable = (widthPx - inset * 2f).coerceAtLeast(1f)
-        var f = ((x - inset) / usable).coerceIn(0f, 1f)
-        if (steps > 0) {
+    var widthPx by remember { mutableFloatStateOf(0f) }
+    var didDrag by remember { mutableStateOf(false) }
+    var downX by remember { mutableFloatStateOf(0f) }
+    var raw by remember { mutableFloatStateOf(0f) }
+    val trackBackdrop = rememberLayerBackdrop()
+    val capsule = remember { RoundedCornerShape(percent = 50) }
+
+    val anim = remember(scope, rangeStart, rangeEnd, steps, thumbWidthPx) {
+        // Pusat thumb bergerak antara setengah thumb dari tiap ujung, jadi
+        // pemetaan tidak berubah saat thumb membesar di bawah jari.
+        fun usable() = (widthPx - thumbWidthPx).coerceAtLeast(1f)
+        fun fractionAt(x: Float) = ((x - thumbWidthPx / 2f) / usable()).coerceIn(0f, 1f)
+        fun snapped(v: Float): Float {
+            val clamped = v.coerceIn(rangeStart, rangeEnd)
+            if (steps <= 0 || span <= 0f) return clamped
             val stops = steps + 1
-            f = (f * stops).roundToInt() / stops.toFloat()
+            val f = (clamped - rangeStart) / span
+            return rangeStart + span * ((f * stops).roundToInt() / stops.toFloat())
         }
-        return valueRange.start + span * f
+        DampedDragAnimation(
+            animationScope = scope,
+            initialValue = value.coerceIn(rangeStart, rangeEnd),
+            valueRange = rangeStart..rangeEnd,
+            visibilityThreshold = (span / 1000f).coerceAtLeast(1e-6f),
+            initialScale = 1f,
+            pressedScale = 1.5f,
+            onDragStarted = { position ->
+                didDrag = false
+                downX = position.x
+            },
+            onDrag = { _, dragAmount ->
+                if (!didDrag) {
+                    didDrag = true
+                    val centre = thumbWidthPx / 2f + usable() * progress
+                    // Jari di atas thumb: lanjut dari nilainya. Di tempat lain: loncat ke jari.
+                    raw = if (abs(downX - centre) <= thumbWidthPx / 2f) {
+                        requestedValue
+                    } else {
+                        rangeStart + span * fractionAt(downX)
+                    }
+                }
+                raw = (raw + span * dragAmount.x / usable()).coerceIn(rangeStart, rangeEnd)
+                latestOnValueChange(snapped(raw))
+            },
+            onDragStopped = {
+                if (!didDrag) {
+                    // Ketukan di trek.
+                    val v = snapped(rangeStart + span * fractionAt(downX))
+                    animateToValue(v)
+                    latestOnValueChange(v)
+                }
+                didDrag = false
+            },
+            onDragCancelled = { didDrag = false },
+        )
     }
+    LaunchedEffect(value, anim) {
+        val target = value.coerceIn(rangeStart, rangeEnd)
+        if (anim.requestedValue != target) anim.updateValue(target)
+    }
+
+    // Kaca hanya dikomposisikan selama ada yang bergerak; diam, thumb putih biasa.
+    val glass = glassOk && anim.isActive
 
     Box(
         modifier = modifier
@@ -109,37 +163,7 @@ fun IosSlider(
             .height(SliderHeight)
             .graphicsLayer { alpha = if (enabled) 1f else 0.45f }
             .onSizeChanged { widthPx = it.width.toFloat() }
-            .then(
-                if (enabled) {
-                    Modifier
-                        .pointerInput(valueRange, steps) {
-                            detectTapGestures(
-                                onPress = {
-                                    pressing = true
-                                    tryAwaitRelease()
-                                    pressing = false
-                                },
-                                onTap = { offset -> latestOnValueChange(valueAt(offset.x)) },
-                            )
-                        }
-                        .pointerInput(valueRange, steps) {
-                            detectHorizontalDragGestures(
-                                onDragStart = { offset ->
-                                    dragging = true
-                                    latestOnValueChange(valueAt(offset.x))
-                                },
-                                onDragEnd = { dragging = false },
-                                onDragCancel = { dragging = false },
-                                onHorizontalDrag = { change, _ ->
-                                    change.consume()
-                                    latestOnValueChange(valueAt(change.position.x))
-                                },
-                            )
-                        }
-                } else {
-                    Modifier
-                },
-            )
+            .then(if (enabled) anim.modifier else Modifier)
             .semantics {
                 progressBarRangeInfo = ProgressBarRangeInfo(value.coerceIn(valueRange), valueRange, steps)
                 if (enabled) {
@@ -151,60 +175,102 @@ fun IosSlider(
             },
         contentAlignment = Alignment.CenterStart,
     ) {
-        // Track: yang dilihat kaca thumb. Saat kaca aktif ia direkam dalam kotak
-        // setinggi thumb terangkat, supaya lensa tidak menarik piksel tepi.
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(SliderTrackHeight)
-                .then(
-                    if (glassActive) {
-                        Modifier.requiredHeight(SliderLiftedThumbHeight).layerBackdrop(trackBackdrop)
-                    } else {
-                        Modifier
-                    },
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
+        // Trek: yang dilihat kaca thumb. Direkam hanya selama kaca aktif.
+        Box(Modifier.then(if (glass) Modifier.layerBackdrop(trackBackdrop) else Modifier)) {
             Box(
                 Modifier
-                    .fillMaxWidth()
-                    .height(SliderTrackHeight)
                     .clip(CircleShape)
                     .background(inactive)
-                    .drawBehind {
-                        // The fill runs to the thumb's centre and on under it.
-                        val inset = SliderThumbWidth.toPx() / 2f
-                        val end = inset + (size.width - inset * 2f) * shown.coerceIn(0f, 1f)
-                        drawRect(color = active, size = Size(end.coerceIn(0f, size.width), size.height))
+                    .height(SliderTrackHeight)
+                    .fillMaxWidth(),
+            )
+            Box(
+                Modifier
+                    .clip(CircleShape)
+                    .background(active)
+                    .height(SliderTrackHeight)
+                    .layout { measurable, constraints ->
+                        val placeable = measurable.measure(constraints)
+                        // Isian sampai pusat thumb.
+                        val inset = thumbWidthPx / 2f
+                        val end = (inset + (constraints.maxWidth - inset * 2f) * anim.progress)
+                            .roundToInt()
+                            .coerceIn(0, constraints.maxWidth)
+                        layout(end, placeable.height) {
+                            placeable.place(0, 0)
+                        }
                     },
             )
         }
-        val thumb = Modifier
-            .offset {
-                val w = liftedPx(SliderThumbWidth, SliderLiftedThumbWidth, lift)
-                val inset = SliderThumbWidth.toPx() / 2f
-                val centre = inset + (widthPx - inset * 2f) * shown.coerceIn(0f, 1f)
-                IntOffset((centre - w / 2f).roundToInt(), 0)
+
+        if (glass) {
+            val thumbBackdrop = rememberBackdrop(trackBackdrop) { drawTrack ->
+                val p = anim.pressProgress
+                scale(lerp(2f / 3f, 1f, p), lerp(0f, 1f, p)) {
+                    drawTrack()
+                }
             }
-            .liftingSize(
-                restWidth = SliderThumbWidth,
-                restHeight = SliderThumbHeight,
-                liftedWidth = SliderLiftedThumbWidth,
-                liftedHeight = SliderLiftedThumbHeight,
-                lift = { lift },
+            Box(
+                Modifier
+                    .graphicsLayer {
+                        translationX = (widthPx - thumbWidthPx).coerceAtLeast(0f) * anim.progress
+                    }
+                    .drawBackdrop(
+                        backdrop = thumbBackdrop,
+                        shape = { capsule },
+                        effects = {
+                            val p = anim.pressProgress
+                            blur(8f.dp.toPx() * (1f - p))
+                            lens(
+                                10f.dp.toPx() * p,
+                                14f.dp.toPx() * p,
+                                chromaticAberration = true,
+                            )
+                        },
+                        highlight = {
+                            val p = anim.pressProgress
+                            Highlight.Ambient.copy(
+                                width = Highlight.Ambient.width / 1.5f,
+                                blurRadius = Highlight.Ambient.blurRadius / 1.5f,
+                                alpha = p,
+                            )
+                        },
+                        shadow = {
+                            Shadow(
+                                radius = 4f.dp,
+                                color = Color.Black.copy(alpha = 0.05f),
+                            )
+                        },
+                        innerShadow = {
+                            val p = anim.pressProgress
+                            InnerShadow(
+                                radius = 4f.dp * p,
+                                alpha = p,
+                            )
+                        },
+                        layerBlock = { dampedThumbScale(anim, 10f) },
+                        onDrawSurface = {
+                            drawRect(Color.White.copy(alpha = (1f - anim.pressProgress).coerceIn(0f, 1f)))
+                        },
+                    )
+                    .size(SliderThumbWidth, SliderThumbHeight),
             )
-        if (glassActive) {
-            LiquidGlassThumb(backdrop = trackBackdrop, glass = { lift }, modifier = thumb)
         } else {
-            RestingThumb(thumb)
+            RestingThumb(
+                Modifier
+                    .graphicsLayer {
+                        translationX = (widthPx - thumbWidthPx).coerceAtLeast(0f) * anim.progress
+                        dampedThumbScale(anim, 10f)
+                    }
+                    .size(SliderThumbWidth, SliderThumbHeight),
+            )
         }
     }
 }
 
 private val SliderHeight = 40.dp
 private val SliderTrackHeight = 6.dp
-private val SliderThumbWidth = 34.dp
-private val SliderThumbHeight = 22.dp
+private val SliderThumbWidth = 40.dp
+private val SliderThumbHeight = 24.dp
 private val SliderLiftedThumbWidth = 46.dp
 private val SliderLiftedThumbHeight = 30.dp

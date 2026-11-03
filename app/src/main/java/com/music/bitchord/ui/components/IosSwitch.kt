@@ -59,6 +59,22 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.music.bitchord.ui.haptics.Haptic
 import com.music.bitchord.ui.haptics.rememberHaptics
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.GraphicsLayerScope
+import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.util.lerp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.music.bitchord.data.settings.AppSettings
+import com.music.bitchord.ui.components.backdrop.backdrops.rememberBackdrop
+import com.music.bitchord.ui.components.backdrop.drawBackdrop
+import com.music.bitchord.ui.components.backdrop.effects.blur
+import com.music.bitchord.ui.components.backdrop.effects.lens
+import com.music.bitchord.ui.components.backdrop.highlight.Highlight
+import com.music.bitchord.ui.components.backdrop.shadow.InnerShadow
+import com.music.bitchord.ui.components.backdrop.shadow.Shadow
 
 /**
  * The iOS 26 switch: a wide green capsule and a white pill of a thumb, which
@@ -97,50 +113,72 @@ fun IosSwitch(
     @Suppress("UNUSED_PARAMETER") colors: SwitchColors? = null,
 ) {
     val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val density = LocalDensity.current
     val scope = rememberCoroutineScope()
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     val currentChecked by rememberUpdatedState(checked)
     val currentOnChange by rememberUpdatedState(onCheckedChange)
+    val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
+    val glassOk = isGlassSupported() && !reduceDynamicBlur
 
-    // 0 (off) to 1 (on). Animated by a spring, and driven directly by the finger while dragging.
-    val position = remember { Animatable(if (checked) 1f else 0f) }
-    val thumbSpring = spring<Float>(dampingRatio = 0.78f, stiffness = 700f)
-    LaunchedEffect(checked) { position.animateTo(if (checked) 1f else 0f, thumbSpring) }
+    val accent = if (dark) Color(0xFF30D158) else Color(0xFF34C759)
+    val trackOff = if (dark) Color(0xFF787880).copy(alpha = 0.36f) else Color(0xFF787878).copy(alpha = 0.2f)
+    val dragWidthPx = with(density) { (TrackWidth - ThumbWidth - ThumbPadding * 2).toPx() }
 
-    // Finger on the switch, pressing or dragging.
-    var touching by remember { mutableStateOf(false) }
-    // Held for a beat after a flip, so a switch toggled by its row's tap
-    // lifts into glass for the trip as well.
-    var flash by remember { mutableStateOf(false) }
-    // Under-damped: the overshoot is the thumb popping past the track.
-    val lift by animateFloatAsState(
-        targetValue = if (touching || flash) 1f else 0f,
-        animationSpec = spring(dampingRatio = 0.74f, stiffness = 520f),
-        label = "iosSwitchLift",
-    )
-    val glassActive by remember { derivedStateOf { touching || flash || lift > 0.002f } }
-    val track by animateColorAsState(
-        targetValue = when {
-            checked && dark -> Color(0xFF30D158)
-            checked -> Color(0xFF34C759)
-            else -> Color(0xFF8E8E93).copy(alpha = if (dark) 0.36f else 0.22f)
-        },
-        label = "iosSwitchTrack",
-    )
-    val trackBackdrop = rememberLayerBackdrop()
+    var didDrag by remember { mutableStateOf(false) }
+    var dragFraction by remember { mutableFloatStateOf(if (checked) 1f else 0f) }
+    val anim = remember(scope, dragWidthPx, rtl) {
+        DampedDragAnimation(
+            animationScope = scope,
+            initialValue = if (checked) 1f else 0f,
+            valueRange = 0f..1f,
+            visibilityThreshold = 0.001f,
+            initialScale = 1f,
+            pressedScale = 1.5f,
+            consumeDown = true,
+            onDragStarted = {
+                didDrag = false
+                dragFraction = requestedValue
+            },
+            onDrag = { _, dragAmount ->
+                didDrag = true
+                val step = (if (rtl) -dragAmount.x else dragAmount.x) / dragWidthPx
+                dragFraction = (dragFraction + step).coerceIn(0f, 1f)
+                updateValue(dragFraction)
+            },
+            onDragStopped = {
+                if (didDrag) {
+                    val target = dragFraction >= 0.5f
+                    updateValue(if (target) 1f else 0f)
+                    if (target != currentChecked) currentOnChange?.invoke(target)
+                } else {
+                    animateToValue(if (currentChecked) 0f else 1f)
+                    currentOnChange?.invoke(!currentChecked)
+                }
+                didDrag = false
+            },
+            onDragCancelled = {
+                didDrag = false
+                updateValue(if (currentChecked) 1f else 0f)
+            },
+        )
+    }
 
     val haptics = rememberHaptics()
     // Skips the first run, so a switch scrolling into view stays quiet.
     var settled by remember { mutableStateOf(false) }
-    LaunchedEffect(checked) {
-        if (settled) {
-            haptics.play(if (checked) Haptic.ToggleOn else Haptic.ToggleOff)
-            flash = true
-            delay(320)
-            flash = false
-        }
+    LaunchedEffect(checked, anim) {
+        val target = if (checked) 1f else 0f
+        if (settled) haptics.play(if (checked) Haptic.ToggleOn else Haptic.ToggleOff)
+        // Dibalik oleh barisnya: thumb terangkat selama menempuh jarak.
+        if (anim.requestedValue != target) anim.animateToValue(target)
         settled = true
     }
+
+    val trackBackdrop = rememberLayerBackdrop()
+    val capsule = remember { RoundedCornerShape(percent = 50) }
+    // Kaca hanya dikomposisikan selama ada yang bergerak; diam, thumb putih biasa.
+    val glass = glassOk && anim.isActive
 
     Box(
         modifier = modifier
@@ -157,56 +195,7 @@ fun IosSwitch(
                                 true
                             }
                         }
-                        .pointerInput(enabled) {
-                            if (!enabled) return@pointerInput
-                            val slop = viewConfiguration.touchSlop
-                            val travelPx = (TrackWidth - ThumbWidth - ThumbPadding * 2).toPx()
-                            awaitEachGesture {
-                                // Takes the touch for itself, so the row around
-                                // the switch does not toggle a second time.
-                                val down = awaitFirstDown(requireUnconsumed = false)
-                                down.consume()
-                                touching = true
-                                var fraction = position.value
-                                var total = 0f
-                                var dragging = false
-                                var cancelled = false
-                                while (true) {
-                                    val event = awaitPointerEvent()
-                                    val change = event.changes.firstOrNull { it.id == down.id }
-                                    if (change == null || change.isConsumed) {
-                                        cancelled = true
-                                        break
-                                    }
-                                    if (!change.pressed) {
-                                        change.consume()
-                                        break
-                                    }
-                                    val dx = change.positionChange().x
-                                    total += dx
-                                    if (!dragging && abs(total) > slop) dragging = true
-                                    if (dragging) {
-                                        val step = (if (rtl) -dx else dx) / travelPx
-                                        fraction = (fraction + step).coerceIn(0f, 1f)
-                                        val f = fraction
-                                        scope.launch { position.snapTo(f) }
-                                        change.consume()
-                                    }
-                                }
-                                touching = false
-                                when {
-                                    cancelled -> scope.launch {
-                                        position.animateTo(if (currentChecked) 1f else 0f, thumbSpring)
-                                    }
-                                    dragging -> {
-                                        val target = fraction >= 0.5f
-                                        if (target != currentChecked) currentOnChange?.invoke(target)
-                                        scope.launch { position.animateTo(if (target) 1f else 0f, thumbSpring) }
-                                    }
-                                    else -> currentOnChange?.invoke(!currentChecked)
-                                }
-                            }
-                        }
+                        .then(if (enabled) anim.modifier else Modifier)
                 } else {
                     Modifier
                 },
@@ -214,49 +203,84 @@ fun IosSwitch(
             .size(TrackWidth, TrackHeight),
         contentAlignment = Alignment.CenterStart,
     ) {
-        // Track: yang dilihat kaca thumb. Direkam hanya saat kaca aktif, dan
-        // kotak rekamannya setinggi thumb yang terangkat, supaya tepi atas dan bawah
-        // thumb melihat lengkung track sendiri, bukan piksel tepi yang tertarik.
-        if (glassActive) {
-            Box(Modifier.requiredSize(TrackWidth, GlassThumbHeight).layerBackdrop(trackBackdrop)) {
-                Box(
-                    Modifier
-                        .align(Alignment.Center)
-                        .size(TrackWidth, TrackHeight)
-                        .clip(CircleShape)
-                        .background(track),
-                )
+        Box(
+            Modifier
+                .then(if (glass) Modifier.layerBackdrop(trackBackdrop) else Modifier)
+                .clip(CircleShape)
+                .drawBehind { drawRect(lerp(trackOff, accent, anim.value.coerceIn(0f, 1f))) }
+                .size(TrackWidth, TrackHeight),
+        )
+
+        if (glass) {
+            val thumbBackdrop = rememberBackdrop(trackBackdrop) { drawTrack ->
+                val p = anim.pressProgress
+                scale(lerp(2f / 3f, 0.75f, p), lerp(0f, 0.75f, p)) {
+                    drawTrack()
+                }
             }
-        } else {
             Box(
                 Modifier
-                    .matchParentSize()
-                    .clip(CircleShape)
-                    .background(track),
+                    .graphicsLayer { switchThumbX(anim.value, dragWidthPx, rtl) }
+                    .drawBackdrop(
+                        backdrop = thumbBackdrop,
+                        shape = { capsule },
+                        effects = {
+                            val p = anim.pressProgress
+                            blur(8f.dp.toPx() * (1f - p))
+                            lens(
+                                5f.dp.toPx() * p,
+                                10f.dp.toPx() * p,
+                                chromaticAberration = true,
+                            )
+                        },
+                        highlight = {
+                            val p = anim.pressProgress
+                            Highlight.Ambient.copy(
+                                width = Highlight.Ambient.width / 1.5f,
+                                blurRadius = Highlight.Ambient.blurRadius / 1.5f,
+                                alpha = p,
+                            )
+                        },
+                        shadow = {
+                            Shadow(
+                                radius = 4f.dp,
+                                color = Color.Black.copy(alpha = 0.05f),
+                            )
+                        },
+                        innerShadow = {
+                            val p = anim.pressProgress
+                            InnerShadow(
+                                radius = 4f.dp * p,
+                                alpha = p,
+                            )
+                        },
+                        layerBlock = { dampedThumbScale(anim, 50f) },
+                        onDrawSurface = {
+                            drawRect(Color.White.copy(alpha = (1f - anim.pressProgress).coerceIn(0f, 1f)))
+                        },
+                    )
+                    .size(ThumbWidth, ThumbHeight),
             )
-        }
-        val thumb = Modifier
-            .offset {
-                // Travel is measured with the thumb's current width, so it
-                // grows from the edge it is leaving and always lands flush.
-                val w = liftedPx(ThumbWidth, GlassThumbWidth, lift)
-                val pad = ThumbPadding.toPx()
-                val travel = (TrackWidth.toPx() - w - pad * 2f).coerceAtLeast(0f)
-                IntOffset((pad + travel * position.value).roundToInt(), 0)
-            }
-            .liftingSize(
-                restWidth = ThumbWidth,
-                restHeight = ThumbHeight,
-                liftedWidth = GlassThumbWidth,
-                liftedHeight = GlassThumbHeight,
-                lift = { lift },
-            )
-        if (glassActive) {
-            LiquidGlassThumb(backdrop = trackBackdrop, glass = { lift }, modifier = thumb)
         } else {
-            RestingThumb(thumb)
+            RestingThumb(
+                Modifier
+                    .graphicsLayer {
+                        switchThumbX(anim.value, dragWidthPx, rtl)
+                        dampedThumbScale(anim, 50f)
+                    }
+                    .size(ThumbWidth, ThumbHeight),
+            )
         }
     }
+}
+
+/** Posisi thumb: dari padding di ujung mati sampai ujung hidup, mengikuti arah tata letak. */
+private fun GraphicsLayerScope.switchThumbX(fraction: Float, dragPx: Float, rtl: Boolean) {
+    val padding = ThumbPadding.toPx()
+    val f = fraction.coerceIn(0f, 1f)
+    translationX =
+        if (rtl) lerp(-padding, -(padding + dragPx), f)
+        else lerp(padding, padding + dragPx, f)
 }
 
 /** The thumb once lifted: it grows well past the track, as iOS 26's does. */
