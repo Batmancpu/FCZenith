@@ -321,12 +321,18 @@ private fun TopPickCard(
     var flightCanvas by remember { mutableStateOf<CanvasArtwork?>(null) }
     // Reads the frame the clip is showing, at the moment of the tap.
     val frameGrab = remember { CanvasFrameGrab() }
+    // Same page id Home opens for this card, so the flight finds the page's cover.
+    val flightId: String? = when (pick.kind) {
+        TopPickKind.LATEST_RELEASE -> pick.browseId
+        TopPickKind.FEATURED_ARTIST -> pick.artistBrowseId
+        TopPickKind.NEW_RELEASE_MIX ->
+            pick.watch?.playlistId
+                ?.takeIf { it.isNotBlank() && !it.startsWith("RDAMVM") }
+                ?.let { if (it.startsWith("VL")) it else "VL$it" }
+        else -> null
+    }
     val openCard = rememberCoverFlightTap(
-        browseId = when (pick.kind) {
-            TopPickKind.LATEST_RELEASE -> pick.browseId
-            TopPickKind.FEATURED_ARTIST -> pick.artistBrowseId
-            else -> null
-        },
+        browseId = flightId,
         token = coverToken,
         action = { onClick(pick, text.title) },
         grabFrame = { frameGrab.grab?.invoke() },
@@ -373,7 +379,7 @@ private fun TopPickCard(
                     pick.images.firstOrNull(),
                     Modifier.fillMaxSize(),
                     // Only the square cover flies, not the whole card around it.
-                    coverModifier = if (pick.kind == TopPickKind.LATEST_RELEASE) {
+                    coverModifier = if (flightId != null) {
                         Modifier.coverFlightSource(
                             coverToken,
                             pick.images.firstOrNull().croppedAt(HEADER_ART_PX).whenArtworkReady(),
