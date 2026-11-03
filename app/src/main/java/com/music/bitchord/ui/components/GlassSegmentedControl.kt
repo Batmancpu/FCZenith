@@ -127,9 +127,6 @@ object AppSegmentedControlStyle : SegmentedControlStyle {
     ) = GlassSegmentedControl(options, selectedIndex, onSelect, modifier, enabled)
 }
 
-private val GLASS_TRACK_PADDING = 4.dp
-private val GLASS_LABEL_PADDING = 18.dp
-
 @Composable
 private fun GlassLabels(
     options: List<String>,
