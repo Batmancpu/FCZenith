@@ -393,11 +393,16 @@ private fun ArtworkPageActions(
             // Keep the right edge fixed while a new action opens room to its
             // left. The surface itself therefore grows instead of jumping to
             // its new width in a single frame.
+            // End-aligned: the profile photo is the last item and stays glued to
+            // the right edge while the glass grows or shrinks to its left. With
+            // the default start alignment the photo slid inside the pill on every
+            // tab change, even though its place on screen never changed.
             .animateContentSize(
                 animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioNoBouncy,
+                    dampingRatio = 0.7f,
                     stiffness = Spring.StiffnessMediumLow,
                 ),
+                alignment = Alignment.CenterEnd,
             )
             // One profile target with no inset is a true circle, the back
             // button's size. Once another action exists, Apple's inset opens at
