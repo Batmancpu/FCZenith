@@ -116,7 +116,9 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.border
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import com.music.bitchord.ui.components.coverFlightSource
 import com.music.bitchord.ui.components.coverFlightTarget
+import com.music.bitchord.ui.components.rememberCoverFlightTap
 import com.music.bitchord.ui.components.enterReveal
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.ui.draw.drawBehind
@@ -2178,6 +2180,8 @@ private fun TopReleaseCard(
     val coverShape = remember { RoundedCornerShape(TOP_RELEASE_CORNER - TOP_RELEASE_INSET).continuous() }
     val haptics = rememberHaptics()
     val hasButton = onToggleSaved != null && saved != null
+    val coverToken = remember { Any() }
+    val openWithCover = rememberCoverFlightTap(item.browseId, coverToken, onClick)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -2189,7 +2193,7 @@ private fun TopReleaseCard(
             .background(Color.White.copy(alpha = LIGHT_FILL_ALPHA), shape)
             .border(1.dp, Color.White.copy(alpha = TOP_RELEASE_EDGE_ALPHA), shape)
             .clip(shape)
-            .longPressMenuClickable(onClick = onClick, onLongClick = onLongPress)
+            .longPressMenuClickable(onClick = openWithCover, onLongClick = onLongPress)
             .padding(
                 start = TOP_RELEASE_INSET,
                 top = TOP_RELEASE_INSET,
@@ -2202,6 +2206,11 @@ private fun TopReleaseCard(
             model = item.thumbnailUrl.artworkAt(CARD_ART_PX),
             contentDescription = null,
             modifier = Modifier
+                .coverFlightSource(
+                    coverToken,
+                    item.thumbnailUrl.artworkAt(CARD_ART_PX),
+                    TOP_RELEASE_CORNER - TOP_RELEASE_INSET,
+                )
                 .size(96.dp)
                 .clip(coverShape)
                 .border(1.dp, Color.White.copy(alpha = TOP_RELEASE_COVER_EDGE_ALPHA), coverShape)

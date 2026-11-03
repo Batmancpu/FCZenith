@@ -29,6 +29,7 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.unit.toSize
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
@@ -229,15 +230,22 @@ fun Modifier.coverFlightTarget(
     val holder = remember { arrayOfNulls<LayoutCoordinates>(1) }
     val visibility = LocalCoverVisibilityScope.current
     val leaving = visibility?.transition?.targetState == EnterExitState.PostExit
+    val lastBounds = remember { arrayOfNulls<Rect>(1) }
     LaunchedEffect(leaving) {
         if (!leaving) return@LaunchedEffect
-        val coordinates = holder[0]?.takeIf { it.isAttached } ?: return@LaunchedEffect
-        startReturn(browseId, coordinates.whole(), cornerPx, wash)
+        val from = holder[0]?.takeIf { it.isAttached }?.whole() ?: lastBounds[0] ?: return@LaunchedEffect
+        startReturn(browseId, from, cornerPx, wash)
+    }
+    // Backstop: if the page went without the exit being seen, fly back from
+    // where it was last measured. Harmless after a flight has already started.
+    DisposableEffect(browseId) {
+        onDispose { lastBounds[0]?.let { startReturn(browseId, it, cornerPx, wash) } }
     }
     return this
         .drawWithContent { if (!CoverFlightState.hidesTarget(browseId)) drawContent() }
         .onGloballyPositioned { coordinates ->
             holder[0] = coordinates
+            lastBounds[0] = coordinates.whole()
             val flight = CoverFlightState.flight
             if (flight != null && !flight.reverse && flight.browseId == browseId) {
                 CoverFlightState.target = coordinates.whole()
@@ -369,6 +377,10 @@ private fun FlightLayer(flight: Flight) {
                 shape = RoundedCornerShape(lerpF(flight.fromCornerPx, toCorner, progress.value))
                 clip = true
             },
+        // The picture is a square of the card's size inside a frame that grows
+        // past it: left to the corner it sat up-left of the frame's centre and
+        // only snapped to the middle when the real sleeve took over.
+        contentAlignment = Alignment.Center,
     ) {
         AsyncImage(
             model = flight.model,
