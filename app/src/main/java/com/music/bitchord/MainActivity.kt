@@ -3818,6 +3818,7 @@ private fun BitChordApp(
                     artworkPageChrome = true,
                     backButtonHazeState = hazeState,
                     trailingTitle = if (detail != null && detailActiveShelf != null) detail.title else null,
+                    actionsHidden = showAccountSelector && !accountSelectorLeaving,
                     // Search has no large in-list header to hand the title back to —
                     // the field takes that space — so its bar title is always up.
                     scrolled = {

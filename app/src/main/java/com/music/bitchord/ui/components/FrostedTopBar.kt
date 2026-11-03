@@ -179,11 +179,19 @@ fun FrostedTopBar(
      * Root tabs have no back button there for it to collide with.
      */
     accessory: (@Composable () -> Unit)? = null,
+    /** True while the account popup is up: the actions pill, glass circle included, steps aside for the card. */
+    actionsHidden: Boolean = false,
     actions: @Composable () -> Unit = {},
 ) {
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
     val useFloatingChrome = artworkPageChrome ||
         (LocalLiquidGlassEnabled.current && isGlassSupported())
+    // Hilang seketika saat kartu membuka di atasnya; kembali dengan fade pendek saat kartu pergi.
+    val actionsAlpha by animateFloatAsState(
+        targetValue = if (actionsHidden) 0f else 1f,
+        animationSpec = tween(durationMillis = if (actionsHidden) 70 else 180),
+        label = "topBarActionsAlpha",
+    )
     val titleAlpha by animateFloatAsState(
         targetValue = if (scrolled() || trailingTitle != null) 1f else 0f,
         animationSpec = tween(220),
@@ -338,7 +346,11 @@ fun FrostedTopBar(
                     Spacer(Modifier.width(ACCESSORY_GAP))
                 }
                 if (useFloatingChrome) {
-                    ArtworkPageActions(hazeState = backButtonHazeState, content = actions)
+                    ArtworkPageActions(
+                        hazeState = backButtonHazeState,
+                        modifier = Modifier.graphicsLayer { alpha = actionsAlpha },
+                        content = actions,
+                    )
                 } else {
                     actions()
                 }
