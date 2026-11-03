@@ -53,6 +53,7 @@ import com.music.bitchord.ui.components.PAGE_GUTTER
 import com.music.bitchord.ui.components.PullToRefresh
 import com.music.bitchord.ui.components.ShimmerBox
 import com.music.bitchord.ui.components.feedSkeleton
+import com.music.bitchord.ui.components.instantPressClickable
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -154,8 +155,7 @@ private fun MoodGenreCard(
         item = item,
         modifier = modifier
             .aspectRatio(MOOD_CARD_ASPECT)
-            .clip(MOOD_CARD_SHAPE)
-            .clickable(onClick = onClick),
+            .instantPressClickable(shape = MOOD_CARD_SHAPE, onClick = onClick),
     )
 }
 
