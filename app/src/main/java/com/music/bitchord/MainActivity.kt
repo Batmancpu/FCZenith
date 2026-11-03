@@ -4803,9 +4803,27 @@ private fun BitChordApp(
                 onDismiss = { songActions = null },
                 // Tapping the lifted track opens its album, as Apple Music's does.
                 onPreviewClick = { song ->
-                    song.albumId?.let { id ->
-                        songActions = null
-                        viewModel.openDetail(id, song.albumName ?: song.title, song.artist, song.thumbnailUrl, BrowseType.ALBUM)
+                    // Kartu yang ditekan langsung hilang, jadi menu harus selalu
+                    // ditutup di sini. Kalau tidak, hanya blur halaman yang tersisa.
+                    songActions = null
+                    val knownAlbumId = song.albumId
+                    if (knownAlbumId != null) {
+                        viewModel.openDetail(knownAlbumId, song.albumName ?: song.title, song.artist, song.thumbnailUrl, BrowseType.ALBUM)
+                    } else if (song.localUri == null && song.videoId.isNotBlank()) {
+                        // albumId belum diketahui: cari dulu, baru buka albumnya.
+                        scope.launch {
+                            val links = YtMusicRepository.trackLinks(song.videoId).getOrNull()
+                            val resolvedAlbumId = links?.albumId
+                            if (resolvedAlbumId != null) {
+                                viewModel.openDetail(
+                                    resolvedAlbumId,
+                                    song.albumName ?: links?.albumName ?: song.title,
+                                    song.artist,
+                                    song.thumbnailUrl,
+                                    BrowseType.ALBUM,
+                                )
+                            }
+                        }
                     }
                 },
             ) { song ->
@@ -5199,11 +5217,13 @@ private fun BitChordApp(
                 // Tapping the lifted card opens it, as a tap on it in the list
                 // would have. Not for a Local Music grouping, which has no page.
                 onPreviewClick = { target ->
-                    target.browseId?.let { id ->
-                        startCoverFlightFor(id)
-                        browseActions = null
+                    val targetId = target.browseId
+                    if (targetId != null) startCoverFlightFor(targetId)
+                    // Selalu ditutup, juga untuk item tanpa halaman (Local Music).
+                    browseActions = null
+                    if (targetId != null) {
                         viewModel.openDetail(
-                            browseId = id,
+                            browseId = targetId,
                             title = target.title,
                             subtitle = target.subtitle,
                             thumbnailUrl = target.thumbnailUrl,
