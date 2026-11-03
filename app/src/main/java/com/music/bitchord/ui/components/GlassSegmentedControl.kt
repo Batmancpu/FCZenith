@@ -1,5 +1,6 @@
 package com.music.bitchord.ui.components
 
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -7,6 +8,7 @@ import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
@@ -17,7 +19,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -27,6 +33,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -38,6 +45,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.ui.components.backdrop.backdrops.layerBackdrop
 import com.music.bitchord.ui.components.backdrop.backdrops.rememberLayerBackdrop
+import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -93,7 +101,7 @@ fun GlassSegmentedControl(
     BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
-            .clip(trackShape),
+            .then(if (liquidOn) Modifier else Modifier.clip(trackShape)),
     ) {
         val inset = with(density) { GLASS_TRACK_PADDING.toPx() }
         val labelPadding = with(density) { GLASS_LABEL_PADDING.toPx() }
@@ -112,19 +120,62 @@ fun GlassSegmentedControl(
         val targetStart = if (selected != null) inset + slot * selected else 0f
         val motion: AnimationSpec<Float> =
             if (reduceAnimation) snap() else spring(GLASS_PILL_DAMPING, Spring.StiffnessMediumLow)
-        val pillStart by animateFloatAsState(targetStart, motion, label = "glassSegmentStart")
-        // Kaca menyala penuh selama pill masih jauh dari tujuan, padam saat mendarat.
+        val scope = rememberCoroutineScope()
+        val pillAnim = remember { Animatable(targetStart) }
+        LaunchedEffect(targetStart) { pillAnim.animateTo(targetStart, motion) }
+        var dragging by remember { mutableStateOf(false) }
+        // 0 diam, 1 pill sedang dipegang/digeser: pill membesar dan kacanya menyala penuh.
+        val lift by animateFloatAsState(if (dragging) 1f else 0f, motion, label = "glassSegmentLift")
+        // Kaca menyala penuh selama pill jauh dari tujuan atau sedang dipegang, padam saat mendarat.
         // Dibaca saat draw/layout, jadi satu frame animasi bukan rekomposisi.
-        val motion = {
-            if (selected == null) 0f else (abs(pillStart - targetStart) / (slot * 0.5f)).coerceIn(0f, 1f)
+        val moving = {
+            if (selected == null) {
+                0f
+            } else {
+                maxOf((abs(pillAnim.value - targetStart) / (slot * 0.5f)).coerceIn(0f, 1f), lift)
+            }
         }
         // Liquid: pill tetap kaca saat diam (lensa menyala), makin bening saat berpindah.
-        val glass = { if (liquidOn) maxOf(motion(), LIQUID_REST_GLASS) else motion() }
+        val glass = { if (liquidOn) maxOf(moving(), LIQUID_REST_GLASS) else moving() }
 
-        Box(Modifier.fillMaxWidth()) {
+        val maxStart = inset + slot * (options.size - 1)
+        val dragPos = remember { floatArrayOf(0f) }
+        val dragModifier = if (liquidOn && enabled && selected != null) {
+            Modifier.pointerInput(options.size, slot, inset, selected, targetStart) {
+                detectHorizontalDragGestures(
+                    onDragStart = {
+                        dragging = true
+                        dragPos[0] = pillAnim.value
+                    },
+                    onDragCancel = {
+                        dragging = false
+                        scope.launch { pillAnim.animateTo(targetStart, motion) }
+                    },
+                    onDragEnd = {
+                        dragging = false
+                        val index = ((dragPos[0] - inset) / slot).roundToInt().coerceIn(0, options.lastIndex)
+                        if (index != selected) {
+                            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onSelect(index)
+                        }
+                        scope.launch { pillAnim.animateTo(inset + slot * index, motion) }
+                    },
+                    onHorizontalDrag = { change, dragAmount ->
+                        change.consume()
+                        dragPos[0] = (dragPos[0] + dragAmount).coerceIn(inset, maxStart)
+                        scope.launch { pillAnim.snapTo(dragPos[0]) }
+                    },
+                )
+            }
+        } else {
+            Modifier
+        }
+
+        Box(Modifier.fillMaxWidth().then(dragModifier)) {
             // Yang dilihat kaca: track beserta label-labelnya.
             Box(
                 Modifier
+                    .clip(trackShape)
                     .layerBackdrop(backdrop)
                     .fillMaxWidth()
                     .then(if (liquidOn) Modifier.background(trackBrush) else Modifier.background(trackColor))
@@ -146,8 +197,14 @@ fun GlassSegmentedControl(
                                     Constraints.fixed(slot.roundToInt(), constraints.maxHeight),
                                 )
                                 layout(constraints.maxWidth, constraints.maxHeight) {
-                                    placeable.place(pillStart.roundToInt(), 0)
+                                    placeable.place(pillAnim.value.roundToInt(), 0)
                                 }
+                            }
+                            .graphicsLayer {
+                                // Pill membesar saat dipegang, meluber sedikit keluar track seperti iOS 26.
+                                val s = if (liquidOn) lift else 0f
+                                scaleX = 1f + 0.10f * s
+                                scaleY = 1f + 0.16f * s
                             },
                     )
                 }
@@ -161,7 +218,7 @@ fun GlassSegmentedControl(
                 modifier = Modifier
                     .matchParentSize()
                     .padding(GLASS_TRACK_PADDING)
-                    .graphicsLayer { alpha = 1f - if (liquidOn) 0.5f * motion() else motion() },
+                    .graphicsLayer { alpha = 1f - if (liquidOn) 0.5f * moving() else moving() },
                 onClick = if (enabled) {
                     { index ->
                         if (index != selected) {
