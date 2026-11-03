@@ -28,6 +28,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
@@ -53,6 +54,10 @@ import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
 import dev.chrisbanes.haze.materials.HazeMaterials
 import kotlin.math.roundToInt
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * The menu a *held* item lifts into, in the shape Apple Music uses: the item
@@ -99,6 +104,9 @@ fun <T : Any> HeldContextMenu(
     // Set by a tap on the lifted card: its plate and menu go at once, so the
     // cover flying out of it is all that is left of it.
     var launched by remember { mutableStateOf(false) }
+    // The tapped card stays up, as lifted, until its cover is in the air: it
+    // goes only when the flying picture can take over, never into a gap.
+    var cardHeld by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     val appReduceAnimation by AppSettings.reduceAnimation.collectAsStateWithLifecycle()
@@ -114,6 +122,7 @@ fun <T : Any> HeldContextMenu(
     LaunchedEffect(open) {
         if (open) {
             launched = false
+            cardHeld = false
             progress.animateTo(
                 1f,
                 if (reduceMotion) {
@@ -125,13 +134,26 @@ fun <T : Any> HeldContextMenu(
                 },
             )
         } else {
-            progress.animateTo(
-                0f,
-                tween(
-                    durationMillis = if (reduceMotion) 110 else if (launched) 150 else 230,
-                    easing = FastOutSlowInEasing,
-                ),
-            )
+            val holdForFlight = launched && coverFlightPending()
+            if (holdForFlight) cardHeld = true
+            coroutineScope {
+                // The page behind and the menu leave at once; only the card waits.
+                launch {
+                    progress.animateTo(
+                        0f,
+                        tween(
+                            durationMillis = if (reduceMotion) 110 else if (launched) 150 else 230,
+                            easing = FastOutSlowInEasing,
+                        ),
+                    )
+                }
+                if (holdForFlight) {
+                    withTimeoutOrNull(CARD_HOLD_MS) {
+                        snapshotFlow { coverFlightAirborne() || !coverFlightPending() }.first { it }
+                    }
+                    cardHeld = false
+                }
+            }
             last = null
         }
     }
@@ -321,11 +343,11 @@ fun <T : Any> HeldContextMenu(
         layout(width, height) {
             backdrop.place(0, 0)
             card.placeWithLayer(cardX, cardY) {
-                val p = progress.value
+                val p = if (cardHeld) 1f else progress.value
                 if (reduceMotion) {
                     scaleX = liftScale
                     scaleY = liftScale
-                    alpha = if (launched) 0f else p.coerceIn(0f, 1f)
+                    alpha = if (launched && !cardHeld) 0f else p.coerceIn(0f, 1f)
                 } else {
                     val scale = lerp(1f, liftScale, p)
                     scaleX = scale
@@ -334,7 +356,7 @@ fun <T : Any> HeldContextMenu(
                     translationY = lerp(fromDy, 0f, p)
                     // Quick, because it starts over the very item it copies:
                     // only the plate and shadow arriving are new.
-                    alpha = if (launched) 0f else (p * 3f).coerceIn(0f, 1f)
+                    alpha = if (launched && !cardHeld) 0f else (p * 3f).coerceIn(0f, 1f)
                 }
             }
             menu.placeWithLayer(menuX, menuY) {
@@ -359,6 +381,9 @@ fun <T : Any> HeldContextMenu(
 }
 
 private val CARD_RADIUS = 20.dp
+
+/** The longest a tapped card waits for its cover to take off before it goes anyway. */
+private const val CARD_HOLD_MS = 1000L
 
 private suspend fun PointerInputScope.swallowAll() {
     awaitPointerEventScope {

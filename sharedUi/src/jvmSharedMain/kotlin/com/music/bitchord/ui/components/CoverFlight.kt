@@ -257,6 +257,17 @@ private fun startReturn(browseId: String, from: Rect, cornerPx: Float, wash: Col
         it === CoverFlightState.flight && !it.reverse && it.browseId == browseId
     }
     val inAir = air != null && !CoverFlightState.airRect.isEmpty
+    // Out again before the cover had left its card (the page was still opening):
+    // nothing was lifted off the card, so there is nothing to fly back. Flying
+    // one anyway showed the card in full while its cover was still elsewhere.
+    val pending = CoverFlightState.flight?.takeIf { !it.reverse && it.browseId == browseId }
+    if (pending != null && !inAir) {
+        CoverFlightState.flight = null
+        CoverFlightState.target = null
+        CoverFlightState.holding = false
+        CoverFlightState.clips.remove(browseId)
+        return
+    }
     if (!inAir && visibleShare(from) < MIN_RETURN_VISIBLE) return
     val settled = if (inAir) CoverFlightState.airProgress.coerceIn(0f, 1f) else 1f
     val start = if (inAir) CoverFlightState.airRect else from
@@ -266,7 +277,9 @@ private fun startReturn(browseId: String, from: Rect, cornerPx: Float, wash: Col
     // What the page is showing right now, read before its sleeve steps aside;
     // a turn-back mid-flight carries on with the frame already in the air.
     next.frame = (if (inAir) air?.frame else null) ?: CoverFlightState.grabs[browseId]?.grab?.invoke()
-    next.imageReady = next.frame != null
+    // Turned round in the air: that picture is already up, so the card stays
+    // aside from this very frame instead of showing until the new one is drawn.
+    next.imageReady = next.frame != null || (inAir && air?.imageReady == true)
     CoverFlightState.holding = false
     // The card is usually still there: hide it from this very frame so it does
     // not show for a moment and blink out as the cover leaves.
@@ -299,6 +312,12 @@ fun startCoverFlightFor(browseId: String?) {
     )
     startFlight(browseId, token, null, from, source.cornerPx * s)
 }
+
+/** A cover is on its way out of a tapped card; the page it opens may not have answered yet. */
+fun coverFlightPending(): Boolean = CoverFlightState.flight?.reverse == false
+
+/** That cover is in the air: the card it left has stood aside for it. */
+fun coverFlightAirborne(): Boolean = CoverFlightState.flying
 
 /** Where the held-item menu has lifted the card to, written by that menu's layout. */
 object LiftedPreview {
