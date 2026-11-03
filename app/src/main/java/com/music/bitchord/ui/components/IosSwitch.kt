@@ -8,6 +8,13 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.offset
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.ui.unit.IntOffset
+import com.music.bitchord.ui.components.backdrop.backdrops.layerBackdrop
+import com.music.bitchord.ui.components.backdrop.backdrops.rememberLayerBackdrop
+import kotlinx.coroutines.delay
+import kotlin.math.roundToInt
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
@@ -38,9 +45,12 @@ import com.music.bitchord.ui.haptics.rememberHaptics
  * The iOS 26 switch: a wide green capsule and a white pill of a thumb, which
  * stretches a little toward where it is going while pressed.
  *
- * Plain drawing only — a track, a thumb, a shadow. Every settings page has a
- * column of these, and anything heavier per switch is paid that many times
- * over on every scroll frame.
+ * Pressed, or flipped by its row, the thumb lifts into iOS 26's glass: it grows
+ * past the track and goes clear, refracting the track under it — see
+ * [LiquidGlassThumb]. At rest it is plain drawing — a track, a thumb, a shadow —
+ * and the glass is composed only while it is lifted, because every settings
+ * page has a column of these and anything heavier per switch is paid that many
+ * times over on every scroll frame.
  *
  * It takes Material3's `Switch` call shape so a settings row adopts it by name
  * alone. [thumbContent] and [colors] are accepted and ignored: on is iOS green
@@ -75,11 +85,16 @@ fun IosSwitch(
         animationSpec = spring(dampingRatio = 0.78f, stiffness = 700f),
         label = "iosSwitchThumb",
     )
-    val stretch by animateFloatAsState(
-        targetValue = if (pressed) 1.18f else 1f,
-        animationSpec = spring(dampingRatio = 0.7f, stiffness = 900f),
-        label = "iosSwitchStretch",
+    // Held for a beat after a flip, so a switch toggled by its row's tap — no
+    // finger on the thumb — lifts into glass for the trip as well.
+    var flash by remember { mutableStateOf(false) }
+    // Under-damped: the overshoot is the thumb popping past the track.
+    val lift by animateFloatAsState(
+        targetValue = if (pressed || flash) 1f else 0f,
+        animationSpec = spring(dampingRatio = 0.62f, stiffness = 520f),
+        label = "iosSwitchLift",
     )
+    val glassActive by remember { derivedStateOf { pressed || flash || lift > 0.002f } }
     val track by animateColorAsState(
         targetValue = when {
             checked && dark -> Color(0xFF30D158)
@@ -88,13 +103,18 @@ fun IosSwitch(
         },
         label = "iosSwitchTrack",
     )
-    val ltr = LocalLayoutDirection.current == LayoutDirection.Ltr
+    val trackBackdrop = rememberLayerBackdrop()
 
     val haptics = rememberHaptics()
     // Skips the first run, so a switch scrolling into view stays quiet.
     var settled by remember { mutableStateOf(false) }
     LaunchedEffect(checked) {
-        if (settled) haptics.play(if (checked) Haptic.ToggleOn else Haptic.ToggleOff)
+        if (settled) {
+            haptics.play(if (checked) Haptic.ToggleOn else Haptic.ToggleOff)
+            flash = true
+            delay(320)
+            flash = false
+        }
         settled = true
     }
 
@@ -115,26 +135,39 @@ fun IosSwitch(
                     Modifier
                 },
             )
-            .size(TrackWidth, TrackHeight)
-            .clip(CircleShape)
-            .background(track),
+            .size(TrackWidth, TrackHeight),
         contentAlignment = Alignment.CenterStart,
     ) {
+        // The track on its own: what the thumb's glass looks through. It is
+        // recorded only while the glass is up.
         Box(
             Modifier
-                .graphicsLayer {
-                    val travel = (TrackWidth - ThumbWidth - ThumbPadding * 2).toPx()
-                    val x = ThumbPadding.toPx() + travel * position
-                    translationX = if (ltr) x else -x
-                    // Grows from the edge it is leaving, so the stretch reads
-                    // as reaching toward the other side.
-                    transformOrigin = TransformOrigin(if (checked == ltr) 1f else 0f, 0.5f)
-                    scaleX = stretch
-                }
-                .size(ThumbWidth, ThumbHeight)
-                .shadow(2.dp, CircleShape)
-                .background(Color.White, CircleShape),
+                .matchParentSize()
+                .then(if (glassActive) Modifier.layerBackdrop(trackBackdrop) else Modifier)
+                .clip(CircleShape)
+                .background(track),
         )
+        val thumb = Modifier
+            .offset {
+                // Travel is measured with the thumb's current width, so it
+                // grows from the edge it is leaving and always lands flush.
+                val w = liftedPx(ThumbWidth, LiftedThumbWidth, lift)
+                val pad = ThumbPadding.toPx()
+                val travel = TrackWidth.toPx() - w - pad * 2f
+                IntOffset((pad + travel * position).roundToInt(), 0)
+            }
+            .liftingSize(
+                restWidth = ThumbWidth,
+                restHeight = ThumbHeight,
+                liftedWidth = LiftedThumbWidth,
+                liftedHeight = LiftedThumbHeight,
+                lift = { lift },
+            )
+        if (glassActive) {
+            LiquidGlassThumb(backdrop = trackBackdrop, glass = { lift }, modifier = thumb)
+        } else {
+            RestingThumb(thumb)
+        }
     }
 }
 
@@ -143,3 +176,5 @@ private val TrackHeight = 28.dp
 private val ThumbWidth = 40.dp
 private val ThumbHeight = 24.dp
 private val ThumbPadding = 2.dp
+private val LiftedThumbWidth = 52.dp
+private val LiftedThumbHeight = 34.dp
