@@ -11,6 +11,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -31,6 +32,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,6 +53,8 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -75,6 +82,8 @@ import com.music.bitchord.ui.components.backdrop.shadow.Shadow
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.max
+import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
 import kotlin.math.sin
 
 /**
@@ -134,11 +143,18 @@ fun LiquidThemeSelector(
         }
     }
 
+    // State drag: isDragging mengangkat pill (seperti ditekan), dragIndex = segmen
+    // di bawah pill selama drag (-1 bila tidak drag) supaya label tajam ikut pill.
+    val scope = rememberCoroutineScope()
+    var isDragging by remember { mutableStateOf(false) }
+    var dragIndex by remember { mutableIntStateOf(-1) }
+    LaunchedEffect(selectedIndex) { dragIndex = -1 }
+
     val sources = remember { List(modes.size) { MutableInteractionSource() } }
     val pressedStates = sources.map { it.collectIsPressedAsState() }
     val anyPressed = pressedStates.any { it.value }
     val pressProgress = animateFloatAsState(
-        targetValue = if (anyPressed && !reduceAnimation) 1f else 0f,
+        targetValue = if ((anyPressed || isDragging) && !reduceAnimation) 1f else 0f,
         animationSpec = if (reduceAnimation) snap() else spring(0.7f, 500f),
         label = "themePillPress",
     )
@@ -307,11 +323,96 @@ fun LiquidThemeSelector(
         Row(
             Modifier
                 .matchParentSize()
+                .pointerInput(slotPx, isLtr, reduceAnimation) {
+                    val dir = if (isLtr) 1f else -1f
+                    val maxIndex = (modes.size - 1).toFloat()
+                    val tracker = VelocityTracker()
+                    var origin = 0f
+                    var travelled = 0f
+                    var lastIndex = 0
+
+                    fun settleTo(idx: Int) {
+                        scope.launch {
+                            if (reduceAnimation) {
+                                position.snapTo(idx.toFloat())
+                            } else {
+                                // Velocity dari drag ikut terbawa, jadi pill
+                                // "dilempar" lalu overshoot sebelum diam.
+                                position.animateTo(
+                                    idx.toFloat(),
+                                    spring(
+                                        dampingRatio = 0.62f,
+                                        stiffness = Spring.StiffnessMediumLow,
+                                        visibilityThreshold = 0.001f,
+                                    ),
+                                )
+                            }
+                        }
+                    }
+
+                    detectHorizontalDragGestures(
+                        onDragStart = {
+                            tracker.resetTracking()
+                            origin = position.value
+                            travelled = 0f
+                            lastIndex = position.value.roundToInt().coerceIn(0, modes.lastIndex)
+                            dragIndex = lastIndex
+                            isDragging = true
+                        },
+                        onHorizontalDrag = { change, dragAmount ->
+                            change.consume()
+                            tracker.addPosition(change.uptimeMillis, change.position)
+                            travelled += dragAmount * dir / slotPx
+                            val target = rubberBand(origin + travelled, maxIndex)
+                            val idx = target.roundToInt().coerceIn(0, modes.lastIndex)
+                            if (idx != lastIndex) {
+                                lastIndex = idx
+                                dragIndex = idx
+                                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            }
+                            scope.launch {
+                                if (reduceAnimation) {
+                                    position.snapTo(target)
+                                } else {
+                                    // Spring kaku mengejar jari: pill sedikit tertinggal
+                                    // (liquid) dan velocity-nya memicu regangan.
+                                    position.animateTo(
+                                        target,
+                                        spring(
+                                            dampingRatio = 0.9f,
+                                            stiffness = 1000f,
+                                            visibilityThreshold = 0.001f,
+                                        ),
+                                    )
+                                }
+                            }
+                        },
+                        onDragEnd = {
+                            val v = tracker.calculateVelocity().x * dir / slotPx
+                            val idx = (position.value + v * 0.12f)
+                                .roundToInt()
+                                .coerceIn(0, modes.lastIndex)
+                            isDragging = false
+                            if (idx != modes.indexOf(currentSelected)) {
+                                dragIndex = idx
+                                currentOnSelected(modes[idx])
+                            } else {
+                                dragIndex = -1
+                            }
+                            settleTo(idx)
+                        },
+                        onDragCancel = {
+                            isDragging = false
+                            dragIndex = -1
+                            settleTo(modes.indexOf(currentSelected).coerceAtLeast(0))
+                        },
+                    )
+                }
                 .padding(SELECTOR_INSET)
                 .graphicsLayer { alpha = 1f - 0.55f * energy() },
         ) {
             modes.forEachIndexed { index, mode ->
-                val selected = index == selectedIndex
+                val selected = index == (if (dragIndex >= 0) dragIndex else selectedIndex)
                 val color by animateColorAsState(
                     targetValue = if (selected) labelColor else labelColor.copy(alpha = 0f),
                     animationSpec = if (reduceAnimation) snap() else tween(180),
@@ -437,6 +538,17 @@ private fun ThemeGlyph(mode: ThemeMode, color: Color) {
             }
         }
     }
+}
+
+/** Tarikan karet di tepi: melewati batas hanya bergeser sedikit (maks ~0.125 segmen). */
+private fun rubberBand(x: Float, maxIndex: Float): Float {
+    val over = when {
+        x < 0f -> -x
+        x > maxIndex -> x - maxIndex
+        else -> return x
+    }
+    val eased = over * 0.25f / (1f + 2f * over)
+    return if (x < 0f) -eased else maxIndex + eased
 }
 
 private val SELECTOR_HEIGHT = 50.dp
