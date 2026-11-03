@@ -144,6 +144,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.SingletonImageLoader
 import coil3.compose.AsyncImage
+import com.music.bitchord.ui.components.GlassSegmentedControl
 import com.music.bitchord.ui.components.PillSegmentedControl
 import com.music.bitchord.ui.components.isGlassSupported
 import com.music.bitchord.ui.components.languageDisplayNameRes
@@ -2798,7 +2799,7 @@ internal fun SegmentedControl(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
-    PillSegmentedControl(options, selectedIndex, onSelect, modifier, enabled)
+    GlassSegmentedControl(options, selectedIndex, onSelect, modifier, enabled)
 }
 
 // ---- Pages ------------------------------------------------------------------

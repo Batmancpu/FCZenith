@@ -53,6 +53,7 @@ internal fun LiquidGlassThumb(
     backdrop: LayerBackdrop,
     glass: () -> Float,
     modifier: Modifier = Modifier,
+    restColor: Color = Color.White,
 ) {
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
     if (!isGlassSupported() || reduceDynamicBlur) {
@@ -102,8 +103,8 @@ internal fun LiquidGlassThumb(
                 drawRect(
                     brush = Brush.verticalGradient(
                         listOf(
-                            Color.White.copy(alpha = fill),
-                            Color.White.copy(alpha = (fill - 0.06f * g).coerceAtLeast(0f)),
+                            restColor.copy(alpha = fill),
+                            restColor.copy(alpha = (fill - 0.06f * g).coerceAtLeast(0f)),
                         ),
                     ),
                     size = size,
