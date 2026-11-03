@@ -207,6 +207,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.drawscope.clipRect
 import com.music.bitchord.data.YtMusicRepository
 
 private const val MAX_ARTIST_SONGS = 20
@@ -2514,12 +2515,11 @@ private val LIKED_COLUMN_COUNT = intArrayOf(6, 5, 7)
 private val LIKED_COLORS = listOf(Color(0xFF7B5CF0), Color(0xFFB45FDB), Color(0xFFFF5FA8))
 private val LIKED_BASE = Brush.verticalGradient(LIKED_COLORS)
 
-/** Kaki hero: detail hilang lebih dulu daripada warnanya. */
-private val LIKED_FOOT_MASK = Brush.verticalGradient(
-    0.28f to Color.Transparent,
-    0.62f to Color.Black.copy(alpha = 0.85f),
-    1.00f to Color.Black,
-)
+/**
+ * Seberapa jauh seni hero menjulur ke atas, melewati tepi atasnya. Di luar layar
+ * saat diam; terlihat ketika halaman ditarik ke bawah, supaya tidak ada lubang.
+ */
+private val LIKED_OVERSCROLL = 320.dp
 
 /**
  * Header Liked Music: full-bleed sampai di bawah bar, isinya mosaik abstrak
@@ -2575,32 +2575,62 @@ private fun LikedMusicHero(
             }
             .fillMaxWidth()
             .height(height)
-            .clipToBounds()
+            // Dipotong di sisi dan bawah, tapi tidak di atas: tarikan ke bawah
+            // menggeser hero turun, dan bagian atasnya harus tetap terisi seni.
+            .drawWithContent {
+                val extra = LIKED_OVERSCROLL.toPx()
+                clipRect(left = 0f, top = -extra, right = size.width, bottom = size.height) {
+                    this@drawWithContent.drawContent()
+                }
+            }
             .coverFlightTarget(page.browseId, 0.dp, palette.background),
     ) {
-        LikedArt(
-            covers = covers,
-            drift = { drift },
-            pulse = { pulse },
-            modifier = Modifier.matchParentSize(),
-        )
-
-        // Salinan yang di-blur, dimunculkan di separuh bawah lewat mask.
-        if (blurFoot) {
+        // Seni sengaja lebih tinggi daripada hero: kelebihannya menjulur ke atas.
+        // Layar dan salinan blurnya berada di kotak yang sama, jadi tetap sejajar.
+        Box(
+            Modifier.layout { measurable, constraints ->
+                val extra = LIKED_OVERSCROLL.roundToPx()
+                val placeable = measurable.measure(
+                    Constraints.fixed(constraints.maxWidth, constraints.maxHeight + extra),
+                )
+                layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(0, -extra) }
+            },
+        ) {
             LikedArt(
                 covers = covers,
                 drift = { drift },
                 pulse = { pulse },
-                modifier = Modifier
-                    .matchParentSize()
-                    // Offscreen agar mask memotong hasil blur, bukan tiap gambar di bawahnya.
-                    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-                    .drawWithContent {
-                        drawContent()
-                        drawRect(LIKED_FOOT_MASK, blendMode = BlendMode.DstIn)
-                    }
-                    .blur(LIKED_FOOT_BLUR, BlurredEdgeTreatment.Rectangle),
+                modifier = Modifier.matchParentSize(),
             )
+
+            // Salinan yang di-blur, dimunculkan di bagian bawah lewat mask.
+            if (blurFoot) {
+                LikedArt(
+                    covers = covers,
+                    drift = { drift },
+                    pulse = { pulse },
+                    modifier = Modifier
+                        .matchParentSize()
+                        // Offscreen agar mask memotong hasil blur, bukan tiap gambar di bawahnya.
+                        .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                        .drawWithContent {
+                            drawContent()
+                            // Mask dihitung dari bawah (72% tinggi hero), bukan dari tinggi
+                            // kotak yang kini lebih panjang ke atas.
+                            drawRect(
+                                brush = Brush.verticalGradient(
+                                    0.00f to Color.Transparent,
+                                    0.47f to Color.Black.copy(alpha = 0.85f),
+                                    1.00f to Color.Black,
+                                    startY = size.height - height.toPx() * 0.72f,
+                                    endY = size.height,
+                                ),
+                                blendMode = BlendMode.DstIn,
+                            )
+                        }
+                        .blur(LIKED_FOOT_BLUR, BlurredEdgeTreatment.Rectangle),
+                )
+            }
         }
 
         // Berakhir di warna halaman penuh, jadi tidak ada tepi tempat seni berhenti.
