@@ -108,6 +108,7 @@ import com.music.bitchord.sharedui.resources.*
 import com.music.bitchord.ui.components.PAGE_GUTTER
 import com.music.bitchord.ui.components.rememberBlurredBackdrop
 import com.music.bitchord.ui.components.ShelfRow
+import com.music.bitchord.ui.components.shelfStagger
 import com.music.bitchord.ui.components.SectionHeaderSkeleton
 import com.music.bitchord.ui.components.ShimmerBox
 import com.music.bitchord.ui.components.contextClick
@@ -185,7 +186,7 @@ internal fun TopPicksShelf(
                                 onClipFound = { found -> hasClip[index] = found },
                             ),
                         ) {
-                            Column(Modifier.width(cardWidth)) {
+                            Column(Modifier.shelfStagger(index).width(cardWidth)) {
                                 // A label is only said once for a run of cards that share it,
                                 // so the row doesn't repeat "Made for You" over every card.
                                 // The line keeps its height so the cards stay aligned.
