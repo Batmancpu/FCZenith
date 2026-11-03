@@ -26,6 +26,7 @@ import androidx.compose.ui.semantics.toggleableState
 import androidx.compose.ui.state.ToggleableState
 import kotlin.math.abs
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.ui.unit.IntOffset
@@ -114,7 +115,7 @@ fun IosSwitch(
     // Under-damped: the overshoot is the thumb popping past the track.
     val lift by animateFloatAsState(
         targetValue = if (touching || flash) 1f else 0f,
-        animationSpec = spring(dampingRatio = 0.62f, stiffness = 520f),
+        animationSpec = spring(dampingRatio = 0.74f, stiffness = 520f),
         label = "iosSwitchLift",
     )
     val glassActive by remember { derivedStateOf { touching || flash || lift > 0.002f } }
@@ -213,15 +214,27 @@ fun IosSwitch(
             .size(TrackWidth, TrackHeight),
         contentAlignment = Alignment.CenterStart,
     ) {
-        // The track on its own: what the thumb's glass looks through. It is
-        // recorded only while the glass is up.
-        Box(
-            Modifier
-                .matchParentSize()
-                .then(if (glassActive) Modifier.layerBackdrop(trackBackdrop) else Modifier)
-                .clip(CircleShape)
-                .background(track),
-        )
+        // Track: yang dilihat kaca thumb. Direkam hanya saat kaca aktif, dan
+        // kotak rekamannya setinggi thumb yang terangkat, supaya tepi atas dan bawah
+        // thumb melihat lengkung track sendiri, bukan piksel tepi yang tertarik.
+        if (glassActive) {
+            Box(Modifier.requiredSize(TrackWidth, GlassThumbHeight).layerBackdrop(trackBackdrop)) {
+                Box(
+                    Modifier
+                        .align(Alignment.Center)
+                        .size(TrackWidth, TrackHeight)
+                        .clip(CircleShape)
+                        .background(track),
+                )
+            }
+        } else {
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .clip(CircleShape)
+                    .background(track),
+            )
+        }
         val thumb = Modifier
             .offset {
                 // Travel is measured with the thumb's current width, so it
@@ -247,8 +260,8 @@ fun IosSwitch(
 }
 
 /** The thumb once lifted: it grows well past the track, as iOS 26's does. */
-private val GlassThumbWidth = 60.dp
-private val GlassThumbHeight = 40.dp
+private val GlassThumbWidth = 50.dp
+private val GlassThumbHeight = 32.dp
 
 private val TrackWidth = 64.dp
 private val TrackHeight = 28.dp

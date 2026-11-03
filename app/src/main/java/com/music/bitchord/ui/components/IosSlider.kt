@@ -36,6 +36,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.requiredHeight
 import com.music.bitchord.ui.components.backdrop.backdrops.layerBackdrop
 import com.music.bitchord.ui.components.backdrop.backdrops.rememberLayerBackdrop
 import kotlin.math.roundToInt
@@ -150,21 +151,35 @@ fun IosSlider(
             },
         contentAlignment = Alignment.CenterStart,
     ) {
-        // The track on its own: this is what the thumb's glass looks through.
+        // Track: yang dilihat kaca thumb. Saat kaca aktif ia direkam dalam kotak
+        // setinggi thumb terangkat, supaya lensa tidak menarik piksel tepi.
         Box(
             Modifier
                 .fillMaxWidth()
                 .height(SliderTrackHeight)
-                .then(if (glassActive) Modifier.layerBackdrop(trackBackdrop) else Modifier)
-                .clip(CircleShape)
-                .background(inactive)
-                .drawBehind {
-                    // The fill runs to the thumb's centre and on under it.
-                    val inset = SliderThumbWidth.toPx() / 2f
-                    val end = inset + (size.width - inset * 2f) * shown.coerceIn(0f, 1f)
-                    drawRect(color = active, size = Size(end.coerceIn(0f, size.width), size.height))
-                },
-        )
+                .then(
+                    if (glassActive) {
+                        Modifier.requiredHeight(SliderLiftedThumbHeight).layerBackdrop(trackBackdrop)
+                    } else {
+                        Modifier
+                    },
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(SliderTrackHeight)
+                    .clip(CircleShape)
+                    .background(inactive)
+                    .drawBehind {
+                        // The fill runs to the thumb's centre and on under it.
+                        val inset = SliderThumbWidth.toPx() / 2f
+                        val end = inset + (size.width - inset * 2f) * shown.coerceIn(0f, 1f)
+                        drawRect(color = active, size = Size(end.coerceIn(0f, size.width), size.height))
+                    },
+            )
+        }
         val thumb = Modifier
             .offset {
                 val w = liftedPx(SliderThumbWidth, SliderLiftedThumbWidth, lift)
@@ -191,5 +206,5 @@ private val SliderHeight = 40.dp
 private val SliderTrackHeight = 6.dp
 private val SliderThumbWidth = 34.dp
 private val SliderThumbHeight = 22.dp
-private val SliderLiftedThumbWidth = 52.dp
-private val SliderLiftedThumbHeight = 32.dp
+private val SliderLiftedThumbWidth = 46.dp
+private val SliderLiftedThumbHeight = 30.dp

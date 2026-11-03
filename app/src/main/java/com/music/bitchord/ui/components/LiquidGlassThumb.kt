@@ -67,12 +67,15 @@ internal fun LiquidGlassThumb(
             effects = {
                 val g = glass().coerceIn(0f, 1f)
                 if (g > 0.01f) {
-                    colorControls(saturation = 1f + 0.6f * g)
-                    blur(1.dp.toPx() * g)
+                    colorControls(saturation = 1f + 0.35f * g)
+                    // Blur nyaris nol: blur tebal meratakan tepi yang justru dibelokkan lensa.
+                    blur(0.5.dp.toPx() * g)
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        // Zona tepi dibatasi di bawah separuh tinggi thumb (30-32dp),
+                        // jadi bagian tengahnya tetap jernih dan hanya tepinya membelokkan track.
                         lens(
-                            refractionHeight = 12.dp.toPx() * g,
-                            refractionAmount = 18.dp.toPx() * g,
+                            refractionHeight = 9.dp.toPx() * g,
+                            refractionAmount = 16.dp.toPx() * g,
                             depthEffect = true,
                         )
                     }
@@ -91,23 +94,24 @@ internal fun LiquidGlassThumb(
                 )
             },
             onDrawSurface = {
-                // Opaque white at rest; lifted, a frosted white glass with a
-                // bright rim, so the thumb still reads as a pill over the track.
+                // Putih pekat saat diam; terangkat, hampir bening dengan sedikit
+                // kabut putih dan pinggiran terang, supaya refraksi track di bawahnya
+                // terlihat dan thumb tetap terbaca sebagai pill.
                 val g = glass().coerceIn(0f, 1f)
-                val fill = 1f - 0.64f * g
+                val fill = 1f - 0.86f * g
                 drawRect(
                     brush = Brush.verticalGradient(
                         listOf(
                             Color.White.copy(alpha = fill),
-                            Color.White.copy(alpha = fill - 0.14f * g),
+                            Color.White.copy(alpha = (fill - 0.06f * g).coerceAtLeast(0f)),
                         ),
                     ),
                     size = size,
                 )
                 if (g > 0.02f) {
-                    val w = 1.5.dp.toPx()
+                    val w = 1.dp.toPx()
                     drawRoundRect(
-                        color = Color.White.copy(alpha = 0.8f * g),
+                        color = Color.White.copy(alpha = 0.7f * g),
                         topLeft = Offset(w / 2f, w / 2f),
                         size = Size(size.width - w, size.height - w),
                         cornerRadius = CornerRadius(size.height / 2f),
