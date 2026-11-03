@@ -114,6 +114,7 @@ import com.music.bitchord.ui.components.longPressMenuClickable
 import com.music.bitchord.ui.components.thumbnailBorder
 import com.music.bitchord.ui.components.coverSharedElement
 import com.music.bitchord.ui.components.markCoverTapped
+import com.music.bitchord.ui.components.rememberCoverTap
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.PI
@@ -310,6 +311,10 @@ private fun TopPickCard(
     val text = cardText(pick, listenerName)
     val longPress = onLongPress?.let { { it(pick) } }
     val coverToken = remember { Any() }
+    val openCard = rememberCoverTap(
+        browseId = pick.browseId.takeIf { pick.kind == TopPickKind.LATEST_RELEASE },
+        token = coverToken,
+    ) { onClick(pick, text.title) }
     Box(
         modifier = modifier
             .aspectRatio(TOP_PICK_RATIO)
@@ -317,10 +322,7 @@ private fun TopPickCard(
             .thumbnailBorder(TopPickShape)
             .background(MaterialTheme.colorScheme.surfaceVariant)
             .longPressMenuClickable(
-                onClick = {
-                    if (pick.kind == TopPickKind.LATEST_RELEASE) markCoverTapped(pick.browseId, coverToken)
-                    onClick(pick, text.title)
-                },
+                onClick = openCard,
                 onLongClick = longPress,
             )
             .contextClick(longPress),

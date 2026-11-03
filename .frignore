@@ -1,0 +1,20 @@
+# Folder/ekstensi tambahan yang di-skip FR Tool saat scan & patch
+# Format: satu nama folder per baris, atau *.ext untuk ekstensi
+#
+# BAWAAN TOOL (selalu di-skip, sudah otomatis - tidak perlu ditulis manual):
+#   folder : .cache, .env, .expo, .git, .next, .patch_backups, .turbo, .venv, .vercel, __pycache__, android, auth_info, build, dist, env, ios, node_modules, venv
+#   ekstensi: .bak, .log, .orig, .pyc, .swp, .tmp
+#
+# Tambahan kamu (baris di bawah ini yang aktif dibaca tool):
+src/jvmSharedMain/kotlin/com/music/bitchord/ui/components/CoverTransition.kt
+:find
+import androidx.compose.ui.graphics.graphicsLayer
+:end_find
+:replace
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.withFrameNanos
+import kotlinx.coroutines.launch
+:end_replace
+:file sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/components/CoverTransition.kt
+boundsTransform = { _, _ -> tween(durationMillis = 780, easing = CoverEasing) },
+tween(durationMillis = 380, delayMillis = delayMs, easing = FastOutSlowInEasing)

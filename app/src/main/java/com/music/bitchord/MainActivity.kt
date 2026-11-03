@@ -2867,8 +2867,8 @@ private fun BitChordApp(
                             // A release page brings its own colour: let it come in over
                             // the cover's flight instead of snapping, while the page it
                             // replaces clears a little faster so the two don't ghost.
-                            fadeIn(tween(420, easing = androidx.compose.animation.core.LinearOutSlowInEasing)) togetherWith
-                                fadeOut(tween(260))
+                            fadeIn(tween(620, easing = androidx.compose.animation.core.LinearOutSlowInEasing)) togetherWith
+                                fadeOut(tween(340))
                         } else {
                             fadeIn(tween(180)) togetherWith fadeOut(tween(180))
                         }

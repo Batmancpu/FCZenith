@@ -87,6 +87,7 @@ import com.music.bitchord.ui.components.SearchPlayingBars
 import com.music.bitchord.ui.components.SignInBanner
 import com.music.bitchord.ui.components.coverSharedElement
 import com.music.bitchord.ui.components.markCoverTapped
+import com.music.bitchord.ui.components.rememberCoverTap
 import com.music.bitchord.ui.components.feedMoreSkeleton
 import com.music.bitchord.ui.components.feedSkeleton
 import com.music.bitchord.ui.components.recentlyPlayedSkeleton
@@ -788,6 +789,7 @@ private fun HeroCard(
     isPlaying: Boolean = false,
 ) {
     val heroToken = remember { Any() }
+    val openHeroWithCover = rememberCoverTap(item.browseId, heroToken, onClick)
     Box(
         modifier = modifier
             .aspectRatio(HERO_CARD_RATIO)
@@ -795,10 +797,7 @@ private fun HeroCard(
             .thumbnailBorder(RoundedCornerShape(18.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant)
             .longPressMenuClickable(
-                onClick = {
-                    markCoverTapped(item.browseId, heroToken)
-                    onClick()
-                },
+                onClick = openHeroWithCover,
                 onLongClick = onLongPress,
             )
             .contextClick(onLongPress),
@@ -1063,13 +1062,11 @@ internal fun ShelfCard(
     isPlaying: Boolean = false,
 ) {
     val coverToken = remember { Any() }
+    val openWithCover = rememberCoverTap(item.browseId, coverToken, onClick)
     Column(
         modifier = modifier
             .longPressMenuClickable(
-                onClick = {
-                    markCoverTapped(item.browseId, coverToken)
-                    onClick()
-                },
+                onClick = openWithCover,
                 onLongClick = onLongPress,
             )
             .contextClick(onLongPress),

@@ -12,6 +12,10 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.tween
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.withFrameNanos
+import kotlinx.coroutines.launch
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.Box
@@ -75,8 +79,31 @@ fun Modifier.coverSharedElement(browseId: String?, token: Any? = null): Modifier
         this@coverSharedElement.sharedElement(
             sharedContentState = rememberSharedContentState(key = "cover:$browseId"),
             animatedVisibilityScope = visibility,
-            boundsTransform = { _, _ -> tween(durationMillis = 520, easing = CoverEasing) },
+            boundsTransform = { _, _ -> tween(durationMillis = 780, easing = CoverEasing) },
         )
+    }
+}
+
+/**
+ * A card's tap that opens a page: marks the cover, waits one frame so the card
+ * has picked up its shared element and been laid out with it, then runs
+ * [action]. Navigating in the very frame the marker flips can start the
+ * transition before the source exists, and the cover then just fades.
+ */
+@Composable
+fun rememberCoverTap(browseId: String?, token: Any, action: () -> Unit): () -> Unit {
+    val scope = rememberCoroutineScope()
+    val latest = rememberUpdatedState(action)
+    return {
+        if (browseId.isNullOrEmpty()) {
+            latest.value()
+        } else {
+            markCoverTapped(browseId, token)
+            scope.launch {
+                withFrameNanos { }
+                latest.value()
+            }
+        }
     }
 }
 
@@ -95,7 +122,7 @@ fun Modifier.enterReveal(delayMs: Int = 0, rise: Dp = 14.dp): Modifier {
     val progress by visibility.transition.animateFloat(
         transitionSpec = {
             if (targetState == EnterExitState.Visible) {
-                tween(durationMillis = 380, delayMillis = delayMs, easing = FastOutSlowInEasing)
+                tween(durationMillis = 420, delayMillis = delayMs + 260, easing = FastOutSlowInEasing)
             } else {
                 tween(durationMillis = 160)
             }

@@ -956,6 +956,15 @@ private fun ReleaseHeader(
                     modifier = Modifier.matchParentSize(),
                 )
             }
+            // The card's own picture, already in the cache, underneath: the cover
+            // is on screen from the first frame of the flight, instead of an
+            // empty sleeve flying over until the larger one has downloaded.
+            AsyncImage(
+                model = page.thumbnailUrl.artworkAt(CARD_ART_PX),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.matchParentSize(),
+            )
             AsyncImage(
                 model = page.thumbnailUrl.artworkAt(HEADER_ART_PX),
                 contentDescription = null,
