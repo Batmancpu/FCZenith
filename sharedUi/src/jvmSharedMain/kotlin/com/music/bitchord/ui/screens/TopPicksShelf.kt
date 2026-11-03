@@ -248,7 +248,10 @@ private fun topPickLabel(pick: TopPick): String = when (pick.kind) {
     TopPickKind.FEATURED_ARTIST,
     TopPickKind.ARTIST_AND_SIMILAR,
     -> stringResource(Res.string.top_pick_label_listen_again)
-    else -> stringResource(Res.string.top_pick_made_for_you)
+    TopPickKind.PERSONAL_STATION -> stringResource(Res.string.top_pick_made_for_you)
+    TopPickKind.MOOD -> stringResource(Res.string.top_pick_label_mood)
+    TopPickKind.NEW_RELEASE_MIX -> stringResource(Res.string.top_pick_label_fresh)
+    TopPickKind.DISCOVERY_STATION -> stringResource(Res.string.top_pick_label_discover)
 }
 
 /** What a card says: the small coloured line, the title, and an optional line under it. */
@@ -264,7 +267,7 @@ private fun cardText(pick: TopPick, listenerName: String?): CardText {
             subtitle = localizeCardSubtitle(pick.subtitle),
         )
         TopPickKind.PERSONAL_STATION -> CardText(
-            eyebrow = stringResource(Res.string.top_pick_made_for_you),
+            eyebrow = stringResource(Res.string.top_pick_based_on_listening),
             title = listenerName?.substringBefore(' ')?.takeIf { it.isNotBlank() }
                 ?.let { stringResource(Res.string.top_pick_named_station, it) }
                 ?: stringResource(Res.string.top_pick_your_station),
@@ -289,12 +292,12 @@ private fun cardText(pick: TopPick, listenerName: String?): CardText {
             subtitle = pick.subtitle,
         )
         TopPickKind.NEW_RELEASE_MIX -> CardText(
-            eyebrow = stringResource(Res.string.top_pick_made_for_you),
+            eyebrow = stringResource(Res.string.top_pick_just_dropped),
             title = pick.title,
             subtitle = pick.subtitle,
         )
         TopPickKind.DISCOVERY_STATION -> CardText(
-            eyebrow = stringResource(Res.string.top_pick_made_for_you),
+            eyebrow = stringResource(Res.string.top_pick_new_to_you),
             title = stringResource(Res.string.top_pick_discovery_station),
             subtitle = "",
         )
@@ -313,6 +316,8 @@ private fun TopPickCard(
     val text = cardText(pick, listenerName)
     val longPress = onLongPress?.let { { it(pick) } }
     val coverToken = remember { Any() }
+    // The clip this card is playing, handed to the cover flight so it flies too.
+    var flightCanvas by remember { mutableStateOf<CanvasArtwork?>(null) }
     val openCard = rememberCoverFlightTap(
         browseId = when (pick.kind) {
             TopPickKind.LATEST_RELEASE -> pick.browseId
@@ -369,11 +374,13 @@ private fun TopPickCard(
                             pick.images.firstOrNull().croppedAt(HEADER_ART_PX).whenArtworkReady(),
                             12.dp,
                             footFade = true,
+                            canvas = flightCanvas,
                         )
                     } else {
                         Modifier
                     },
                     coverHide = Modifier.hideDuringCoverFlight(coverToken),
+                    onClip = { flightCanvas = it },
                     // A New Release Mix is a playlist; only a real release has a sleeve that moves.
                     motion = pick.takeIf { it.kind == TopPickKind.LATEST_RELEASE }?.let { release ->
                         CardMotionSource(release.browseId ?: release.title) {
@@ -393,10 +400,14 @@ private fun TopPickCard(
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
-                        .coverFlightSource(coverToken, artistPhoto, 12.dp)
+                        .coverFlightSource(coverToken, artistPhoto, 12.dp, canvas = flightCanvas)
                         .fillMaxSize(),
                 )
-                CardMotion(pick.artistMotion(), Modifier.fillMaxSize().hideDuringCoverFlight(coverToken))
+                CardMotion(
+                    pick.artistMotion(),
+                    Modifier.fillMaxSize().hideDuringCoverFlight(coverToken),
+                    onCanvas = { flightCanvas = it },
+                )
                 // The caption sits on the picture's own darkened foot, as on
                 // Apple's photo cards, rather than on a band of flat black.
                 Box(
@@ -491,6 +502,7 @@ private fun ReleaseArt(
     coverModifier: Modifier = Modifier,
     coverHide: Modifier = Modifier,
     motion: CardMotionSource? = null,
+    onClip: (CanvasArtwork?) -> Unit = {},
 ) {
     // How much of the still the clip has covered. Two faded layers stacked
     // would leave the still showing through the clip's own fade, so the still
@@ -546,6 +558,7 @@ private fun ReleaseArt(
             Modifier.fillMaxWidth().aspectRatio(1f).then(coverHide),
             bottomFade = 0.22f,
             onCover = { covered = it },
+            onCanvas = onClip,
         )
     }
 }
@@ -580,6 +593,7 @@ private fun CardMotion(
     modifier: Modifier,
     bottomFade: Float = 0f,
     onCover: (Float) -> Unit = {},
+    onCanvas: (CanvasArtwork?) -> Unit = {},
 ) {
     if (source == null || !LocalArtworkImages.current) return
     // Looked up whether or not the clip may play yet, so the answer is to hand
@@ -617,6 +631,12 @@ private fun CardMotion(
                 mounted = false
             }
         }
+    }
+    // Tells the card which clip is on screen, so a tap can fly it with the cover.
+    val reportCanvas by rememberUpdatedState(onCanvas)
+    DisposableEffect(canvas, mounted) {
+        if (mounted) reportCanvas(canvas)
+        onDispose { reportCanvas(null) }
     }
     if (!mounted) return
     // Only paused for a scroll or for Now Playing passing over: neither is worth

@@ -45,6 +45,8 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import com.music.bitchord.data.canvas.CanvasArtwork
+import com.music.bitchord.ui.player.CanvasArtworkPlayer
 import kotlin.math.max
 import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.filterNotNull
@@ -80,6 +82,8 @@ private class FlightSource(
     var model: Any? = null,
     var cornerPx: Float = 0f,
     var footFade: Boolean = false,
+    /** The clip the card is playing right now, if any: it flies with the cover. */
+    var canvas: CanvasArtwork? = null,
 )
 
 private class Flight(
@@ -95,6 +99,7 @@ private class Flight(
     var model: Any? = null
     var toCornerPx: Float = 0f
     var footFade: Boolean = false
+    var canvas: CanvasArtwork? = null
 
     /** The card the cover leaves from or returns to. Set last: the layer waits on it. */
     var token by mutableStateOf<Any?>(null)
@@ -156,6 +161,7 @@ private object CoverFlightState {
         f.model = source.model
         f.toCornerPx = source.cornerPx
         f.footFade = source.footFade
+        f.canvas = source.canvas
         f.token = token
         return true
     }
@@ -181,6 +187,7 @@ private fun startFlight(browseId: String, token: Any) {
     CoverFlightState.flight = Flight(browseId, false, source.bounds, source.cornerPx).also {
         it.model = source.model
         it.footFade = source.footFade
+        it.canvas = source.canvas
         it.token = token
     }
 }
@@ -225,12 +232,14 @@ fun Modifier.coverFlightSource(
     model: Any?,
     corner: Dp = 12.dp,
     footFade: Boolean = false,
+    canvas: CanvasArtwork? = null,
 ): Modifier {
     val cornerPx = with(LocalDensity.current) { corner.toPx() }
     val info = remember(token) { FlightSource() }
     info.model = model
     info.cornerPx = cornerPx
     info.footFade = footFade
+    info.canvas = canvas
     DisposableEffect(token) {
         CoverFlightState.sources[token] = info
         onDispose { CoverFlightState.sources.remove(token) }
@@ -471,6 +480,32 @@ private fun FlightLayer(flight: Flight) {
                     }
                 },
         )
+        // The card's clip rides along with the still, same size and same
+        // frame, instead of staying behind while only the thumbnail flies.
+        flight.canvas?.let { clip ->
+            var clipReady by remember(flight) { mutableStateOf(false) }
+            LaunchedEffect(flight) {
+                // One frame after take-off, so building the player doesn't land on the first frame.
+                withFrameNanos { }
+                clipReady = true
+            }
+            if (clipReady) {
+                CanvasArtworkPlayer(
+                    canvas = clip,
+                    isPlaying = true,
+                    modifier = Modifier
+                        .requiredSize(sideDp)
+                        .graphicsLayer {
+                            val rect = rectAt(progress.value)
+                            val scale = max(rect.width, rect.height) / sidePx
+                            scaleX = scale
+                            scaleY = scale
+                        },
+                    bottomFade = if (flight.footFade) 0.22f else 0f,
+                    frameCapturePx = 0,
+                )
+            }
+        }
         if (wash != Color.Unspecified) {
             Box(
                 Modifier

@@ -216,6 +216,12 @@
     <string name="top_pick_new_from">New from %1$s</string>
     <string name="top_pick_label_new_release">New Release</string>
     <string name="top_pick_label_listen_again">Listen Again</string>
+    <string name="top_pick_label_mood">Mood</string>
+    <string name="top_pick_label_fresh">Fresh Picks</string>
+    <string name="top_pick_label_discover">Discover</string>
+    <string name="top_pick_based_on_listening">Based on Your Listening</string>
+    <string name="top_pick_just_dropped">Just Dropped</string>
+    <string name="top_pick_new_to_you">New to You</string>
     <string name="mood_energy">Energy</string>
     <string name="mood_energy_line">High-voltage tracks to keep you moving.</string>
     <string name="mood_relax">Relax</string>
