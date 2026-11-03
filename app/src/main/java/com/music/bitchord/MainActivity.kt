@@ -166,7 +166,7 @@ import com.music.bitchord.ui.components.LocalPlayingBarsMotion
 import com.music.bitchord.ui.components.handleDacVolumeKey
 import com.music.bitchord.ui.components.VolumeHud
 import com.music.bitchord.ui.navigation.AppDestination
-import com.music.bitchord.ui.components.CoverTransitionBox
+import com.music.bitchord.ui.components.CoverFlightHost
 import com.music.bitchord.ui.components.LocalCoverVisibilityScope
 import com.music.bitchord.ui.navigation.AppRoute
 import com.music.bitchord.ui.screens.EqualizerPresetPage
@@ -2821,7 +2821,7 @@ private fun BitChordApp(
                 .skipDrawWhenPlayerCovers(activeDock)
                 .snapshotBackdropSource(pageBackdrop),
         ) {
-            CoverTransitionBox(Modifier.weight(1f).fillMaxHeight()) {
+            CoverFlightHost(Modifier.weight(1f).fillMaxHeight()) {
                 AnimatedContent(
                     // Whatever is on top of the back stack — see [AppNavigator].
                     targetState = when {

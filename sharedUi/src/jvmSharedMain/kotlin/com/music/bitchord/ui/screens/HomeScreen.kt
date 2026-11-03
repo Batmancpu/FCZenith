@@ -85,7 +85,9 @@ import com.music.bitchord.ui.components.PullToRefresh
 import com.music.bitchord.ui.components.SHELF_CARD_WIDTH
 import com.music.bitchord.ui.components.SearchPlayingBars
 import com.music.bitchord.ui.components.SignInBanner
-import com.music.bitchord.ui.components.coverSharedElement
+import com.music.bitchord.ui.components.coverFlightSource
+import com.music.bitchord.ui.components.hideDuringCoverFlight
+import com.music.bitchord.ui.components.rememberCoverFlightTap
 import com.music.bitchord.ui.components.markCoverTapped
 import com.music.bitchord.ui.components.rememberCoverTap
 import com.music.bitchord.ui.components.feedMoreSkeleton
@@ -789,7 +791,7 @@ private fun HeroCard(
     isPlaying: Boolean = false,
 ) {
     val heroToken = remember { Any() }
-    val openHeroWithCover = rememberCoverTap(item.browseId, heroToken, onClick)
+    val openHeroWithCover = rememberCoverFlightTap(item.browseId, heroToken, onClick)
     Box(
         modifier = modifier
             .aspectRatio(HERO_CARD_RATIO)
@@ -807,13 +809,14 @@ private fun HeroCard(
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier
-                .coverSharedElement(item.browseId, heroToken)
+                .coverFlightSource(heroToken, item.thumbnailUrl.artworkAt(HEADER_ART_PX), 18.dp)
                 .fillMaxSize()
                 .clip(RoundedCornerShape(18.dp)),
         )
         if (isCurrent && isPlaying) SearchPlayingBars(Modifier.align(Alignment.Center))
         Column(
             modifier = Modifier
+                .hideDuringCoverFlight(heroToken)
                 .fillMaxWidth()
                 .align(Alignment.BottomStart)
                 .background(
@@ -1062,7 +1065,7 @@ internal fun ShelfCard(
     isPlaying: Boolean = false,
 ) {
     val coverToken = remember { Any() }
-    val openWithCover = rememberCoverTap(item.browseId, coverToken, onClick)
+    val openWithCover = rememberCoverFlightTap(item.browseId, coverToken, onClick)
     Column(
         modifier = modifier
             .longPressMenuClickable(
@@ -1118,7 +1121,7 @@ internal fun ShelfCard(
             else -> {
                 Box(
                     modifier = Modifier
-                        .coverSharedElement(item.browseId, coverToken)
+                        .coverFlightSource(coverToken, item.thumbnailUrl.artworkAt(CARD_ART_PX), 12.dp)
                         .fillMaxWidth()
                         .aspectRatio(1f)
                         .clip(RoundedCornerShape(12.dp))

@@ -112,7 +112,9 @@ import com.music.bitchord.ui.components.ShimmerBox
 import com.music.bitchord.ui.components.contextClick
 import com.music.bitchord.ui.components.longPressMenuClickable
 import com.music.bitchord.ui.components.thumbnailBorder
-import com.music.bitchord.ui.components.coverSharedElement
+import com.music.bitchord.ui.components.coverFlightSource
+import com.music.bitchord.ui.components.hideDuringCoverFlight
+import com.music.bitchord.ui.components.rememberCoverFlightTap
 import com.music.bitchord.ui.components.markCoverTapped
 import com.music.bitchord.ui.components.rememberCoverTap
 import org.jetbrains.compose.resources.painterResource
@@ -311,7 +313,7 @@ private fun TopPickCard(
     val text = cardText(pick, listenerName)
     val longPress = onLongPress?.let { { it(pick) } }
     val coverToken = remember { Any() }
-    val openCard = rememberCoverTap(
+    val openCard = rememberCoverFlightTap(
         browseId = pick.browseId.takeIf { pick.kind == TopPickKind.LATEST_RELEASE },
         token = coverToken,
     ) { onClick(pick, text.title) }
@@ -357,7 +359,11 @@ private fun TopPickCard(
                     pick.images.firstOrNull(),
                     if (pick.kind == TopPickKind.LATEST_RELEASE) {
                         Modifier
-                            .coverSharedElement(pick.browseId, coverToken)
+                            .coverFlightSource(
+                                coverToken,
+                                pick.images.firstOrNull().croppedAt(HEADER_ART_PX).whenArtworkReady(),
+                                12.dp,
+                            )
                             .fillMaxSize()
                             .clip(TopPickShape)
                     } else {
@@ -410,7 +416,7 @@ private fun TopPickCard(
                     .aspectRatio(730f / 484f),
             )
         }
-        CardCaption(text, eyebrowColor, Modifier.align(Alignment.BottomStart))
+        CardCaption(text, eyebrowColor, Modifier.align(Alignment.BottomStart).hideDuringCoverFlight(coverToken))
     }
 }
 

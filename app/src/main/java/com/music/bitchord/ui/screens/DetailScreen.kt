@@ -116,7 +116,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.border
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
-import com.music.bitchord.ui.components.coverSharedElement
+import com.music.bitchord.ui.components.coverFlightTarget
 import com.music.bitchord.ui.components.enterReveal
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.ui.draw.drawBehind
@@ -936,7 +936,7 @@ private fun ReleaseHeader(
     ) {
         Box(
             Modifier
-                .coverSharedElement(page.browseId)
+                .coverFlightTarget(page.browseId, 12.dp)
                 .size(sleeveSize)
                 .shadow(SLEEVE_SHADOW, SLEEVE_SHAPE)
                 .background(palette.elevated)
