@@ -1717,7 +1717,12 @@ fun MoodGridPage(
 @Composable
 private fun MoodTile(mood: TopPickMood, onClick: (TopPickMood, String) -> Unit, modifier: Modifier) {
     val title = stringResource(mood.titleRes())
-    Column(modifier.clickable { onClick(mood, title) }) {
+    Column(
+        modifier.longPressMenuClickable(
+            onClick = { onClick(mood, title) },
+            onLongClick = null,
+        ),
+    ) {
         Box(
             Modifier
                 .fillMaxWidth()
