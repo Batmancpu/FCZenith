@@ -328,8 +328,9 @@ private fun TopPickCard(
             else -> null
         },
         token = coverToken,
+        action = { onClick(pick, text.title) },
         grabFrame = { frameGrab.grab?.invoke() },
-    ) { onClick(pick, text.title) }
+    )
     Box(
         modifier = modifier
             .aspectRatio(TOP_PICK_RATIO)

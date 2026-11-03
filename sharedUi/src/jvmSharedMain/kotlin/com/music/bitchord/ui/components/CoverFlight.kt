@@ -96,10 +96,7 @@ private class FlightSource(
     var cornerPx: Float = 0f,
     var footFade: Boolean = false,
     /** The clip the card is playing right now, if any: it flies with the cover. */
-    var canvas: CanvasArtwork? = null
-
-    /** The frame the clip was showing when the cover took off: it flies instead of the still. */
-    var frame: ImageBitmap? = null,
+    var canvas: CanvasArtwork? = null,
 )
 
 private class Flight(
@@ -116,6 +113,9 @@ private class Flight(
     var toCornerPx: Float = 0f
     var footFade: Boolean = false
     var canvas: CanvasArtwork? = null
+
+    /** The frame the clip was showing when the cover took off: it flies instead of the still. */
+    var frame: ImageBitmap? = null
 
     /** The card the cover leaves from or returns to. Set last: the layer waits on it. */
     var token by mutableStateOf<Any?>(null)
@@ -383,9 +383,9 @@ fun RegisterCoverFlightGrab(browseId: String?, grab: CanvasFrameGrab) {
 fun rememberCoverFlightTap(
     browseId: String?,
     token: Any,
+    action: () -> Unit,
     /** The frame the card's clip is showing at the moment of the tap, if it has one. */
     grabFrame: (() -> ImageBitmap?)? = null,
-    action: () -> Unit,
 ): () -> Unit {
     val latest = rememberUpdatedState(action)
     // Lets a flight back find the card again, which is a new composition after the page closes.
