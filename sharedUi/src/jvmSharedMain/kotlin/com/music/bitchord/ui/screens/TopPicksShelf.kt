@@ -190,9 +190,8 @@ internal fun TopPicksShelf(
                                 // so the row doesn't repeat "Made for You" over every card.
                                 // The line keeps its height so the cards stay aligned.
                                 val label = topPickLabel(pick)
-                                val previousLabel = picks.getOrNull(index - 1)?.let { topPickLabel(it) }
                                 Text(
-                                    text = if (label == previousLabel) " " else label,
+                                    text = label,
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 1,
