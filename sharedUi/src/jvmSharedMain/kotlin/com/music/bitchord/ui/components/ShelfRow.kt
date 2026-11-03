@@ -94,7 +94,9 @@ internal val LocalShelfScrollFlow = staticCompositionLocalOf<ShelfScrollFlow?> {
 fun Modifier.shelfStagger(index: Int): Modifier {
     val flow = LocalShelfScrollFlow.current ?: return this
     // 1 is the card as it is; below that its entrance is under way.
-    val progress = remember { Animatable(1f) }
+    // A card composed mid-swipe starts hidden, so it never flashes at full
+    // strength before its entrance; one composed at rest is already settled.
+    val progress = remember { Animatable(if (flow.scrolling && flow.forward) 0f else 1f) }
     val scope = rememberCoroutineScope()
     // 0: not placed yet. 1: placed beyond the right edge, waiting to come in.
     // 2: settled, nothing left to decide. Plain, so a frame of the swipe
@@ -112,8 +114,20 @@ fun Modifier.shelfStagger(index: Int): Modifier {
                     // Hidden before it comes in, so it never shows at full
                     // strength for a frame as it reaches the edge.
                     scope.launch { progress.snapTo(0f) }
+                } else if (flow.scrolling && flow.forward && x > edge * 0.5f) {
+                    // A lazy row only places a card once it is already inside
+                    // the viewport, so the first placement of a card swiped in
+                    // from the right is just under the edge, never beyond it.
+                    phase[0] = 2
+                    val wait = flow.nextWaveSlot().coerceAtMost(SHELF_STAGGER_MAX_SLOT) * SHELF_STAGGER_STEP_MS
+                    scope.launch {
+                        if (progress.value != 0f) progress.snapTo(0f)
+                        delay(wait)
+                        progress.animateTo(1f, spring(dampingRatio = 0.74f, stiffness = 300f))
+                    }
                 } else {
                     phase[0] = 2
+                    if (progress.value != 1f) scope.launch { progress.snapTo(1f) }
                 }
                 return@onGloballyPositioned
             }
