@@ -16,10 +16,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.layout.layout
-import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -33,7 +29,6 @@ import com.music.bitchord.ui.components.backdrop.effects.colorControls
 import com.music.bitchord.ui.components.backdrop.effects.lens
 import com.music.bitchord.ui.components.backdrop.highlight.Highlight
 import com.music.bitchord.ui.components.backdrop.shadow.Shadow
-import kotlin.math.roundToInt
 
 /**
  * The thumb of iOS 26's switch and slider: a white pill at rest that, once
@@ -128,29 +123,4 @@ internal fun LiquidGlassThumb(
 @Composable
 internal fun RestingThumb(modifier: Modifier = Modifier) {
     Box(modifier.shadow(2.dp, CircleShape).background(Color.White, CircleShape))
-}
-
-/** [rest] to [lifted] in pixels at [t]; [t] may overshoot, which is the bounce. */
-internal fun Density.liftedPx(rest: Dp, lifted: Dp, t: Float): Float =
-    rest.toPx() + (lifted.toPx() - rest.toPx()) * t
-
-/**
- * Sizes the thumb between its resting and lifted dimensions, read on layout so
- * a frame of the lift is a relayout. It may stand taller than the track around
- * it: what overflows is centred, as it is on iOS.
- */
-internal fun Modifier.liftingSize(
-    restWidth: Dp,
-    restHeight: Dp,
-    liftedWidth: Dp,
-    liftedHeight: Dp,
-    lift: () -> Float,
-): Modifier = layout { measurable, constraints ->
-    val t = lift()
-    val w = liftedPx(restWidth, liftedWidth, t).roundToInt().coerceAtLeast(1)
-    val h = liftedPx(restHeight, liftedHeight, t).roundToInt().coerceAtLeast(1)
-    val placeable = measurable.measure(Constraints.fixed(w, h))
-    val outW = w.coerceAtMost(constraints.maxWidth)
-    val outH = h.coerceAtMost(constraints.maxHeight)
-    layout(outW, outH) { placeable.place((outW - w) / 2, (outH - h) / 2) }
 }

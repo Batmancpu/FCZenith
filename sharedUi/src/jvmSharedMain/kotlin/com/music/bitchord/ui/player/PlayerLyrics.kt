@@ -4,7 +4,6 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -177,12 +176,6 @@ private fun isRtl(text: String): Boolean {
         }
     }
     return rtlCount > ltrCount
-}
-
-/** Returns the text direction for [text]: LTR by default, RTL when detected. */
-private fun textDirectionFor(text: String): androidx.compose.ui.text.style.TextDirection {
-    return if (isRtl(text)) androidx.compose.ui.text.style.TextDirection.Rtl
-    else androidx.compose.ui.text.style.TextDirection.Ltr
 }
 
 /** Whether [text] carries Arabic-script letters (Persian, Arabic, Urdu…). */

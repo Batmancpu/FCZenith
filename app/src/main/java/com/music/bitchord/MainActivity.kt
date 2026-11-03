@@ -1,7 +1,6 @@
 package com.music.bitchord
 
 import android.Manifest
-import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
@@ -33,14 +32,12 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -50,18 +47,15 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
-import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.LocalOverscrollFactory
 import androidx.compose.material.icons.Icons
@@ -73,7 +67,6 @@ import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.IosShare
 import androidx.compose.material.icons.rounded.MoreHoriz
-import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Sort
 import androidx.compose.material.icons.rounded.Upgrade
 import com.music.bitchord.data.listentogether.ServerConnectionState
@@ -84,7 +77,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.ModalBottomSheetProperties
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -111,7 +103,6 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -120,7 +111,6 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -138,7 +128,6 @@ import com.music.bitchord.data.NerdStats
 import com.music.bitchord.data.TrackLog
 import com.music.bitchord.data.innertube.InnertubeParser
 import com.music.bitchord.data.model.BrowseType
-import com.music.bitchord.data.model.HomeShelf
 import com.music.bitchord.data.model.LikeStatus
 import com.music.bitchord.data.model.PlaybackSourceType
 import com.music.bitchord.data.model.SearchFilter
@@ -190,7 +179,6 @@ import com.music.bitchord.ui.screens.SignatureApiEditor
 import com.music.bitchord.ui.screens.SettingsScreen
 import com.music.bitchord.ui.screens.SourceEditorAlert
 import com.music.bitchord.ui.screens.SourcesScreen
-import com.music.bitchord.data.sources.TrackMatcher
 import com.music.bitchord.ui.screens.SpotifyCanvasAuthScreen
 import com.music.bitchord.ui.screens.SpotifyLibraryScreen
 import com.music.bitchord.data.spotify.SPOTIFY_PAGE_PREFIX
@@ -199,7 +187,6 @@ import com.music.bitchord.playback.LinkRequest
 import com.music.bitchord.playback.MusicLink
 import com.music.bitchord.playback.OriginalVersion
 import com.music.bitchord.playback.PlayerDeepLink
-import com.music.bitchord.playback.QueueBuilder
 import com.music.bitchord.playback.QueueCoordinator
 import com.music.bitchord.playback.QueueCoordinator.asQueueEntry
 import com.music.bitchord.playback.QueueShuffle
@@ -207,7 +194,6 @@ import com.music.bitchord.playback.QueueSource
 import com.music.bitchord.playback.cast.CastController
 import com.music.bitchord.data.model.QueueTier
 import com.music.bitchord.playback.autoplayEnabledFor
-import com.music.bitchord.playback.autoplaySectionStart
 import com.music.bitchord.playback.beginRadioQueue
 import com.music.bitchord.playback.commitRadioQueue
 import com.music.bitchord.playback.fromAutoplay
@@ -219,14 +205,12 @@ import com.music.bitchord.playback.playBoundedContext
 import com.music.bitchord.playback.contextEntryKey
 import com.music.bitchord.playback.toMediaItem
 import com.music.bitchord.playback.toSong
-import com.music.bitchord.playback.toDirectYouTubeMediaItem
 import com.music.bitchord.playback.toggleAutoplay
 import com.music.bitchord.playback.toggleShuffle
 import com.music.bitchord.playback.upgradeQuality
 import com.music.bitchord.playback.revertToOriginal
 import com.music.bitchord.playback.swapToVersion
 import com.music.bitchord.playback.smart.VersionAudioAligner
-import com.music.bitchord.download.DownloadSession
 import com.music.bitchord.download.DownloadStore
 import com.music.bitchord.download.MediaTagger
 import com.music.bitchord.download.DownloadTarget
@@ -307,19 +291,7 @@ import com.music.bitchord.ui.screens.MoodGridPage
 import com.music.bitchord.ui.player.NowPlayingScreen
 import com.music.bitchord.ui.player.MusicVideoEngine
 import com.music.bitchord.ui.player.PlayerSheetMotion
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.window.DialogWindowProvider
-import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.Outline
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.unit.Density
-import androidx.compose.material3.SheetState
-import androidx.compose.material3.SheetValue
-import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.foundation.layout.offset
@@ -329,7 +301,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.ui.layout.onSizeChanged
 import com.music.bitchord.ui.player.LocalPlayerDock
-import com.music.bitchord.ui.player.playerMorph
 import com.music.bitchord.ui.player.recedeBehindPlayer
 import com.music.bitchord.ui.player.skipDrawWhenPlayerCovers
 import com.music.bitchord.ui.player.PlayerDock
@@ -366,7 +337,6 @@ import com.music.bitchord.ui.theme.rememberArtworkPalette
 import com.music.bitchord.data.canvas.AppleArtistArtRepository
 import com.music.bitchord.data.canvas.keyColors
 import com.music.bitchord.ui.theme.SystemBarIcons
-import com.music.bitchord.ui.utils.guardSheetFromContentTouches
 import com.music.bitchord.ui.utils.rememberIosOverscrollFactory
 import com.music.bitchord.ui.performance.resolvePerformanceRefreshRate
 import dev.chrisbanes.haze.HazeState
@@ -6173,22 +6143,6 @@ private fun Isolated(content: @Composable () -> Unit) = content()
 
 /** Longer than the ⋯ menu's exit, so its panel keeps its frost on the way out. */
 private const val SNAPSHOT_RELEASE_DELAY_MS = 400L
-
-/**
- * The player sheet's shape: square, as [RectangleShape] was, but reaching a
- * whole sheet's height above the sheet's top edge.
- *
- * The sheet's Surface clips its content to this shape, and on the way down to
- * the mini player the artwork travels ahead of the sheet carrying it — up
- * above the sheet's top edge, where a plain rectangle cut it off mid-air,
- * leaving only its lower part to arrive in the bar. Nothing else is drawn
- * outside the sheet (its background is transparent and it casts no shadow),
- * so at rest this is the rectangle it replaces.
- */
-private object PlayerSheetShape : Shape {
-    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline =
-        Outline.Rectangle(Rect(0f, -size.height, size.width, size.height))
-}
 
 private const val TAB_HOME = 0
 private const val TAB_EXPLORE = 1

@@ -1,40 +1,18 @@
 package com.music.bitchord.ui.components
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.draggable
-import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.platform.LocalDensity
-import kotlinx.coroutines.launch
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.toggleableState
 import androidx.compose.ui.state.ToggleableState
-import kotlin.math.abs
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.requiredSize
-import androidx.compose.foundation.layout.offset
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.ui.unit.IntOffset
 import com.music.bitchord.ui.components.backdrop.backdrops.layerBackdrop
 import com.music.bitchord.ui.components.backdrop.backdrops.rememberLayerBackdrop
-import kotlinx.coroutines.delay
-import kotlin.math.roundToInt
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SwitchColors
@@ -50,7 +28,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -283,14 +260,8 @@ private fun GraphicsLayerScope.switchThumbX(fraction: Float, dragPx: Float, rtl:
         else lerp(padding, padding + dragPx, f)
 }
 
-/** The thumb once lifted: it grows well past the track, as iOS 26's does. */
-private val GlassThumbWidth = 50.dp
-private val GlassThumbHeight = 32.dp
-
 private val TrackWidth = 64.dp
 private val TrackHeight = 28.dp
 private val ThumbWidth = 40.dp
 private val ThumbHeight = 24.dp
 private val ThumbPadding = 2.dp
-private val LiftedThumbWidth = 58.dp
-private val LiftedThumbHeight = 38.dp

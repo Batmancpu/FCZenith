@@ -1,7 +1,6 @@
 package com.music.bitchord.ui.player
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.ui.unit.constrainWidth
 import androidx.compose.ui.unit.offset
@@ -13,7 +12,6 @@ import com.music.bitchord.playback.PlaybackPosition
 import com.music.bitchord.sharedui.resources.*
 
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.animation.Crossfade
 import com.music.bitchord.ui.components.TrackTextSwitch
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -275,13 +273,6 @@ private val DISMISS_STRIP_HEIGHT = 32.dp
 /** The breathing room above the sleeve, needed twice: once to apply, once to measure past. */
 private val ART_BOX_TOP_PAD = 8.dp
 /**
- * How far below the sleeve's top edge the video/audio pill floats.
- *
- * Far enough to clear the artwork's rounded corners, so the pill reads as
- * something laid on the cover rather than something clipped by it.
- */
-private val VERSION_PILL_ART_INSET = 12.dp
-/**
  * Share of the motion-artwork banner's height given over to its dissolve.
  *
  * Generous on purpose: the banner has no card edge to stop at, so anything
@@ -493,14 +484,6 @@ private const val DOCK_FADE_FULL = 0.6f
 
 /** The least the faded player is drawn at while docking — see the player's fade. */
 private const val DOCK_FADE_FLOOR = 1f / 255f
-
-/**
- * Selama terbang dari/ke mini player, cover menuju kartu sampul di tengah, bukan
- * rect banner full-bleed yang menempel di pojok kiri-atas sheet (itu yang membuat
- * posisinya terasa terlalu ke atas). Banner baru mekar dari kartu setelah titik
- * ini, di ujung perjalanan.
- */
-private const val DOCK_BANNER_FROM = 0.15f
 
 /** Lama clip animasi cover (Apple/Spotify) padam ke thumbnail saat mix/crossfade mulai, dan kembali setelahnya. */
 private const val CLIP_MIX_FADE_OUT_MS = 900

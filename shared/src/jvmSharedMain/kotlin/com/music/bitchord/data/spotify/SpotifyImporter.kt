@@ -15,7 +15,6 @@ import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -27,16 +26,6 @@ import java.util.concurrent.atomic.AtomicInteger
 data class SpotifyImportTrack(
     val title: String,
     val artist: String,
-)
-
-/** The result of fetching and resolving a Spotify playlist's tracks. */
-data class SpotifyImportResult(
-    val title: String,
-    val description: String,
-    val thumbnailUrl: String?,
-    val totalTracks: Int,
-    val resolvedVideoIds: List<String>,
-    val unmatchedTracks: List<SpotifyImportTrack>,
 )
 
 object SpotifyImporter {

@@ -18,12 +18,6 @@ package com.my.kizzy.rpc
 sealed class RpcImage {
     abstract suspend fun resolveImage(resolveExternalImage: suspend (String) -> String?): String?
 
-    class DiscordImage(val image: String) : RpcImage() {
-        override suspend fun resolveImage(resolveExternalImage: suspend (String) -> String?): String {
-            return if (image.startsWith("http")) image else "mp:$image"
-        }
-    }
-
     class ExternalImage(
         val image: String,
         private val fallbackDiscordAsset: String? = null,

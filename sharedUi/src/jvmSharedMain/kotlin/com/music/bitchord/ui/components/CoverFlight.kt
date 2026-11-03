@@ -51,7 +51,6 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import coil3.compose.AsyncImagePainter
 import com.music.bitchord.data.canvas.CanvasArtwork
-import com.music.bitchord.ui.player.CanvasArtworkPlayer
 import kotlin.math.max
 import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.filterNotNull
@@ -84,9 +83,6 @@ private const val CLIP_HANDOFF_TIMEOUT_MS = 1500L
 
 /** How fast the flight's idea of its destination follows the real one, per second. */
 private const val CHASE_RATE = 16f
-
-/** A card or sleeve must be at least this much on screen to be flown to or from. */
-private const val MIN_VISIBLE = 0.5f
 
 /** A return is let off more: the card it lands on may sit half under the bars. */
 private const val MIN_RETURN_VISIBLE = 0.25f
