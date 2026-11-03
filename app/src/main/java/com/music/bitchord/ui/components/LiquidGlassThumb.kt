@@ -21,6 +21,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.ui.components.backdrop.backdrops.LayerBackdrop
 import com.music.bitchord.ui.components.backdrop.drawBackdrop
+import com.music.bitchord.ui.components.backdrop.effects.blur
+import com.music.bitchord.ui.components.backdrop.effects.colorControls
 import com.music.bitchord.ui.components.backdrop.effects.lens
 import com.music.bitchord.ui.components.backdrop.highlight.Highlight
 import com.music.bitchord.ui.components.backdrop.shadow.Shadow
@@ -57,12 +59,17 @@ internal fun LiquidGlassThumb(
             shape = { shape },
             effects = {
                 val g = glass().coerceIn(0f, 1f)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && g > 0.01f) {
-                    lens(
-                        refractionHeight = 10.dp.toPx() * g,
-                        refractionAmount = 14.dp.toPx() * g,
-                        depthEffect = true,
-                    )
+                if (g > 0.01f) {
+                    colorControls(saturation = 1f + 0.8f * g)
+                    blur(1.5.dp.toPx() * g)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        lens(
+                            refractionHeight = 14.dp.toPx() * g,
+                            refractionAmount = 22.dp.toPx() * g,
+                            depthEffect = true,
+                            chromaticAberration = true,
+                        )
+                    }
                 }
             },
             highlight = {
@@ -80,7 +87,7 @@ internal fun LiquidGlassThumb(
             onDrawSurface = {
                 // Opaque white at rest; a faint veil once it is glass.
                 val g = glass().coerceIn(0f, 1f)
-                drawRect(color = Color.White.copy(alpha = 1f - 0.9f * g), size = size)
+                drawRect(color = Color.White.copy(alpha = 1f - 0.84f * g), size = size)
             },
         ),
     )

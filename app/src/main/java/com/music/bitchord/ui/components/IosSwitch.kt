@@ -1,7 +1,15 @@
 package com.music.bitchord.ui.components
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.platform.LocalDensity
+import kotlinx.coroutines.launch
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -80,21 +88,31 @@ fun IosSwitch(
     val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
-    val position by animateFloatAsState(
-        targetValue = if (checked) 1f else 0f,
-        animationSpec = spring(dampingRatio = 0.78f, stiffness = 700f),
-        label = "iosSwitchThumb",
-    )
+    val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    val position = remember { Animatable(if (checked) 1f else 0f) }
+    val thumbSpring = spring<Float>(dampingRatio = 0.78f, stiffness = 700f)
+    LaunchedEffect(checked) { position.animateTo(if (checked) 1f else 0f, thumbSpring) }
+    // Jari di atas thumb: thumb mengikuti geseran di sepanjang track.
+    var dragging by remember { mutableStateOf(false) }
+    val currentChecked by rememberUpdatedState(checked)
+    val currentOnChange by rememberUpdatedState(onCheckedChange)
+    val dragTravelPx = with(density) { (TrackWidth - ThumbWidth - ThumbPadding * 2).toPx() }
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    val dragState = rememberDraggableState { delta ->
+        val step = (if (rtl) -delta else delta) / dragTravelPx
+        scope.launch { position.snapTo((position.value + step).coerceIn(0f, 1f)) }
+    }
     // Held for a beat after a flip, so a switch toggled by its row's tap — no
     // finger on the thumb — lifts into glass for the trip as well.
     var flash by remember { mutableStateOf(false) }
     // Under-damped: the overshoot is the thumb popping past the track.
     val lift by animateFloatAsState(
-        targetValue = if (pressed || flash) 1f else 0f,
+        targetValue = if (pressed || flash || dragging) 1f else 0f,
         animationSpec = spring(dampingRatio = 0.62f, stiffness = 520f),
         label = "iosSwitchLift",
     )
-    val glassActive by remember { derivedStateOf { pressed || flash || lift > 0.002f } }
+    val glassActive by remember { derivedStateOf { pressed || flash || dragging || lift > 0.002f } }
     val track by animateColorAsState(
         targetValue = when {
             checked && dark -> Color(0xFF30D158)
@@ -130,6 +148,17 @@ fun IosSwitch(
                         indication = null,
                         role = Role.Switch,
                         onValueChange = onCheckedChange,
+                    ).draggable(
+                        state = dragState,
+                        orientation = Orientation.Horizontal,
+                        enabled = enabled,
+                        onDragStarted = { dragging = true },
+                        onDragStopped = {
+                            dragging = false
+                            val target = position.value >= 0.5f
+                            if (target != currentChecked) currentOnChange?.invoke(target)
+                            scope.launch { position.animateTo(if (target) 1f else 0f, thumbSpring) }
+                        },
                     )
                 } else {
                     Modifier
@@ -153,8 +182,8 @@ fun IosSwitch(
                 // grows from the edge it is leaving and always lands flush.
                 val w = liftedPx(ThumbWidth, LiftedThumbWidth, lift)
                 val pad = ThumbPadding.toPx()
-                val travel = TrackWidth.toPx() - w - pad * 2f
-                IntOffset((pad + travel * position).roundToInt(), 0)
+                val travel = (TrackWidth.toPx() - w - pad * 2f).coerceAtLeast(0f)
+                IntOffset((pad + travel * position.value).roundToInt(), 0)
             }
             .liftingSize(
                 restWidth = ThumbWidth,
@@ -176,5 +205,5 @@ private val TrackHeight = 28.dp
 private val ThumbWidth = 40.dp
 private val ThumbHeight = 24.dp
 private val ThumbPadding = 2.dp
-private val LiftedThumbWidth = 52.dp
-private val LiftedThumbHeight = 34.dp
+private val LiftedThumbWidth = 58.dp
+private val LiftedThumbHeight = 38.dp
