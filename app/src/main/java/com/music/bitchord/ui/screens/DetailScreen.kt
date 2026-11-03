@@ -116,6 +116,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.border
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import com.music.bitchord.ui.components.coverSharedElement
 import coil3.compose.LocalPlatformContext
 import coil3.compose.AsyncImagePainter
 import coil3.request.ImageRequest
@@ -921,6 +922,7 @@ private fun ReleaseHeader(
     ) {
         Box(
             Modifier
+                .coverSharedElement(page.browseId)
                 .size(sleeveSize)
                 .shadow(SLEEVE_SHADOW, SLEEVE_SHAPE)
                 .background(palette.elevated)

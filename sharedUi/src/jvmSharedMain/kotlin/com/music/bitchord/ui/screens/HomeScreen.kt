@@ -85,6 +85,8 @@ import com.music.bitchord.ui.components.PullToRefresh
 import com.music.bitchord.ui.components.SHELF_CARD_WIDTH
 import com.music.bitchord.ui.components.SearchPlayingBars
 import com.music.bitchord.ui.components.SignInBanner
+import com.music.bitchord.ui.components.coverSharedElement
+import com.music.bitchord.ui.components.markCoverTapped
 import com.music.bitchord.ui.components.feedMoreSkeleton
 import com.music.bitchord.ui.components.feedSkeleton
 import com.music.bitchord.ui.components.recentlyPlayedSkeleton
@@ -785,20 +787,30 @@ private fun HeroCard(
     isCurrent: Boolean = false,
     isPlaying: Boolean = false,
 ) {
+    val heroToken = remember { Any() }
     Box(
         modifier = modifier
             .aspectRatio(HERO_CARD_RATIO)
             .clip(RoundedCornerShape(18.dp))
             .thumbnailBorder(RoundedCornerShape(18.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant)
-            .longPressMenuClickable(onClick = onClick, onLongClick = onLongPress)
+            .longPressMenuClickable(
+                onClick = {
+                    markCoverTapped(item.browseId, heroToken)
+                    onClick()
+                },
+                onLongClick = onLongPress,
+            )
             .contextClick(onLongPress),
     ) {
         AsyncImage(
             model = item.thumbnailUrl.artworkAt(HEADER_ART_PX),
             contentDescription = null,
             contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .coverSharedElement(item.browseId, heroToken)
+                .fillMaxSize()
+                .clip(RoundedCornerShape(18.dp)),
         )
         if (isCurrent && isPlaying) SearchPlayingBars(Modifier.align(Alignment.Center))
         Column(
@@ -1050,9 +1062,16 @@ internal fun ShelfCard(
     isCurrent: Boolean = false,
     isPlaying: Boolean = false,
 ) {
+    val coverToken = remember { Any() }
     Column(
         modifier = modifier
-            .longPressMenuClickable(onClick = onClick, onLongClick = onLongPress)
+            .longPressMenuClickable(
+                onClick = {
+                    markCoverTapped(item.browseId, coverToken)
+                    onClick()
+                },
+                onLongClick = onLongPress,
+            )
             .contextClick(onLongPress),
     ) {
         when (item.browseId) {
@@ -1102,6 +1121,7 @@ internal fun ShelfCard(
             else -> {
                 Box(
                     modifier = Modifier
+                        .coverSharedElement(item.browseId, coverToken)
                         .fillMaxWidth()
                         .aspectRatio(1f)
                         .clip(RoundedCornerShape(12.dp))

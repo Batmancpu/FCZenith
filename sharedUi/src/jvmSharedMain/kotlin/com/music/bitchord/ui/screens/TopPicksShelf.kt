@@ -112,6 +112,8 @@ import com.music.bitchord.ui.components.ShimmerBox
 import com.music.bitchord.ui.components.contextClick
 import com.music.bitchord.ui.components.longPressMenuClickable
 import com.music.bitchord.ui.components.thumbnailBorder
+import com.music.bitchord.ui.components.coverSharedElement
+import com.music.bitchord.ui.components.markCoverTapped
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.PI
@@ -307,13 +309,20 @@ private fun TopPickCard(
 ) {
     val text = cardText(pick, listenerName)
     val longPress = onLongPress?.let { { it(pick) } }
+    val coverToken = remember { Any() }
     Box(
         modifier = modifier
             .aspectRatio(TOP_PICK_RATIO)
             .clip(TopPickShape)
             .thumbnailBorder(TopPickShape)
             .background(MaterialTheme.colorScheme.surfaceVariant)
-            .longPressMenuClickable(onClick = { onClick(pick, text.title) }, onLongClick = longPress)
+            .longPressMenuClickable(
+                onClick = {
+                    if (pick.kind == TopPickKind.LATEST_RELEASE) markCoverTapped(pick.browseId, coverToken)
+                    onClick(pick, text.title)
+                },
+                onLongClick = longPress,
+            )
             .contextClick(longPress),
     ) {
         val eyebrowColor: Color
@@ -344,7 +353,14 @@ private fun TopPickCard(
             TopPickKind.LATEST_RELEASE, TopPickKind.NEW_RELEASE_MIX -> {
                 ReleaseArt(
                     pick.images.firstOrNull(),
-                    Modifier.fillMaxSize(),
+                    if (pick.kind == TopPickKind.LATEST_RELEASE) {
+                        Modifier
+                            .coverSharedElement(pick.browseId, coverToken)
+                            .fillMaxSize()
+                            .clip(TopPickShape)
+                    } else {
+                        Modifier.fillMaxSize()
+                    },
                     // A New Release Mix is a playlist; only a real release has a sleeve that moves.
                     motion = pick.takeIf { it.kind == TopPickKind.LATEST_RELEASE }?.let { release ->
                         CardMotionSource(release.browseId ?: release.title) {
