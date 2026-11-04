@@ -989,8 +989,8 @@ private fun ReleaseHeader(
     heroHeight: Dp = sleeveSize * 1.2f,
 ) {
     val (credit, meta) = page.headerLines(songs.size, songs.playtime())
-    // Liked Music tidak memakai sleeve berbingkai: seninya full-bleed.
-    val fullBleed = page.isLikedMusic()
+    // Liked Music dan Most Played tidak memakai sleeve berbingkai: seninya full-bleed.
+    val fullBleed = page.isLikedMusic() || page.covers.isNotEmpty()
     // Every row on a release carries the same credit — see [pageCredit] — so
     // the first one speaks for the whole page, the same source the rows'
     // own long-press "Open artist" already reads from.
@@ -1004,7 +1004,9 @@ private fun ReleaseHeader(
             .padding(top = if (fullBleed) 0.dp else topBarContentPadding(), bottom = 18.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        if (fullBleed) {
+        if (page.covers.isNotEmpty()) {
+            MostPlayedHero(page = page, palette = palette)
+        } else if (fullBleed) {
             LikedMusicHero(
                 page = page,
                 palette = palette,
@@ -2516,6 +2518,67 @@ private fun DetailPage.headerLines(trackCount: Int, playtime: String? = null): P
         playtime,
     ).joinToString(" · ")
     return credit to meta
+}
+
+/**
+ * Header Most Played: mosaic yang sama dengan kartu Home, full-bleed selebar
+ * layar sampai di bawah bar (tanpa bingkai dan sudut membulat). Kakinya larut
+ * ke warna halaman dan judul naik menimpanya, seperti [LikedMusicHero].
+ */
+@Composable
+private fun MostPlayedHero(
+    page: DetailPage,
+    palette: ArtworkPalette,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier
+            // Paling luar: tinggi yang dilaporkan lebih pendek, sehingga
+            // judul di bawahnya tergambar di atas kaki hero.
+            .layout { measurable, constraints ->
+                val placeable = measurable.measure(constraints)
+                val overlap = LIKED_HERO_OVERLAP.roundToPx().coerceAtMost(placeable.height)
+                layout(placeable.width, placeable.height - overlap) { placeable.place(0, 0) }
+            }
+            .fillMaxWidth()
+            .aspectRatio(1f)
+            .coverFlightTarget(page.browseId, 0.dp, palette.background),
+    ) {
+        CompositionLocalProvider(LocalSettledMosaic provides true) {
+            MostPlayedArt(
+                covers = page.covers,
+                motion = true,
+                modifier = Modifier.matchParentSize().clipToBounds(),
+            )
+        }
+        // Berakhir di warna halaman penuh, jadi tidak ada tepi tempat seni berhenti.
+        val clear = palette.background.copy(alpha = 0f)
+        Box(
+            Modifier
+                .matchParentSize()
+                .background(
+                    Brush.verticalGradient(
+                        0.00f to clear,
+                        0.60f to clear,
+                        0.74f to palette.background.copy(alpha = 0.45f),
+                        0.88f to palette.background.copy(alpha = 0.88f),
+                        1.00f to palette.background,
+                    ),
+                ),
+        )
+        // Sedikit gelap di atas supaya ikon bar kaca tetap terbaca.
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.28f)
+                .background(
+                    Brush.verticalGradient(
+                        0f to Color.Black.copy(alpha = 0.22f),
+                        1f to Color.Transparent,
+                    ),
+                ),
+        )
+    }
 }
 
 /** Liked Music di YouTube Music (VLLM) atau Liked milik perangkat. */

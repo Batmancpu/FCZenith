@@ -35,6 +35,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.compositionLocalOf
@@ -96,6 +97,8 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -532,23 +535,17 @@ private fun TopPickCard(
         if (branded && pick.kind != TopPickKind.ARTIST_AND_SIMILAR && pick.kind != TopPickKind.MOST_PLAYED) {
             AmbientGlow(base = glowBase(pick), modifier = Modifier.fillMaxSize())
         }
-        if (pick.kind == TopPickKind.MOST_PLAYED) {
-            MostPlayedPanel(
-                text = text,
-                images = pick.images,
-                modifier = Modifier.fillMaxSize().hideDuringCoverFlight(coverToken),
-            )
-        } else {
-            CardOverlay(
-                text = text,
-                eyebrowColor = eyebrowColor,
-                branded = branded,
-                titleInArt = pick.kind == TopPickKind.MOOD ||
-                    pick.kind == TopPickKind.PERSONAL_STATION ||
-                    pick.kind == TopPickKind.DISCOVERY_STATION,
-                modifier = Modifier.fillMaxSize().hideDuringCoverFlight(coverToken),
-            )
-        }
+        // Most Played sekarang memakai overlay yang sama dengan kartu lain
+        // (tanpa panel kaca).
+        CardOverlay(
+            text = text,
+            eyebrowColor = eyebrowColor,
+            branded = branded,
+            titleInArt = pick.kind == TopPickKind.MOOD ||
+                pick.kind == TopPickKind.PERSONAL_STATION ||
+                pick.kind == TopPickKind.DISCOVERY_STATION,
+            modifier = Modifier.fillMaxSize().hideDuringCoverFlight(coverToken),
+        )
     }
 }
 
@@ -1065,10 +1062,21 @@ private fun CardMotion(
     // the frame it lands back on the mini player. The still under it comes back
     // as it goes.
     var mounted by remember { mutableStateOf(false) }
+    // Frame terakhir klip (dan posisinya), ditahan selama klip dilepas atau
+    // belum melukis frame pertamanya, supaya yang tampil bukan thumbnail awal.
+    var held by remember(canvas) { mutableStateOf<ImageBitmap?>(null) }
+    var heldPositionMs by remember(canvas) { mutableLongStateOf(0L) }
+    var clipShown by remember(canvas) { mutableStateOf(false) }
     LaunchedEffect(motion, mayPlay, scrolling) {
         when {
             // The row has handed the slot on, and it does that only at rest.
-            !mayPlay -> mounted = false
+            !mayPlay -> {
+                frameGrab?.grab?.invoke()?.let {
+                    held = it
+                    heldPositionMs = 0L
+                }
+                mounted = false
+            }
             motion -> if (!mounted) {
                 delay(CLIP_START_DELAY_MS)
                 snapshotFlow { scrolling() }.first { !it }
@@ -1076,6 +1084,7 @@ private fun CardMotion(
             }
             else -> {
                 delay(CLIP_RELEASE_DELAY_MS)
+                if (held == null) frameGrab?.grab?.invoke()?.let { held = it }
                 mounted = false
             }
         }
@@ -1085,6 +1094,25 @@ private fun CardMotion(
     DisposableEffect(canvas, mounted) {
         if (mounted) reportCanvas(canvas)
         onDispose { reportCanvas(null) }
+    }
+    val heldFrame = held
+    if (heldFrame != null && !clipShown) {
+        Image(
+            bitmap = heldFrame,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = modifier
+                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                .drawWithContent {
+                    drawContent()
+                    if (bottomFade > 0f) {
+                        drawRect(
+                            Brush.verticalGradient(1f - bottomFade to Color.Black, 1f to Color.Transparent),
+                            blendMode = BlendMode.DstIn,
+                        )
+                    }
+                },
+        )
     }
     if (!mounted) return
     // Only paused for a scroll or for Now Playing passing over: neither is worth
@@ -1097,6 +1125,16 @@ private fun CardMotion(
         bottomFade = bottomFade,
         onCoverChanged = onCover,
         pausedForTransition = !motion || scrolling(),
+        startPositionMs = heldPositionMs,
+        revealInstantly = held != null,
+        captureStill = !motion,
+        onStillCaptured = { image, position ->
+            if (image != null) {
+                held = image
+                heldPositionMs = position
+            }
+        },
+        onRenderedChanged = { clipShown = it },
         frameGrab = frameGrab,
     )
 }

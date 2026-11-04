@@ -53,8 +53,10 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import coil3.compose.AsyncImagePainter
 import com.music.bitchord.data.canvas.CanvasArtwork
+import kotlin.math.PI
 import kotlin.math.max
 import kotlin.math.roundToInt
+import kotlin.math.sin
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
@@ -85,6 +87,12 @@ private const val CLIP_REVEAL_MS = 180L
 
 /** How long the cover takes to dissolve into the page's clip. */
 private const val CLIP_DISSOLVE_MS = 220
+
+/** How long the flying cover dissolves into a sleeve that has no clip, once it has landed. */
+private const val LAND_DISSOLVE_MS = 180
+
+/** Peak drop shadow of the flying cover, reached mid-flight. */
+private const val FLIGHT_SHADOW_DP = 30
 
 /** How long a landed cover waits on the page's own clip before it lets go anyway. */
 private const val CLIP_HANDOFF_TIMEOUT_MS = 1500L
@@ -616,6 +624,12 @@ private fun FlightLayer(flight: Flight) {
                 // The clip's own fade-in finishes under the cover before the cover lifts.
                 if (shown != null) delay(CLIP_REVEAL_MS)
                 fade.animateTo(0f, tween(durationMillis = CLIP_DISSOLVE_MS))
+            } else if (!flight.reverse) {
+                // Mendarat di halaman tanpa klip: sleeve sudah digambar di bawah
+                // cover terbang, lalu cover memudar pelan. Tanpa ini cover
+                // lenyap seketika dan sleeve yang belum tergambar terlihat berkedip.
+                CoverFlightState.holding = true
+                fade.animateTo(0f, tween(durationMillis = LAND_DISSOLVE_MS))
             } else if (flight.frame != null) {
                 // Back on the card with the page's frame: it dissolves into the card's own picture.
                 fade.animateTo(0f, tween(durationMillis = CLIP_DISSOLVE_MS))
@@ -666,6 +680,15 @@ private fun FlightLayer(flight: Flight) {
             .graphicsLayer {
                 val toCorner = if (flight.reverse) flight.toCornerPx else CoverFlightState.targetCornerPx
                 shape = RoundedCornerShape(lerpF(flight.fromCornerPx, toCorner, progress.value))
+                // Drop shadow: naik saat cover lepas, puncak di tengah penerbangan,
+                // hilang saat mendarat. Cover dengan kaki memudar ikut meredup
+                // supaya bayangannya tidak membentuk pita gelap di kaki.
+                val p = progress.value
+                val lift = sin(PI.toFloat() * p)
+                val foot = if (!flight.footFade) 1f else if (flight.reverse) flight.settled * (1f - p) else p
+                shadowElevation = FLIGHT_SHADOW_DP.dp.toPx() * lift * foot
+                ambientShadowColor = Color.Black.copy(alpha = 0.45f)
+                spotShadowColor = Color.Black.copy(alpha = 0.85f)
                 clip = true
                 // Gambar terbang tetap utuh selama di udara; hanya memudar
                 // setelah mendarat (lihat [fade]), bukan bersilang dengan kartu.
