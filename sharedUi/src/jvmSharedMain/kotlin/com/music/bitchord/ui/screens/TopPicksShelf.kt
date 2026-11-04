@@ -453,7 +453,8 @@ private fun TopPickCard(
                 branded = false
             }
         }
-        if (branded) {
+        // Not over the artist collage: the glow tinted the photos themselves.
+        if (branded && pick.kind != TopPickKind.ARTIST_AND_SIMILAR) {
             AmbientGlow(base = glowBase(pick), modifier = Modifier.fillMaxSize())
         }
         CardOverlay(
@@ -486,13 +487,13 @@ private fun CardOverlay(
     Box(modifier) {
         if (branded) {
             Wordmark(
-                logoHeight = 13.dp,
-                fontSize = 15.sp,
+                logoHeight = 14.dp,
+                fontSize = 16.sp,
                 color = Color.White,
                 gap = 2.dp,
                 modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(start = 16.dp, top = 16.dp),
+                    .align(Alignment.TopEnd)
+                    .padding(top = 12.dp, end = 12.dp),
             )
         }
         if (titleInArt) {
@@ -512,7 +513,9 @@ private fun CardOverlay(
                     .padding(start = 16.dp, end = 16.dp, top = 40.dp),
             )
         }
-        val band = if (branded) {
+        // The darker band only where the name is in the art above it; the
+        // collage and photo cards fade up from the picture so it stays clear.
+        val band = if (titleInArt) {
             Brush.verticalGradient(
                 0f to Color.Black.copy(alpha = 0.22f),
                 1f to Color.Black.copy(alpha = 0.50f),
@@ -530,14 +533,14 @@ private fun CardOverlay(
                 .fillMaxWidth()
                 .background(band),
         ) {
-            if (branded) {
+            if (titleInArt) {
                 Box(Modifier.fillMaxWidth().height(0.5.dp).background(Color.White.copy(alpha = 0.22f)))
             }
             Column(
                 Modifier.padding(
                     start = 16.dp,
                     end = 16.dp,
-                    top = if (branded) 12.dp else 30.dp,
+                    top = if (titleInArt) 12.dp else if (branded) 20.dp else 30.dp,
                     bottom = 14.dp,
                 ),
             ) {
@@ -591,7 +594,7 @@ private fun glowBase(pick: TopPick): Color = when (pick.kind) {
 /** One slow drift of the glow; longer than the stations' breath so the two never line up. */
 private const val GLOW_PERIOD_MS = 14_000
 
-private val GlowAlpha = floatArrayOf(0.50f, 0.42f, 0.45f)
+private val GlowAlpha = floatArrayOf(0.30f, 0.26f, 0.20f)
 
 private class GlowBrushes(val radii: FloatArray, val blobs: List<Brush>)
 
