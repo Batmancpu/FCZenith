@@ -103,26 +103,57 @@ fun ExplicitSongTitle(
  * is Next.
  */
 object TrackFlow {
-    private const val HINT_VALID_MS = 3_000L
-    private var current: String? = null
-    private var before: String? = null
+    private const val HINT_VALID_MS = 2_000L
+    private const val TRAIL_SIZE = 32
+
+    /** Lagu yang sudah tampil, berurutan seperti riwayat browser; [cursor] menunjuk yang sekarang. */
+    private val trail = ArrayList<String>()
+    private var cursor = -1
+    private var currentId: String? = null
     private var forward = true
     private var hintForward: Boolean? = null
     private var hintAt = 0L
 
-    /** Dipanggil saat Next/Previous ditekan, supaya arah animasi pasti. */
+    /** Dipanggil saat Next/Previous ditekan, supaya arah animasi pasti. Dipakai satu kali saja. */
     fun hint(forward: Boolean) {
         hintForward = forward
         hintAt = System.currentTimeMillis()
     }
 
     fun forwardTo(id: String): Boolean {
-        if (id != current) {
-            val hinted = hintForward?.takeIf { System.currentTimeMillis() - hintAt < HINT_VALID_MS }
-            forward = hinted ?: (id != before)
-            before = current
-            current = id
+        // Lagu yang sama (mini player dan player besar menanyakan hal yang sama):
+        // jawabannya sudah ditentukan oleh yang pertama bertanya.
+        if (id == currentId) return forward
+        // Petunjuk dibuang begitu dipakai, supaya perubahan lagu berikutnya yang bukan
+        // dari tombol (auto-advance, tap antrean, notifikasi) tidak ikut arah yang lama.
+        val hinted = hintForward?.takeIf { System.currentTimeMillis() - hintAt < HINT_VALID_MS }
+        hintForward = null
+        val at = trail.lastIndexOf(id)
+        // Tanpa petunjuk: kembali ke lagu yang ada di belakang riwayat berarti mundur.
+        val back = hinted?.not() ?: (at in 0 until cursor)
+        if (back) {
+            if (at in 0 until cursor) {
+                cursor = at
+            } else {
+                // Previous ke lagu yang belum pernah tampil: ia jadi yang paling depan.
+                trail.add(0, id)
+                cursor = 0
+            }
+        } else if (at > cursor) {
+            // Maju lagi ke lagu yang tadi ditinggalkan.
+            cursor = at
+        } else {
+            // Lagu baru: yang ada di depan kursor dibuang, lalu ditambahkan.
+            while (trail.size > cursor + 1) trail.removeAt(trail.lastIndex)
+            trail.add(id)
+            cursor = trail.lastIndex
         }
+        if (trail.size > TRAIL_SIZE) {
+            trail.removeAt(0)
+            cursor = (cursor - 1).coerceAtLeast(0)
+        }
+        forward = !back
+        currentId = id
         return forward
     }
 }
