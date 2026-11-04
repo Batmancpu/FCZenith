@@ -221,6 +221,25 @@ class BitChordApplication : Application(), SingletonImageLoader.Factory, Configu
                         .build(),
                 )
             }
+            // Gambar (foto akun, cover liked, dll.) sering dikirim server dengan
+            // no-cache / max-age pendek, sehingga Coil mengunduh ulang tiap app dibuka
+            // dan gagal saat offline. Di sini header-nya diganti supaya cache disk
+            // dianggap segar 90 hari: tanpa request jaringan, dan tetap tampil offline.
+            .addInterceptor { chain ->
+                val response = chain.proceed(chain.request())
+                val type = response.header("Content-Type").orEmpty()
+                if (response.isSuccessful && (type.isEmpty() || type.startsWith("image/"))) {
+                    response.newBuilder()
+                        .removeHeader("Pragma")
+                        .removeHeader("Vary")
+                        .removeHeader("Expires")
+                        .removeHeader("Age")
+                        .header("Cache-Control", "public, max-age=7776000")
+                        .build()
+                } else {
+                    response
+                }
+            }
             .build()
     }
 
@@ -258,7 +277,7 @@ class BitChordApplication : Application(), SingletonImageLoader.Factory, Configu
             .diskCache {
                 DiskCache.Builder()
                     .directory(cacheDir.resolve("image_cache"))
-                    .maxSizeBytes(100L * 1024 * 1024)
+                    .maxSizeBytes(200L * 1024 * 1024)
                     .build()
             }
             // Covers arriving with a hard cut read as the list flickering as
