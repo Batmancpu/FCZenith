@@ -173,6 +173,43 @@ private fun HeroShelfSkeleton() {
     }
 }
 
+/**
+ * The editorial shelf that leads Explore: a title and subtitle, then wide
+ * 1.5-ratio cards under a two-line caption, the next card peeking in at the
+ * edge. Mirrors the real shelf's metrics so the grid below does not jump.
+ */
+@Composable
+fun EditorialShelfSkeleton() {
+    Column(Modifier.padding(bottom = 26.dp)) {
+        Column(Modifier.padding(horizontal = PAGE_GUTTER, vertical = 10.dp)) {
+            SkeletonLine(fraction = 0.5f, height = 22.dp)
+            Spacer(Modifier.height(8.dp))
+            SkeletonLine(fraction = 0.66f, height = 14.dp)
+        }
+        BoxWithConstraints {
+            val cardWidth = maxWidth - PAGE_GUTTER - 36.dp
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = PAGE_GUTTER),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                userScrollEnabled = false,
+            ) {
+                items(2) { card ->
+                    Column(Modifier.width(cardWidth)) {
+                        SkeletonLine(fraction = TitleWidths[card % TitleWidths.size], height = 16.dp)
+                        Spacer(Modifier.height(4.dp))
+                        SkeletonLine(fraction = SubtitleWidths[card % SubtitleWidths.size] + 0.3f, height = 14.dp)
+                        Spacer(Modifier.height(8.dp))
+                        ShimmerBox(
+                            modifier = Modifier.fillMaxWidth().aspectRatio(1.5f),
+                            shape = RoundedCornerShape(16.dp),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
 /** Reserved at the top of Play while Recents loads. */
 fun LazyListScope.recentlyPlayedSkeleton() {
     item(key = "skeleton:recently-played") {

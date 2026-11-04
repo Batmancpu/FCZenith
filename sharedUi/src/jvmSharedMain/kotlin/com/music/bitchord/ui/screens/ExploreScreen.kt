@@ -51,6 +51,7 @@ import com.music.bitchord.data.model.UiState
 import com.music.bitchord.ui.components.MessageState
 import com.music.bitchord.ui.components.PAGE_GUTTER
 import com.music.bitchord.ui.components.PullToRefresh
+import com.music.bitchord.ui.components.EditorialShelfSkeleton
 import com.music.bitchord.ui.components.ShimmerBox
 import com.music.bitchord.ui.components.feedSkeleton
 import com.music.bitchord.ui.components.instantPressClickable
@@ -114,6 +115,10 @@ fun ExploreScreen(
                 }
                 if (editorial != null && onShelfItemClick != null) {
                     editorialShelf(editorial, onShelfItemClick, onShelfItemLongPress)
+                } else if (onShelfItemClick != null && homeState is UiState.Loading) {
+                    // The release shelf is still on the wire: hold its place so
+                    // the mood grid doesn't jump down when it lands.
+                    item(key = "editorial-skeleton") { EditorialShelfSkeleton() }
                 }
                 when (state) {
                     UiState.Loading -> item { ExploreSkeletonRows(columns) }
