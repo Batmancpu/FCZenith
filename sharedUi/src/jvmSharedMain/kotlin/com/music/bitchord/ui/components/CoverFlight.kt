@@ -91,6 +91,14 @@ private const val CLIP_DISSOLVE_MS = 220
 /** How long the flying cover dissolves into a sleeve that has no clip, once it has landed. */
 private const val LAND_DISSOLVE_MS = 180
 
+/**
+ * Berapa lama gambar hidup (mosaic) yang baru dikomposisi diberi waktu memuat
+ * tile-nya sebelum kartu/sleeve asal disembunyikan. Tanpa jeda ini cover
+ * terbang masih kosong beberapa frame saat aslinya sudah hilang, dan itu
+ * terlihat sebagai blink.
+ */
+private const val CONTENT_READY_MS = 64L
+
 /** Peak drop shadow of the flying cover, reached mid-flight. */
 private const val FLIGHT_SHADOW_DP = 30
 
@@ -251,7 +259,6 @@ private object CoverFlightState {
         val source = sources[token] ?: return false
         f.model = source.model
         f.content = source.content
-        if (source.content != null) f.imageReady = true
         f.toCornerPx = source.cornerPx
         f.footFade = source.footFade
         if (f.canvas == null) f.canvas = source.canvas
@@ -295,7 +302,7 @@ private fun startFlight(
         it.canvas = source.canvas
         it.frame = frame
         it.content = source.content
-        it.imageReady = frame != null || source.content != null
+        it.imageReady = frame != null
         it.token = token
     }
 }
@@ -577,7 +584,7 @@ private fun FlightLayer(flight: Flight) {
                 snapshotFlow { CoverFlightState.target }.filterNotNull().first()
             }
         }
-        delay(150)
+        delay(if (flight.content != null) CONTENT_READY_MS else 150L)
         flight.imageReady = true
     }
     LaunchedEffect(flight) {

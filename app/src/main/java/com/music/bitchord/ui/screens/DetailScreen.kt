@@ -602,7 +602,7 @@ fun DetailScreen(
                 val gridColumns = libraryGrid(maxWidth - PAGE_GUTTER * 2).columns
                 // Liked Music: tarikan ke bawah dibatasi kecil, jadi seni ekstra di
                 // atas hero cukup tipis dan lubang tidak pernah terlihat.
-                val listOverscroll = if (page.isLikedMusic()) {
+                val listOverscroll = if (page.isLikedMusic() || page.covers.isNotEmpty()) {
                     rememberIosOverscrollEffect(LIKED_MAX_PULL)
                 } else {
                     rememberOverscrollEffect()
@@ -1005,7 +1005,7 @@ private fun ReleaseHeader(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         if (page.covers.isNotEmpty()) {
-            MostPlayedHero(page = page, palette = palette)
+            MostPlayedHero(page = page, palette = palette, height = heroHeight)
         } else if (fullBleed) {
             LikedMusicHero(
                 page = page,
@@ -2529,6 +2529,7 @@ private fun DetailPage.headerLines(trackCount: Int, playtime: String? = null): P
 private fun MostPlayedHero(
     page: DetailPage,
     palette: ArtworkPalette,
+    height: Dp,
     modifier: Modifier = Modifier,
 ) {
     Box(
@@ -2541,15 +2542,35 @@ private fun MostPlayedHero(
                 layout(placeable.width, placeable.height - overlap) { placeable.place(0, 0) }
             }
             .fillMaxWidth()
-            .aspectRatio(1f)
+            .height(height)
+            // Dipotong di sisi dan bawah, tapi tidak di atas: tarikan ke bawah
+            // (dibatasi LIKED_MAX_PULL) menggeser hero turun dan bagian atasnya
+            // tetap terisi seni, jadi tidak ada ruang kosong.
+            .drawWithContent {
+                val extra = LIKED_OVERSCROLL.toPx()
+                clipRect(left = 0f, top = -extra, right = size.width, bottom = size.height) {
+                    this@drawWithContent.drawContent()
+                }
+            }
             .coverFlightTarget(page.browseId, 0.dp, palette.background),
     ) {
-        CompositionLocalProvider(LocalSettledMosaic provides true) {
-            MostPlayedArt(
-                covers = page.covers,
-                motion = true,
-                modifier = Modifier.matchParentSize().clipToBounds(),
-            )
+        // Seni sengaja lebih tinggi daripada hero: kelebihannya menjulur ke atas.
+        Box(
+            Modifier.layout { measurable, constraints ->
+                val extra = LIKED_OVERSCROLL.roundToPx()
+                val placeable = measurable.measure(
+                    Constraints.fixed(constraints.maxWidth, constraints.maxHeight + extra),
+                )
+                layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(0, -extra) }
+            },
+        ) {
+            CompositionLocalProvider(LocalSettledMosaic provides true) {
+                MostPlayedArt(
+                    covers = page.covers,
+                    motion = true,
+                    modifier = Modifier.matchParentSize().clipToBounds(),
+                )
+            }
         }
         // Berakhir di warna halaman penuh, jadi tidak ada tepi tempat seni berhenti.
         val clear = palette.background.copy(alpha = 0f)
