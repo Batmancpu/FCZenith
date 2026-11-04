@@ -154,6 +154,8 @@ fun LiquidSegmentedControl(
     edgeScroll: ScrollState? = null,
     /** Lebar viewport track (px); dibutuhkan bersama [edgeScroll]. */
     viewportPx: Float = 0f,
+    /** False untuk track yang bisa digeser: rim digambar pemanggil di viewport yang diam. */
+    drawRim: Boolean = true,
     content: @Composable (index: Int, color: Color) -> Unit,
 ) {
     val modes = remember(count) { List(count) { it } }
@@ -386,48 +388,7 @@ fun LiquidSegmentedControl(
 
         // 3) Tepi kaca: rim ambient, bayangan luar, inner shadow tipis, border putih transparan.
         //    Hanya dekorasi (tanpa input); konten yang terbaca selalu digambar paling akhir.
-        if (glassOn) {
-            Box(
-                Modifier
-                    .drawBackdrop(
-                        backdrop = emptyBackdrop(),
-                        shape = { shape },
-                        effects = {},
-                        highlight = { Highlight.Ambient },
-                        shadow = {
-                            Shadow(
-                                radius = 10.dp,
-                                color = Color.Black.copy(alpha = if (light) 0.06f else 0.25f),
-                            )
-                        },
-                        innerShadow = {
-                            InnerShadow(
-                                radius = 6.dp,
-                                offset = DpOffset(0.dp, 2.dp),
-                                color = Color.Black.copy(alpha = if (light) 0.14f else 0.35f),
-                                alpha = 0.6f,
-                            )
-                        },
-                        onDrawFront = {
-                            val w = 0.75f.dp.toPx()
-                            drawRoundRect(
-                                color = Color.White.copy(alpha = if (light) 0.55f else 0.16f),
-                                topLeft = Offset(w / 2f, w / 2f),
-                                size = Size(size.width - w, size.height - w),
-                                cornerRadius = CornerRadius((size.height - w) / 2f),
-                                style = Stroke(w),
-                            )
-                        },
-                    )
-                    .matchParentSize(),
-            )
-        } else {
-            Box(
-                Modifier
-                    .matchParentSize()
-                    .border(GLASS_EDGE_WIDTH, GLASS_EDGE_COLOR, shape),
-            )
-        }
+        if (drawRim) SegmentedRim(Modifier.matchParentSize(), shape, light, glassOn)
 
         // 4) Hanya label terpilih yang digambar tajam di atas pill (yang lain sudah ada di track);
         //    memudar sebagian selagi kaca menyala supaya refraksi label di bawah pill terlihat.
@@ -664,6 +625,9 @@ fun LiquidScrollSegmentedControl(
     val reduceAnimation by AppSettings.reduceAnimation.collectAsStateWithLifecycle()
     val scroll = rememberScrollState()
     val placed = remember { booleanArrayOf(false) }
+    val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
+    val glassOn = isGlassSupported() && !reduceDynamicBlur
+    val light = MaterialTheme.colorScheme.surface.luminance() > 0.5f
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val natural = minSegmentWidth * count + SELECTOR_INSET * 2
         if (natural <= maxWidth) {
@@ -697,15 +661,68 @@ fun LiquidScrollSegmentedControl(
                 dragOnlyFromPill = true,
                 edgeScroll = scroll,
                 viewportPx = viewportPx,
+                drawRim = false,
                 content = content,
             )
         }
+        // Rim di viewport yang diam, jadi tepinya tidak ikut hilang saat track digeser.
+        SegmentedRim(Modifier.matchParentSize(), RoundedCornerShape(percent = 50), light, glassOn)
     }
 }
 
 @Composable
 private fun SegmentBox(modifier: Modifier, content: @Composable () -> Unit) {
     Box(modifier.fillMaxHeight(), contentAlignment = Alignment.Center) { content() }
+}
+
+/**
+ * Rim track: tepi kaca (atau border biasa tanpa glass). Dipisah supaya track yang
+ * bisa digeser menggambarnya di viewport yang diam, bukan ikut bergeser bersama track.
+ */
+@Composable
+private fun SegmentedRim(
+    modifier: Modifier,
+    shape: RoundedCornerShape,
+    light: Boolean,
+    glassOn: Boolean,
+) {
+    if (glassOn) {
+        Box(
+            modifier
+                .drawBackdrop(
+                    backdrop = emptyBackdrop(),
+                    shape = { shape },
+                    effects = {},
+                    highlight = { Highlight.Ambient },
+                    shadow = {
+                        Shadow(
+                            radius = 10.dp,
+                            color = Color.Black.copy(alpha = if (light) 0.06f else 0.25f),
+                        )
+                    },
+                    innerShadow = {
+                        InnerShadow(
+                            radius = 6.dp,
+                            offset = DpOffset(0.dp, 2.dp),
+                            color = Color.Black.copy(alpha = if (light) 0.14f else 0.35f),
+                            alpha = 0.6f,
+                        )
+                    },
+                    onDrawFront = {
+                        val w = 0.75f.dp.toPx()
+                        drawRoundRect(
+                            color = Color.White.copy(alpha = if (light) 0.55f else 0.16f),
+                            topLeft = Offset(w / 2f, w / 2f),
+                            size = Size(size.width - w, size.height - w),
+                            cornerRadius = CornerRadius((size.height - w) / 2f),
+                            style = Stroke(w),
+                        )
+                    },
+                ),
+        )
+    } else {
+        Box(modifier.border(GLASS_EDGE_WIDTH, GLASS_EDGE_COLOR, shape))
+    }
 }
 
 @Composable
