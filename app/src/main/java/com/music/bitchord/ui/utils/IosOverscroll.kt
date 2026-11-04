@@ -26,6 +26,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Velocity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -62,6 +63,8 @@ private fun rubberBand(rawDistance: Float, containerPx: Float): Float {
 private class IosOverscrollEffect(
     // Batas tarikan ke bawah (px). 0 = tanpa batas, ikut tinggi kontainer.
     private val maxPullDownPx: Float = 0f,
+    // Batas tarikan ke segala arah (px), dipakai panel menu. 0 = tanpa batas.
+    private val maxPullPx: Float = 0f,
 ) : OverscrollEffect {
     private val rawPullX = mutableFloatStateOf(0f)
     private val rawPullY = mutableFloatStateOf(0f)
@@ -167,12 +170,20 @@ private class IosOverscrollEffect(
     }
 
     override val node: DelegatableNode = IosOverscrollNode(
-        offsetX = { rubberBand(rawPullX.floatValue, containerWidthPx) },
+        offsetX = {
+            if (maxPullPx > 0f) {
+                rubberBand(rawPullX.floatValue, maxPullPx * rubberBandConstant)
+            } else {
+                rubberBand(rawPullX.floatValue, containerWidthPx)
+            }
+        },
         offsetY = {
             val raw = rawPullY.floatValue
             // Tarikan ke bawah dibatasi supaya tidak pernah melewati seni ekstra
             // di atas hero. Tarikan ke atas tetap memakai kurva biasa.
-            if (maxPullDownPx > 0f && raw > 0f) {
+            if (maxPullPx > 0f) {
+                rubberBand(raw, maxPullPx * rubberBandConstant)
+            } else if (maxPullDownPx > 0f && raw > 0f) {
                 rubberBand(raw, maxPullDownPx * rubberBandConstant)
             } else {
                 rubberBand(raw, containerHeightPx)
@@ -211,13 +222,16 @@ private class IosOverscrollNode(
 private class IosOverscrollFactory(
     private val density: Density,
     private val scope: CoroutineScope,
+    private val maxPullPx: Float = 0f,
 ) : OverscrollFactory {
-    override fun createOverscrollEffect(): OverscrollEffect = IosOverscrollEffect()
+    override fun createOverscrollEffect(): OverscrollEffect = IosOverscrollEffect(maxPullPx = maxPullPx)
 
     override fun equals(other: Any?): Boolean =
-        other is IosOverscrollFactory && other.density == density && other.scope === scope
+        other is IosOverscrollFactory && other.density == density && other.scope === scope &&
+            other.maxPullPx == maxPullPx
 
-    override fun hashCode(): Int = 31 * density.hashCode() + scope.hashCode()
+    override fun hashCode(): Int =
+        31 * (31 * density.hashCode() + scope.hashCode()) + maxPullPx.hashCode()
 }
 
 /** Provides iOS-style rubber-band overscroll to every descendant scroll container. */
@@ -226,6 +240,16 @@ fun rememberIosOverscrollFactory(): OverscrollFactory {
     val density = LocalDensity.current
     val scope = rememberCoroutineScope()
     return remember(density, scope) { IosOverscrollFactory(density, scope) }
+}
+
+/** Overscroll iOS untuk panel menu: tarikannya pendek (maks [maxPull]), tidak ikut tinggi panel. */
+@Composable
+fun rememberIosMenuOverscrollFactory(maxPull: Dp = 36.dp): OverscrollFactory {
+    val density = LocalDensity.current
+    val scope = rememberCoroutineScope()
+    return remember(density, scope, maxPull) {
+        IosOverscrollFactory(density, scope, with(density) { maxPull.toPx() })
+    }
 }
 
 /** Efek iOS yang tarikan ke bawahnya tidak pernah melewati [maxPullDown]. */

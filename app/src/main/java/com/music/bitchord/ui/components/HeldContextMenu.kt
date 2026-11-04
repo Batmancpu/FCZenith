@@ -266,7 +266,7 @@ fun <T : Any> HeldContextMenu(
                     .iosMenuTouchHost(touch, iosMenuColors().pressed)
                     .padding(vertical = 8.dp),
             ) {
-                CompositionLocalProvider(LocalIosMenuTouch provides touch) {
+                IosMenuScrollEnvironment(touch) {
                     actions(menuItem)
                 }
             }

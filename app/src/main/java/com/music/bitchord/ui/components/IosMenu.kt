@@ -541,7 +541,7 @@ fun <T : Any> IosMenuPopover(
                         .iosMenuTouchHost(touch, pressedColor)
                         .padding(vertical = 8.dp),
                 ) {
-                    CompositionLocalProvider(LocalIosMenuTouch provides touch) {
+                    IosMenuScrollEnvironment(touch) {
                         content(menuItem)
                     }
                 }

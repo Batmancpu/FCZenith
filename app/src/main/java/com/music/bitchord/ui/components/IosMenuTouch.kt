@@ -6,6 +6,23 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.LocalOverscrollFactory
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.Role
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.music.bitchord.data.settings.AppSettings
+import com.music.bitchord.ui.utils.rememberIosMenuOverscrollFactory
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.compositionLocalOf
@@ -108,7 +125,8 @@ internal class IosMenuTouch(private val scope: CoroutineScope) {
         val t = if (scrolled) null else targetAt(pos)
         if (t !== startTarget && (pos - down).getDistance() > slop) leftStart = true
         if (t !== hovered) select(t, animate = true)
-        jellyTo(pos, dead, maxShift)
+        // Menu yang sedang digulir tidak ikut meregang: tarikan jari itu milik daftar.
+        jellyTo(if (scrolled) down else pos, dead, maxShift)
     }
 
     private fun select(t: Target?, animate: Boolean) {
@@ -251,4 +269,61 @@ internal fun GraphicsLayerScope.applyIosMenuJelly(touch: IosMenuTouch, grow: Flo
     scaleY *= jy
     translationX += touch.jellyX.value + (0.5f - pivotX) * size.width * grow * (1f - jx)
     translationY += touch.jellyY.value + (0.5f - pivotY) * size.height * grow * (1f - jy)
+}
+
+/** Jelly untuk panel menu biasa (bukan [IosMenuPopover]), berpusat di ([originX], [originY]). */
+internal fun Modifier.iosMenuJelly(touch: IosMenuTouch, originX: Float, originY: Float): Modifier =
+    graphicsLayer {
+        transformOrigin = TransformOrigin(originX, originY)
+        applyIosMenuJelly(touch, 1f, originX, originY)
+    }
+
+/** Objek sentuhan untuk panel menu yang menggambar dirinya sendiri. */
+@Composable
+internal fun rememberJellyMenuTouch(): IosMenuTouch {
+    val reduce by AppSettings.reduceAnimation.collectAsStateWithLifecycle()
+    return rememberIosMenuTouch(reduce)
+}
+
+/** Pil sentuhan + jelly lewat [touch], dan overscroll pendek untuk daftar di dalam menu. */
+@Composable
+internal fun IosMenuScrollEnvironment(touch: IosMenuTouch, content: @Composable () -> Unit) {
+    CompositionLocalProvider(
+        LocalIosMenuTouch provides touch,
+        LocalOverscrollFactory provides rememberIosMenuOverscrollFactory(),
+        content = content,
+    )
+}
+
+/** Isi panel menu biasa: kolom dengan pil sentuhan di belakang barisnya. */
+@Composable
+internal fun JellyMenuBody(
+    touch: IosMenuTouch,
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val pressed = iosMenuColors().pressed
+    Column(modifier.iosMenuTouchHost(touch, pressed).padding(vertical = 8.dp)) {
+        IosMenuScrollEnvironment(touch) { content() }
+    }
+}
+
+/** Satu baris menu biasa: terdaftar ke pil sentuhan, tanpa ripple saat ada host. */
+@Composable
+internal fun Modifier.jellyMenuRow(
+    corner: Dp = 14.dp,
+    role: Role = Role.Button,
+    onClick: () -> Unit,
+): Modifier {
+    val touch = LocalIosMenuTouch.current
+    val source = remember { MutableInteractionSource() }
+    return this
+        .iosMenuTouchTarget(true, corner, onClick)
+        .clip(RoundedCornerShape(corner))
+        .clickable(
+            interactionSource = source,
+            indication = if (touch == null) LocalIndication.current else null,
+            role = role,
+            onClick = onClick,
+        )
 }

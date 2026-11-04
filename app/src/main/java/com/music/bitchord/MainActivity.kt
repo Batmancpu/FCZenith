@@ -149,6 +149,10 @@ import com.music.bitchord.ui.AddonBlockedAlert
 import com.music.bitchord.data.settings.LibrarySort
 import com.music.bitchord.data.settings.ThemeMode
 import com.music.bitchord.ui.components.AccountProfileSelector
+import com.music.bitchord.ui.components.JellyMenuBody
+import com.music.bitchord.ui.components.iosMenuJelly
+import com.music.bitchord.ui.components.jellyMenuRow
+import com.music.bitchord.ui.components.rememberJellyMenuTouch
 import com.music.bitchord.ui.components.DacVolumeHud
 import com.music.bitchord.ui.components.DacVolumeKeys
 import com.music.bitchord.ui.components.LocalPlayingBarsMotion
@@ -3997,23 +4001,8 @@ private fun BitChordApp(
                                             tint = MaterialTheme.colorScheme.onSurface,
                                         )
                                     }
-                                    DropdownMenu(
-                                        expanded = librarySortMenuOpen,
-                                        onDismissRequest = { librarySortMenuOpen = false },
-                                    ) {
-                                        LibrarySort.entries.forEach { option ->
-                                            DropdownMenuItem(
-                                                text = { Text(option.localizedLabel()) },
-                                                trailingIcon = if (option == librarySort) {
-                                                    { Icon(Icons.Rounded.Check, contentDescription = null) }
-                                                } else null,
-                                                onClick = {
-                                                    AppSettings.setLibrarySort(option)
-                                                    librarySortMenuOpen = false
-                                                },
-                                            )
-                                        }
-                                    }
+                                    // The menu itself is a FrostedMenuPanel, composed
+                                    // with the other frosted overlays further down.
                                 }
                             }
                             // Sort, only on an album or playlist page or a device
@@ -5450,6 +5439,22 @@ private fun BitChordApp(
             )
         }
 
+        if (librarySortMenuOpen) {
+            BackHandler { librarySortMenuOpen = false }
+            FrostedMenuPanel(hazeState = hazeState, onDismiss = { librarySortMenuOpen = false }) {
+                LibrarySort.entries.forEach { option ->
+                    FrostedMenuRow(
+                        label = option.localizedLabel(),
+                        checked = option == librarySort,
+                        onClick = {
+                            AppSettings.setLibrarySort(option)
+                            librarySortMenuOpen = false
+                        },
+                    )
+                }
+            }
+        }
+
         val menuFolder = detail?.browseId?.takeIf { it.isDeviceFolder() }
         if (folderMenuOpen && menuFolder != null) {
             BackHandler { folderMenuOpen = false }
@@ -5943,9 +5948,10 @@ private fun FrostedSortMenu(
         Row(
             Modifier
                 .fillMaxWidth()
+                .padding(horizontal = 8.dp)
+                .jellyMenuRow(onClick = onFlipDateDirection)
                 .heightIn(min = 48.dp)
-                .clickable(role = Role.Button) { onFlipDateDirection() }
-                .padding(horizontal = 20.dp, vertical = 8.dp),
+                .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
@@ -6020,6 +6026,7 @@ private fun FrostedMenuPanel(
 ) {
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
     val shape = MaterialTheme.shapes.extraLarge
+    val touch = rememberJellyMenuTouch()
     Box(
         Modifier
             .fillMaxSize()
@@ -6033,6 +6040,7 @@ private fun FrostedMenuPanel(
             shape = shape,
             modifier = Modifier
                 .padding(top = 56.dp, end = 20.dp)
+                .iosMenuJelly(touch, 1f, 0f)
                 .width(IntrinsicSize.Max)
                 .clip(shape)
                 .then(
@@ -6047,7 +6055,7 @@ private fun FrostedMenuPanel(
                 )
                 .clickable(onClick = {}),
         ) {
-            Column(Modifier.padding(vertical = 8.dp), content = content)
+            JellyMenuBody(touch, content = content)
         }
     }
 }
@@ -6063,9 +6071,10 @@ private fun FrostedMenuRow(
     Row(
         Modifier
             .fillMaxWidth()
+            .padding(horizontal = 8.dp)
+            .jellyMenuRow(onClick = onClick)
             .heightIn(min = 44.dp)
-            .clickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 10.dp),
+            .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(

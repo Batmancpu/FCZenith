@@ -86,6 +86,7 @@ fun AccountProfileSelector(
     var managing by remember { mutableStateOf(false) }
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
     val reduceMotion by AppSettings.reduceAnimation.collectAsStateWithLifecycle()
+    val touch = rememberIosMenuTouch(reduceMotion)
     val shape = RoundedCornerShape(22.dp)
     val surface = MaterialTheme.colorScheme.surface
     val scrim = MaterialTheme.colorScheme.scrim
@@ -174,6 +175,7 @@ fun AccountProfileSelector(
                     alpha = fade.value.coerceIn(0f, 1f)
                     // Grows out of the corner under the profile button.
                     transformOrigin = TransformOrigin(0.92f, 0f)
+                    if (!reduceMotion) applyIosMenuJelly(touch, s, 0.92f, 0f)
                 }
                 .clip(shape)
                 .then(
@@ -198,8 +200,9 @@ fun AccountProfileSelector(
         ) {
             // Room under the last row to match the space between rows, so the
             // list doesn't stop short against the card's edge.
+            IosMenuScrollEnvironment(touch) {
             LazyColumn(
-                modifier = Modifier.heightIn(max = 440.dp),
+                modifier = Modifier.heightIn(max = 440.dp).iosMenuTouchHost(touch, iosMenuColors().pressed),
                 contentPadding = PaddingValues(bottom = 8.dp),
             ) {
                 item { Text(stringResource(R.string.switch_account), style = MaterialTheme.typography.titleMedium,
@@ -229,6 +232,7 @@ fun AccountProfileSelector(
                 item { SelectorAction(SfIcons.ManageAccounts, stringResource(R.string.manage_accounts), iconSize = 26.dp) { managing = !managing } }
                 item { SelectorAction(SfIcons.Settings, stringResource(R.string.settings), onClick = { close(onOpenSettings) }) }
             }
+            }
         }
     }
 }
@@ -245,9 +249,11 @@ fun AccountProfileSelector(
         scaleY = s
         alpha = r.coerceIn(0f, 1f)
     }
-    Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable(role = Role.RadioButton, onClick = if (managing) onRemove else onClick)
+    Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp)
+        .jellyMenuRow(role = Role.RadioButton, onClick = if (managing) onRemove else onClick)
+        .heightIn(min = 48.dp)
         .semantics { contentDescription = description }
-        .padding(horizontal = 18.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        .padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         if (profile.avatar != null) AsyncImage(profile.avatar, null, Modifier.size(32.dp).then(revealFx).clip(MaterialTheme.shapes.extraLarge))
         else Icon(SfIcons.AccountPlaceholder, null, Modifier.size(32.dp).then(revealFx), tint = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.width(12.dp)); Column(Modifier.weight(1f)) {
@@ -266,8 +272,10 @@ fun AccountProfileSelector(
     iconSize: Dp = 22.dp,
     onClick: () -> Unit,
 ) {
-    Row(Modifier.fillMaxWidth().heightIn(min = 44.dp).clickable(role = Role.Button, onClick = onClick)
-        .semantics { contentDescription = label }.padding(horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp)
+        .jellyMenuRow(onClick = onClick)
+        .heightIn(min = 44.dp)
+        .semantics { contentDescription = label }.padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
         // In the avatars' column, so the labels line up with the names above.
         Box(Modifier.width(32.dp), contentAlignment = Alignment.Center) { Icon(icon, null, Modifier.size(iconSize)) }
         Spacer(Modifier.width(12.dp)); Text(label, style = MaterialTheme.typography.bodyLarge)
