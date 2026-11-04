@@ -246,11 +246,8 @@ fun HomeScreen(
                     MessageState(state.message, actionLabel = stringResource(Res.string.retry), onAction = onRetry)
                 }
                 is UiState.Success -> {
-                    // Home only: the Apple-style release row sits right under Top Picks.
+                    // The Apple-style release row now leads Explore; keep it out of Home.
                     val editorialIndex = if (onTopPickClick != null) editorialShelfIndex(state.data) else null
-                    if (editorialIndex != null) {
-                        editorialShelf(state.data[editorialIndex], onItemClick, onItemLongPress)
-                    }
                     if (recentlyPlayedLoading) {
                         recentlyPlayedSkeleton()
                     }

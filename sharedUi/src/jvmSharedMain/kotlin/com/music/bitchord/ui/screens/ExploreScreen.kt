@@ -69,7 +69,19 @@ fun ExploreScreen(
     modifier: Modifier = Modifier,
     /** The big "Explore" heading; the desktop's pages carry none. */
     showTitle: Boolean = true,
+    /**
+     * The home feed, read only for the release shelf (Apple's "New" style
+     * cards) that leads this page. Home leaves that shelf out.
+     */
+    homeState: UiState<List<HomeShelf>>? = null,
+    onShelfItemClick: ((ShelfItem, String) -> Unit)? = null,
+    onShelfItemLongPress: ((ShelfItem) -> Unit)? = null,
 ) {
+    val editorial = remember(homeState) {
+        (homeState as? UiState.Success)?.data?.let { shelves ->
+            editorialShelfIndex(shelves)?.let { shelves[it] }
+        }
+    }
     PullToRefresh(
         refreshing = refreshing,
         onRefresh = onRefresh,
@@ -99,6 +111,9 @@ fun ExploreScreen(
                             ),
                         )
                     }
+                }
+                if (editorial != null && onShelfItemClick != null) {
+                    editorialShelf(editorial, onShelfItemClick, onShelfItemLongPress)
                 }
                 when (state) {
                     UiState.Loading -> item { ExploreSkeletonRows(columns) }
