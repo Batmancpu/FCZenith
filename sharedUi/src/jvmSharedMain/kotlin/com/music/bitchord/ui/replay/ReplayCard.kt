@@ -137,30 +137,33 @@ fun ReplayCreditCard(
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
-                        0.0f to Color.Black.copy(alpha = 0.24f),
-                        0.40f to Color.Black.copy(alpha = 0.12f),
-                        0.72f to Color.Black.copy(alpha = 0.38f),
-                        1.0f to Color.Black.copy(alpha = 0.72f),
+                        0.0f to Color.Black.copy(alpha = 0.46f),
+                        0.35f to Color.Black.copy(alpha = 0.22f),
+                        0.60f to Color.Black.copy(alpha = 0.52f),
+                        1.0f to Color.Black.copy(alpha = 0.84f),
                     ),
                 ),
         )
 
         Column(Modifier.fillMaxSize().padding(horizontal = 18.dp, vertical = 16.dp)) {
-            // The two things a card says about itself, at the two corners a card
-            // says them from: what it is on the left, whose it is on the right.
-            // The wordmark that used to sit here is gone — the logo says it, and
-            // saying it twice on an object this small is the difference between
-            // a card and an advert.
-            Row(verticalAlignment = Alignment.Top) {
-                Text(
-                    text = stringResource(Res.string.your_listening_experience).uppercase(Locale.getDefault()),
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.W700,
-                    letterSpacing = 1.4.sp,
-                    lineHeight = 13.sp,
-                    color = Color.White.copy(alpha = 0.72f),
-                    modifier = Modifier.weight(1f),
-                )
+            // Head: what the card is on the left, in a dark pill so it stays
+            // readable over any artwork; the logo on the right.
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(Res.string.your_listening_experience).uppercase(Locale.getDefault()),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.W700,
+                        letterSpacing = 1.2.sp,
+                        color = Color.White.copy(alpha = 0.92f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(50))
+                            .background(Color.Black.copy(alpha = 0.32f))
+                            .padding(horizontal = 10.dp, vertical = 4.dp),
+                    )
+                }
                 Spacer(Modifier.width(10.dp))
                 Icon(
                     painter = painterResource(Res.drawable.ic_logo),
@@ -172,15 +175,20 @@ fun ReplayCreditCard(
 
             Spacer(Modifier.weight(1f))
 
+            // Body: the one figure, large and plain, with its name under it.
             Text(
                 text = value,
                 style = MaterialTheme.typography.headlineMedium.copy(
-                    fontSize = 27.sp,
-                    lineHeight = 30.sp,
+                    fontSize = if (value.length <= 6) 40.sp else 26.sp,
+                    lineHeight = if (value.length <= 6) 42.sp else 30.sp,
                     fontWeight = FontWeight.W800,
-                    brush = PolishedInk,
-                    shadow = EmbossShadow,
+                    shadow = Shadow(
+                        color = Color.Black.copy(alpha = 0.45f),
+                        offset = Offset(0f, 2f),
+                        blurRadius = 10f,
+                    ),
                 ),
+                color = Color.White,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -188,26 +196,30 @@ fun ReplayCreditCard(
                 text = label.uppercase(Locale.ROOT),
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.W700,
-                letterSpacing = 1.8.sp,
-                color = Color.White.copy(alpha = 0.65f),
+                letterSpacing = 1.6.sp,
+                color = Color.White.copy(alpha = 0.80f),
             )
 
-            // Weighted either side rather than pinned to the foot, so the figure
-            // sits where a card's number sits — across the middle — instead of
-            // leaving the whole upper half of a full-width card empty.
-            Spacer(Modifier.weight(0.85f))
-            Row(verticalAlignment = Alignment.Bottom) {
+            Spacer(Modifier.height(12.dp))
+            Box(Modifier.fillMaxWidth().height(0.5.dp).background(Color.White.copy(alpha = 0.20f)))
+            Spacer(Modifier.height(10.dp))
+
+            // Foot: whose card it is on the left, since when on the right.
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Embossed(
-                        text = holder.ifBlank { stringResource(Res.string.default_replay_holder) }
-                            .uppercase(Locale.getDefault()),
-                        size = 13.sp,
+                    Text(
+                        text = holder.ifBlank { stringResource(Res.string.default_replay_holder) },
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.W700,
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                     if (detail != null) {
                         Text(
                             text = detail,
                             style = MaterialTheme.typography.labelSmall,
-                            color = Color.White.copy(alpha = 0.6f),
+                            color = Color.White.copy(alpha = 0.70f),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -219,16 +231,10 @@ fun ReplayCreditCard(
                         Text(
                             text = stringResource(Res.string.member_since).uppercase(Locale.getDefault()),
                             style = MaterialTheme.typography.labelSmall,
-                            fontSize = 7.sp,
-                            lineHeight = 8.sp,
+                            fontSize = 8.sp,
+                            lineHeight = 10.sp,
                             letterSpacing = 0.8.sp,
-                            color = Color.White.copy(alpha = 0.55f),
-                            // Both lines to the right edge, not just the block.
-                            // Column alignment places the text *box*; inside it
-                            // the two lines still set from the left, which left
-                            // "MEMBER / SINCE" hanging a few pixels off the date
-                            // under it — the one misalignment on the card that
-                            // catches the eye every time.
+                            color = Color.White.copy(alpha = 0.60f),
                             textAlign = TextAlign.End,
                         )
                         Embossed(text = memberSince, size = 12.sp)
