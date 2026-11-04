@@ -2599,10 +2599,14 @@ private fun MostPlayedHero(
                 .matchParentSize()
                 .background(
                     Brush.verticalGradient(
+                        // Titik dan alpha disamakan dengan wash cover terbang
+                        // (CoverFlight), jadi saat cover mendarat dan memudar
+                        // tidak ada perubahan bentuk fade di kaki hero.
                         0.00f to clear,
-                        0.60f to clear,
-                        0.74f to palette.background.copy(alpha = 0.45f),
-                        0.88f to palette.background.copy(alpha = 0.88f),
+                        0.45f to clear,
+                        0.65f to palette.background.copy(alpha = 0.30f),
+                        0.82f to palette.background.copy(alpha = 0.72f),
+                        0.94f to palette.background.copy(alpha = 0.95f),
                         1.00f to palette.background,
                     ),
                 ),
