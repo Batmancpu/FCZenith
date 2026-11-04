@@ -581,6 +581,16 @@ private fun BitChordApp(
     // dock or the motion directly.
     val reducePlayerMotion by AppSettings.reduceAnimation.collectAsStateWithLifecycle()
     val activeDock = playerDock.takeIf { !reducePlayerMotion }
+    // Selagi player ditarik/dibuka di atas halaman, animasi hero Most Played
+    // dibekukan. Dibaca lewat snapshotFlow, jadi tidak ada recomposition di sini.
+    LaunchedEffect(activeDock) {
+        try {
+            androidx.compose.runtime.snapshotFlow { (activeDock?.openFraction() ?: 0f) > 0f }
+                .collect { com.music.bitchord.ui.screens.HeroMotion.frozen = it }
+        } finally {
+            com.music.bitchord.ui.screens.HeroMotion.frozen = false
+        }
+    }
     playerSheetMotion.flingVelocity = with(LocalDensity.current) { PLAYER_PULL_FLING_VELOCITY.toPx() }
     // How the app takes the player down, whatever for: a back press, or a page
     // opened from inside it. Set straight to false, the sheet left in one frame

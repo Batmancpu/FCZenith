@@ -2605,7 +2605,7 @@ private fun MostPlayedHero(
             CompositionLocalProvider(LocalSettledMosaic provides true) {
                 MostPlayedArt(
                     covers = page.covers,
-                    motion = true,
+                    motion = !HeroMotion.frozen,
                     modifier = Modifier.fillMaxSize().drawWithContent {
                         shared.record(
                             size = IntSize(
@@ -3067,6 +3067,15 @@ private fun LikedArt(
             }
         }
     }
+}
+
+/**
+ * Diisi MainActivity: true selagi player ditarik atau terbuka di atas halaman.
+ * Hero Most Played berhenti beranimasi selama itu, supaya mosaic, mesh, dan blur
+ * kaki tidak digambar ulang tiap frame berebut GPU dengan canvas player.
+ */
+object HeroMotion {
+    var frozen by mutableStateOf(false)
 }
 
 /** The Liked Music mosaic as a standalone cover, for Home's Most Played card. */
