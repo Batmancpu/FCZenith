@@ -454,54 +454,194 @@ private fun TopPickCard(
             }
         }
         if (branded) {
-            Wordmark(
-                logoHeight = 14.dp,
-                fontSize = 16.sp,
-                color = Color.White,
-                gap = 2.dp,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(top = 12.dp, end = 12.dp),
-            )
+            AmbientGlow(base = glowBase(pick), modifier = Modifier.fillMaxSize())
         }
-        CardCaption(text, eyebrowColor, Modifier.align(Alignment.BottomStart).hideDuringCoverFlight(coverToken))
+        CardOverlay(
+            text = text,
+            eyebrowColor = eyebrowColor,
+            branded = branded,
+            titleInArt = pick.kind == TopPickKind.MOOD ||
+                pick.kind == TopPickKind.PERSONAL_STATION ||
+                pick.kind == TopPickKind.DISCOVERY_STATION,
+            modifier = Modifier.fillMaxSize().hideDuringCoverFlight(coverToken),
+        )
     }
 }
 
+/**
+ * What sits over a card's art, laid out as Apple Music's Friends Mix is: the
+ * wordmark top-left and, on stations and moods, the name large under it; the
+ * rest rides in a band along the foot. On the branded cards the band is a
+ * darker layer with a faint lit edge; on photo cards it fades up from the
+ * picture instead, so the cover is never cut by a line.
+ */
 @Composable
-private fun CardCaption(text: CardText, eyebrowColor: Color, modifier: Modifier) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
-    ) {
-        Text(
-            text = text.eyebrow,
-            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp, lineHeight = 16.sp),
-            color = eyebrowColor,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-            text = text.title,
-            style = MaterialTheme.typography.titleMedium.copy(
-                fontSize = 17.sp,
-                lineHeight = 21.sp,
-                fontWeight = FontWeight.SemiBold,
-            ),
-            color = Color.White,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
-        if (text.subtitle.isNotBlank()) {
-            Text(
-                text = text.subtitle,
-                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp, lineHeight = 16.sp),
-                color = Color.White.copy(alpha = 0.86f),
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
+private fun CardOverlay(
+    text: CardText,
+    eyebrowColor: Color,
+    branded: Boolean,
+    titleInArt: Boolean,
+    modifier: Modifier,
+) {
+    Box(modifier) {
+        if (branded) {
+            Wordmark(
+                logoHeight = 13.dp,
+                fontSize = 15.sp,
+                color = Color.White,
+                gap = 2.dp,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(start = 16.dp, top = 16.dp),
             )
         }
+        if (titleInArt) {
+            Text(
+                text = text.title,
+                style = MaterialTheme.typography.headlineMedium.copy(
+                    fontSize = 25.sp,
+                    lineHeight = 27.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = (-0.5).sp,
+                ),
+                color = Color.White,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(start = 16.dp, end = 16.dp, top = 40.dp),
+            )
+        }
+        val band = if (branded) {
+            Brush.verticalGradient(
+                0f to Color.Black.copy(alpha = 0.22f),
+                1f to Color.Black.copy(alpha = 0.50f),
+            )
+        } else {
+            Brush.verticalGradient(
+                0f to Color.Transparent,
+                0.30f to Color.Black.copy(alpha = 0.34f),
+                1f to Color.Black.copy(alpha = 0.62f),
+            )
+        }
+        Column(
+            Modifier
+                .align(Alignment.BottomStart)
+                .fillMaxWidth()
+                .background(band),
+        ) {
+            if (branded) {
+                Box(Modifier.fillMaxWidth().height(0.5.dp).background(Color.White.copy(alpha = 0.22f)))
+            }
+            Column(
+                Modifier.padding(
+                    start = 16.dp,
+                    end = 16.dp,
+                    top = if (branded) 12.dp else 30.dp,
+                    bottom = 14.dp,
+                ),
+            ) {
+                Text(
+                    text = text.eyebrow,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontSize = 13.sp,
+                        lineHeight = 16.sp,
+                        fontWeight = FontWeight.Medium,
+                    ),
+                    color = eyebrowColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (!titleInArt) {
+                    Text(
+                        text = text.title,
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontSize = 17.sp,
+                            lineHeight = 21.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        ),
+                        color = Color.White,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                if (text.subtitle.isNotBlank()) {
+                    Text(
+                        text = text.subtitle,
+                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp, lineHeight = 16.sp),
+                        color = Color.White.copy(alpha = 0.90f),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** The colour a branded card's glow is mixed from. */
+private fun glowBase(pick: TopPick): Color = when (pick.kind) {
+    TopPickKind.PERSONAL_STATION -> Color(0xFFFA4A6E)
+    TopPickKind.DISCOVERY_STATION -> Color(0xFF3A52B0)
+    TopPickKind.MOOD -> (pick.mood ?: TopPickMood.FEEL_GOOD).style().background
+    TopPickKind.ARTIST_AND_SIMILAR -> collagePalette(pick.artistName.orEmpty()).bottom
+    else -> Color(0xFF444444)
+}
+
+/** One slow drift of the glow; longer than the stations' breath so the two never line up. */
+private const val GLOW_PERIOD_MS = 14_000
+
+private val GlowAlpha = floatArrayOf(0.50f, 0.42f, 0.45f)
+
+private class GlowBrushes(val radii: FloatArray, val blobs: List<Brush>)
+
+/**
+ * Soft light drifting over a card's colour, the way Friends Mix's backdrop
+ * flows: a pale blob, a blob turned a little around the hue wheel, and a deep
+ * one at the foot. The brushes are built once per card size and only moved,
+ * and the phase is read in the draw pass alone, like the stations' loops.
+ */
+@Composable
+private fun AmbientGlow(base: Color, modifier: Modifier = Modifier) {
+    val phase by loopPhase(GLOW_PERIOD_MS)
+    val tones = remember(base) {
+        val turned = Color(base.green, base.blue, base.red)
+        listOf(
+            lerp(base, Color.White, 0.45f),
+            lerp(base, turned, 0.40f),
+            lerp(base, Color.Black, 0.50f),
+        )
+    }
+    val cache = remember(tones) {
+        SizeCache { size ->
+            val reach = maxOf(size.width, size.height)
+            val radii = floatArrayOf(reach * 0.80f, reach * 0.72f, reach * 0.85f)
+            GlowBrushes(
+                radii = radii,
+                blobs = tones.mapIndexed { i, tone ->
+                    Brush.radialGradient(
+                        0f to tone.copy(alpha = GlowAlpha[i]),
+                        1f to Color.Transparent,
+                        center = Offset(radii[i], radii[i]),
+                        radius = radii[i],
+                    )
+                },
+            )
+        }
+    }
+    Canvas(modifier.then(RetainedArt)) {
+        val w = size.width
+        val h = size.height
+        val glow = cache.get(size)
+        fun blob(index: Int, cx: Float, cy: Float) {
+            val radius = glow.radii[index]
+            translate(left = cx - radius, top = cy - radius) {
+                drawCircle(glow.blobs[index], radius = radius, center = Offset(radius, radius))
+            }
+        }
+        blob(0, w * (0.20f + 0.16f * wave(phase, 0f)), h * (0.18f + 0.10f * wave(phase, 0.25f)))
+        blob(1, w * (0.85f + 0.14f * wave(phase, 0.40f)), h * (0.52f + 0.14f * wave(phase, 0.70f)))
+        blob(2, w * (0.35f + 0.20f * wave(phase, 0.60f)), h * (0.95f + 0.05f * wave(phase, 0.10f)))
     }
 }
 
@@ -1119,10 +1259,10 @@ private fun MoodArt(
             val side = w * 0.70f
             Frame(left = (w - side) / 2f, top = (h - side) / 2f, side = side)
         } else {
-            // Most of the card's width, but never down into the caption: the
-            // emblem keeps to the card's top two thirds whatever its proportions.
-            val side = minOf(w * 0.84f, h * 0.62f)
-            Frame(left = (w - side) / 2f, top = h * 0.37f - side / 2f, side = side)
+            // Smaller and lower than it was: the name now sits large above it
+            // and the caption band below, so the emblem keeps to the middle.
+            val side = minOf(w * 0.66f, h * 0.46f)
+            Frame(left = (w - side) / 2f, top = h * 0.545f - side / 2f, side = side)
         }
         val stroke = cache.stroke((if (square) 2.dp else 2.5.dp).toPx())
         drawEmblem(mood, f, loop?.value ?: mood.stillPhase(), style.stroke, stroke, cache)
