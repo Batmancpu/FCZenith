@@ -278,8 +278,8 @@ val LocalPlayerDock = staticCompositionLocalOf<PlayerDock?> { null }
 /** The share of the opening over which the glass gives way to the plain panel. */
 private const val PANEL_FILL_UNTIL = 0.2f
 
-/** Seberapa jauh panel terbuka saat lebarnya sudah penuh selebar layar. */
-private const val PANEL_WIDE_AT = 0.06f
+/** Seberapa jauh panel terbuka saat lebarnya sudah penuh selebar layar: bertahap, bukan langsung. */
+private const val PANEL_WIDE_AT = 0.8f
 
 internal class PlayerMorph(val rect: Rect, val corner: Float, val progress: Float)
 
