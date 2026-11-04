@@ -56,6 +56,13 @@ import com.music.bitchord.ui.components.ShimmerBox
 import com.music.bitchord.ui.components.feedSkeleton
 import com.music.bitchord.ui.components.instantPressClickable
 
+/**
+ * Shelf editorial terakhir yang pernah ditemukan. Feed Home bisa sesaat tidak
+ * memuatnya (refresh Home hanya membawa feed inti, supplement belum kembali),
+ * dan kartu lebar di puncak Explore tidak boleh ikut hilang karenanya.
+ */
+private var lastEditorial: HomeShelf? = null
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExploreScreen(
@@ -79,9 +86,11 @@ fun ExploreScreen(
     onShelfItemLongPress: ((ShelfItem) -> Unit)? = null,
 ) {
     val editorial = remember(homeState) {
-        (homeState as? UiState.Success)?.data?.let { shelves ->
+        val found = (homeState as? UiState.Success)?.data?.let { shelves ->
             editorialShelfIndex(shelves)?.let { shelves[it] }
         }
+        if (found != null) lastEditorial = found
+        found ?: lastEditorial
     }
     PullToRefresh(
         refreshing = refreshing,

@@ -1635,7 +1635,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 if (sections.isEmpty()) {
                     UiState.Error(text(R.string.nothing_to_explore))
                 } else {
-                    UiState.Success(sections)
+                    // Artwork yang sudah pernah dimuat langsung dipakai, jadi
+                    // refresh tidak mengosongkan grid lalu mengulang puluhan request.
+                    UiState.Success(withCachedArtwork(sections))
                 }
             },
             onFailure = { UiState.Error(it.friendly()) },
@@ -1649,28 +1651,58 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      * number at a time from the shelves they open, so the grid gains real art
      * without saturating the browse client or delaying the category list.
      */
+    private val moodArtworkCache = HashMap<String, String>()
+    private var moodArtworkJob: kotlinx.coroutines.Job? = null
+
+    private fun moodKey(item: MoodGenre) = "${item.browseId}|${item.params}"
+
+    private fun withCachedArtwork(sections: List<MoodGenreSection>): List<MoodGenreSection> =
+        if (moodArtworkCache.isEmpty()) {
+            sections
+        } else {
+            sections.map { section ->
+                section.copy(items = section.items.map { item ->
+                    moodArtworkCache[moodKey(item)]?.let { item.copy(thumbnailUrl = it) } ?: item
+                })
+            }
+        }
+
     private fun loadMoodGenreArtwork(sections: List<MoodGenreSection>) {
-        viewModelScope.launch {
-            val limiter = Semaphore(4)
+        // Refresh baru menggantikan pemuatan lama, bukan menumpuk di atasnya.
+        moodArtworkJob?.cancel()
+        val missing = sections.flatMap(MoodGenreSection::items).filter { moodKey(it) !in moodArtworkCache }
+        if (missing.isEmpty()) return
+        moodArtworkJob = viewModelScope.launch {
+            // Biarkan tab selesai masuk / loader refresh selesai dulu.
+            kotlinx.coroutines.delay(500)
+            val limiter = Semaphore(2)
+            val pending = HashMap<String, String>()
+            // Satu pembaruan state untuk banyak hasil, bukan satu per hasil:
+            // tiap pembaruan membangun ulang seluruh grid dan recompose.
+            fun flush() {
+                if (pending.isEmpty()) return
+                val batch = HashMap(pending)
+                pending.clear()
+                val current = (_explore.value as? UiState.Success)?.data ?: return
+                _explore.value = UiState.Success(current.map { section ->
+                    section.copy(items = section.items.map { currentItem ->
+                        batch[moodKey(currentItem)]?.let { currentItem.copy(thumbnailUrl = it) } ?: currentItem
+                    })
+                })
+            }
             coroutineScope {
-                sections.flatMap(MoodGenreSection::items).forEach { item ->
+                missing.forEach { item ->
                     launch {
                         val artwork = limiter.withPermit {
                             YtMusicRepository.moodGenreArtwork(item.browseId, item.params).getOrNull()
                         } ?: return@launch
-                        val current = (_explore.value as? UiState.Success)?.data ?: return@launch
-                        _explore.value = UiState.Success(current.map { section ->
-                            section.copy(items = section.items.map { currentItem ->
-                                if (currentItem.browseId == item.browseId && currentItem.params == item.params) {
-                                    currentItem.copy(thumbnailUrl = artwork)
-                                } else {
-                                    currentItem
-                                }
-                            })
-                        })
+                        moodArtworkCache[moodKey(item)] = artwork
+                        pending[moodKey(item)] = artwork
+                        if (pending.size >= 8) flush()
                     }
                 }
             }
+            flush()
         }
     }
 
