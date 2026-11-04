@@ -25,7 +25,7 @@ private const val WORDMARK_ASPECT = 730f / 484f
 private const val WORDMARK_INK_BOTTOM = 0.96f
 
 /** How far the word is raised against the mark, as a share of the word's own height. */
-private const val WORDMARK_TEXT_LIFT = 0.06f
+private const val WORDMARK_TEXT_LIFT = 0.03f
 
 /**
  * The app's mark with "Music" beside it.
