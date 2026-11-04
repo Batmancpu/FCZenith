@@ -544,12 +544,27 @@ object Innertube {
      * tetap disimpan sebagai cadangan offline.
      */
     private fun browseFreshMs(browseId: String): Long = when {
-        browseId.startsWith("MPRE") || browseId.startsWith("MPAD") -> 24L * 60 * 60 * 1000
-        browseId.startsWith("UC") || browseId.startsWith("MPLA") -> 6L * 60 * 60 * 1000
+        browseId.startsWith("MPRE") || browseId.startsWith("MPAD") -> 6L * 60 * 60 * 1000
+        browseId.startsWith("UC") || browseId.startsWith("MPLA") -> 30L * 60 * 1000
         browseId == "FEmusic_moods_and_genres" -> 24L * 60 * 60 * 1000
         browseId == "FEmusic_explore" -> 6L * 60 * 60 * 1000
         else -> 0L
     }
+
+    /**
+     * Halaman artis/album memuat status subscribe dan "disimpan ke library", jadi setiap aksi
+     * tulis membuang cache browse. Tanpa ini status lama bisa muncul lagi setelah diubah.
+     */
+    private fun clearBrowseCache() {
+        browseCacheDir?.listFiles()?.forEach { runCatching { it.delete() } }
+    }
+
+    private fun isWriteEndpoint(endpoint: String): Boolean =
+        endpoint.startsWith("like/") ||
+            endpoint.startsWith("subscription/") ||
+            endpoint.startsWith("playlist/") ||
+            endpoint == "browse/edit_playlist" ||
+            endpoint == "feedback"
 
     /** Satu file per akun/channel/bahasa/halaman, supaya data akun lain tidak pernah tercampur. */
     private fun browseCacheFile(browseId: String, params: String?): java.io.File? {
@@ -1201,6 +1216,7 @@ object Innertube {
         region: String? = currentRegion,
         bodyExtras: JsonObjectBuilder.() -> Unit,
     ): JsonObject {
+        if (isWriteEndpoint(endpoint)) clearBrowseCache()
         // This is the common authenticated request path: Home, Library,
         // likes, playlists, account menus and all their continuations pass
         // through it. Waiting here makes restoration process-wide rather than

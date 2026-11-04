@@ -28,7 +28,7 @@ object LyricsDiskCache {
 
     private const val VERSION = 1
     private const val MAX_BYTES = 20L * 1024 * 1024
-    private const val MAX_AGE_MS = 180L * 24 * 60 * 60 * 1000
+    private const val MAX_AGE_MS = 30L * 24 * 60 * 60 * 1000
     private var writes = 0
 
     private fun file(key: String): File? {
