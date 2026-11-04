@@ -433,7 +433,9 @@ private fun TopPickCard(
                             null,
                             TopPickCorner,
                             footFade = true,
-                            content = { m -> art(covers, motion, m) },
+                            // Cover terbang selalu bergerak, walau kartunya sendiri
+                            // sedang di-pause karena Home tertutup.
+                            content = { m -> art(covers, true, m) },
                         ),
                         art = { m -> art(covers, motion, m) },
                     )

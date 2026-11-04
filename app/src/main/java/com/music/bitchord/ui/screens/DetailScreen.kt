@@ -2908,15 +2908,25 @@ fun MostPlayedArt(covers: List<String>, motion: Boolean, modifier: Modifier = Mo
     // posisi dan miring tile selalu sama di ketiganya dan tidak loncat saat
     // cover mendarat.
     var nowMs by remember { mutableLongStateOf(SystemClock.uptimeMillis()) }
-    if (motion) {
-        LaunchedEffect(Unit) {
-            while (true) withFrameMillis { nowMs = SystemClock.uptimeMillis() }
+    // Saat [motion] mati (Home tertutup player/halaman), jam ini berhenti dan
+    // mosaic tetap di posisi terakhirnya, bukan kembali ke susunan awal.
+    // Saat nyala lagi, jam menyusul waktu global secara halus (bukan loncat).
+    LaunchedEffect(motion) {
+        if (!motion) return@LaunchedEffect
+        var last = SystemClock.uptimeMillis()
+        while (true) {
+            withFrameMillis { }
+            val now = SystemClock.uptimeMillis()
+            val dt = now - last
+            last = now
+            val behind = now - nowMs - dt
+            nowMs += dt + (behind * 0.06f).toLong()
         }
     }
     LikedArt(
         covers = covers.take(LIKED_MAX_COVERS),
-        drift = { if (motion) (nowMs % LIKED_DRIFT_MS) / LIKED_DRIFT_MS.toFloat() else 0f },
-        pulse = { if (motion) (nowMs % LIKED_PULSE_MS) / LIKED_PULSE_MS.toFloat() else 0f },
+        drift = { (nowMs % LIKED_DRIFT_MS) / LIKED_DRIFT_MS.toFloat() },
+        pulse = { (nowMs % LIKED_PULSE_MS) / LIKED_PULSE_MS.toFloat() },
         modifier = modifier,
     )
 }
