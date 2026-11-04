@@ -1630,6 +1630,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private suspend fun fetchExplore() {
+        loadMoodArtworkFromDisk()
         val state = YtMusicRepository.moodAndGenres().fold(
             onSuccess = { sections ->
                 if (sections.isEmpty()) {
@@ -1653,6 +1654,46 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      */
     private val moodArtworkCache = HashMap<String, String>()
     private var moodArtworkJob: kotlinx.coroutines.Job? = null
+    private var moodArtworkLoaded = false
+
+    private fun moodArtworkFile() = File(getApplication<Application>().filesDir, MOOD_ARTWORK_FILE)
+
+    /**
+     * Membaca peta artwork dari disk sekali per proses, supaya buka Explore
+     * setelah app dimatikan langsung menampilkan gambar tanpa puluhan request.
+     * Berkas yang lebih tua dari seminggu diabaikan dan dibangun ulang.
+     */
+    private suspend fun loadMoodArtworkFromDisk() {
+        if (moodArtworkLoaded) return
+        moodArtworkLoaded = true
+        val stored = withContext(Dispatchers.IO) {
+            runCatching {
+                val file = moodArtworkFile()
+                if (!file.exists() || System.currentTimeMillis() - file.lastModified() > MOOD_ARTWORK_MAX_AGE_MS) {
+                    emptyMap()
+                } else {
+                    file.readLines().mapNotNull { line ->
+                        val cut = line.indexOf('\t')
+                        if (cut <= 0) null else line.substring(0, cut) to line.substring(cut + 1)
+                    }.toMap()
+                }
+            }.getOrDefault(emptyMap())
+        }
+        stored.forEach { (key, url) -> moodArtworkCache.putIfAbsent(key, url) }
+    }
+
+    private fun saveMoodArtworkToDisk() {
+        val snapshot = HashMap(moodArtworkCache)
+        if (snapshot.isEmpty()) return
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                val file = moodArtworkFile()
+                val tmp = File(file.parentFile, file.name + ".tmp")
+                tmp.writeText(snapshot.entries.joinToString("\n") { "${it.key}\t${it.value}" })
+                if (!tmp.renameTo(file)) tmp.delete()
+            }
+        }
+    }
 
     private fun moodKey(item: MoodGenre) = "${item.browseId}|${item.params}"
 
@@ -1703,6 +1744,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
             flush()
+            saveMoodArtworkToDisk()
         }
     }
 
@@ -2607,6 +2649,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     companion object {
         /** Today's Top Picks row, kept so the next launch paints it before any request. */
         private const val TOP_PICKS_FILE = "top_picks_v6_5.json"
+
+        /** Peta artwork kategori Explore, kunci "browseId|params" lalu URL dipisah tab. */
+        private const val MOOD_ARTWORK_FILE = "explore_mood_art_v1.txt"
+        private const val MOOD_ARTWORK_MAX_AGE_MS = 7L * 24 * 60 * 60 * 1000
 
         /** Per-addon budget for the Addons search tab; a slow addon is left out, not waited on. */
         private const val ADDON_SEARCH_TIMEOUT_MS = 12_000L

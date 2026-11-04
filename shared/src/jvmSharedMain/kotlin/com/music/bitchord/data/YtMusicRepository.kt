@@ -309,16 +309,31 @@ object YtMusicRepository {
         moodGenreShelfCache[key]?.let { return Result.success(it) }
         return call("mood-genre:$browseId") {
             InnertubeParser.parseHome(Innertube.browse(browseId, params))
-        }.also { result -> result.getOrNull()?.let { moodGenreShelfCache.putIfAbsent(key, it) } }
+        }.also { result ->
+            result.getOrNull()?.let {
+                // Hanya kategori yang dibuka pengguna yang masuk sini; dibatasi
+                // supaya shelf penuh tidak menumpuk di memori.
+                if (moodGenreShelfCache.size >= 12) moodGenreShelfCache.clear()
+                moodGenreShelfCache.putIfAbsent(key, it)
+            }
+        }
     }
 
     /** A category card borrows the first real cover from the playlists it opens. */
-    suspend fun moodGenreArtwork(browseId: String, params: String?): Result<String?> =
-        moodGenreShelves(browseId, params).map { shelves ->
+    suspend fun moodGenreArtwork(browseId: String, params: String?): Result<String?> {
+        fun firstCover(shelves: List<HomeShelf>): String? =
             shelves.asSequence().flatMap { it.items.asSequence() }
                 .mapNotNull(ShelfItem::thumbnailUrl)
                 .firstOrNull()
+
+        val key = "$browseId:${params.orEmpty()}"
+        moodGenreShelfCache[key]?.let { return Result.success(firstCover(it)) }
+        // Hanya satu URL yang dibutuhkan tile; shelf penuhnya tidak disimpan,
+        // jadi puluhan kategori tidak menahan puluhan shelf di memori.
+        return call("mood-genre-art:$browseId") {
+            firstCover(InnertubeParser.parseHome(Innertube.browse(browseId, params)))
         }
+    }
 
     /** One page of a search response, with the token for its next page if present. */
     data class SearchPage(
