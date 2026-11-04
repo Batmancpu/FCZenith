@@ -1112,7 +1112,13 @@ fun NowPlayingScreen(
     var lyricsOpen by remember {
         mutableStateOf(restoredPlayerScreen == LastPlayerScreen.LYRICS)
     }
-    val queueSlide = remember { mutableFloatStateOf(0f) }
+    // Player yang dibuka langsung ke queue harus sudah di posisi 1 sejak awal,
+    // seperti animatedCollapse milik lirik. Kalau mulai dari 0, sleeve (atau klip
+    // canvas full-bleed) masih berupa banner/kartu dan baru menyusut ke header
+    // saat cover sedang terbang dari mini player, sehingga terbangnya tidak mulus.
+    val queueSlide = remember {
+        mutableFloatStateOf(if (restoredPlayerScreen == LastPlayerScreen.QUEUE) 1f else 0f)
+    }
     // Expensive, song-scoped preparation is deliberately staggered. The small
     // backdrop decode runs after the track hand-off has settled; lyrics and
     // queue are then composed offscreen on separate beats rather than all three
@@ -3516,7 +3522,15 @@ fun NowPlayingScreen(
                             // Cover kartu ikut panel sepenuhnya (tidak ditarik ke atas) dan
                             // membesar bertahap, supaya margin atasnya terjaga dan tidak
                             // terpotong tepi panel. Banner full-bleed tetap seperti semula.
-                            val unridden = if (heroMode) dockFrame.offset * (1f - dockFrame.ride) else 0f
+                            // Di lirik/queue (p = 1) cover adalah thumbnail header yang ikut
+                            // panel sepenuhnya, jadi bagian "tidak ikut naik" ditiadakan.
+                            // Tanpa (1 - p) cover canvas ditarik ke atas dan melenceng dari
+                            // jalur terbangnya ke/dari mini player.
+                            val unridden = if (heroMode) {
+                                dockFrame.offset * (1f - dockFrame.ride) * (1f - p())
+                            } else {
+                                0f
+                            }
                             val base = if (heroMode) dockEase(dockT()) else dockEaseCard(dockT())
                             // Di menu lirik/queue (p = 1) cover adalah thumbnail header:
                             // ia ikut panel dulu, tidak lebih dulu terbang ke mini player.
