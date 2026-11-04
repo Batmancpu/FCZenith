@@ -59,6 +59,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeJoin
@@ -349,6 +350,8 @@ private fun TopPickCard(
     val text = cardText(pick, listenerName)
     val longPress = onLongPress?.let { { it(pick) } }
     val coverToken = remember { Any() }
+    // Dari warna tema aplikasi, bukan sistem, supaya ikut pilihan tema di dalam app.
+    val darkSurface = MaterialTheme.colorScheme.surface.luminance() < 0.5f
     // The clip this card is playing, handed to the cover flight so it flies too.
     var flightCanvas by remember { mutableStateOf<CanvasArtwork?>(null) }
     // Reads the frame the clip is showing, at the moment of the tap.
@@ -375,15 +378,25 @@ private fun TopPickCard(
         modifier = modifier
             .aspectRatio(TOP_PICK_RATIO)
             .clip(TopPickShape)
-            .thumbnailBorder(TopPickShape)
+            // Mode gelap: satu garis tipis saja. Dua border putih yang bertumpuk
+            // tampak seperti bingkai abu-abu terang di atas latar hitam.
+            .then(if (darkSurface) Modifier else Modifier.thumbnailBorder(TopPickShape))
             .border(
                 width = 0.75.dp,
                 brush = Brush.verticalGradient(
-                    listOf(
-                        Color.White.copy(alpha = 0.38f),
-                        Color.White.copy(alpha = 0.04f),
-                        Color.White.copy(alpha = 0.14f),
-                    ),
+                    if (darkSurface) {
+                        listOf(
+                            Color.White.copy(alpha = 0.14f),
+                            Color.White.copy(alpha = 0.02f),
+                            Color.White.copy(alpha = 0.06f),
+                        )
+                    } else {
+                        listOf(
+                            Color.White.copy(alpha = 0.38f),
+                            Color.White.copy(alpha = 0.04f),
+                            Color.White.copy(alpha = 0.14f),
+                        )
+                    },
                 ),
                 shape = TopPickShape,
             )
