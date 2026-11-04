@@ -501,29 +501,13 @@ private fun HomeTitle(title: String, modifier: Modifier = Modifier) {
     val style = MaterialTheme.typography.displayLarge
     val logoHeight = with(LocalDensity.current) { (style.fontSize * LOGO_TO_FONT).toDp() }
     Column(modifier = modifier.padding(horizontal = PAGE_GUTTER, vertical = 8.dp)) {
-        Row(
+        Wordmark(
+            logoHeight = logoHeight,
+            fontSize = style.fontSize * MUSIC_TO_FONT,
+            color = MaterialTheme.colorScheme.onBackground,
+            gap = 8.dp,
             modifier = Modifier.padding(bottom = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                painter = painterResource(Res.drawable.ic_logo),
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier
-                    .height(logoHeight)
-                    .aspectRatio(LOGO_ASPECT)
-                    .alignBy { it.measuredHeight },
-            )
-            Spacer(Modifier.width(6.dp))
-            Text(
-                text = "Music",
-                color = MaterialTheme.colorScheme.onBackground,
-                fontSize = style.fontSize * MUSIC_TO_FONT,
-                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
-                maxLines = 1,
-                modifier = Modifier.alignByBaseline(),
-            )
-        }
+        )
         HorizontalDivider(
             thickness = 1.dp,
             color = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),
@@ -538,7 +522,7 @@ private fun HomeTitle(title: String, modifier: Modifier = Modifier) {
 }
 
 /** The wordmark's height against the heading's font size. */
-private const val LOGO_TO_FONT = 0.46f
+private const val LOGO_TO_FONT = 0.70f
 
 /** The "Music" word's size against the heading's font size. */
 private const val MUSIC_TO_FONT = 0.88f

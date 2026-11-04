@@ -454,15 +454,14 @@ private fun TopPickCard(
             }
         }
         if (branded) {
-            Icon(
-                painter = painterResource(Res.drawable.ic_logo),
-                contentDescription = null,
-                tint = Color.White,
+            Wordmark(
+                logoHeight = 14.dp,
+                fontSize = 16.sp,
+                color = Color.White,
+                gap = 5.dp,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(top = 12.dp, end = 12.dp)
-                    .height(15.dp)
-                    .aspectRatio(730f / 484f),
+                    .padding(top = 12.dp, end = 12.dp),
             )
         }
         CardCaption(text, eyebrowColor, Modifier.align(Alignment.BottomStart).hideDuringCoverFlight(coverToken))
@@ -1742,15 +1741,14 @@ private fun MoodTile(mood: TopPickMood, onClick: (TopPickMood, String) -> Unit, 
             // it — for as long as the shelf was in view; the motion is Top
             // Picks' own, one card at a time.
             MoodArt(mood, mood.style(), Modifier.fillMaxSize(), square = true, still = true)
-            Icon(
-                painter = painterResource(Res.drawable.ic_logo),
-                contentDescription = null,
-                tint = Color.White,
+            Wordmark(
+                logoHeight = 10.dp,
+                fontSize = 12.sp,
+                color = Color.White,
+                gap = 4.dp,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(top = 8.dp, end = 8.dp)
-                    .height(11.dp)
-                    .aspectRatio(730f / 484f),
+                    .padding(top = 8.dp, end = 8.dp),
             )
         }
         Spacer(Modifier.height(10.dp))
