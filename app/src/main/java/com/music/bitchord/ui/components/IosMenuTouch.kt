@@ -42,7 +42,6 @@ import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -83,6 +82,7 @@ internal class IosMenuTouch(private val scope: CoroutineScope) {
     private var anchorTarget: Target? = null
     private var anchorTop = 0f
     private var down = Offset.Zero
+    private var downWindow = Offset.Zero
 
     val indicator = Animatable(Rect.Zero, Rect.VectorConverter)
     val indicatorAlpha = Animatable(0f)
@@ -101,14 +101,21 @@ internal class IosMenuTouch(private val scope: CoroutineScope) {
     private fun Target.local(): Rect? {
         val c = coords?.takeIf { it.isAttached } ?: return null
         val h = host?.takeIf { it.isAttached } ?: return null
-        return Rect(c.positionInRoot() - h.positionInRoot(), c.size.toSize())
+        // Koordinat host, bukan root: skala/geser jelly dan pop panel (layer induk)
+        // tidak boleh ikut terhitung, kalau tidak baris "bergeser" dan dianggap scroll.
+        return Rect(h.localPositionOf(c, Offset.Zero), c.size.toSize())
     }
+
+    /** Posisi jari di ruang window: stabil walau panel sedang bergoyang. */
+    private fun toWindow(p: Offset): Offset =
+        host?.takeIf { it.isAttached }?.localToWindow(p) ?: p
 
     private fun targetAt(p: Offset): Target? =
         targets.firstOrNull { it.enabled && it.onClick != null && it.local()?.contains(p) == true }
 
     fun begin(pos: Offset) {
         down = pos
+        downWindow = toWindow(pos)
         scrolled = false
         leftStart = false
         val t = targetAt(pos)
@@ -126,7 +133,7 @@ internal class IosMenuTouch(private val scope: CoroutineScope) {
         if (t !== startTarget && (pos - down).getDistance() > slop) leftStart = true
         if (t !== hovered) select(t, animate = true)
         // Menu yang sedang digulir tidak ikut meregang: tarikan jari itu milik daftar.
-        jellyTo(if (scrolled) down else pos, dead, maxShift)
+        jellyTo(if (scrolled) downWindow else toWindow(pos), dead, maxShift)
     }
 
     private fun select(t: Target?, animate: Boolean) {
@@ -152,8 +159,8 @@ internal class IosMenuTouch(private val scope: CoroutineScope) {
     private fun jellyTo(pos: Offset, dead: Float, maxShift: Float) {
         if (reduceMotion) return
         fun soft(d: Float): Float = if (abs(d) <= dead) 0f else (abs(d) - dead) * sign(d)
-        val dx = soft(pos.x - down.x)
-        val dy = soft(pos.y - down.y)
+        val dx = soft(pos.x - downWindow.x)
+        val dy = soft(pos.y - downWindow.y)
         val w = hostSize.width.coerceAtLeast(1f)
         val h = hostSize.height.coerceAtLeast(1f)
         val tx = (dx * 0.07f).coerceIn(-maxShift, maxShift)
