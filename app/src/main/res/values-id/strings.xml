@@ -861,6 +861,11 @@
     <string name="liquid_glass_unavailable">Memerlukan Android 12 atau yang lebih baru</string>
 
     <string name="listen_as">Dengarkan sebagai</string>
+    <string name="edit_profile">Ubah profil</string>
+    <string name="profile_display_name">Nama tampilan</string>
+    <string name="profile_change_photo">Ganti foto</string>
+    <string name="profile_reset">Kembalikan ke profil Google</string>
+    <string name="profile_local_only_note">Hanya tampil di aplikasi ini. Akun Google kamu tidak berubah.</string>
 
     <string name="lyrics_debug_logs">Log debug lirik</string>
 

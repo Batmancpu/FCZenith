@@ -556,7 +556,30 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private val _account = MutableStateFlow<Account?>(null)
-    val account: StateFlow<Account?> = _account.asStateFlow()
+    /**
+     * Akun yang tampil di seluruh aplikasi: data Google, dengan nama/foto buatan
+     * pengguna di atasnya bila ada (lihat [AppSettings.profileOverride]).
+     */
+    val account: StateFlow<Account?> = combine(_account, AppSettings.profileOverride) { raw, override ->
+        applyProfileOverride(raw, override)
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.Eagerly,
+        applyProfileOverride(_account.value, AppSettings.profileOverride.value),
+    )
+
+    private fun applyProfileOverride(raw: Account?, override: AppSettings.ProfileOverride): Account? {
+        raw ?: return null
+        if (override.name.isBlank() && override.photoPath.isBlank()) return raw
+        if (override.owner != AppSettings.profileOwnerOf(raw.email)) return raw
+        val photo = override.photoPath
+            .takeIf { it.isNotEmpty() && File(it).exists() }
+            ?.let { "file://$it" }
+        return raw.copy(
+            name = override.name.ifBlank { raw.name },
+            thumbnailUrl = photo ?: raw.thumbnailUrl,
+        )
+    }
 
     /**
      * The channels this login can act as. Empty until the picker asks for

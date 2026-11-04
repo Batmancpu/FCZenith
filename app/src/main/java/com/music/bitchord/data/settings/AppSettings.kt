@@ -780,6 +780,17 @@ object AppSettings {
     val discordToken = MutableStateFlow("")
 
     /**
+     * Nama dan foto profil buatan pengguna, hanya berlaku di aplikasi ini dan
+     * menggantikan milik Google. [owner] mengikat override ke satu akun
+     * (lihat [profileOwnerOf]) supaya tidak muncul di akun lain.
+     */
+    data class ProfileOverride(val owner: String = "", val name: String = "", val photoPath: String = "")
+
+    val profileOverride = MutableStateFlow(ProfileOverride())
+
+    fun profileOwnerOf(email: String?): String = email.orEmpty().ifBlank { "default" }
+
+    /**
      * Who the token belongs to, cached at login. Kept so the settings screen
      * can show the account without a round trip every time it opens, and can
      * still show it offline.
@@ -1127,6 +1138,11 @@ object AppSettings {
         discordUsername.value = prefs.getString(KEY_DISCORD_USERNAME, "").orEmpty()
         discordName.value = prefs.getString(KEY_DISCORD_NAME, "").orEmpty()
         discordAvatar.value = prefs.getString(KEY_DISCORD_AVATAR, "").orEmpty()
+        profileOverride.value = ProfileOverride(
+            owner = prefs.getString(KEY_PROFILE_OWNER, "").orEmpty(),
+            name = prefs.getString(KEY_PROFILE_NAME, "").orEmpty(),
+            photoPath = prefs.getString(KEY_PROFILE_PHOTO, "").orEmpty(),
+        )
         discordRpcEnabled.value = prefs.getBoolean(KEY_DISCORD_RPC_ENABLED, true)
         discordUseDetails.value = prefs.getBoolean(KEY_DISCORD_USE_DETAILS, false)
         discordShowAudioQuality.value = prefs.getBoolean(KEY_DISCORD_SHOW_AUDIO_QUALITY, true)
@@ -1848,6 +1864,20 @@ object AppSettings {
         authStore.discordToken = value.ifEmpty { null }
     }
 
+    /** Menyimpan override profil; foto lama yang diganti ikut dihapus dari penyimpanan. */
+    fun setProfileOverride(owner: String, name: String, photoPath: String) {
+        val oldPhoto = profileOverride.value.photoPath
+        profileOverride.value = ProfileOverride(owner, name, photoPath)
+        prefs.edit()
+            .putString(KEY_PROFILE_OWNER, owner)
+            .putString(KEY_PROFILE_NAME, name)
+            .putString(KEY_PROFILE_PHOTO, photoPath)
+            .apply()
+        if (oldPhoto.isNotEmpty() && oldPhoto != photoPath) runCatching { java.io.File(oldPhoto).delete() }
+    }
+
+    fun clearProfileOverride() = setProfileOverride("", "", "")
+
     fun setDiscordAccount(username: String, name: String, avatar: String?) {
         discordUsername.value = username
         discordName.value = name
@@ -2333,6 +2363,9 @@ object AppSettings {
     private const val KEY_SPOTIFY_SPDC_TOKEN = "spotify_spdc_token"
 
     private const val KEY_DISCORD_USERNAME = "discord_username"
+    private const val KEY_PROFILE_OWNER = "profile_override_owner"
+    private const val KEY_PROFILE_NAME = "profile_override_name"
+    private const val KEY_PROFILE_PHOTO = "profile_override_photo"
     private const val KEY_DISCORD_NAME = "discord_name"
     private const val KEY_DISCORD_AVATAR = "discord_avatar"
     private const val KEY_DISCORD_RPC_ENABLED = "discord_rpc_enabled"

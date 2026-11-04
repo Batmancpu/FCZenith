@@ -952,6 +952,11 @@
     <string name="current_profile">Current profile</string>
     <string name="selected_account">Selected account</string>
     <string name="listen_as">Listen as</string>
+    <string name="edit_profile">Edit profile</string>
+    <string name="profile_display_name">Display name</string>
+    <string name="profile_change_photo">Change photo</string>
+    <string name="profile_reset">Reset to Google profile</string>
+    <string name="profile_local_only_note">Shown only in this app. Your Google account is not changed.</string>
     <string name="default_youtube_profile">YouTube Music default profile</string>
     <string name="account_profiles_help">A Google account can have Personal and Brand profiles. Each has its own library, likes and history.</string>
     <string name="choose_profile">Choose a profile</string>
