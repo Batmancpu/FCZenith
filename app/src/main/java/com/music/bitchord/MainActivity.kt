@@ -4121,7 +4121,19 @@ private fun BitChordApp(
                             // three of its own controls — Apple Music leaves the
                             // profile off its album pages too.
                             if (!isReleaseDetail) TopBarAccountButton(
-                                account = account,
+                                // Offline the account request fails and `account` stays null;
+                                // the profile saved on the device (what the popup reads) stands in.
+                                account = account ?: googleAccounts
+                                    .firstOrNull { it.accountId == activeAccountId }
+                                    ?.let { saved ->
+                                        val profile = saved.profiles.firstOrNull { it.profileId == activeProfileId }
+                                            ?: saved.profiles.firstOrNull()
+                                        com.music.bitchord.data.model.Account(
+                                            name = profile?.name ?: saved.name,
+                                            email = saved.email,
+                                            thumbnailUrl = profile?.avatar,
+                                        )
+                                    },
                                 onClick = {
                                     if (signedIn) {
                                         viewModel.loadChannels()
