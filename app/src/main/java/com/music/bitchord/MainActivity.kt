@@ -266,6 +266,8 @@ import com.music.bitchord.ui.components.QueueActionNotice
 import com.music.bitchord.ui.components.QueueActionNoticeHost
 import com.music.bitchord.ui.components.TopBarAccountButton
 import com.music.bitchord.ui.screens.SegmentedControl
+import com.music.bitchord.ui.screens.LocalMostPlayedArt
+import com.music.bitchord.ui.screens.MostPlayedArt
 import com.music.bitchord.ui.components.SearchField
 import com.music.bitchord.sharedui.resources.Res as SharedRes
 import com.music.bitchord.sharedui.resources.search_hint
@@ -414,6 +416,9 @@ class MainActivity : AppCompatActivity() {
                     LocalOverscrollFactory provides iosOverscrollFactory,
                     LocalLiquidGlassEnabled provides liquidGlassEnabled,
                     LocalSegmentedControlStyle provides AppSegmentedControlStyle,
+                    LocalMostPlayedArt provides { covers, motion, modifier ->
+                        MostPlayedArt(covers, motion, modifier)
+                    },
                     LocalAppBackdrop provides appBackdrop,
                 ) {
                 // The window's width, measured rather than asked for.

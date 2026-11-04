@@ -9,6 +9,7 @@ import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.model.TopPick
 import com.music.bitchord.data.model.TopPickKind
 import com.music.bitchord.data.model.TopPickMood
+import com.music.bitchord.data.model.TopPickSong
 import com.music.bitchord.data.model.WatchTarget
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -66,6 +67,8 @@ object TopPicks {
         val artists: List<ArtistRef> = emptyList(),
         val songs: List<Song> = emptyList(),
         val genres: List<String> = emptyList(),
+        /** The songs played most, all time, best first. */
+        val topSongs: List<Song> = emptyList(),
     )
 
     suspend fun build(
@@ -123,7 +126,24 @@ object TopPicks {
                 ?: shuffled.firstOrNull { it.images.isNotEmpty() }
             if (withArt == null) shuffled else listOf(withArt) + shuffled.filter { it !== withArt }
         }
-        listOfNotNull(lead) + rest
+        // Slot 2 is the listener's own Most Played card; what used to hold
+        // slot 2 (the card with real artwork) follows it as slot 3.
+        listOfNotNull(lead, mostPlayed(local)) + rest
+    }
+
+    /** The listener's most played songs as one card, or null with too little history to fill it. */
+    private fun mostPlayed(local: LocalTaste): TopPick? {
+        val songs = local.topSongs
+            .filter { !it.thumbnailUrl.isNullOrBlank() }
+            .distinctBy { it.videoId }
+            .take(30)
+        if (songs.size < 3) return null
+        return TopPick(
+            kind = TopPickKind.MOST_PLAYED,
+            subtitle = songs.map { it.artist }.filter { it.isNotBlank() }.distinct().take(3).joinToString(", "),
+            images = songs.mapNotNull { it.thumbnailUrl }.distinct(),
+            songs = songs.map { TopPickSong(it.videoId, it.title, it.artist, it.thumbnailUrl) },
+        )
     }
 
     /**
@@ -145,6 +165,9 @@ object TopPicks {
 
     /** The queue a card starts. Never called for [TopPickKind.LATEST_RELEASE], which opens a page. */
     suspend fun queue(pick: TopPick): Result<List<Song>> {
+        if (pick.kind == TopPickKind.MOST_PLAYED) {
+            return Result.success(pick.songs.map { it.toSong() })
+        }
         if (pick.kind == TopPickKind.MOOD) return moodQueue(pick)
         val target = pick.watch ?: return Result.failure(IllegalStateException("no queue behind ${pick.kind}"))
         if (pick.kind == TopPickKind.PERSONAL_STATION || pick.kind == TopPickKind.DISCOVERY_STATION) {

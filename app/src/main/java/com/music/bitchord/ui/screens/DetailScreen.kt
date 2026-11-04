@@ -2783,6 +2783,30 @@ private fun LikedArt(
     }
 }
 
+/** The Liked Music mosaic as a standalone cover, for Home's Most Played card. */
+@Composable
+fun MostPlayedArt(covers: List<String>, motion: Boolean, modifier: Modifier = Modifier) {
+    val transition = rememberInfiniteTransition(label = "mostPlayedArt")
+    val drift by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(LIKED_DRIFT_MS, easing = LinearEasing)),
+        label = "mostPlayedDrift",
+    )
+    val pulse by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(LIKED_PULSE_MS, easing = LinearEasing)),
+        label = "mostPlayedPulse",
+    )
+    LikedArt(
+        covers = covers.take(LIKED_MAX_COVERS),
+        drift = { if (motion) drift else 0f },
+        pulse = { if (motion) pulse else 0f },
+        modifier = modifier,
+    )
+}
+
 private fun likedTileShape(k: Int): Shape = when (k % 4) {
     0 -> RoundedCornerShape(26.dp)
     1 -> CircleShape

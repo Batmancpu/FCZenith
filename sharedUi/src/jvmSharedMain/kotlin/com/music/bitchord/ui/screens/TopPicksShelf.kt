@@ -140,6 +140,12 @@ import kotlin.math.sin
  * card leaves composition.
  */
 
+/**
+ * Draws the Liked Music mosaic from the given covers, for the Most Played card.
+ * The phone app supplies it, since that artwork lives there; null falls back to a gradient.
+ */
+val LocalMostPlayedArt = staticCompositionLocalOf<(@Composable (List<String>, Boolean, Modifier) -> Unit)?> { null }
+
 /** Width over height: Apple's cards are a 3:4 portrait. */
 private const val TOP_PICK_RATIO = 0.75f
 
@@ -262,6 +268,7 @@ private fun topPickLabel(pick: TopPick): String = when (pick.kind) {
     TopPickKind.MOOD -> stringResource(Res.string.top_pick_label_mood)
     TopPickKind.NEW_RELEASE_MIX -> stringResource(Res.string.top_pick_label_fresh)
     TopPickKind.DISCOVERY_STATION -> stringResource(Res.string.top_pick_label_discover)
+    TopPickKind.MOST_PLAYED -> stringResource(Res.string.top_pick_label_most_played)
 }
 
 /** What a card says: the small coloured line, the title, and an optional line under it. */
@@ -317,6 +324,11 @@ private fun cardText(pick: TopPick, listenerName: String?): CardText {
             eyebrow = stringResource(Res.string.top_pick_new_to_you),
             title = stringResource(Res.string.top_pick_discovery_station),
             subtitle = "",
+        )
+        TopPickKind.MOST_PLAYED -> CardText(
+            eyebrow = stringResource(Res.string.top_pick_most_played_eyebrow),
+            title = stringResource(Res.string.top_pick_most_played_title),
+            subtitle = pick.subtitle,
         )
     }
 }
@@ -382,6 +394,30 @@ private fun TopPickCard(
             TopPickKind.PERSONAL_STATION -> {
                 PersonalStationArt(Modifier.fillMaxSize())
                 eyebrowColor = Color(0xFFFFD2DA)
+                branded = true
+            }
+            TopPickKind.MOST_PLAYED -> {
+                val art = LocalMostPlayedArt.current
+                val covers = if (LocalArtworkImages.current) pick.images else emptyList()
+                if (art != null) {
+                    art(covers, LocalArtworkMotion.current, Modifier.fillMaxSize())
+                } else {
+                    Box(
+                        Modifier.fillMaxSize().background(
+                            Brush.linearGradient(listOf(Color(0xFF9B6CFF), Color(0xFFFF7AB8))),
+                        ),
+                    )
+                }
+                // A soft dark foot so the title reads over the bright mosaic.
+                Box(
+                    Modifier.fillMaxSize().background(
+                        Brush.verticalGradient(
+                            0.35f to Color.Transparent,
+                            1f to Color.Black.copy(alpha = 0.50f),
+                        ),
+                    ),
+                )
+                eyebrowColor = Color(0xFFE9DCFF)
                 branded = true
             }
             TopPickKind.DISCOVERY_STATION -> {
@@ -467,7 +503,7 @@ private fun TopPickCard(
             }
         }
         // Not over the artist collage: the glow tinted the photos themselves.
-        if (branded && pick.kind != TopPickKind.ARTIST_AND_SIMILAR) {
+        if (branded && pick.kind != TopPickKind.ARTIST_AND_SIMILAR && pick.kind != TopPickKind.MOST_PLAYED) {
             AmbientGlow(base = glowBase(pick), modifier = Modifier.fillMaxSize())
         }
         CardOverlay(
@@ -476,7 +512,8 @@ private fun TopPickCard(
             branded = branded,
             titleInArt = pick.kind == TopPickKind.MOOD ||
                 pick.kind == TopPickKind.PERSONAL_STATION ||
-                pick.kind == TopPickKind.DISCOVERY_STATION,
+                pick.kind == TopPickKind.DISCOVERY_STATION ||
+                pick.kind == TopPickKind.MOST_PLAYED,
             modifier = Modifier.fillMaxSize().hideDuringCoverFlight(coverToken),
         )
     }

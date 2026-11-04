@@ -41,6 +41,9 @@ enum class TopPickKind {
 
     /** Music the listener hasn't played yet — YouTube's Discover Mix. */
     DISCOVERY_STATION,
+
+    /** The songs this listener plays most, from the app's own Replay stats. */
+    MOST_PLAYED,
 }
 
 /**
@@ -152,4 +155,22 @@ data class TopPick(
     val exclude: List<String> = emptyList(),
     /** Words that steer a mood station toward the listener's own scene, e.g. "bollywood". */
     val hints: List<String> = emptyList(),
+    /** The tracks a [TopPickKind.MOST_PLAYED] card plays, in rank order. */
+    val songs: List<TopPickSong> = emptyList(),
 )
+
+/** A track kept inside a [TopPick], small enough to sit in the saved row. */
+@Serializable
+data class TopPickSong(
+    val videoId: String,
+    val title: String,
+    val artist: String,
+    val thumbnailUrl: String? = null,
+) {
+    fun toSong(): Song = Song(
+        videoId = videoId,
+        title = title,
+        artist = artist,
+        thumbnailUrl = thumbnailUrl,
+    )
+}

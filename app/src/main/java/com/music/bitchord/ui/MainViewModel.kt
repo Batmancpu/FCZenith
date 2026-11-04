@@ -1843,6 +1843,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             artists = month.artists.take(10).map { ArtistRef(name = it.title, browseId = it.browseId) },
             songs = month.songs.take(5).map { it.song },
             genres = month.genres.take(3).map { it.title },
+            topSongs = runCatching { ListeningStats.summary(ReplayPeriod.ALL_TIME) }
+                .getOrNull()?.songs.orEmpty().take(30).map { it.song },
         )
     }
 
@@ -2571,7 +2573,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     companion object {
         /** Today's Top Picks row, kept so the next launch paints it before any request. */
-        private const val TOP_PICKS_FILE = "top_picks_v5.json"
+        private const val TOP_PICKS_FILE = "top_picks_v6_5.json"
 
         /** Per-addon budget for the Addons search tab; a slow addon is left out, not waited on. */
         private const val ADDON_SEARCH_TIMEOUT_MS = 12_000L
