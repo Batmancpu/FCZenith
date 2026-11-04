@@ -22,3 +22,8 @@ text = label,
 val baseLabel = topPickLabel(pick)
 val label = if (picks.take(index).any { sharesTopPickLabel(it, pick) }) {
 pick.artistName?.takeIf { it.isNotBlank() } ?: baseLabel
+com/music/bitchord/ui/player/NowPlayingScreen.kt
+internal object CanvasStills {
+var current by mutableStateOf<CanvasStill?>(null)
+** Lagu pemilik [current]: dipakai selagi klip lagu itu belum selesai dicari di player yang baru dibuka. *
+var songKey: String? = null

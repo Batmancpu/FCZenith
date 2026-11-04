@@ -160,8 +160,12 @@ class PlayerDock {
         if (travel <= 1f) return null
         val progress = (1f - offset / travel).coerceIn(0f, 1f)
         if (progress >= 1f) return null
-        val left = pill.left * (1f - progress)
-        val right = size.width - (size.width - pill.right) * (1f - progress)
+        // Sama dengan [panelBounds]: lebar menyusul lebih cepat dari naiknya,
+        // jadi tidak ada celah di kiri dan kanan layar selagi di-drag.
+        val wideX = (progress / PANEL_WIDE_AT).coerceIn(0f, 1f)
+        val wide = 1f - (1f - wideX) * (1f - wideX)
+        val left = pill.left * (1f - wide)
+        val right = size.width - (size.width - pill.right) * (1f - wide)
         val bottom = (pill.bottom + (size.height - pill.bottom) * progress - offset).coerceAtLeast(1f)
         return PlayerMorph(
             rect = Rect(left, 0f, right.coerceAtLeast(left + 1f), bottom),
@@ -275,7 +279,7 @@ val LocalPlayerDock = staticCompositionLocalOf<PlayerDock?> { null }
 private const val PANEL_FILL_UNTIL = 0.2f
 
 /** Seberapa jauh panel terbuka saat lebarnya sudah penuh selebar layar. */
-private const val PANEL_WIDE_AT = 0.35f
+private const val PANEL_WIDE_AT = 0.06f
 
 internal class PlayerMorph(val rect: Rect, val corner: Float, val progress: Float)
 

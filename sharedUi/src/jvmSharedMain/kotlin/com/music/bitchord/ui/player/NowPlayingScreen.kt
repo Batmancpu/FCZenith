@@ -382,6 +382,9 @@ internal class CanvasStill(val url: String, val image: ImageBitmap, val position
 internal object CanvasStills {
     var current by mutableStateOf<CanvasStill?>(null)
 
+    /** Lagu pemilik [current]: dipakai selagi klip lagu itu belum selesai dicari di player yang baru dibuka. */
+    var songKey: String? = null
+
     /** Whether [current] is still the clip's frame, rather than one it has played on from. */
     var fresh by mutableStateOf(false)
 }
@@ -2030,7 +2033,14 @@ fun NowPlayingScreen(
     // is the still too.
     val stillClip = canvas?.takeIf { !clipFullscreen }
     val stillUrl = stillClip?.url
-    fun still(): CanvasStill? = CanvasStills.current?.takeIf { it.url == stillUrl }
+    val stillSongKey = "${song.title}|${song.artist}"
+    fun still(): CanvasStill? {
+        val current = CanvasStills.current ?: return null
+        if (stillUrl != null) return current.takeIf { it.url == stillUrl }
+        // Player baru dibuka dan canvas-nya belum ditemukan: pakai frame terakhir
+        // lagu yang sama, supaya yang tampil bukan thumbnail awal.
+        return current.takeIf { !clipFullscreen && CanvasStills.songKey == stillSongKey }
+    }
     // The moves the still is for. Not the drawers and popups, under which the
     // clip pauses but nothing moves.
     val stillMoving = collapseStarted || dockMoving || lyricsOpen || queueOpen || queueDragging
@@ -2070,8 +2080,11 @@ fun NowPlayingScreen(
         val url = stillClip?.url
         if (image != null && url != null) {
             CanvasStills.current = CanvasStill(url, image, position)
+            CanvasStills.songKey = stillSongKey
             CanvasStills.fresh = true
-        } else {
+        } else if (url != null && CanvasStills.current?.url != url) {
+            // Hanya still milik klip lain yang dibuang. Pembacaan yang gagal
+            // tidak boleh menghapus frame terakhir klip ini.
             CanvasStills.current = null
         }
     }
