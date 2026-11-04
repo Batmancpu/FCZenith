@@ -328,17 +328,24 @@ private fun androidx.compose.foundation.lazy.LazyListScope.itemsIndexedShelves(
     onMoodClick: ((TopPickMood, String) -> Unit)? = null,
     onMoodsShowAll: () -> Unit = {},
 ) {
-    shelves.withListenAgainFirst().forEachIndexed { index, shelf ->
-        // Find Your Mood follows the lead shelf, as on Apple Music's Home.
-        if (index == 1 && onMoodClick != null) {
+    val ordered = shelves.withListenAgainFirst()
+    // Find Your Mood sits right after Recents, so it never follows another
+    // row of cards directly. Without Recents (a guest) it goes after the second shelf.
+    val moodAt = (ordered.indexOfFirst { it.title.trim().equals(RECENTS_TITLE, ignoreCase = true) }
+        .takeIf { it >= 0 } ?: 1) + 1
+    ordered.forEachIndexed { index, shelf ->
+        if (index == moodAt && onMoodClick != null) {
             item(key = "find-your-mood") { FindYourMoodShelf(onMoodClick, onMoodsShowAll) }
         }
         item(key = shelf.title + index) {
             val openItem: (ShelfItem) -> Unit = { item -> onItemClick(item, shelf.title) }
-            // Listen again and Quick picks are lists on the web player, as
-            // Recents is here: one pager for all three.
-            if (shelf.layout == ShelfLayout.LIST ||
-                shelf.title.equals(RECENTS_TITLE, ignoreCase = true)
+            val isListenAgain = LISTEN_AGAIN_TITLES.any { shelf.title.trim().equals(it, ignoreCase = true) }
+            // Listen again is one row of square cards, as Recently Played is on
+            // Apple Music; Quick picks and Recents keep the paged list.
+            if (!isListenAgain && (
+                    shelf.layout == ShelfLayout.LIST ||
+                        shelf.title.equals(RECENTS_TITLE, ignoreCase = true)
+                    )
             ) {
                 RecentShelf(
                     shelf = shelf,
@@ -357,7 +364,14 @@ private fun androidx.compose.foundation.lazy.LazyListScope.itemsIndexedShelves(
                 )
             } else {
                 Shelf(
-                    shelf = shelf,
+                    shelf = if (isListenAgain) {
+                        shelf.copy(
+                            title = localizeShelfTitle(shelf.title),
+                            subtitle = localizeShelfSubtitle(shelf.subtitle),
+                        )
+                    } else {
+                        shelf
+                    },
                     onItemClick = openItem,
                     onItemLongPress = onItemLongPress,
                     currentSong = currentSong,
@@ -365,6 +379,9 @@ private fun androidx.compose.foundation.lazy.LazyListScope.itemsIndexedShelves(
                 )
             }
         }
+    }
+    if (moodAt >= ordered.size && onMoodClick != null) {
+        item(key = "find-your-mood") { FindYourMoodShelf(onMoodClick, onMoodsShowAll) }
     }
 }
 
