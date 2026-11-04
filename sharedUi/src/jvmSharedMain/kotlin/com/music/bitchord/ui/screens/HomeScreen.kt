@@ -371,7 +371,7 @@ private fun RecentShelf(
             ) {
                 items(shelf.items.chunked(RECENT_TRACKS_PER_COLUMN)) { column ->
                     Column(Modifier.width(columnWidth)) {
-                        column.forEach { item ->
+                        column.forEachIndexed { index, item ->
                             RecentTrackRow(
                                 item = item,
                                 onClick = { onItemClick(item) },
@@ -379,6 +379,13 @@ private fun RecentShelf(
                                 isCurrent = isCurrentItem(item),
                                 isPlaying = isCurrentItem(item) && isPlaying,
                             )
+                            if (index < column.lastIndex) {
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(start = 60.dp),
+                                    thickness = 0.5.dp,
+                                    color = MaterialTheme.colorScheme.outline,
+                                )
+                            }
                         }
                     }
                 }

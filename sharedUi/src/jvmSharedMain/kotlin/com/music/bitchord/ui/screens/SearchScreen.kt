@@ -847,6 +847,13 @@ private fun LazyListScope.recentSearches(
             onRemove = { onRemove(entity.id) },
             onSwipeToQueue = song?.let { { onSongSwipe(it) } },
         )
+        if (entity != history.last()) {
+            HorizontalDivider(
+                modifier = Modifier.padding(start = ROW_DIVIDER_INSET),
+                thickness = 0.5.dp,
+                color = MaterialTheme.colorScheme.outline,
+            )
+        }
     }
 }
 
@@ -918,6 +925,13 @@ private fun LazyListScope.recentAddonSearches(
                     modifier = Modifier.size(18.dp),
                 )
             }
+        }
+        if (term != history.last()) {
+            HorizontalDivider(
+                modifier = Modifier.padding(start = PAGE_GUTTER + 38.dp),
+                thickness = 0.5.dp,
+                color = MaterialTheme.colorScheme.outline,
+            )
         }
     }
 }
