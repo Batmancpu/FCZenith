@@ -281,6 +281,16 @@ private const val PANEL_FILL_UNTIL = 0.2f
 /** Seberapa jauh panel terbuka saat lebarnya sudah penuh selebar layar: bertahap, bukan langsung. */
 private const val PANEL_WIDE_AT = 0.8f
 
+/**
+ * Kurva lebar panel (0 di pill, 1 saat selebar layar) untuk jarak buka [t].
+ * Dipakai juga oleh cover yang terbang ke/dari mini player, supaya cover turun
+ * dan naik selaras dengan panel, tidak mendahului atau tertinggal darinya.
+ */
+internal fun panelWideEase(t: Float): Float {
+    val x = (t / PANEL_WIDE_AT).coerceIn(0f, 1f)
+    return 1f - (1f - x) * (1f - x)
+}
+
 internal class PlayerMorph(val rect: Rect, val corner: Float, val progress: Float)
 
 private class MorphShape(private val rect: Rect, private val corner: Float) : Shape {

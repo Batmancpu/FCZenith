@@ -534,6 +534,13 @@ private fun dockEase(t: Float): Float {
 }
 
 /**
+ * Posisi/ukuran cover terbang (canvas maupun thumbnail biasa) di antara mini
+ * player dan sleeve. Mengikuti kurva lebar panel, jadi cover tidak turun ke
+ * mini player selagi panel masih lebar.
+ */
+private fun dockFlyEase(t: Float): Float = panelWideEase(t)
+
+/**
  * The share of the sheet's travel the artwork rides on its way to the cover. All
  * of it bowed the path below the straight line and cut the cover's foot off at
  * the panel's edge; a quarter keeps it close to a straight line.
@@ -3531,7 +3538,7 @@ fun NowPlayingScreen(
                             } else {
                                 0f
                             }
-                            val base = if (heroMode) dockEase(dockT()) else dockEaseCard(dockT())
+                            val base = dockFlyEase(dockT())
                             // Di menu lirik/queue (p = 1) cover adalah thumbnail header:
                             // ia ikut panel dulu, tidak lebih dulu terbang ke mini player.
                             val ease = base + (dockEaseThumb(dockT()) - base) * p()
