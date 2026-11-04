@@ -458,7 +458,7 @@ private fun TopPickCard(
                 logoHeight = 14.dp,
                 fontSize = 16.sp,
                 color = Color.White,
-                gap = 5.dp,
+                gap = 2.dp,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(top = 12.dp, end = 12.dp),
@@ -1745,7 +1745,7 @@ private fun MoodTile(mood: TopPickMood, onClick: (TopPickMood, String) -> Unit, 
                 logoHeight = 10.dp,
                 fontSize = 12.sp,
                 color = Color.White,
-                gap = 4.dp,
+                gap = 2.dp,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(top = 8.dp, end = 8.dp),

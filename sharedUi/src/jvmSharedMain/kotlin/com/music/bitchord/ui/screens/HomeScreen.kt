@@ -505,7 +505,7 @@ private fun HomeTitle(title: String, modifier: Modifier = Modifier) {
             logoHeight = logoHeight,
             fontSize = style.fontSize * MUSIC_TO_FONT,
             color = MaterialTheme.colorScheme.onBackground,
-            gap = 8.dp,
+            gap = 2.dp,
             modifier = Modifier.padding(bottom = 14.dp),
         )
         HorizontalDivider(
