@@ -766,6 +766,7 @@ fun DetailScreen(
                 is UiState.Error -> item { MessageState(state.message) }
                 is UiState.Success -> if (folder != null && folderState != null) {
                     localFolderItems(
+                        afterFlight = page.covers.isNotEmpty(),
                         folder = folder,
                         state = folderState,
                         songs = queue,
@@ -1089,7 +1090,7 @@ private fun ReleaseHeader(
             textAlign = TextAlign.Center,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.enterReveal(150).padding(horizontal = HEADER_GUTTER),
+            modifier = Modifier.flightReveal(150, afterFlight = page.covers.isNotEmpty()).padding(horizontal = HEADER_GUTTER),
         )
         if (credit.isNotBlank()) {
             Spacer(Modifier.height(2.dp))
@@ -1104,7 +1105,7 @@ private fun ReleaseHeader(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier
-                    .enterReveal(200)
+                    .flightReveal(200, afterFlight = page.covers.isNotEmpty())
                     .padding(horizontal = HEADER_GUTTER)
                     .let { m ->
                         val id = artist?.artistId
@@ -1126,7 +1127,7 @@ private fun ReleaseHeader(
                 textAlign = TextAlign.Center,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.enterReveal(240).padding(horizontal = HEADER_GUTTER),
+                modifier = Modifier.flightReveal(240, afterFlight = page.covers.isNotEmpty()).padding(horizontal = HEADER_GUTTER),
             )
         }
 
@@ -1137,7 +1138,7 @@ private fun ReleaseHeader(
             Spacer(Modifier.height(18.dp))
             Row(
                 modifier = Modifier
-                    .enterReveal(290)
+                    .flightReveal(290, afterFlight = page.covers.isNotEmpty())
                     .widthIn(max = RELEASE_ACTIONS_MAX_WIDTH)
                     .fillMaxWidth()
                     .padding(horizontal = HEADER_GUTTER),

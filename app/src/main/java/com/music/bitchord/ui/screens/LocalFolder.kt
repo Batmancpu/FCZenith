@@ -268,6 +268,7 @@ internal fun LazyListScope.localFolderItems(
     onSongClick: (List<Song>, Int) -> Unit,
     onSongLongPress: (Song) -> Unit,
     onSongSwipe: (Song) -> Unit,
+    afterFlight: Boolean = false,
 ) {
     val tabs = folder.tabs
     item(key = "folder-tabs") {
@@ -275,7 +276,9 @@ internal fun LazyListScope.localFolderItems(
             options = tabs.map { it.label() },
             selectedIndex = tabs.indexOf(state.tab).coerceAtLeast(0),
             onSelect = { state.tab = tabs[it] },
-            modifier = Modifier.padding(start = PAGE_GUTTER, end = PAGE_GUTTER, bottom = 14.dp),
+            modifier = Modifier
+                .flightReveal(300, afterFlight = afterFlight)
+                .padding(start = PAGE_GUTTER, end = PAGE_GUTTER, bottom = 14.dp),
         )
     }
 
@@ -344,6 +347,7 @@ internal fun LazyListScope.localFolderItems(
             }
         } else {
             itemsIndexed(songs, key = { index, song -> "song-${song.videoId}-$index" }) { index, song ->
+                Column(Modifier.flightReveal(340 + index.coerceAtMost(8) * 30, afterFlight = afterFlight)) {
                 SongRow(
                     song = song,
                     selected = song.videoId in state.selectedIds,
@@ -364,6 +368,7 @@ internal fun LazyListScope.localFolderItems(
                     },
                 )
                 if (index < songs.lastIndex) FolderDivider(palette)
+                }
             }
         }
 
