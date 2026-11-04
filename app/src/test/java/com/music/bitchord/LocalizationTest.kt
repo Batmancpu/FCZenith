@@ -12,11 +12,11 @@ import javax.xml.parsers.DocumentBuilderFactory
 class LocalizationTest {
 
     @Test
-    fun supportedLanguages_containsVietnamese() {
-        val viLanguage = SUPPORTED_LANGUAGES.firstOrNull { it.tag == "vi" }
-        assertNotNull("Vietnamese language must be in SUPPORTED_LANGUAGES", viLanguage)
-        assertEquals(R.string.vietnamese, viLanguage?.nameRes)
-        assertEquals(R.string.vietnamese, languageDisplayNameRes("vi"))
+    fun supportedLanguages_containsIndonesian() {
+        val idLanguage = SUPPORTED_LANGUAGES.firstOrNull { it.tag == "id" }
+        assertNotNull("Indonesian language must be in SUPPORTED_LANGUAGES", idLanguage)
+        assertEquals(R.string.indonesian, idLanguage?.nameRes)
+        assertEquals(R.string.indonesian, languageDisplayNameRes("id"))
     }
 
     @Test
@@ -42,7 +42,7 @@ class LocalizationTest {
             if (name != null) configuredLocales.add(name)
         }
 
-        assertTrue("locales_config.xml must include 'vi'", configuredLocales.contains("vi"))
+        assertTrue("locales_config.xml must include 'id'", configuredLocales.contains("id"))
 
         for (lang in SUPPORTED_LANGUAGES) {
             assertTrue(
