@@ -145,9 +145,14 @@ fun GlassNavBar(
     // The theme's own glass tint, as the liquid top bar has it — no white wash.
     val glassSurface: @Composable () -> Modifier = { Modifier.liquidGlass(shape = pillShape) }
 
+    // Seberapa terbuka player (0..1), dibaca saat draw oleh tab bar untuk
+    // mendorong tab ke bawah (expanded) atau ke kiri/kanan (inline).
+    val chromeProgress = remember(dock) { { dock?.openFraction() ?: 0f } }
+
     FloatingTabBar(
         selectedTabKey = selectedIndex,
         scrollConnection = scrollConnection,
+        chromeProgress = chromeProgress,
         modifier = modifier
             .windowInsetsPadding(floatingBarInsets)
             .padding(horizontal = NAV_BAR_GUTTER)

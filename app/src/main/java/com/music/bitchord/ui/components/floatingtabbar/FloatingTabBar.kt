@@ -145,6 +145,31 @@ val LocalTabPillGeometry = compositionLocalOf<() -> Offset> { { Offset.Unspecifi
 
 private val DefaultTabBarContentModifier: @Composable () -> Modifier = { Modifier }
 
+private val ZeroChromeProgress: () -> Float = { 0f }
+
+/** Bukaan player (0..1) saat bar sudah selesai menyingkir. Sisanya bar sudah di luar layar. */
+private const val CHROME_PUSH_DONE_AT = 0.7f
+
+/** Jarak ekstra supaya bar benar-benar lepas dari layar, bukan berhenti di tepinya. */
+private val CHROME_PUSH_MARGIN = 64.dp
+
+private fun chromePushEase(progress: Float): Float {
+    val t = (progress / CHROME_PUSH_DONE_AT).coerceIn(0f, 1f)
+    return t * t * (3f - 2f * t)
+}
+
+/** Mode expanded: baris tab turun ke bawah layar mengikuti bukaan player. */
+private fun Modifier.chromePushDown(progress: () -> Float): Modifier = graphicsLayer {
+    val e = chromePushEase(progress())
+    translationY = (size.height + CHROME_PUSH_MARGIN.toPx()) * e
+}
+
+/** Mode inline: tab terdorong ke kiri dan Search ke kanan mengikuti bukaan player. */
+private fun Modifier.chromePushSide(progress: () -> Float, direction: Float): Modifier = graphicsLayer {
+    val e = chromePushEase(progress())
+    translationX = direction * (size.width + CHROME_PUSH_MARGIN.toPx()) * e
+}
+
 /**
  * A floating tab bar that can transition between inline and expanded states.
  *
@@ -224,6 +249,8 @@ fun FloatingTabBar(
     selectedTabKey: Any?,
     scrollConnection: FloatingTabBarScrollConnection,
     modifier: Modifier = Modifier,
+    /** 0 = bar diam, 1 = player terbuka penuh. Dibaca saat draw saja. */
+    chromeProgress: () -> Float = ZeroChromeProgress,
     tabBarContentModifier: @Composable () -> Modifier = DefaultTabBarContentModifier,
     inlineAccessory: (@Composable SharedTransitionScope.(Modifier, AnimatedVisibilityScope) -> Unit)? = null,
     expandedAccessory: (@Composable SharedTransitionScope.(Modifier, AnimatedVisibilityScope) -> Unit)? = null,
@@ -259,6 +286,7 @@ fun FloatingTabBar(
             if (isInline) {
                 InlineBar(
                     scope = scope,
+                    chromeProgress = chromeProgress,
                     selectedTabKey = selectedTabKey,
                     accessory = inlineAccessory,
                     isAccessoryShared = isAccessoryShared,
@@ -273,6 +301,7 @@ fun FloatingTabBar(
             } else {
                 ExpandedBar(
                     scope = scope,
+                    chromeProgress = chromeProgress,
                     selectedTabKey = selectedTabKey,
                     accessory = expandedAccessory,
                     isAccessoryShared = isAccessoryShared,
@@ -453,6 +482,7 @@ interface FloatingTabBarScope {
 @Composable
 private fun SharedTransitionScope.InlineBar(
     scope: FloatingTabBarScopeImpl,
+    chromeProgress: () -> Float,
     selectedTabKey: Any?,
     accessory: (@Composable SharedTransitionScope.(Modifier, AnimatedVisibilityScope) -> Unit)?,
     isAccessoryShared: Boolean,
@@ -467,6 +497,8 @@ private fun SharedTransitionScope.InlineBar(
     val inlineTab = scope.getInlineTab(selectedTabKey)
     val standaloneTab = scope.standaloneTab
     val hasInlineTab = inlineTab != null
+    // Tab menyingkir ke sisi awalnya, Search ke sisi akhirnya.
+    val startSign = if (LocalLayoutDirection.current == LayoutDirection.Rtl) 1f else -1f
 
     // With an accessory the row spans the full width ([tab][accessory][standalone],
     // iOS 26 Apple Music style); without one, the cluster is packed and centered.
@@ -489,7 +521,7 @@ private fun SharedTransitionScope.InlineBar(
                 elevations = elevations,
                 animatedVisibilityScope = animatedVisibilityScope,
                 tabBarContentModifier = tabBarContentModifier,
-                modifier = Modifier
+                modifier = Modifier.chromePushSide(chromeProgress, startSign)
             )
         }
 
@@ -518,6 +550,7 @@ private fun SharedTransitionScope.InlineBar(
                 modifier = Modifier
                     .fillMaxHeight()
                     .aspectRatio(1f)
+                    .chromePushSide(chromeProgress, -startSign)
             )
         }
     }
@@ -668,6 +701,7 @@ private fun SharedTransitionScope.InlineAccessory(
 @Composable
 private fun SharedTransitionScope.ExpandedBar(
     scope: FloatingTabBarScopeImpl,
+    chromeProgress: () -> Float,
     selectedTabKey: Any?,
     accessory: (@Composable SharedTransitionScope.(Modifier, AnimatedVisibilityScope) -> Unit)?,
     isAccessoryShared: Boolean,
@@ -711,6 +745,7 @@ private fun SharedTransitionScope.ExpandedBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(IntrinsicSize.Max)
+                .chromePushDown(chromeProgress)
         ) {
             if (hasTabGroup) {
                 ExpandedTabs(
