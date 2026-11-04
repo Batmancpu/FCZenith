@@ -132,8 +132,9 @@ internal class IosMenuTouch(private val scope: CoroutineScope) {
         val t = if (scrolled) null else targetAt(pos)
         if (t !== startTarget && (pos - down).getDistance() > slop) leftStart = true
         if (t !== hovered) select(t, animate = true)
-        // Menu yang sedang digulir tidak ikut meregang: tarikan jari itu milik daftar.
-        jellyTo(if (scrolled) downWindow else toWindow(pos), dead, maxShift)
+        // Menu yang digulir tetap bergoyang mengikuti jari, hanya lebih lembut,
+        // supaya menu panjang tidak terasa mati saat ditarik.
+        jellyTo(toWindow(pos), dead, maxShift, if (scrolled) SCROLL_JELLY_GAIN else 1f)
     }
 
     private fun select(t: Target?, animate: Boolean) {
@@ -156,17 +157,17 @@ internal class IosMenuTouch(private val scope: CoroutineScope) {
         }
     }
 
-    private fun jellyTo(pos: Offset, dead: Float, maxShift: Float) {
+    private fun jellyTo(pos: Offset, dead: Float, maxShift: Float, gain: Float = 1f) {
         if (reduceMotion) return
         fun soft(d: Float): Float = if (abs(d) <= dead) 0f else (abs(d) - dead) * sign(d)
         val dx = soft(pos.x - downWindow.x)
         val dy = soft(pos.y - downWindow.y)
         val w = hostSize.width.coerceAtLeast(1f)
         val h = hostSize.height.coerceAtLeast(1f)
-        val tx = (dx * 0.07f).coerceIn(-maxShift, maxShift)
-        val ty = (dy * 0.07f).coerceIn(-maxShift, maxShift)
-        val ax = (abs(dx) / w * 0.22f).coerceAtMost(0.06f)
-        val ay = (abs(dy) / h * 0.22f).coerceAtMost(0.06f)
+        val tx = (dx * 0.07f * gain).coerceIn(-maxShift, maxShift)
+        val ty = (dy * 0.07f * gain).coerceIn(-maxShift, maxShift)
+        val ax = (abs(dx) / w * 0.22f * gain).coerceAtMost(0.06f)
+        val ay = (abs(dy) / h * 0.22f * gain).coerceAtMost(0.06f)
         val sx = 1f + ax - ay * 0.5f
         val sy = 1f + ay - ax * 0.5f
         val follow = spring<Float>(dampingRatio = 0.6f, stiffness = 500f)
@@ -196,6 +197,9 @@ internal class IosMenuTouch(private val scope: CoroutineScope) {
 }
 
 internal val LocalIosMenuTouch = compositionLocalOf<IosMenuTouch?> { null }
+
+/** Kekuatan jelly saat daftar menu sedang digulir, dibanding saat jari hanya menggeser. */
+private const val SCROLL_JELLY_GAIN = 0.6f
 
 @Composable
 internal fun rememberIosMenuTouch(reduceMotion: Boolean): IosMenuTouch {
