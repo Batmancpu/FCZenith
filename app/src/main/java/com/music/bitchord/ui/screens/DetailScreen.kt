@@ -2536,6 +2536,8 @@ private fun MostPlayedHero(
     height: Dp,
     modifier: Modifier = Modifier,
 ) {
+    val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
+    val blurFoot = !reduceDynamicBlur && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
     Box(
         modifier
             // Paling luar: tinggi yang dilaporkan lebih pendek, sehingga
@@ -2592,6 +2594,49 @@ private fun MostPlayedHero(
                 )
             }
         }
+        // Salinan mosaic yang di-blur, dimunculkan di kaki lewat mask, seperti
+        // blur cover #1 di kartu: kaki hero masuk dulu ke warna cover sebenarnya,
+        // baru larut ke warna halaman.
+        if (blurFoot) {
+            Box(
+                Modifier
+                    .matchParentSize()
+                    // Offscreen agar mask memotong hasil blur, bukan tiap gambar di bawahnya.
+                    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                    .drawWithContent {
+                        drawContent()
+                        drawRect(
+                            brush = Brush.verticalGradient(
+                                0.00f to Color.Transparent,
+                                0.50f to Color.Transparent,
+                                0.66f to Color.Black.copy(alpha = 0.40f),
+                                0.82f to Color.Black.copy(alpha = 0.85f),
+                                1.00f to Color.Black,
+                            ),
+                            blendMode = BlendMode.DstIn,
+                        )
+                    }
+                    .blur(LIKED_FOOT_BLUR, BlurredEdgeTreatment.Rectangle),
+            ) {
+                Box(
+                    Modifier.matchParentSize().layout { measurable, constraints ->
+                        val w = constraints.maxWidth
+                        val h = constraints.maxHeight
+                        val side = maxOf(w, h)
+                        val placeable = measurable.measure(Constraints.fixed(side, side))
+                        layout(w, h) { placeable.place((w - side) / 2, (h - side) / 2) }
+                    },
+                ) {
+                    CompositionLocalProvider(LocalSettledMosaic provides true) {
+                        MostPlayedArt(
+                            covers = page.covers,
+                            motion = true,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                }
+            }
+        }
         // Berakhir di warna halaman penuh, jadi tidak ada tepi tempat seni berhenti.
         val clear = palette.background.copy(alpha = 0f)
         Box(
@@ -2599,13 +2644,15 @@ private fun MostPlayedHero(
                 .matchParentSize()
                 .background(
                     Brush.verticalGradient(
-                        // Titik dan alpha disamakan dengan wash cover terbang
-                        // (CoverFlight), jadi saat cover mendarat dan memudar
-                        // tidak ada perubahan bentuk fade di kaki hero.
+                        // Banyak titik di sepanjang kurva halus (ease), dekat dengan
+                        // wash cover terbang (CoverFlight) supaya pendaratan tetap mulus.
                         0.00f to clear,
                         0.45f to clear,
+                        0.55f to palette.background.copy(alpha = 0.08f),
                         0.65f to palette.background.copy(alpha = 0.30f),
+                        0.73f to palette.background.copy(alpha = 0.52f),
                         0.82f to palette.background.copy(alpha = 0.72f),
+                        0.88f to palette.background.copy(alpha = 0.84f),
                         0.94f to palette.background.copy(alpha = 0.95f),
                         1.00f to palette.background,
                     ),
