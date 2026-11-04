@@ -7,13 +7,13 @@
     <path android:pathData="M0,0h1024v1024h-1024z">
         <aapt:attr name="android:fillColor">
             <gradient
-                android:startX="512"
-                android:startY="0"
-                android:endX="512"
-                android:endY="1024"
-                android:type="linear">
-                <item android:color="#FB5C74" android:offset="0.0" />
-                <item android:color="#FA233B" android:offset="1.0" />
+                android:centerX="512"
+                android:centerY="512"
+                android:gradientRadius="724"
+                android:type="radial">
+                <item android:color="#FCFBFD" android:offset="0.0" />
+                <item android:color="#F1F0F4" android:offset="0.55" />
+                <item android:color="#DFDFE8" android:offset="1.0" />
             </gradient>
         </aapt:attr>
     </path>
