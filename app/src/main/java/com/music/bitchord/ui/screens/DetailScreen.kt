@@ -236,7 +236,8 @@ private const val SLEEVE_FRACTION = 0.76f
 /** ...and of its height, so a landscape window still shows the title under it. */
 private const val SLEEVE_MAX_HEIGHT = 0.5f
 
-private val SLEEVE_SHAPE = RoundedCornerShape(12.dp)
+private val SLEEVE_CORNER = 20.dp
+private val SLEEVE_SHAPE = RoundedCornerShape(SLEEVE_CORNER)
 private val SLEEVE_SHADOW = 18.dp
 
 /** Shuffle and Add to Library either side of the release page's Play pill. */
@@ -1010,7 +1011,7 @@ private fun ReleaseHeader(
             )
         } else Box(
             Modifier
-                .coverFlightTarget(page.browseId, 12.dp)
+                .coverFlightTarget(page.browseId, SLEEVE_CORNER)
                 .size(sleeveSize)
                 .shadow(SLEEVE_SHADOW, SLEEVE_SHAPE)
                 .background(palette.elevated)

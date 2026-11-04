@@ -155,7 +155,9 @@ private const val TOP_PICK_FRACTION = 0.60f
 /** Held back on a tablet, the same way [heroCardWidth] is. */
 private val TOP_PICK_MAX_WIDTH = 280.dp
 
-private val TopPickShape = RoundedCornerShape(20.dp)
+private val TopPickCorner = 20.dp
+
+private val TopPickShape = RoundedCornerShape(TopPickCorner)
 
 private fun topPickWidth(available: Dp): Dp = minOf(available * TOP_PICK_FRACTION, TOP_PICK_MAX_WIDTH)
 
@@ -446,7 +448,7 @@ private fun TopPickCard(
                         Modifier.coverFlightSource(
                             coverToken,
                             pick.images.firstOrNull().croppedAt(HEADER_ART_PX).whenArtworkReady(),
-                            12.dp,
+                            TopPickCorner,
                             footFade = true,
                             canvas = flightCanvas,
                         )
@@ -475,7 +477,7 @@ private fun TopPickCard(
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
-                        .coverFlightSource(coverToken, artistPhoto, 12.dp, canvas = flightCanvas)
+                        .coverFlightSource(coverToken, artistPhoto, TopPickCorner, canvas = flightCanvas)
                         .fillMaxSize(),
                 )
                 CardMotion(
