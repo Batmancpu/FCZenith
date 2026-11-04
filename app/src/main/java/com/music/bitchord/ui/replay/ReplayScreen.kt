@@ -61,6 +61,7 @@ import com.music.bitchord.data.model.artworkAt
 import com.music.bitchord.data.stats.ArtistFacts
 import com.music.bitchord.data.stats.ReplayPeriod
 import com.music.bitchord.data.stats.ReplaySummary
+import com.music.bitchord.ui.components.GlassSegmentedControl
 import com.music.bitchord.ui.components.PAGE_GUTTER
 import com.music.bitchord.ui.icons.BitChordIcons
 import com.music.bitchord.ui.player.MeshGradientBackground
@@ -298,41 +299,18 @@ private fun Heading(state: ReplayState, onPeriodChange: (ReplayPeriod) -> Unit, 
 @Composable
 private fun PeriodPicker(selected: ReplayPeriod, onSelect: (ReplayPeriod) -> Unit, dark: Boolean) {
     val context = LocalContext.current
-    val textColor = if (dark) Color.White else Color.Black
-    // Four equal shares of the full width, each held to one line. Sized to
-    // their labels instead, the chips ran past the edge on a narrow phone and
-    // the last was squeezed into whatever was left, one letter to a line.
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(textColor.copy(alpha = 0.10f))
-            .padding(3.dp),
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
+    val periods = ReplayPeriod.entries
+    val labels = periods.map { it.localizedTab(context) }
+    // The glass control reads light or dark off the theme's surface, so it is
+    // handed the page's own mode: the Replay page is dark or light as a whole.
+    MaterialTheme(
+        colorScheme = MaterialTheme.colorScheme.copy(surface = if (dark) Color.Black else Color.White),
     ) {
-        ReplayPeriod.entries.forEach { period ->
-            val active = period == selected
-            val background by animateColorAsState(
-                if (active) textColor.copy(alpha = 0.92f) else Color.Transparent,
-                tween(160),
-                label = "periodChip",
-            )
-            Text(
-                text = period.localizedTab(context),
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.W700,
-                color = if (active) if (dark) Color.Black else Color.White else textColor.copy(alpha = 0.75f),
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(background)
-                    .clickable { onSelect(period) }
-                    .padding(horizontal = 6.dp, vertical = 8.dp),
-            )
-        }
+        GlassSegmentedControl(
+            options = labels,
+            selectedIndex = periods.indexOf(selected),
+            onSelect = { onSelect(periods[it]) },
+        )
     }
 }
 
