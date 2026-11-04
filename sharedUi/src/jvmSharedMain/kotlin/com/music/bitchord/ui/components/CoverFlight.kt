@@ -11,7 +11,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -67,6 +69,12 @@ import kotlinx.coroutines.withTimeoutOrNull
  * card simply stays as it is and the page cross-fades in as before.
  */
 
+/**
+ * True di dalam gambar hidup yang terbang atau sudah mendarat: mosaic tidak
+ * memutar animasi masuk tile-nya lagi, karena ia sudah tampil utuh di kartu.
+ */
+val LocalSettledMosaic = compositionLocalOf { false }
+
 private val FlightEasing = CubicBezierEasing(0.32f, 0.72f, 0f, 1f)
 private const val FLIGHT_MS = 780
 private const val TARGET_TIMEOUT_MS = 700L
@@ -94,6 +102,8 @@ private class FlightSource(
     var footFade: Boolean = false,
     /** The clip the card is playing right now, if any: it flies with the cover. */
     var canvas: CanvasArtwork? = null,
+    /** Gambar hidup (mosaic) yang terbang menggantikan satu foto. */
+    var content: (@Composable (Modifier) -> Unit)? = null,
 )
 
 private class Flight(
@@ -107,6 +117,7 @@ private class Flight(
     val settled: Float = 1f,
 ) {
     var model: Any? = null
+    var content: (@Composable (Modifier) -> Unit)? = null
     var toCornerPx: Float = 0f
     var footFade: Boolean = false
     var canvas: CanvasArtwork? = null
@@ -231,6 +242,8 @@ private object CoverFlightState {
         val token = bestToken ?: return false
         val source = sources[token] ?: return false
         f.model = source.model
+        f.content = source.content
+        if (source.content != null) f.imageReady = true
         f.toCornerPx = source.cornerPx
         f.footFade = source.footFade
         if (f.canvas == null) f.canvas = source.canvas
@@ -273,7 +286,8 @@ private fun startFlight(
         it.footFade = source.footFade
         it.canvas = source.canvas
         it.frame = frame
-        it.imageReady = frame != null
+        it.content = source.content
+        it.imageReady = frame != null || source.content != null
         it.token = token
     }
 }
@@ -380,6 +394,7 @@ fun Modifier.coverFlightSource(
     corner: Dp = 12.dp,
     footFade: Boolean = false,
     canvas: CanvasArtwork? = null,
+    content: (@Composable (Modifier) -> Unit)? = null,
 ): Modifier {
     val cornerPx = with(LocalDensity.current) { corner.toPx() }
     val info = remember(token) { FlightSource() }
@@ -387,6 +402,7 @@ fun Modifier.coverFlightSource(
     info.cornerPx = cornerPx
     info.footFade = footFade
     info.canvas = canvas
+    info.content = content
     DisposableEffect(token) {
         CoverFlightState.sources[token] = info
         onDispose { CoverFlightState.sources.remove(token) }
@@ -694,6 +710,11 @@ private fun FlightLayer(flight: Flight) {
                 contentScale = ContentScale.Crop,
                 modifier = pictureModifier,
             )
+        } else if (flight.content != null) {
+            // Gambar hidup (mosaic) terbang sebagai dirinya sendiri, tetap bergerak.
+            CompositionLocalProvider(LocalSettledMosaic provides true) {
+                flight.content?.invoke(pictureModifier)
+            }
         } else {
             AsyncImage(
                 model = flight.model,

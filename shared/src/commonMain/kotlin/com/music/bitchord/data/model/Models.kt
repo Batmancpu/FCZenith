@@ -597,6 +597,8 @@ data class DetailPage(
      * fetched with a session; see [SubscriptionState].
      */
     val subscription: SubscriptionState? = null,
+    /** Cover-cover yang membentuk mosaic sleeve (halaman Most Played); kosong untuk halaman lain. */
+    val covers: List<String> = emptyList(),
 )
 
 /**

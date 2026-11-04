@@ -119,6 +119,8 @@ import androidx.compose.foundation.border
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.music.bitchord.ui.components.coverFlightSource
+import androidx.compose.runtime.CompositionLocalProvider
+import com.music.bitchord.ui.components.LocalSettledMosaic
 import com.music.bitchord.ui.components.coverFlightTarget
 import com.music.bitchord.ui.components.coverFlightClip
 import com.music.bitchord.ui.components.coverFlightClipRendered
@@ -1047,6 +1049,17 @@ private fun ReleaseHeader(
                 onState = { artFailed = it is AsyncImagePainter.State.Error },
                 modifier = Modifier.matchParentSize(),
             )
+            // Halaman Most Played: sleeve-nya mosaic hidup yang sama dengan kartu,
+            // jadi mosaic yang terbang mendarat di atas dirinya sendiri.
+            if (page.covers.isNotEmpty()) {
+                CompositionLocalProvider(LocalSettledMosaic provides true) {
+                    MostPlayedArt(
+                        covers = page.covers,
+                        motion = true,
+                        modifier = Modifier.matchParentSize().clip(SLEEVE_SHAPE),
+                    )
+                }
+            }
             // Animated cover art, inside the same frame. Always running:
             // unlike the player's sleeve there is no transport here to follow,
             // and the page is only up while it's being read.
@@ -2824,7 +2837,9 @@ private fun LikedTile(
     pulse: () -> Float,
     modifier: Modifier = Modifier,
 ) {
-    var shown by remember { mutableStateOf(false) }
+    // Mosaic yang sudah tampil di kartu lalu terbang tidak mengulang animasi masuk tile.
+    val settled = LocalSettledMosaic.current
+    var shown by remember { mutableStateOf(settled) }
     LaunchedEffect(Unit) { shown = true }
     val enter by animateFloatAsState(
         targetValue = if (shown) 1f else 0f,

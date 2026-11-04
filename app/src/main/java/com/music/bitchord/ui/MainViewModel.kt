@@ -18,6 +18,7 @@ import com.music.bitchord.data.YtMusicRepository
 import com.music.bitchord.data.TopPicks
 import com.music.bitchord.data.AppleArtistPhotos
 import com.music.bitchord.data.model.ArtistRef
+import com.music.bitchord.data.model.MOST_PLAYED_BROWSE_ID
 import com.music.bitchord.data.model.TopPick
 import com.music.bitchord.data.stats.ListeningStats
 import com.music.bitchord.data.stats.ReplayPeriod
@@ -2978,6 +2979,23 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             thumbnailUrl = group.thumbnailUrl,
             songs = if (group.songs.isEmpty()) UiState.Error(text(R.string.no_tracks_here)) else UiState.Success(group.songs),
             type = group.type,
+        )
+    }
+
+    /**
+     * Membuka halaman Most Played dengan lagu yang sudah ada di kartu, jadi
+     * langsung terisi dan mosaic kartu bisa terbang ke sleeve-nya.
+     */
+    fun openMostPlayed(pick: TopPick, label: String) {
+        if (_detailStack.value.lastOrNull()?.browseId == MOST_PLAYED_BROWSE_ID) return
+        val songs = pick.songs.map { it.toSong() }
+        _detailStack.value += DetailPage(
+            browseId = MOST_PLAYED_BROWSE_ID,
+            title = pick.title.ifBlank { label },
+            subtitle = pick.subtitle,
+            thumbnailUrl = pick.images.firstOrNull(),
+            songs = if (songs.isEmpty()) UiState.Error(text(R.string.no_tracks_here)) else UiState.Success(songs),
+            covers = pick.images,
         )
     }
 

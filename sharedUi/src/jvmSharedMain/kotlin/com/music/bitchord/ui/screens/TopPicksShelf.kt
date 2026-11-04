@@ -62,6 +62,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.CompositingStrategy
@@ -103,6 +104,7 @@ import coil3.compose.AsyncImage
 import com.music.bitchord.data.model.CARD_ART_PX
 import com.music.bitchord.data.model.HEADER_ART_PX
 import com.music.bitchord.data.model.TopPick
+import com.music.bitchord.data.model.MOST_PLAYED_BROWSE_ID
 import com.music.bitchord.data.model.TopPickKind
 import com.music.bitchord.data.model.TopPickMood
 import com.music.bitchord.data.model.artworkAt
@@ -354,6 +356,8 @@ private fun TopPickCard(
     // Same page id Home opens for this card, so the flight finds the page's cover.
     val flightId: String? = when (pick.kind) {
         TopPickKind.LATEST_RELEASE -> pick.browseId
+        TopPickKind.MOST_PLAYED ->
+            MOST_PLAYED_BROWSE_ID.takeIf { pick.images.isNotEmpty() && LocalArtworkImages.current }
         TopPickKind.FEATURED_ARTIST -> pick.artistBrowseId
         TopPickKind.NEW_RELEASE_MIX ->
             pick.watch?.playlistId
@@ -401,8 +405,24 @@ private fun TopPickCard(
             TopPickKind.MOST_PLAYED -> {
                 val art = LocalMostPlayedArt.current
                 val covers = if (LocalArtworkImages.current) pick.images else emptyList()
-                if (art != null) {
-                    art(covers, LocalArtworkMotion.current, Modifier.fillMaxSize())
+                val motion = LocalArtworkMotion.current
+                if (art != null && covers.isNotEmpty() && flightId != null) {
+                    // Mosaic persegi di atas, kakinya memudar ke blur; mosaic inilah
+                    // yang terbang (tetap bergerak) ke sleeve halamannya.
+                    MostPlayedCardArt(
+                        backdrop = covers.first(),
+                        modifier = Modifier.fillMaxSize(),
+                        coverModifier = Modifier.coverFlightSource(
+                            coverToken,
+                            null,
+                            TopPickCorner,
+                            footFade = true,
+                            content = { m -> art(covers, motion, m) },
+                        ),
+                        art = { m -> art(covers, motion, m) },
+                    )
+                } else if (art != null) {
+                    art(covers, motion, Modifier.fillMaxSize())
                 } else {
                     Box(
                         Modifier.fillMaxSize().background(
@@ -410,15 +430,6 @@ private fun TopPickCard(
                         ),
                     )
                 }
-                // A soft dark foot so the title reads over the bright mosaic.
-                Box(
-                    Modifier.fillMaxSize().background(
-                        Brush.verticalGradient(
-                            0.35f to Color.Transparent,
-                            1f to Color.Black.copy(alpha = 0.50f),
-                        ),
-                    ),
-                )
                 eyebrowColor = Color(0xFFE9DCFF)
                 branded = true
             }
@@ -508,16 +519,23 @@ private fun TopPickCard(
         if (branded && pick.kind != TopPickKind.ARTIST_AND_SIMILAR && pick.kind != TopPickKind.MOST_PLAYED) {
             AmbientGlow(base = glowBase(pick), modifier = Modifier.fillMaxSize())
         }
-        CardOverlay(
-            text = text,
-            eyebrowColor = eyebrowColor,
-            branded = branded,
-            titleInArt = pick.kind == TopPickKind.MOOD ||
-                pick.kind == TopPickKind.PERSONAL_STATION ||
-                pick.kind == TopPickKind.DISCOVERY_STATION ||
-                pick.kind == TopPickKind.MOST_PLAYED,
-            modifier = Modifier.fillMaxSize().hideDuringCoverFlight(coverToken),
-        )
+        if (pick.kind == TopPickKind.MOST_PLAYED) {
+            MostPlayedPanel(
+                text = text,
+                images = pick.images,
+                modifier = Modifier.fillMaxSize().hideDuringCoverFlight(coverToken),
+            )
+        } else {
+            CardOverlay(
+                text = text,
+                eyebrowColor = eyebrowColor,
+                branded = branded,
+                titleInArt = pick.kind == TopPickKind.MOOD ||
+                    pick.kind == TopPickKind.PERSONAL_STATION ||
+                    pick.kind == TopPickKind.DISCOVERY_STATION,
+                modifier = Modifier.fillMaxSize().hideDuringCoverFlight(coverToken),
+            )
+        }
     }
 }
 
@@ -671,6 +689,108 @@ private fun CardOverlay(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Panel khusus kartu Most Played: kaca ungu yang mengambang di kaki cover,
+ * dengan label "Your Top Songs", tiga cover lagu berikutnya yang bertumpuk,
+ * judul besar, dan daftar artis. Gradasi saja, bukan blur langsung, supaya
+ * baris kartu tetap ringan.
+ */
+@Composable
+private fun MostPlayedPanel(text: CardText, images: List<String>, modifier: Modifier) {
+    val shape = RoundedCornerShape(18.dp)
+    Box(modifier) {
+        Wordmark(
+            logoHeight = 14.dp,
+            fontSize = 16.sp,
+            color = Color.White,
+            gap = 2.dp,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = 12.dp, end = 12.dp),
+        )
+        Column(
+            Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(start = 10.dp, end = 10.dp, bottom = 10.dp)
+                .clip(shape)
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            Color.White.copy(alpha = 0.20f),
+                            Color(0xFF2A1856).copy(alpha = 0.62f),
+                        ),
+                    ),
+                )
+                .border(
+                    width = 0.75.dp,
+                    brush = Brush.verticalGradient(
+                        listOf(
+                            Color.White.copy(alpha = 0.55f),
+                            Color.White.copy(alpha = 0.06f),
+                        ),
+                    ),
+                    shape = shape,
+                )
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+        ) {
+            Box(Modifier.fillMaxWidth()) {
+                Text(
+                    text = text.eyebrow.uppercase(),
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontSize = 11.sp,
+                        lineHeight = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 1.4.sp,
+                    ),
+                    color = Color(0xFFE9DCFF),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .padding(end = 56.dp),
+                )
+                Box(Modifier.align(Alignment.CenterEnd)) {
+                    images.drop(1).take(3).forEachIndexed { index, url ->
+                        AsyncImage(
+                            model = url.croppedAt(96).whenArtworkReady(),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .padding(start = (index * 13).dp)
+                                .size(22.dp)
+                                .clip(CircleShape)
+                                .border(1.5.dp, Color.White.copy(alpha = 0.85f), CircleShape),
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = text.title,
+                style = MaterialTheme.typography.headlineMedium.copy(
+                    fontSize = 24.sp,
+                    lineHeight = 26.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = (-0.5).sp,
+                ),
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (text.subtitle.isNotBlank()) {
+                Text(
+                    text = text.subtitle,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp, lineHeight = 15.sp),
+                    color = Color.White.copy(alpha = 0.78f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
     }
@@ -833,6 +953,55 @@ private fun ReleaseArt(
  * while the card is on screen.
  */
 private class CardMotionSource(val key: Any, val lookup: suspend () -> CanvasArtwork?)
+
+/**
+ * Seni kartu Most Played: mosaic persegi di atas, dan di bawahnya kaki mosaic
+ * memudar ke salinan blur cover #1 (dibuat sekali, bukan blur langsung).
+ */
+@Composable
+private fun MostPlayedCardArt(
+    backdrop: String,
+    modifier: Modifier,
+    coverModifier: Modifier,
+    art: @Composable (Modifier) -> Unit,
+) {
+    Box(modifier.background(Color.Black)) {
+        AsyncImage(
+            model = rememberBlurredBackdrop(backdrop.croppedAt(BACKDROP_SOURCE_PX).whenArtworkReady()),
+            contentDescription = null,
+            contentScale = ContentScale.FillBounds,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .fillMaxHeight(0.42f),
+        )
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        0.6f to Color.Black.copy(alpha = 0.08f),
+                        1f to Color.Black.copy(alpha = 0.38f),
+                    ),
+                ),
+        )
+        art(
+            coverModifier
+                .fillMaxWidth()
+                .aspectRatio(1f)
+                // Mosaic digambar lebih besar lalu diputar: potong di tepi persegi.
+                .clipToBounds()
+                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                .drawWithContent {
+                    drawContent()
+                    drawRect(
+                        Brush.verticalGradient(0.78f to Color.Black, 1f to Color.Transparent),
+                        blendMode = BlendMode.DstIn,
+                    )
+                },
+        )
+    }
+}
 
 /** The artist's own looping clip, for the cards that show their face. */
 private fun TopPick.artistMotion(): CardMotionSource? {

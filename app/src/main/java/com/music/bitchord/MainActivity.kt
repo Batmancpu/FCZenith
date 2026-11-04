@@ -1708,7 +1708,9 @@ private fun BitChordApp(
                     ?.let { if (it.startsWith("VL")) it else "VL$it" }
             else -> null
         }
-        if (pageId != null) {
+        if (pick.kind == TopPickKind.MOST_PLAYED) {
+            viewModel.openMostPlayed(pick, label)
+        } else if (pageId != null) {
             viewModel.openDetail(
                 browseId = pageId,
                 title = pick.title.ifBlank { label },

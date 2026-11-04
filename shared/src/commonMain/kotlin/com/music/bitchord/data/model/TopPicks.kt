@@ -159,6 +159,9 @@ data class TopPick(
     val songs: List<TopPickSong> = emptyList(),
 )
 
+/** Page id halaman Most Played: halaman `local:` yang langsung menampilkan lagunya, tanpa fetch. */
+const val MOST_PLAYED_BROWSE_ID = "local:most_played"
+
 /** A track kept inside a [TopPick], small enough to sit in the saved row. */
 @Serializable
 data class TopPickSong(
