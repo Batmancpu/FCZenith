@@ -1283,6 +1283,53 @@ private fun TopPickMood.lineRes() = when (this) {
     TopPickMood.WORK -> Res.string.mood_work_line
 }
 
+/**
+ * A mood's backdrop brushes, built once per card size: a diagonal sweep from a
+ * lit corner to a deep one, a soft light at the top-left, a halo behind the
+ * emblem and a darker foot. Only drawn per frame, never rebuilt.
+ */
+private class MoodBackdrop(style: MoodStyle, size: Size) {
+    val base: Brush = Brush.linearGradient(
+        listOf(
+            lerp(style.background, Color.White, 0.18f),
+            style.background,
+            lerp(style.background, Color.Black, 0.36f),
+        ),
+        start = Offset.Zero,
+        end = Offset(size.width, size.height),
+    )
+    val glowRadius = maxOf(size.width, size.height) * 0.75f
+    val glow: Brush = Brush.radialGradient(
+        0f to Color.White.copy(alpha = 0.34f),
+        1f to Color.Transparent,
+        center = Offset(glowRadius, glowRadius),
+        radius = glowRadius,
+    )
+    val haloRadius = size.width * 0.62f
+    val halo: Brush = Brush.radialGradient(
+        0f to style.stroke.copy(alpha = 0.28f),
+        1f to Color.Transparent,
+        center = Offset(haloRadius, haloRadius),
+        radius = haloRadius,
+    )
+    val foot: Brush = Brush.verticalGradient(
+        0.55f to Color.Transparent,
+        1f to Color.Black.copy(alpha = 0.30f),
+        startY = 0f,
+        endY = size.height,
+    )
+}
+
+/** Small lights scattered round the emblem: x, y as shares of the card, then radius in dp. */
+private val MoodSparkles = floatArrayOf(
+    0.12f, 0.14f, 1.4f,
+    0.86f, 0.22f, 1.0f,
+    0.20f, 0.82f, 1.0f,
+    0.90f, 0.80f, 1.6f,
+    0.08f, 0.52f, 0.9f,
+    0.93f, 0.50f, 0.9f,
+)
+
 /** The emblem's square, in card pixels; [x] and [y] take shares of its side. */
 private class Frame(val left: Float, val top: Float, val side: Float) {
     fun x(f: Float) = left + side * f
@@ -1309,8 +1356,21 @@ private fun MoodArt(
     // and recomposes nothing.
     val loop = if (still) null else loopPhase(style.periodMs)
     val cache = remember(mood) { EmblemCache() }
+    val backdrop = remember(style) { SizeCache { size -> MoodBackdrop(style, size) } }
     Canvas(if (still) modifier else modifier.then(RetainedArt)) {
-        drawRect(style.background)
+        val b = backdrop.get(size)
+        drawRect(b.base)
+        translate(left = -b.glowRadius * 0.35f, top = -b.glowRadius * 0.35f) {
+            drawCircle(b.glow, radius = b.glowRadius, center = Offset(b.glowRadius, b.glowRadius))
+        }
+        drawRect(b.foot)
+        for (i in MoodSparkles.indices step 3) {
+            drawCircle(
+                color = style.stroke.copy(alpha = 0.40f),
+                radius = MoodSparkles[i + 2].dp.toPx(),
+                center = Offset(size.width * MoodSparkles[i], size.height * MoodSparkles[i + 1]),
+            )
+        }
         val w = size.width
         val h = size.height
         val f = if (square) {
@@ -1322,6 +1382,13 @@ private fun MoodArt(
             val side = minOf(w * 0.66f, h * 0.46f)
             Frame(left = (w - side) / 2f, top = h * 0.545f - side / 2f, side = side)
         }
+        // A soft halo and two faint rings behind the emblem.
+        translate(left = f.center.x - b.haloRadius, top = f.center.y - b.haloRadius) {
+            drawCircle(b.halo, radius = b.haloRadius, center = Offset(b.haloRadius, b.haloRadius))
+        }
+        val ring = Stroke(width = 1.dp.toPx())
+        drawCircle(style.stroke.copy(alpha = 0.16f), radius = f.side * 0.66f, center = f.center, style = ring)
+        drawCircle(style.stroke.copy(alpha = 0.09f), radius = f.side * 0.86f, center = f.center, style = ring)
         val stroke = cache.stroke((if (square) 2.dp else 2.5.dp).toPx())
         drawEmblem(mood, f, loop?.value ?: mood.stillPhase(), style.stroke, stroke, cache)
     }
@@ -1928,11 +1995,11 @@ private fun MoodTile(mood: TopPickMood, onClick: (TopPickMood, String) -> Unit, 
                 // Sinks, dims and ripples the moment a finger lands, rim and
                 // all: the scale is drawn outside the clip below.
                 .instantPressClickable(
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(18.dp),
                     onClick = { onClick(mood, title) },
                 )
-                .clip(RoundedCornerShape(12.dp))
-                .thumbnailBorder(RoundedCornerShape(12.dp)),
+                .clip(RoundedCornerShape(18.dp))
+                .thumbnailBorder(RoundedCornerShape(18.dp)),
         ) {
             // Still. A shelf of tiles each breathing on its own loop kept the
             // page under the glass bars redrawing — and the bars' blur with
@@ -1946,14 +2013,41 @@ private fun MoodTile(mood: TopPickMood, onClick: (TopPickMood, String) -> Unit, 
                 gap = 2.dp,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(top = 8.dp, end = 8.dp),
+                    .padding(top = 10.dp, end = 10.dp),
             )
+            // A glass play button, so the tile reads as a station to start.
+            Box(
+                Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(10.dp)
+                    .size(30.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.22f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Canvas(Modifier.size(12.dp)) {
+                    val tri = Path().apply {
+                        moveTo(size.width * 0.12f, 0f)
+                        lineTo(size.width, size.height / 2f)
+                        lineTo(size.width * 0.12f, size.height)
+                        close()
+                    }
+                    drawPath(tri, Color.White)
+                }
+            }
         }
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(12.dp))
         Text(
             text = title,
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
             color = MaterialTheme.colorScheme.onBackground,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            text = stringResource(mood.lineRes()),
+            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp, lineHeight = 16.sp),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
