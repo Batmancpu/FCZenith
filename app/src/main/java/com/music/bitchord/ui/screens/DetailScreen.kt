@@ -2,6 +2,7 @@ package com.music.bitchord.ui.screens
 
 import com.music.bitchord.ui.components.trackArtSize
 import android.os.Build
+import android.os.SystemClock
 import com.music.bitchord.R
 
 import androidx.compose.animation.AnimatedContent
@@ -70,6 +71,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.withFrameMillis
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -1005,7 +1008,7 @@ private fun ReleaseHeader(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         if (page.covers.isNotEmpty()) {
-            MostPlayedHero(page = page, palette = palette, height = heroHeight)
+            MostPlayedHero(page = page, palette = palette, height = heroHeight * 1.3f)
         } else if (fullBleed) {
             LikedMusicHero(
                 page = page,
@@ -2554,21 +2557,37 @@ private fun MostPlayedHero(
             }
             .coverFlightTarget(page.browseId, 0.dp, palette.background),
     ) {
-        // Seni sengaja lebih tinggi daripada hero: kelebihannya menjulur ke atas.
+        // Perpanjangan di atas tepi hero untuk tarikan ke bawah: warna awal
+        // gradien mosaic, jadi tidak pernah ada ruang kosong.
         Box(
-            Modifier.layout { measurable, constraints ->
-                val extra = LIKED_OVERSCROLL.roundToPx()
-                val placeable = measurable.measure(
-                    Constraints.fixed(constraints.maxWidth, constraints.maxHeight + extra),
-                )
-                layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(0, -extra) }
+            Modifier
+                .matchParentSize()
+                .drawBehind {
+                    val extra = LIKED_OVERSCROLL.toPx()
+                    drawRect(
+                        color = LIKED_COLORS[0],
+                        topLeft = Offset(0f, -extra),
+                        size = androidx.compose.ui.geometry.Size(size.width, extra + 1f),
+                    )
+                },
+        )
+        // Mosaic digambar dalam kotak persegi seperti di kartu (sisi terpanjang
+        // hero), di tengah, lalu dipotong di tepi hero. Susunan tile-nya sama
+        // persis dengan cover yang terbang, hanya lebih besar.
+        Box(
+            Modifier.matchParentSize().layout { measurable, constraints ->
+                val w = constraints.maxWidth
+                val h = constraints.maxHeight
+                val side = maxOf(w, h)
+                val placeable = measurable.measure(Constraints.fixed(side, side))
+                layout(w, h) { placeable.place((w - side) / 2, (h - side) / 2) }
             },
         ) {
             CompositionLocalProvider(LocalSettledMosaic provides true) {
                 MostPlayedArt(
                     covers = page.covers,
                     motion = true,
-                    modifier = Modifier.matchParentSize().clipToBounds(),
+                    modifier = Modifier.fillMaxSize(),
                 )
             }
         }
@@ -2884,23 +2903,20 @@ private fun LikedArt(
 /** The Liked Music mosaic as a standalone cover, for Home's Most Played card. */
 @Composable
 fun MostPlayedArt(covers: List<String>, motion: Boolean, modifier: Modifier = Modifier) {
-    val transition = rememberInfiniteTransition(label = "mostPlayedArt")
-    val drift by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(LIKED_DRIFT_MS, easing = LinearEasing)),
-        label = "mostPlayedDrift",
-    )
-    val pulse by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(LIKED_PULSE_MS, easing = LinearEasing)),
-        label = "mostPlayedPulse",
-    )
+    // Satu jam global untuk semua mosaic (kartu, cover terbang, halaman):
+    // fasenya dihitung dari waktu, bukan dari saat komposisi dimulai, sehingga
+    // posisi dan miring tile selalu sama di ketiganya dan tidak loncat saat
+    // cover mendarat.
+    var nowMs by remember { mutableLongStateOf(SystemClock.uptimeMillis()) }
+    if (motion) {
+        LaunchedEffect(Unit) {
+            while (true) withFrameMillis { nowMs = SystemClock.uptimeMillis() }
+        }
+    }
     LikedArt(
         covers = covers.take(LIKED_MAX_COVERS),
-        drift = { if (motion) drift else 0f },
-        pulse = { if (motion) pulse else 0f },
+        drift = { if (motion) (nowMs % LIKED_DRIFT_MS) / LIKED_DRIFT_MS.toFloat() else 0f },
+        pulse = { if (motion) (nowMs % LIKED_PULSE_MS) / LIKED_PULSE_MS.toFloat() else 0f },
         modifier = modifier,
     )
 }
