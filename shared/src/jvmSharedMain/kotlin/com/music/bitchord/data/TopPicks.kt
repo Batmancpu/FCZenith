@@ -126,9 +126,16 @@ object TopPicks {
                 ?: shuffled.firstOrNull { it.images.isNotEmpty() }
             if (withArt == null) shuffled else listOf(withArt) + shuffled.filter { it !== withArt }
         }
-        // Slot 2 is the listener's own Most Played card; what used to hold
-        // slot 2 (the card with real artwork) follows it as slot 3.
-        listOfNotNull(lead, mostPlayed(local)) + rest
+        // The listener's own Most Played card is no longer pinned to slot 2: it
+        // lands at a random slot on every build, anywhere but the first.
+        val cards = listOfNotNull(lead) + rest
+        val mostPlayed = mostPlayed(local)
+        if (mostPlayed == null) {
+            cards
+        } else {
+            val at = if (cards.isEmpty()) 0 else Random.nextInt(1, cards.size + 1)
+            cards.toMutableList().also { it.add(at, mostPlayed) }
+        }
     }
 
     /** The listener's most played songs as one card, or null with too little history to fill it. */
