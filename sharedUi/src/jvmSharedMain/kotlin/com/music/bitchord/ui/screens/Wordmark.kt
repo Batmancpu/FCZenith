@@ -24,6 +24,9 @@ private const val WORDMARK_ASPECT = 730f / 484f
 /** The mark's ink ends at 464 of the viewport's 484, so its box hangs a little below it. */
 private const val WORDMARK_INK_BOTTOM = 0.96f
 
+/** How far the word is raised against the mark, as a share of the word's own height. */
+private const val WORDMARK_TEXT_LIFT = 0.06f
+
 /**
  * The app's mark with "Music" beside it.
  *
@@ -64,7 +67,9 @@ internal fun Wordmark(
         val word = measurables[1].measure(loose)
         val baseline = word[FirstBaseline].let { if (it == androidx.compose.ui.layout.AlignmentLine.Unspecified) word.height else it }
         val inkBottom = (logo.height * WORDMARK_INK_BOTTOM).roundToInt()
-        val logoY = baseline - inkBottom
+        // The mark sits a touch lower than baseline-to-baseline, which reads as the word riding a little higher.
+        val lift = (word.height * WORDMARK_TEXT_LIFT).roundToInt()
+        val logoY = baseline - inkBottom + lift
         val shift = maxOf(0, -logoY)
         val logoTop = logoY + shift
         val wordTop = shift
