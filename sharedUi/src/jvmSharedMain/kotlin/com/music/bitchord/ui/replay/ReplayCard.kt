@@ -145,7 +145,7 @@ fun ReplayCreditCard(
                 ),
         )
 
-        Column(Modifier.fillMaxSize().padding(horizontal = 18.dp, vertical = 16.dp)) {
+        Column(Modifier.fillMaxSize().padding(horizontal = 18.dp, vertical = 14.dp)) {
             // Head: what the card is on the left, in a dark pill so it stays
             // readable over any artwork; the logo on the right.
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -153,56 +153,65 @@ fun ReplayCreditCard(
                     Text(
                         text = stringResource(Res.string.your_listening_experience).uppercase(Locale.getDefault()),
                         style = MaterialTheme.typography.labelSmall,
+                        fontSize = 10.sp,
                         fontWeight = FontWeight.W700,
-                        letterSpacing = 1.2.sp,
+                        letterSpacing = 1.1.sp,
                         color = Color.White.copy(alpha = 0.92f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier
                             .clip(RoundedCornerShape(50))
                             .background(Color.Black.copy(alpha = 0.32f))
-                            .padding(horizontal = 10.dp, vertical = 4.dp),
+                            .padding(horizontal = 9.dp, vertical = 3.dp),
                     )
                 }
-                Spacer(Modifier.width(10.dp))
+                Spacer(Modifier.width(8.dp))
                 Icon(
                     painter = painterResource(Res.drawable.ic_logo),
                     contentDescription = null,
                     tint = Color.White,
-                    modifier = Modifier.size(width = 34.dp, height = 22.dp),
+                    modifier = Modifier.size(width = 30.dp, height = 19.dp),
                 )
             }
 
-            Spacer(Modifier.weight(1f))
+            // Body: takes only the height left over, so the foot below is never
+            // pushed off the card. The figure is big only when it is short.
+            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
+                Column {
+                    val short = value.length <= 6
+                    Text(
+                        text = value,
+                        style = MaterialTheme.typography.headlineMedium.copy(
+                            fontSize = if (short) 34.sp else 17.sp,
+                            lineHeight = if (short) 38.sp else 21.sp,
+                            fontWeight = if (short) FontWeight.W800 else FontWeight.W700,
+                            shadow = Shadow(
+                                color = Color.Black.copy(alpha = 0.45f),
+                                offset = Offset(0f, 2f),
+                                blurRadius = 8f,
+                            ),
+                        ),
+                        color = Color.White,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = label.uppercase(Locale.ROOT),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontSize = 10.sp,
+                        lineHeight = 12.sp,
+                        fontWeight = FontWeight.W700,
+                        letterSpacing = 1.4.sp,
+                        color = Color.White.copy(alpha = 0.80f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                }
+            }
 
-            // Body: the one figure, large and plain, with its name under it.
-            Text(
-                text = value,
-                style = MaterialTheme.typography.headlineMedium.copy(
-                    fontSize = if (value.length <= 6) 40.sp else 26.sp,
-                    lineHeight = if (value.length <= 6) 42.sp else 30.sp,
-                    fontWeight = FontWeight.W800,
-                    shadow = Shadow(
-                        color = Color.Black.copy(alpha = 0.45f),
-                        offset = Offset(0f, 2f),
-                        blurRadius = 10f,
-                    ),
-                ),
-                color = Color.White,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = label.uppercase(Locale.ROOT),
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.W700,
-                letterSpacing = 1.6.sp,
-                color = Color.White.copy(alpha = 0.80f),
-            )
-
-            Spacer(Modifier.height(12.dp))
             Box(Modifier.fillMaxWidth().height(0.5.dp).background(Color.White.copy(alpha = 0.20f)))
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(8.dp))
 
             // Foot: whose card it is on the left, since when on the right.
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -210,6 +219,8 @@ fun ReplayCreditCard(
                     Text(
                         text = holder.ifBlank { stringResource(Res.string.default_replay_holder) },
                         style = MaterialTheme.typography.titleSmall,
+                        fontSize = 13.sp,
+                        lineHeight = 16.sp,
                         fontWeight = FontWeight.W700,
                         color = Color.White,
                         maxLines = 1,
@@ -219,6 +230,8 @@ fun ReplayCreditCard(
                         Text(
                             text = detail,
                             style = MaterialTheme.typography.labelSmall,
+                            fontSize = 10.sp,
+                            lineHeight = 13.sp,
                             color = Color.White.copy(alpha = 0.70f),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -226,18 +239,18 @@ fun ReplayCreditCard(
                     }
                 }
                 if (memberSince != null) {
-                    Spacer(Modifier.width(10.dp))
+                    Spacer(Modifier.width(8.dp))
                     Column(horizontalAlignment = Alignment.End) {
                         Text(
                             text = stringResource(Res.string.member_since).uppercase(Locale.getDefault()),
                             style = MaterialTheme.typography.labelSmall,
-                            fontSize = 8.sp,
-                            lineHeight = 10.sp,
+                            fontSize = 7.sp,
+                            lineHeight = 9.sp,
                             letterSpacing = 0.8.sp,
                             color = Color.White.copy(alpha = 0.60f),
                             textAlign = TextAlign.End,
                         )
-                        Embossed(text = memberSince, size = 12.sp)
+                        Embossed(text = memberSince, size = 11.sp)
                     }
                 }
             }
