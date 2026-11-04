@@ -109,6 +109,23 @@ private val HOME_TITLE_LIFT = 28.dp
 private const val RECENTS_TITLE = "Recents"
 private const val RECENT_TRACKS_PER_COLUMN = 4
 
+private val LISTEN_AGAIN_TITLES = listOf("Listen again", "Nghe lại", "もう一度聴く")
+
+/**
+ * Recents and YouTube's Listen again trade places: Listen again leads the
+ * feed and Recents sits where it was. Left as is when either is missing, as
+ * for a guest, who has no Recents.
+ */
+private fun List<HomeShelf>.withListenAgainFirst(): List<HomeShelf> {
+    val recents = indexOfFirst { it.title.trim().equals(RECENTS_TITLE, ignoreCase = true) }
+    val again = indexOfFirst { shelf -> LISTEN_AGAIN_TITLES.any { shelf.title.trim().equals(it, ignoreCase = true) } }
+    if (recents < 0 || again < 0 || recents == again) return this
+    return toMutableList().also {
+        it[recents] = this[again]
+        it[again] = this[recents]
+    }
+}
+
 private fun List<ShelfItem>.playingItemMatcher(song: Song?): (ShelfItem) -> Boolean {
     song ?: return { false }
     // The card that was played, when the shelf holds it, and only that one —
@@ -311,7 +328,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.itemsIndexedShelves(
     onMoodClick: ((TopPickMood, String) -> Unit)? = null,
     onMoodsShowAll: () -> Unit = {},
 ) {
-    shelves.forEachIndexed { index, shelf ->
+    shelves.withListenAgainFirst().forEachIndexed { index, shelf ->
         // Find Your Mood follows the lead shelf, as on Apple Music's Home.
         if (index == 1 && onMoodClick != null) {
             item(key = "find-your-mood") { FindYourMoodShelf(onMoodClick, onMoodsShowAll) }
@@ -321,7 +338,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.itemsIndexedShelves(
             // Listen again and Quick picks are lists on the web player, as
             // Recents is here: one pager for all three.
             if (shelf.layout == ShelfLayout.LIST ||
-                (index == 0 && shelf.title.equals(RECENTS_TITLE, ignoreCase = true))
+                shelf.title.equals(RECENTS_TITLE, ignoreCase = true)
             ) {
                 RecentShelf(
                     shelf = shelf,
