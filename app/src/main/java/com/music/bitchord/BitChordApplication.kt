@@ -144,6 +144,9 @@ class BitChordApplication : Application(), SingletonImageLoader.Factory, Configu
         AppSettings.init(this, authStore)
         // Cache halaman browse (album, artis, explore) di disk: hemat data dan tetap tampil offline.
         Innertube.browseCacheDir = cacheDir.resolve("browse_cache")
+        // Lirik yang sudah ketemu + jawaban lookup artis Apple, juga di disk.
+        com.music.bitchord.data.lyrics.LyricsDiskCache.dir = cacheDir.resolve("lyrics_cache")
+        com.music.bitchord.data.canvas.AppleArtistArtRepository.init(cacheDir.resolve("apple_artist_art.json"))
         // Before anything resolves a track: an addon with `checkValidLossless`
         // is gated on this, and the gate reads "no" until it has looked.
         com.music.bitchord.playback.audio.LosslessOutput.init(this)

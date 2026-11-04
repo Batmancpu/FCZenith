@@ -369,7 +369,30 @@ object YtMusicRepository {
      * field's typeahead. Unfiltered on purpose: a suggestion is a query, and
      * which tab it is then run against is the user's to pick afterwards.
      */
-    suspend fun searchSuggestions(input: String): Result<List<String>> =
+    /** Memo kecil berumur pendek: ketikan yang sama dalam beberapa menit tidak minta jaringan lagi. */
+    private class TimedMemo<T : Any>(private val max: Int, private val ttlMs: Long) {
+        private val map = object : LinkedHashMap<String, Pair<Long, T>>(max, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Pair<Long, T>>) = size > max
+        }
+
+        fun get(key: String): T? = synchronized(map) { map[key] }
+            ?.takeIf { System.currentTimeMillis() - it.first < ttlMs }?.second
+
+        fun put(key: String, value: T) {
+            synchronized(map) { map[key] = System.currentTimeMillis() to value }
+        }
+    }
+
+    private val suggestMemo = TimedMemo<List<String>>(64, 5 * 60_000L)
+    private val typeaheadMemo = TimedMemo<SearchPage>(32, 5 * 60_000L)
+
+    suspend fun searchSuggestions(input: String): Result<List<String>> {
+        val key = "${Innertube.cookie?.hashCode()}|${input.trim().lowercase()}"
+        suggestMemo.get(key)?.let { return Result.success(it) }
+        return searchSuggestionsNetwork(input).onSuccess { if (it.isNotEmpty()) suggestMemo.put(key, it) }
+    }
+
+    private suspend fun searchSuggestionsNetwork(input: String): Result<List<String>> =
         call("suggest") {
             InnertubeParser.parseSearchSuggestions(Innertube.searchSuggestions(input))
         }
@@ -386,7 +409,13 @@ object YtMusicRepository {
      * IME Search / tapping a suggestion) still use the normal authenticated
      * [searchPage] path and are recorded properly.
      */
-    suspend fun searchTypeahead(input: String): Result<SearchPage> =
+    suspend fun searchTypeahead(input: String): Result<SearchPage> {
+        val key = input.trim().lowercase()
+        typeaheadMemo.get(key)?.let { return Result.success(it) }
+        return searchTypeaheadNetwork(input).onSuccess { typeaheadMemo.put(key, it) }
+    }
+
+    private suspend fun searchTypeaheadNetwork(input: String): Result<SearchPage> =
         call("typeahead:$input") {
             InnertubeParser.parseSearchPage(
                 Innertube.searchTypeahead(input),

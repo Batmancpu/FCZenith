@@ -62,14 +62,75 @@ fun AppleArtistArt.keyColors() = ArtworkKeyColors(Color(background), Color(accen
 object AppleArtistArtRepository {
 
     private const val TAG = "AppleArtistArt"
-    private const val CACHE_SIZE = 64
+    private const val CACHE_SIZE = 200
+    private const val MAX_AGE_MS = 30L * 24 * 60 * 60 * 1000
     private const val HERO_WIDTH = 1200
     private const val LOGO_WIDTH = 1000
     private const val USER_AGENT =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
             "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 
-    private class Entry(val art: AppleArtistArt?)
+    private class Entry(val art: AppleArtistArt?, val at: Long = System.currentTimeMillis())
+
+    @Volatile
+    private var store: java.io.File? = null
+
+    /** Memuat jawaban lookup Apple dari disk (termasuk "tidak ada"), supaya tidak diulang tiap app dibuka. */
+    fun init(file: java.io.File) {
+        store = file
+        runCatching {
+            if (!file.isFile) return@runCatching
+            val root = JSONObject(file.readText())
+            val now = System.currentTimeMillis()
+            synchronized(cache) {
+                for (key in root.keys()) {
+                    val entry = root.optJSONObject(key)?.toEntry() ?: continue
+                    if (now - entry.at <= MAX_AGE_MS) cache[key] = entry
+                }
+            }
+        }
+    }
+
+    private fun persist() {
+        val file = store ?: return
+        runCatching {
+            val root = JSONObject()
+            synchronized(cache) { cache.forEach { (k, v) -> root.put(k, v.toJson()) } }
+            val tmp = java.io.File(file.path + ".tmp")
+            tmp.writeText(root.toString())
+            tmp.renameTo(file)
+        }
+    }
+
+    private fun Entry.toJson(): JSONObject = JSONObject().apply {
+        put("at", at)
+        art?.let { a ->
+            put("hero", a.heroUrl)
+            a.logoUrl?.let { put("logo", it) }
+            put("aspect", a.logoAspect.toDouble())
+            a.videoUrl?.let { put("video", it) }
+            put("bg", a.background)
+            put("accent", a.accent)
+            a.keyColor?.let { put("key", it) }
+        }
+    }
+
+    private fun JSONObject.toEntry(): Entry {
+        val at = optLong("at")
+        val hero = optString("hero").takeIf { it.isNotBlank() } ?: return Entry(null, at)
+        return Entry(
+            AppleArtistArt(
+                heroUrl = hero,
+                logoUrl = optString("logo").takeIf { it.isNotBlank() },
+                logoAspect = optDouble("aspect", 1.0).toFloat(),
+                videoUrl = optString("video").takeIf { it.isNotBlank() },
+                background = optInt("bg"),
+                accent = optInt("accent"),
+                keyColor = if (has("key")) optInt("key") else null,
+            ),
+            at,
+        )
+    }
 
     private val cache = object : LinkedHashMap<String, Entry>(CACHE_SIZE, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Entry>) =
@@ -120,6 +181,7 @@ object AppleArtistArtRepository {
                 .getOrNull()
         } ?: return null
         synchronized(cache) { cache[browseId] = entry }
+        withContext(Dispatchers.IO) { persist() }
         _updates.value++
         return entry.art
     }

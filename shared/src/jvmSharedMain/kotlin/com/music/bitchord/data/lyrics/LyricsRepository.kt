@@ -94,6 +94,40 @@ object LyricsRepository {
         order: List<LyricsSource> = LyricsSource.entries,
         prioritizeSyllableSync: Boolean = false,
         isrc: String? = null,
+        onSourceStarted: ((LyricsSource) -> Unit)? = null,
+        onSourceResult: ((LyricsSource, Result?) -> Unit)? = null,
+        onSourceCancelled: ((LyricsSource) -> Unit)? = null,
+    ): Result? {
+        // Cache disk: lagu yang liriknya pernah ketemu tidak menanyai sumber lagi
+        // dan tetap berlirik saat offline. Kunci memuat sumber + urutan pilihan.
+        val sequence = (order + LyricsSource.offered).distinct().filter { it in sources && !it.hidden }
+        val key = "$videoId|${sequence.joinToString(",") { it.name }}|$prioritizeSyllableSync"
+        val cacheable = videoId.isNotBlank() && sequence.isNotEmpty()
+        if (cacheable) {
+            LyricsDiskCache.read(key)?.let { cached ->
+                onSourceStarted?.invoke(cached.source)
+                onSourceResult?.invoke(cached.source, cached)
+                return cached
+            }
+        }
+        val found = lyricsNetwork(
+            videoId, title, artist, durationMs, album, sources, order,
+            prioritizeSyllableSync, isrc, onSourceStarted, onSourceResult, onSourceCancelled,
+        )
+        if (cacheable && found != null) LyricsDiskCache.write(key, found)
+        return found
+    }
+
+    private suspend fun lyricsNetwork(
+        videoId: String,
+        title: String,
+        artist: String,
+        durationMs: Long,
+        album: String? = null,
+        sources: Set<LyricsSource> = LyricsSource.entries.toSet(),
+        order: List<LyricsSource> = LyricsSource.entries,
+        prioritizeSyllableSync: Boolean = false,
+        isrc: String? = null,
         /** Called from the provider job itself, including for lazily-started providers. */
         onSourceStarted: ((LyricsSource) -> Unit)? = null,
         /**
