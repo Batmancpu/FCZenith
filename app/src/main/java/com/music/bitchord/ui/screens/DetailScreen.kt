@@ -2563,6 +2563,15 @@ private fun MostPlayedHero(
                 clipRect(left = 0f, top = -extra, right = size.width, bottom = size.height) {
                     this@drawWithContent.drawContent()
                 }
+                // Tarikan menggeser hero ke posisi piksel pecahan; tepi bawah yang
+                // dipotong tepat di batas itu menyisakan satu baris setengah
+                // transparan (garis glitch). Strip warna halaman menutup jahitannya.
+                val seam = 2.dp.toPx()
+                drawRect(
+                    color = palette.background,
+                    topLeft = Offset(0f, size.height - seam),
+                    size = androidx.compose.ui.geometry.Size(size.width, seam * 2f),
+                )
             }
             .coverFlightTarget(page.browseId, 0.dp, palette.background),
     ) {
@@ -2786,6 +2795,13 @@ private fun LikedMusicHero(
                 clipRect(left = 0f, top = -extra, right = size.width, bottom = size.height) {
                     this@drawWithContent.drawContent()
                 }
+                // Jahitan piksel pecahan di tepi bawah saat ditarik: lihat MostPlayedHero.
+                val seam = 2.dp.toPx()
+                drawRect(
+                    color = palette.background,
+                    topLeft = Offset(0f, size.height - seam),
+                    size = androidx.compose.ui.geometry.Size(size.width, seam * 2f),
+                )
             }
             .coverFlightTarget(page.browseId, 0.dp, palette.background),
     ) {
