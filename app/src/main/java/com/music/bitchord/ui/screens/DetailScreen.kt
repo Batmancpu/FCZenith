@@ -91,6 +91,10 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.GraphicsLayerScope
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.contentDescription
@@ -2536,6 +2540,8 @@ private fun MostPlayedHero(
     height: Dp,
     modifier: Modifier = Modifier,
 ) {
+    // Mosaic direkam sekali; salinan blur di kaki memakai rekaman yang sama.
+    val shared = rememberGraphicsLayer()
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
     val blurFoot = !reduceDynamicBlur && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
     Box(
@@ -2590,7 +2596,15 @@ private fun MostPlayedHero(
                 MostPlayedArt(
                     covers = page.covers,
                     motion = true,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize().drawWithContent {
+                        shared.record(
+                            size = IntSize(
+                                size.width.roundToInt().coerceAtLeast(1),
+                                size.height.roundToInt().coerceAtLeast(1),
+                            ),
+                        ) { this@drawWithContent.drawContent() }
+                        drawLayer(shared)
+                    },
                 )
             }
         }
@@ -2627,13 +2641,7 @@ private fun MostPlayedHero(
                         layout(w, h) { placeable.place((w - side) / 2, (h - side) / 2) }
                     },
                 ) {
-                    CompositionLocalProvider(LocalSettledMosaic provides true) {
-                        MostPlayedArt(
-                            covers = page.covers,
-                            motion = true,
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    }
+                    Box(Modifier.fillMaxSize().drawBehind { drawLayer(shared) })
                 }
             }
         }
@@ -2717,6 +2725,8 @@ private fun LikedMusicHero(
     height: Dp,
     modifier: Modifier = Modifier,
 ) {
+    // Mosaic direkam sekali; salinan blur di kaki memakai rekaman yang sama.
+    val shared = rememberGraphicsLayer()
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
     val blurFoot = !reduceDynamicBlur && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
 
@@ -2783,16 +2793,20 @@ private fun LikedMusicHero(
                 drift = { drift },
                 pulse = { pulse },
                 topInset = LIKED_OVERSCROLL,
-                modifier = Modifier.matchParentSize(),
+                modifier = Modifier.matchParentSize().drawWithContent {
+                    shared.record(
+                        size = IntSize(
+                            size.width.roundToInt().coerceAtLeast(1),
+                            size.height.roundToInt().coerceAtLeast(1),
+                        ),
+                    ) { this@drawWithContent.drawContent() }
+                    drawLayer(shared)
+                },
             )
 
             // Salinan yang di-blur, dimunculkan di bagian bawah lewat mask.
             if (blurFoot) {
-                LikedArt(
-                    covers = covers,
-                    drift = { drift },
-                    pulse = { pulse },
-                    topInset = LIKED_OVERSCROLL,
+                Box(
                     modifier = Modifier
                         .matchParentSize()
                         // Offscreen agar mask memotong hasil blur, bukan tiap gambar di bawahnya.
@@ -2812,7 +2826,8 @@ private fun LikedMusicHero(
                                 blendMode = BlendMode.DstIn,
                             )
                         }
-                        .blur(LIKED_FOOT_BLUR, BlurredEdgeTreatment.Rectangle),
+                        .blur(LIKED_FOOT_BLUR, BlurredEdgeTreatment.Rectangle)
+                        .drawBehind { drawLayer(shared) },
                 )
             }
         }
@@ -2937,12 +2952,14 @@ private fun LikedArt(
                         index = k,
                         size = s,
                         pulse = pulse,
-                        modifier = Modifier.offset {
+                        // Digeser di fase draw (graphicsLayer), bukan offset layout:
+                        // tidak ada pengukuran ulang puluhan tile di setiap frame.
+                        place = {
                             val step = (s + LIKED_GAP).toPx()
                             val cycle = step * n
                             val raw = (i * step + LIKED_COLUMN_DIR[c] * drift() * cycle + c * 0.37f * step) % cycle
                             val y = (if (raw < 0f) raw + cycle else raw) - step
-                            IntOffset(colX.roundToPx(), y.roundToInt())
+                            Offset(colX.toPx(), y)
                         },
                     )
                 }
@@ -2997,6 +3014,7 @@ private fun LikedTile(
     index: Int,
     size: Dp,
     pulse: () -> Float,
+    place: GraphicsLayerScope.() -> Offset,
     modifier: Modifier = Modifier,
 ) {
     // Mosaic yang sudah tampil di kartu lalu terbang tidak mengulang animasi masuk tile.
@@ -3022,6 +3040,9 @@ private fun LikedTile(
             .size(size)
             .graphicsLayer {
                 val a = sin((pulse() + index * 0.173f) * 2f * PI.toFloat())
+                val o = place()
+                translationX = o.x
+                translationY = o.y
                 val s = (0.82f + 0.18f * enter) * (1f + 0.035f * a)
                 scaleX = s
                 scaleY = s
