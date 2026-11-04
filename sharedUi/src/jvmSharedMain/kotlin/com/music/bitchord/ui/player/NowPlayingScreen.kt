@@ -512,6 +512,15 @@ private fun dockEaseCard(t: Float): Float {
     return x * x * (3f - 2f * x)
 }
 
+/** Untuk thumbnail header (menu lirik/queue): cover ikut panel sampai drag sejauh ini, baru menyatu ke mini. */
+private const val DOCK_THUMB_FULL_AT = 0.35f
+
+/** Smoothstep: cover thumbnail tetap di panelnya, baru turun ke mini player di akhir drag. */
+private fun dockEaseThumb(t: Float): Float {
+    val x = (t / DOCK_THUMB_FULL_AT).coerceIn(0f, 1f)
+    return x * x * (3f - 2f * x)
+}
+
 /** Drag sejauh ini cover masih seukuran cover mini, supaya muat di panel yang baru setinggi pill. */
 private const val DOCK_COVER_START_AT = 0.05f
 
@@ -3508,7 +3517,10 @@ fun NowPlayingScreen(
                             // membesar bertahap, supaya margin atasnya terjaga dan tidak
                             // terpotong tepi panel. Banner full-bleed tetap seperti semula.
                             val unridden = if (heroMode) dockFrame.offset * (1f - dockFrame.ride) else 0f
-                            val ease = if (heroMode) dockEase(dockT()) else dockEaseCard(dockT())
+                            val base = if (heroMode) dockEase(dockT()) else dockEaseCard(dockT())
+                            // Di menu lirik/queue (p = 1) cover adalah thumbnail header:
+                            // ia ikut panel dulu, tidak lebih dulu terbang ke mini player.
+                            val ease = base + (dockEaseThumb(dockT()) - base) * p()
                             return lerp(mini, rect.translate(0f, -unridden), ease)
                         }
                         // The banner's dissolve, firmed up into the cover's hard edge as
