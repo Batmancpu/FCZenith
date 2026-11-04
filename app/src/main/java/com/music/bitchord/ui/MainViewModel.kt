@@ -2571,7 +2571,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     companion object {
         /** Today's Top Picks row, kept so the next launch paints it before any request. */
-        private const val TOP_PICKS_FILE = "top_picks_v4.json"
+        private const val TOP_PICKS_FILE = "top_picks_v5.json"
 
         /** Per-addon budget for the Addons search tab; a slow addon is left out, not waited on. */
         private const val ADDON_SEARCH_TIMEOUT_MS = 12_000L
