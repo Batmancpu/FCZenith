@@ -219,6 +219,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.translate
 import com.music.bitchord.data.YtMusicRepository
 
 private const val MAX_ARTIST_SONGS = 20
@@ -2723,6 +2724,55 @@ private val MESH_CYAN = Color(0xFF35D0F5)
 private val MESH_AMETHYST = Color(0xFF9A4DE8)
 private val MESH_ROYAL = Color(0xFF2D4DE0)
 
+private const val HALF_PI = 1.5707964f
+
+/**
+ * Satu blob mesh: pusat bergerak di (x + ax*sin(fx*t + px), y + ay*sin(fy*t + py))
+ * relatif terhadap lebar/tinggi, berjari-jari r * lebar, dengan alpha yang bisa
+ * berdenyut sebesar [alphaAmp].
+ */
+private class MeshBlob(
+    val color: Color,
+    val x: Float, val ax: Float, val fx: Float, val px: Float,
+    val y: Float, val ay: Float, val fy: Float, val py: Float,
+    val r: Float,
+    val alpha: Float,
+    val alphaAmp: Float = 0f,
+    val alphaPhase: Float = 0f,
+)
+
+private val MESH_BLOBS = listOf(
+    MeshBlob(MESH_TURQUOISE, 0.14f, 0.16f, 1f, 0f, 0.30f, 0.12f, 1f, HALF_PI, 0.90f, 0.78f, 0.12f, 0f),
+    MeshBlob(MESH_AMETHYST, 0.86f, 0.10f, 1f, HALF_PI, 0.20f, 0.10f, 1f, 1.3f, 0.85f, 0.85f),
+    MeshBlob(MESH_ROYAL, 0.58f, 0.18f, 2f, 0f, 0.58f, 0.08f, 2f, HALF_PI, 0.80f, 0.90f),
+    MeshBlob(MESH_CYAN, 0.90f, 0.08f, 1f, 2f, 0.92f, 0.05f, 1f, HALF_PI, 0.75f, 0.70f, 0.10f, HALF_PI),
+    // Cahaya lembut di dalam, memberi kedalaman tanpa grain.
+    MeshBlob(Color.White, 0.50f, 0.20f, 1f, 0.5f, 0.42f, 0.08f, 1f, 0.5f + HALF_PI, 0.55f, 0.14f),
+)
+
+/**
+ * Shader gradien tiap blob dibuat sekali per lebar (berpusat di nol, alpha penuh)
+ * lalu dipakai ulang setiap frame; yang bergerak hanya translate dan alpha.
+ */
+private class MeshBrushCache {
+    private var width = -1f
+    private var brushes: List<Brush> = emptyList()
+
+    fun get(w: Float): List<Brush> {
+        if (w != width) {
+            width = w
+            brushes = MESH_BLOBS.map { b ->
+                Brush.radialGradient(
+                    listOf(b.color, b.color.copy(alpha = 0f)),
+                    center = Offset.Zero,
+                    radius = b.r * w,
+                )
+            }
+        }
+        return brushes
+    }
+}
+
 /**
  * Seberapa jauh seni hero menjulur ke atas, melewati tepi atasnya. Di luar layar
  * saat diam; terlihat ketika halaman ditarik ke bawah, supaya tidak ada lubang.
@@ -2910,6 +2960,7 @@ private fun LikedArt(
     mesh: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
+    val meshCache = remember { MeshBrushCache() }
     BoxWithConstraints(
         modifier.drawBehind {
             drawRect(if (mesh) MOST_PLAYED_BASE else LIKED_BASE)
@@ -2928,15 +2979,22 @@ private fun LikedArt(
                 )
             }
             if (mesh) {
-                // Turquoise berdenyut pelan; tiap blob punya frekuensi dan fase
-                // sendiri supaya pusaran warnanya organik, bukan sejajar.
-                blob(MESH_TURQUOISE, w * (0.14f + 0.16f * sin(t)), h * (0.30f + 0.12f * cos(t)), w * 0.90f, 0.78f + 0.12f * sin(t))
-                blob(MESH_AMETHYST, w * (0.86f + 0.10f * cos(t)), h * (0.20f + 0.10f * sin(t + 1.3f)), w * 0.85f, 0.85f)
-                blob(MESH_ROYAL, w * (0.58f + 0.18f * sin(2f * t)), h * (0.58f + 0.08f * cos(2f * t)), w * 0.80f, 0.90f)
-                blob(MESH_CYAN, w * (0.90f + 0.08f * sin(t + 2f)), h * (0.92f + 0.05f * cos(t)), w * 0.75f, 0.70f + 0.10f * cos(t))
-                blob(MESH_AMETHYST, w * (0.18f + 0.10f * cos(t + 0.8f)), h * (0.96f + 0.04f * sin(t)), w * 0.70f, 0.75f)
-                // Cahaya lembut di dalam, memberi kedalaman tanpa grain.
-                blob(Color.White, w * (0.50f + 0.20f * sin(t + 0.5f)), h * (0.42f + 0.08f * cos(t + 0.5f)), w * 0.55f, 0.14f)
+                // Tiap blob punya frekuensi dan fase sendiri supaya pusaran warnanya
+                // organik, bukan sejajar. Shader dipakai ulang dari cache.
+                val brushes = meshCache.get(w)
+                for (i in MESH_BLOBS.indices) {
+                    val b = MESH_BLOBS[i]
+                    val cx = w * (b.x + b.ax * sin(b.fx * t + b.px))
+                    val cy = h * (b.y + b.ay * sin(b.fy * t + b.py))
+                    translate(cx, cy) {
+                        drawCircle(
+                            brush = brushes[i],
+                            radius = b.r * w,
+                            center = Offset.Zero,
+                            alpha = b.alpha + b.alphaAmp * sin(t + b.alphaPhase),
+                        )
+                    }
+                }
             } else {
                 blob(Color(0xFF5CC8FF), w * (0.22f + 0.14f * sin(t)), h * (0.22f + 0.10f * cos(t)), w * 0.75f)
                 blob(Color(0xFFFF7AB8), w * (0.82f + 0.12f * cos(t)), h * (0.68f + 0.10f * sin(t)), w * 0.80f)
