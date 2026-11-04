@@ -384,11 +384,11 @@ fun LiquidSegmentedControl(
                     shape,
                 )
         }
-        Box(pill.size(slot, SELECTOR_HEIGHT - SELECTOR_INSET * 2))
-
         // 3) Tepi kaca: rim ambient, bayangan luar, inner shadow tipis, border putih transparan.
-        //    Hanya dekorasi (tanpa input); konten yang terbaca selalu digambar paling akhir.
+        //    Digambar sebelum pill supaya pill yang ditarik tampil di atas rim.
         if (drawRim) SegmentedRim(Modifier.matchParentSize(), shape, light, glassOn)
+
+        Box(pill.size(slot, SELECTOR_HEIGHT - SELECTOR_INSET * 2))
 
         // 4) Hanya label terpilih yang digambar tajam di atas pill (yang lain sudah ada di track);
         //    memudar sebagian selagi kaca menyala supaya refraksi label di bawah pill terlihat.
@@ -651,6 +651,8 @@ fun LiquidScrollSegmentedControl(
             if (placed[0] && !reduceAnimation) scroll.animateScrollTo(target) else scroll.scrollTo(target)
             placed[0] = true
         }
+        // Rim di viewport yang diam, digambar di bawah track supaya pill tampil di atasnya.
+        SegmentedRim(Modifier.matchParentSize(), RoundedCornerShape(percent = 50), light, glassOn)
         Box(Modifier.clip(RoundedCornerShape(percent = 50)).horizontalScroll(scroll)) {
             LiquidSegmentedControl(
                 count = count,
@@ -665,8 +667,6 @@ fun LiquidScrollSegmentedControl(
                 content = content,
             )
         }
-        // Rim di viewport yang diam, jadi tepinya tidak ikut hilang saat track digeser.
-        SegmentedRim(Modifier.matchParentSize(), RoundedCornerShape(percent = 50), light, glassOn)
     }
 }
 
