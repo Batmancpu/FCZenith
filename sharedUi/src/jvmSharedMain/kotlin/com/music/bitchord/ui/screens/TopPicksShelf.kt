@@ -3,6 +3,7 @@ package com.music.bitchord.ui.screens
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -58,6 +59,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.draw.drawWithContent
@@ -147,7 +149,7 @@ private const val TOP_PICK_FRACTION = 0.60f
 /** Held back on a tablet, the same way [heroCardWidth] is. */
 private val TOP_PICK_MAX_WIDTH = 280.dp
 
-private val TopPickShape = RoundedCornerShape(12.dp)
+private val TopPickShape = RoundedCornerShape(20.dp)
 
 private fun topPickWidth(available: Dp): Dp = minOf(available * TOP_PICK_FRACTION, TOP_PICK_MAX_WIDTH)
 
@@ -356,6 +358,17 @@ private fun TopPickCard(
             .aspectRatio(TOP_PICK_RATIO)
             .clip(TopPickShape)
             .thumbnailBorder(TopPickShape)
+            .border(
+                width = 0.75.dp,
+                brush = Brush.verticalGradient(
+                    listOf(
+                        Color.White.copy(alpha = 0.38f),
+                        Color.White.copy(alpha = 0.04f),
+                        Color.White.copy(alpha = 0.14f),
+                    ),
+                ),
+                shape = TopPickShape,
+            )
             .background(MaterialTheme.colorScheme.surfaceVariant)
             .longPressMenuClickable(
                 onClick = openCard,
@@ -496,29 +509,11 @@ private fun CardOverlay(
                     .padding(top = 12.dp, end = 12.dp),
             )
         }
-        if (titleInArt) {
-            Text(
-                text = text.title,
-                style = MaterialTheme.typography.headlineMedium.copy(
-                    fontSize = 25.sp,
-                    lineHeight = 27.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = (-0.5).sp,
-                ),
-                color = Color.White,
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(start = 16.dp, end = 16.dp, top = 40.dp),
-            )
-        }
-        // The darker band only where the name is in the art above it; the
-        // collage and photo cards fade up from the picture so it stays clear.
+        // The name now sits in the art, just above the darker band at the foot.
         val band = if (titleInArt) {
             Brush.verticalGradient(
-                0f to Color.Black.copy(alpha = 0.22f),
-                1f to Color.Black.copy(alpha = 0.50f),
+                0f to Color.Black.copy(alpha = 0.30f),
+                1f to Color.Black.copy(alpha = 0.62f),
             )
         } else {
             Brush.verticalGradient(
@@ -530,52 +525,112 @@ private fun CardOverlay(
         Column(
             Modifier
                 .align(Alignment.BottomStart)
-                .fillMaxWidth()
-                .background(band),
+                .fillMaxWidth(),
         ) {
             if (titleInArt) {
-                Box(Modifier.fillMaxWidth().height(0.5.dp).background(Color.White.copy(alpha = 0.22f)))
-            }
-            Column(
-                Modifier.padding(
-                    start = 16.dp,
-                    end = 16.dp,
-                    top = if (titleInArt) 12.dp else if (branded) 20.dp else 30.dp,
-                    bottom = 14.dp,
-                ),
-            ) {
-                Text(
-                    text = text.eyebrow,
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        fontSize = 13.sp,
-                        lineHeight = 16.sp,
-                        fontWeight = FontWeight.Medium,
-                    ),
-                    color = eyebrowColor,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (!titleInArt) {
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .background(
+                            Brush.verticalGradient(
+                                0f to Color.Transparent,
+                                1f to Color.Black.copy(alpha = 0.30f),
+                            ),
+                        )
+                        .padding(start = 18.dp, end = 18.dp, top = 36.dp, bottom = 14.dp),
+                ) {
+                    Box(
+                        Modifier
+                            .width(26.dp)
+                            .height(2.dp)
+                            .clip(RoundedCornerShape(1.dp))
+                            .background(
+                                Brush.horizontalGradient(
+                                    listOf(Color(0xFFFFE9B8), Color(0xFFD9A441)),
+                                ),
+                            ),
+                    )
+                    Spacer(Modifier.height(10.dp))
                     Text(
                         text = text.title,
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontSize = 17.sp,
-                            lineHeight = 21.sp,
-                            fontWeight = FontWeight.SemiBold,
+                        style = MaterialTheme.typography.headlineMedium.copy(
+                            fontSize = 27.sp,
+                            lineHeight = 29.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            letterSpacing = (-0.6).sp,
+                            shadow = Shadow(
+                                color = Color.Black.copy(alpha = 0.35f),
+                                offset = Offset(0f, 3f),
+                                blurRadius = 14f,
+                            ),
                         ),
                         color = Color.White,
-                        maxLines = 2,
+                        maxLines = 3,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                if (text.subtitle.isNotBlank()) {
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(0.75.dp)
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(
+                                    Color.Transparent,
+                                    Color.White.copy(alpha = 0.45f),
+                                    Color.Transparent,
+                                ),
+                            ),
+                        ),
+                )
+            }
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .background(band),
+            ) {
+                Column(
+                    Modifier.padding(
+                        start = 18.dp,
+                        end = 18.dp,
+                        top = if (titleInArt) 14.dp else if (branded) 20.dp else 30.dp,
+                        bottom = 16.dp,
+                    ),
+                ) {
                     Text(
-                        text = text.subtitle,
-                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp, lineHeight = 16.sp),
-                        color = Color.White.copy(alpha = 0.90f),
-                        maxLines = 2,
+                        text = if (titleInArt) text.eyebrow.uppercase() else text.eyebrow,
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontSize = if (titleInArt) 12.sp else 13.sp,
+                            lineHeight = 16.sp,
+                            fontWeight = if (titleInArt) FontWeight.SemiBold else FontWeight.Medium,
+                            letterSpacing = if (titleInArt) 1.2.sp else 0.sp,
+                        ),
+                        color = eyebrowColor,
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
+                    if (!titleInArt) {
+                        Text(
+                            text = text.title,
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontSize = 17.sp,
+                                lineHeight = 21.sp,
+                                fontWeight = FontWeight.SemiBold,
+                            ),
+                            color = Color.White,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    if (text.subtitle.isNotBlank()) {
+                        Text(
+                            text = text.subtitle,
+                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp, lineHeight = 16.sp),
+                            color = Color.White.copy(alpha = 0.90f),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
             }
         }
