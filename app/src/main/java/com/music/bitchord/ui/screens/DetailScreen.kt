@@ -2574,7 +2574,7 @@ private fun MostPlayedHero(
                 .drawBehind {
                     val extra = LIKED_OVERSCROLL.toPx()
                     drawRect(
-                        color = LIKED_COLORS[0],
+                        color = MOST_PLAYED_COLORS[0],
                         topLeft = Offset(0f, -extra),
                         size = androidx.compose.ui.geometry.Size(size.width, extra + 1f),
                     )
@@ -2701,6 +2701,18 @@ private val LIKED_COLUMN_COUNT = intArrayOf(6, 5, 7)
 
 private val LIKED_COLORS = listOf(Color(0xFF7B5CF0), Color(0xFFB45FDB), Color(0xFFFF5FA8))
 private val LIKED_BASE = Brush.verticalGradient(LIKED_COLORS)
+
+/**
+ * Most Played: mesh gradient mengalir, biru royal, ungu amethyst, dan turquoise-cyan
+ * yang berdenyut pelan. Dasarnya gradien halus; warna-warna lain menggenang
+ * sebagai blob lembut yang bergerak tidak linear.
+ */
+private val MOST_PLAYED_COLORS = listOf(Color(0xFF1B2FB0), Color(0xFF6A33CC), Color(0xFF1A6FD8))
+private val MOST_PLAYED_BASE = Brush.verticalGradient(MOST_PLAYED_COLORS)
+private val MESH_TURQUOISE = Color(0xFF18E6D8)
+private val MESH_CYAN = Color(0xFF35D0F5)
+private val MESH_AMETHYST = Color(0xFF9A4DE8)
+private val MESH_ROYAL = Color(0xFF2D4DE0)
 
 /**
  * Seberapa jauh seni hero menjulur ke atas, melewati tepi atasnya. Di luar layar
@@ -2878,18 +2890,20 @@ private fun LikedArt(
     // Bagian seni yang menjulur di atas tepi hero; icon digeser turun setengahnya
     // supaya tetap di tengah area yang terlihat.
     topInset: Dp = 0.dp,
+    // Latar mesh biru-amethyst-turquoise (Most Played) alih-alih ungu-pink Liked Music.
+    mesh: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     BoxWithConstraints(
         modifier.drawBehind {
-            drawRect(LIKED_BASE)
+            drawRect(if (mesh) MOST_PLAYED_BASE else LIKED_BASE)
             val t = pulse() * 2f * PI.toFloat()
             val w = size.width
             val h = size.height
-            fun blob(color: Color, cx: Float, cy: Float, r: Float) {
+            fun blob(color: Color, cx: Float, cy: Float, r: Float, alpha: Float = 0.75f) {
                 drawCircle(
                     brush = Brush.radialGradient(
-                        listOf(color.copy(alpha = 0.75f), color.copy(alpha = 0f)),
+                        listOf(color.copy(alpha = alpha), color.copy(alpha = 0f)),
                         center = Offset(cx, cy),
                         radius = r,
                     ),
@@ -2897,9 +2911,21 @@ private fun LikedArt(
                     center = Offset(cx, cy),
                 )
             }
-            blob(Color(0xFF5CC8FF), w * (0.22f + 0.14f * sin(t)), h * (0.22f + 0.10f * cos(t)), w * 0.75f)
-            blob(Color(0xFFFF7AB8), w * (0.82f + 0.12f * cos(t)), h * (0.68f + 0.10f * sin(t)), w * 0.80f)
-            blob(Color(0xFF9B6CFF), w * (0.45f + 0.18f * sin(2f * t)), h * (0.95f + 0.05f * cos(2f * t)), w * 0.70f)
+            if (mesh) {
+                // Turquoise berdenyut pelan; tiap blob punya frekuensi dan fase
+                // sendiri supaya pusaran warnanya organik, bukan sejajar.
+                blob(MESH_TURQUOISE, w * (0.14f + 0.16f * sin(t)), h * (0.30f + 0.12f * cos(t)), w * 0.90f, 0.78f + 0.12f * sin(t))
+                blob(MESH_AMETHYST, w * (0.86f + 0.10f * cos(t)), h * (0.20f + 0.10f * sin(t + 1.3f)), w * 0.85f, 0.85f)
+                blob(MESH_ROYAL, w * (0.58f + 0.18f * sin(2f * t)), h * (0.58f + 0.08f * cos(2f * t)), w * 0.80f, 0.90f)
+                blob(MESH_CYAN, w * (0.90f + 0.08f * sin(t + 2f)), h * (0.92f + 0.05f * cos(t)), w * 0.75f, 0.70f + 0.10f * cos(t))
+                blob(MESH_AMETHYST, w * (0.18f + 0.10f * cos(t + 0.8f)), h * (0.96f + 0.04f * sin(t)), w * 0.70f, 0.75f)
+                // Cahaya lembut di dalam, memberi kedalaman tanpa grain.
+                blob(Color.White, w * (0.50f + 0.20f * sin(t + 0.5f)), h * (0.42f + 0.08f * cos(t + 0.5f)), w * 0.55f, 0.14f)
+            } else {
+                blob(Color(0xFF5CC8FF), w * (0.22f + 0.14f * sin(t)), h * (0.22f + 0.10f * cos(t)), w * 0.75f)
+                blob(Color(0xFFFF7AB8), w * (0.82f + 0.12f * cos(t)), h * (0.68f + 0.10f * sin(t)), w * 0.80f)
+                blob(Color(0xFF9B6CFF), w * (0.45f + 0.18f * sin(2f * t)), h * (0.95f + 0.05f * cos(2f * t)), w * 0.70f)
+            }
         },
     ) {
         val width = maxWidth
@@ -2994,6 +3020,7 @@ fun MostPlayedArt(covers: List<String>, motion: Boolean, modifier: Modifier = Mo
     }
     LikedArt(
         covers = covers.take(LIKED_MAX_COVERS),
+        mesh = true,
         drift = { (nowMs % LIKED_DRIFT_MS) / LIKED_DRIFT_MS.toFloat() },
         pulse = { (nowMs % LIKED_PULSE_MS) / LIKED_PULSE_MS.toFloat() },
         modifier = modifier,
