@@ -126,6 +126,25 @@ private fun List<HomeShelf>.withListenAgainFirst(): List<HomeShelf> {
     }
 }
 
+/**
+ * Listen again adalah satu baris kartu persegi, jadi shelf tepat di bawahnya
+ * tidak boleh berbentuk sama: shelf berbentuk lain terdekat (daftar berhalaman
+ * seperti Recents/Quick picks dulu, lalu video) naik mengisi slot itu.
+ * Dibiarkan apa adanya bila semua shelf di bawahnya berbentuk kartu.
+ */
+private fun List<HomeShelf>.withOtherModelBelowListenAgain(): List<HomeShelf> {
+    val again = indexOfFirst { shelf -> LISTEN_AGAIN_TITLES.any { shelf.title.trim().equals(it, ignoreCase = true) } }
+    if (again < 0 || again + 1 >= size) return this
+    fun HomeShelf.isPagedList() =
+        layout == ShelfLayout.LIST || title.trim().equals(RECENTS_TITLE, ignoreCase = true)
+    fun HomeShelf.isCardRow() = layout == ShelfLayout.CARDS && !isPagedList()
+    if (!this[again + 1].isCardRow()) return this
+    val from = (again + 2 until size).firstOrNull { this[it].isPagedList() }
+        ?: (again + 2 until size).firstOrNull { !this[it].isCardRow() }
+        ?: return this
+    return toMutableList().also { it.add(again + 1, it.removeAt(from)) }
+}
+
 private fun List<ShelfItem>.playingItemMatcher(song: Song?): (ShelfItem) -> Boolean {
     song ?: return { false }
     // The card that was played, when the shelf holds it, and only that one —
@@ -328,7 +347,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.itemsIndexedShelves(
     onMoodClick: ((TopPickMood, String) -> Unit)? = null,
     onMoodsShowAll: () -> Unit = {},
 ) {
-    val ordered = shelves.withListenAgainFirst()
+    val ordered = shelves.withListenAgainFirst().withOtherModelBelowListenAgain()
     // Find Your Mood sits right after Recents, so it never follows another
     // row of cards directly. Without Recents (a guest) it goes after the second shelf.
     val moodAt = (ordered.indexOfFirst { it.title.trim().equals(RECENTS_TITLE, ignoreCase = true) }
