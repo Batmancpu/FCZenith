@@ -116,7 +116,13 @@ object TopPicks {
             }
             artists.getOrNull(2)?.let { andSimilar(it, photos) }?.let(::add)
             discoveryStation(mixes, artists, history)?.let(::add)
-        }.shuffled()
+        }.shuffled().let { shuffled ->
+            // Slot 2 always carries real artwork: the New Release Mix's cover
+            // first, then an artist card; the rest keep their random order.
+            val withArt = shuffled.firstOrNull { it.kind == TopPickKind.NEW_RELEASE_MIX && it.images.isNotEmpty() }
+                ?: shuffled.firstOrNull { it.images.isNotEmpty() }
+            if (withArt == null) shuffled else listOf(withArt) + shuffled.filter { it !== withArt }
+        }
         listOfNotNull(lead) + rest
     }
 
