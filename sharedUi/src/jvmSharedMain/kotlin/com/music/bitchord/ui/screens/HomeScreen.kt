@@ -246,6 +246,11 @@ fun HomeScreen(
                     MessageState(state.message, actionLabel = stringResource(Res.string.retry), onAction = onRetry)
                 }
                 is UiState.Success -> {
+                    // Home only: the Apple-style release row sits right under Top Picks.
+                    val editorialIndex = if (onTopPickClick != null) editorialShelfIndex(state.data) else null
+                    if (editorialIndex != null) {
+                        editorialShelf(state.data[editorialIndex], onItemClick, onItemLongPress)
+                    }
                     if (recentlyPlayedLoading) {
                         recentlyPlayedSkeleton()
                     }
@@ -253,7 +258,11 @@ fun HomeScreen(
                     // Recently Played lands, every real shelf must retain its
                     // compact-card layout instead of briefly becoming a hero.
                     itemsIndexedShelves(
-                        shelves = state.data,
+                        shelves = if (editorialIndex != null) {
+                            state.data.filterIndexed { index, _ -> index != editorialIndex }
+                        } else {
+                            state.data
+                        },
                         onMoodClick = onMoodClick,
                         onMoodsShowAll = onMoodsShowAll,
                         onItemClick = onItemClick,
