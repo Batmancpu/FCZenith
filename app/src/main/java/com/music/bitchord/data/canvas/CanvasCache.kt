@@ -5,6 +5,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.database.StandaloneDatabaseProvider
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.cache.CacheDataSource
+import androidx.media3.datasource.cache.ContentMetadata
 import androidx.media3.datasource.cache.SimpleCache
 import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.playback.DynamicLruCacheEvictor
@@ -80,6 +81,26 @@ object CanvasCache {
 
     /** How many clips are stored. */
     fun clipCount(): Int = if (::cache.isInitialized) cache.keys.size else 0
+
+    /**
+     * Whether the clip at [url] is stored on disk in full, so playing it needs
+     * no network at all. Key = URL, same as the default CacheDataSource key.
+     * A partly downloaded clip counts as not cached: finishing it would spend
+     * data.
+     */
+    fun isClipCached(url: String): Boolean {
+        if (!::cache.isInitialized) return false
+        return runCatching {
+            val length = ContentMetadata.getContentLength(cache.getContentMetadata(url))
+            length > 0L && cache.isCached(url, 0L, length)
+        }.getOrDefault(false)
+    }
+
+    /** Whether any rendition of [artwork] is fully on disk. */
+    fun isCached(artwork: CanvasArtwork): Boolean =
+        isClipCached(artwork.url) ||
+            artwork.portraitUrl?.let(::isClipCached) == true ||
+            artwork.fallbackUrl?.let(::isClipCached) == true
 
     /** Deletes every stored clip. Disk work: call off the main thread. */
     fun clear() {

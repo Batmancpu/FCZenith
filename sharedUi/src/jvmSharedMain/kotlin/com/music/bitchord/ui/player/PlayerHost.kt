@@ -35,6 +35,12 @@ interface PlayerHost {
     /** A Canvas already settled for [song], without a lookup. */
     fun cachedCanvas(song: Song): CanvasArtwork?
 
+    /**
+     * A Canvas for [song] whose clip is already fully on disk. Played even
+     * when canvas over cellular is off, because it costs no data.
+     */
+    fun cachedCanvasOnDisk(song: Song): CanvasArtwork? = null
+
     /** Looks a Canvas up for [song]; null is the normal answer. */
     suspend fun canvasFor(song: Song): CanvasArtwork?
 

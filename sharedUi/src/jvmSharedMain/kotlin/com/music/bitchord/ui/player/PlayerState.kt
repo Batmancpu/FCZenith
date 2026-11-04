@@ -63,9 +63,11 @@ internal fun rememberCanvasArtwork(song: Song): CanvasArtwork? {
     // clean; the same-titled-impostor case is guarded where the clip is
     // adopted, by [CanvasArtwork.matches].
     var canvas by remember(song.title, song.artist) { mutableStateOf<CanvasArtwork?>(null) }
-    LaunchedEffect(song.videoId, song.albumName, canvasAllowedNow, prioritizeSpotifyCanvas) {
+    LaunchedEffect(song.videoId, song.albumName, canvasEnabled, canvasAllowedNow, prioritizeSpotifyCanvas) {
         if (!canvasAllowedNow) {
-            canvas = null
+            // Fitur hidup tapi data seluler tidak diizinkan: hanya klip yang
+            // sudah utuh di cache disk yang diputar. Selain itu, still art.
+            canvas = if (canvasEnabled) PlayerPlatform.host.cachedCanvasOnDisk(song) else null
             return@LaunchedEffect
         }
         // Anything already settled for this track paints immediately: a

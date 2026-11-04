@@ -1,5 +1,6 @@
 package com.music.bitchord.data.canvas
 
+import androidx.media3.common.util.UnstableApi
 import com.music.bitchord.data.DebugLog as Log
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.settings.AppSettings
@@ -124,6 +125,24 @@ object CanvasRepository {
         // clip already worked out in an earlier session is the only answer.
         if (AppSettings.meteredConnection.value != null) return null
         return CanvasIndex.get("song|${song.videoId}")
+    }
+
+    /**
+     * Canvas [song] yang klipnya sudah utuh di disk ([CanvasCache]), tanpa
+     * menyentuh jaringan. Dipakai saat canvas lewat data seluler dimatikan:
+     * klip yang sudah ada di cache tetap diputar karena tidak memakai kuota,
+     * sedangkan lagu tanpa klip di cache tidak memicu pencarian/unduhan.
+     */
+    @OptIn(UnstableApi::class)
+    fun cachedOnDisk(song: Song): CanvasArtwork? {
+        if (song.videoId.isBlank()) return null
+        val key = cacheKey(
+            base = "song|${song.videoId}",
+            spotifyFirst = AppSettings.prioritizeSpotifyCanvas.value,
+        )
+        val artwork = synchronized(cache) { cache[key]?.artwork }
+            ?: CanvasIndex.get("song|${song.videoId}")
+        return artwork?.takeIf { CanvasCache.isCached(it) }
     }
 
     /**
