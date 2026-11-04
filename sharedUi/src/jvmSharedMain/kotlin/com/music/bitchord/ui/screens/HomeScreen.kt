@@ -511,7 +511,8 @@ private fun HomeTitle(title: String, modifier: Modifier = Modifier) {
                 tint = MaterialTheme.colorScheme.onBackground,
                 modifier = Modifier
                     .height(logoHeight)
-                    .aspectRatio(LOGO_ASPECT),
+                    .aspectRatio(LOGO_ASPECT)
+                    .alignBy { it.measuredHeight },
             )
             Spacer(Modifier.width(6.dp))
             Text(
@@ -520,6 +521,7 @@ private fun HomeTitle(title: String, modifier: Modifier = Modifier) {
                 fontSize = style.fontSize * MUSIC_TO_FONT,
                 fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
                 maxLines = 1,
+                modifier = Modifier.alignByBaseline(),
             )
         }
         HorizontalDivider(
@@ -536,10 +538,10 @@ private fun HomeTitle(title: String, modifier: Modifier = Modifier) {
 }
 
 /** The wordmark's height against the heading's font size. */
-private const val LOGO_TO_FONT = 0.38f
+private const val LOGO_TO_FONT = 0.46f
 
 /** The "Music" word's size against the heading's font size. */
-private const val MUSIC_TO_FONT = 0.78f
+private const val MUSIC_TO_FONT = 0.88f
 
 /** ic_logo's viewport, 730 x 484. */
 private const val LOGO_ASPECT = 730f / 484f
