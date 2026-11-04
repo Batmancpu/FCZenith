@@ -39,6 +39,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -262,12 +263,14 @@ fun RowScope.IosMenuQuickAction(
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val color = if (enabled) colors.label else colors.secondaryLabel
+    val touch = LocalIosMenuTouch.current
     Column(
         modifier = Modifier
             .weight(1f)
             .fillMaxHeight()
+            .iosMenuTouchTarget(enabled, 16.dp, onClick)
             .clip(RoundedCornerShape(16.dp))
-            .background(if (pressed) colors.pressed else Color.Transparent)
+            .background(if (pressed && touch == null) colors.pressed else Color.Transparent)
             .clickable(interactionSource = interaction, indication = null, enabled = enabled, onClick = onClick)
             .padding(horizontal = 4.dp, vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -319,12 +322,14 @@ fun IosMenuRow(
     val pressed by interaction.collectIsPressedAsState()
     val alpha = if (enabled) 1f else 0.4f
     val foreground = labelColor ?: colors.label
+    val touch = LocalIosMenuTouch.current
     Row(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 8.dp)
+            .iosMenuTouchTarget(enabled, 14.dp, onClick)
             .clip(RoundedCornerShape(14.dp))
-            .background(if (pressed) colors.pressed else Color.Transparent)
+            .background(if (pressed && touch == null) colors.pressed else Color.Transparent)
             .then(
                 if (onClick != null) {
                     Modifier.clickable(
@@ -476,6 +481,8 @@ fun <T : Any> IosMenuPopover(
 
     val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val scrim = Color.Black.copy(alpha = if (dark) 0.30f else 0.14f)
+    val touch = rememberIosMenuTouch(reduceMotion)
+    val pressedColor = iosMenuColors().pressed
     val insets = WindowInsets.safeDrawing
     var overlayOffset by remember { mutableStateOf(Offset.Zero) }
 
@@ -531,9 +538,12 @@ fun <T : Any> IosMenuPopover(
                 Column(
                     Modifier
                         .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                        .iosMenuTouchHost(touch, pressedColor)
                         .padding(vertical = 8.dp),
                 ) {
-                    content(menuItem)
+                    CompositionLocalProvider(LocalIosMenuTouch provides touch) {
+                        content(menuItem)
+                    }
                 }
             }
         },
@@ -566,6 +576,7 @@ fun <T : Any> IosMenuPopover(
                 val scale = lerp(0.3f, 1f, p)
                 scaleX = scale
                 scaleY = scale
+                applyIosMenuJelly(touch, scale, 1f, if (hangsDown) 0f else 1f)
             }
         }
         layout(width, height) {

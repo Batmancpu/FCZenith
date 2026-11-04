@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
@@ -117,6 +118,7 @@ fun <T : Any> HeldContextMenu(
     }
     val reduceMotion = appReduceAnimation || systemAnimationsOff
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
+    val touch = rememberIosMenuTouch(reduceMotion)
 
     val progress = remember { Animatable(0f) }
     LaunchedEffect(open) {
@@ -261,9 +263,12 @@ fun <T : Any> HeldContextMenu(
                     // The same frosted plate the held item sits on, so the
                     // item and its menu read as one thing lifted off the page.
                     .iosMenuPanel(fillOverride = plate, rimOverride = hairline)
+                    .iosMenuTouchHost(touch, iosMenuColors().pressed)
                     .padding(vertical = 8.dp),
             ) {
-                actions(menuItem)
+                CompositionLocalProvider(LocalIosMenuTouch provides touch) {
+                    actions(menuItem)
+                }
             }
         },
     ) { measurables, constraints ->
@@ -378,6 +383,7 @@ fun <T : Any> HeldContextMenu(
                     scaleY = scale
                     translationX = lerp(fromDx, 0f, p)
                     translationY = lerp(fromDy, 0f, p)
+                    applyIosMenuJelly(touch, scale, if (alignEnd) 1f else 0f, if (menuBelow) 0f else 1f)
                 }
             }
         }
