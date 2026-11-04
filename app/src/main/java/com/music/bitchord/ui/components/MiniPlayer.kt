@@ -74,6 +74,7 @@ import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
 import kotlin.math.abs
 import kotlin.math.sqrt
+import kotlin.math.tanh
 
 /**
  * The transport buttons' touch target. Material's default 48dp is what a bar
@@ -160,6 +161,16 @@ private val PULL_LIFT_EASE = 72.dp
 /** The bar's rise per pixel of finger as a pull starts. */
 private const val PULL_LIFT_RATE = 0.5f
 
+/** Seberapa jauh bar boleh bergeser ke samping saat di-swipe (batas lembut). */
+private val JELLY_MAX_OFFSET = 36.dp
+
+/** Melar horizontal saat ditarik, dan gepeng vertikal. 0.12 = 12% pada tarikan penuh. */
+private const val JELLY_STRETCH_X = 0.12f
+private const val JELLY_SQUASH_Y = 0.10f
+
+/** Makin kecil makin bergoyang. Dipakai saat bar dilepas dan memantul balik. */
+private const val JELLY_DAMPING = 0.3f
+
 /**
  * How far the bar rises for [pulled] pixels of finger: [PULL_LIFT_RATE] of the
  * finger to begin with, slowing the further it goes — a rubber band with no
@@ -229,9 +240,20 @@ internal fun Modifier.miniPlayerGestures(
     // recomposing it.
     val lift = remember { mutableFloatStateOf(0f) }
     val settle = remember { arrayOfNulls<Job>(1) }
+    // Jelly: geser, gepeng, dan fase pantulan. Hanya dibaca saat draw.
+    val jOffset = remember { mutableFloatStateOf(0f) }
+    val jSquish = remember { mutableFloatStateOf(0f) }
+    val jPhase = remember { mutableFloatStateOf(0f) }
+    val jellyJob = remember { arrayOfNulls<Job>(1) }
     return pointerInput(Unit) {
         val trackThreshold = TRACK_SWIPE_THRESHOLD.toPx()
         val liftEase = PULL_LIFT_EASE.toPx()
+        val jellyMax = JELLY_MAX_OFFSET.toPx()
+        val jellyFollow: (Float) -> Unit = { d ->
+            val o = jellyMax * tanh(d / (jellyMax * 2.5f))
+            jOffset.floatValue = o
+            jSquish.floatValue = abs(o) / jellyMax
+        }
         val maxVelocity = viewConfiguration.maximumFlingVelocity
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false)
@@ -258,11 +280,30 @@ internal fun Modifier.miniPlayerGestures(
             val slopped = start ?: return@awaitEachGesture
 
             if (!vertical) {
+                jellyJob[0]?.cancel()
+                jPhase.floatValue = 1f
                 var dragged = slopped.position.x - down.position.x
+                jellyFollow(dragged)
                 // Read before consuming: a consumed change reports no movement.
                 val finished = drag(pointer) { change ->
                     dragged += change.positionChange().x
                     change.consume()
+                    jellyFollow(dragged)
+                }
+                // Dilepas atau dibatalkan: bar memantul balik seperti jelly.
+                jPhase.floatValue = 1f
+                jellyJob[0] = scope.launch {
+                    animate(
+                        initialValue = 1f,
+                        targetValue = 0f,
+                        animationSpec = spring(
+                            dampingRatio = JELLY_DAMPING,
+                            stiffness = Spring.StiffnessLow,
+                        ),
+                    ) { value, _ -> jPhase.floatValue = value }
+                    jOffset.floatValue = 0f
+                    jSquish.floatValue = 0f
+                    jPhase.floatValue = 1f
                 }
                 if (!finished) return@awaitEachGesture
                 val crossed = dragged <= -trackThreshold || dragged >= trackThreshold
@@ -310,7 +351,14 @@ internal fun Modifier.miniPlayerGestures(
                 ) { value, _ -> lift.floatValue = value }
             }
         }
-    }.graphicsLayer { translationY = -lift.floatValue }
+    }.graphicsLayer {
+        val p = jPhase.floatValue
+        val s = jSquish.floatValue * p
+        translationX = jOffset.floatValue * p
+        scaleX = 1f + JELLY_STRETCH_X * s
+        scaleY = 1f - JELLY_SQUASH_Y * s
+        translationY = -lift.floatValue
+    }
 }
 
 /**
