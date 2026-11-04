@@ -142,6 +142,8 @@ class BitChordApplication : Application(), SingletonImageLoader.Factory, Configu
             CoroutineScope(Dispatchers.IO).launch { Innertube.ensureSessionScope() }
         }
         AppSettings.init(this, authStore)
+        // Cache halaman browse (album, artis, explore) di disk: hemat data dan tetap tampil offline.
+        Innertube.browseCacheDir = cacheDir.resolve("browse_cache")
         // Before anything resolves a track: an addon with `checkValidLossless`
         // is gated on this, and the gate reads "no" until it has looked.
         com.music.bitchord.playback.audio.LosslessOutput.init(this)

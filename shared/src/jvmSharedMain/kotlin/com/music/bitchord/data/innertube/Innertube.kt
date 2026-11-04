@@ -526,11 +526,93 @@ object Innertube {
 
     // ---- Public API ---------------------------------------------------------
 
-    suspend fun browse(browseId: String, params: String? = null): JsonObject =
-        postMusic("browse") {
-            put("browseId", browseId)
-            params?.let { put("params", it) }
+    /**
+     * Folder untuk cache browse di disk; diisi aplikasi saat start. Null = tanpa cache.
+     * Halaman album/artis/explore dipakai ulang tanpa jaringan selama masih segar, dan
+     * semua halaman yang pernah dibuka tetap tampil (basi) saat offline.
+     */
+    @Volatile
+    var browseCacheDir: java.io.File? = null
+
+    private const val BROWSE_CACHE_MAX_BYTES = 30L * 1024 * 1024
+    private const val BROWSE_STALE_LIMIT_MS = 30L * 24 * 60 * 60 * 1000
+    private var browseWrites = 0
+
+    /**
+     * Berapa lama sebuah halaman dianggap segar. 0 = selalu minta jaringan (Home, library,
+     * playlist, riwayat: berubah oleh aksi pengguna atau pull-to-refresh), tetapi hasilnya
+     * tetap disimpan sebagai cadangan offline.
+     */
+    private fun browseFreshMs(browseId: String): Long = when {
+        browseId.startsWith("MPRE") || browseId.startsWith("MPAD") -> 24L * 60 * 60 * 1000
+        browseId.startsWith("UC") || browseId.startsWith("MPLA") -> 6L * 60 * 60 * 1000
+        browseId == "FEmusic_moods_and_genres" -> 24L * 60 * 60 * 1000
+        browseId == "FEmusic_explore" -> 6L * 60 * 60 * 1000
+        else -> 0L
+    }
+
+    /** Satu file per akun/channel/bahasa/halaman, supaya data akun lain tidak pernah tercampur. */
+    private fun browseCacheFile(browseId: String, params: String?): java.io.File? {
+        val dir = browseCacheDir ?: return null
+        val raw = listOf(
+            cookie.orEmpty(),
+            channelOverride?.pageId.orEmpty(),
+            channelOverride?.dataSyncId.orEmpty(),
+            currentLocaleTag,
+            browseId,
+            params.orEmpty(),
+        ).joinToString("\u0000")
+        val hex = MessageDigest.getInstance("SHA-256").digest(raw.toByteArray())
+            .joinToString("") { "%02x".format(it) }
+        return java.io.File(dir, "$hex.json")
+    }
+
+    private fun readBrowseCache(file: java.io.File?, maxAgeMs: Long): JsonObject? {
+        if (file == null || !file.isFile) return null
+        if (System.currentTimeMillis() - file.lastModified() > maxAgeMs) return null
+        return runCatching { Json.parseToJsonElement(file.readText()).jsonObject }.getOrNull()
+    }
+
+    private fun writeBrowseCache(file: java.io.File?, body: JsonObject) {
+        if (file == null) return
+        runCatching {
+            file.parentFile?.mkdirs()
+            val tmp = java.io.File(file.path + ".tmp")
+            tmp.writeText(body.toString())
+            tmp.renameTo(file)
+            if (browseWrites++ % 20 == 0) pruneBrowseCache(file.parentFile)
         }
+    }
+
+    /** Buang file terlama sampai total di bawah batas. */
+    private fun pruneBrowseCache(dir: java.io.File?) {
+        val files = dir?.listFiles()?.filter { it.isFile } ?: return
+        var total = files.sumOf { it.length() }
+        if (total <= BROWSE_CACHE_MAX_BYTES) return
+        for (f in files.sortedBy { it.lastModified() }) {
+            if (total <= BROWSE_CACHE_MAX_BYTES * 3 / 4) break
+            total -= f.length()
+            f.delete()
+        }
+    }
+
+    suspend fun browse(browseId: String, params: String? = null): JsonObject {
+        val file = browseCacheFile(browseId, params)
+        val fresh = browseFreshMs(browseId)
+        if (fresh > 0L) readBrowseCache(file, fresh)?.let { return it }
+        return try {
+            postMusic("browse") {
+                put("browseId", browseId)
+                params?.let { put("params", it) }
+            }.also { writeBrowseCache(file, it) }
+        } catch (e: IOException) {
+            // Offline / jaringan putus: pakai salinan terakhir kalau ada. Error lain
+            // (401/403, dll.) sengaja tidak ditelan supaya refresh sesi tetap jalan.
+            readBrowseCache(file, BROWSE_STALE_LIMIT_MS)?.also {
+                Log.d(TAG, "browse $browseId offline, serving cached copy")
+            } ?: throw e
+        }
+    }
 
     /**
      * The next page of a paged browse response — playlists and library feeds
