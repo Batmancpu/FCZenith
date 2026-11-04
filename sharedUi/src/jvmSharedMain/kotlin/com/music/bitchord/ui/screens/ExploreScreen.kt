@@ -91,6 +91,14 @@ fun ExploreScreen(
     ) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val columns = moodColumns(maxWidth)
+            // Dihitung sekali per data/kolom, bukan di setiap recomposition.
+            val moodRows = remember(state, columns) {
+                (state as? UiState.Success)?.data
+                    ?.flatMap(MoodGenreSection::items)
+                    ?.distinctBy { it.browseId to it.params }
+                    ?.chunked(columns)
+                    .orEmpty()
+            }
             LazyColumn(
                 state = listState,
                 contentPadding = contentPadding,
@@ -128,10 +136,7 @@ fun ExploreScreen(
                     is UiState.Success -> {
                         // Moods and genres read as one grid; the server's
                         // grouping only decides the order.
-                        val rows = state.data.flatMap(MoodGenreSection::items)
-                            .distinctBy { it.browseId to it.params }
-                            .chunked(columns)
-                        items(rows, key = { row -> row.first().let { "${it.browseId}|${it.params}" } }) { row ->
+                        items(moodRows, key = { row -> row.first().let { "${it.browseId}|${it.params}" } }) { row ->
                             MoodGenreRow(row = row, columns = columns, onCategoryClick = onCategoryClick)
                         }
                     }

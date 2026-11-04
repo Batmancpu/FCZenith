@@ -46,6 +46,9 @@ import com.music.bitchord.ui.components.ShelfRow
 import com.music.bitchord.ui.components.longPressMenuClickable
 import com.music.bitchord.ui.components.thumbnailBorder
 import java.util.Locale
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 
 /**
  * Apple Music's "New" tab card, beside Top Picks rather than instead of it: the
@@ -63,6 +66,16 @@ private val EDITORIAL_SHAPE = RoundedCornerShape(16.dp)
 
 /** Blurbs already asked for, by browse id; "" for a release that has none. */
 private val editorialBlurbs = HashMap<String, String>()
+
+/**
+ * Blurb dimuat bertahap: tiap kartu mengambil satu halaman album penuh (dua
+ * request + parse JSON besar), dan delapan sekaligus saat tab dibuka membuat
+ * transisi dan scroll tersendat. Maksimal dua berjalan bersamaan, dan baru
+ * dimulai setelah tab selesai masuk.
+ */
+private val blurbGate = Semaphore(2)
+private const val BLURB_START_DELAY_MS = 400L
+private val BLURB_WHITESPACE = Regex("\\s+")
 
 private fun ShelfItem.isRelease() =
     !browseId.isNullOrEmpty() && !thumbnailUrl.isNullOrEmpty() && !isVideo && videoId == null
@@ -142,7 +155,10 @@ private fun EditorialCard(
     var blurb by remember(id) { mutableStateOf(editorialBlurbs[id]?.takeIf { it.isNotEmpty() }) }
     LaunchedEffect(id) {
         if (id.isEmpty() || id in editorialBlurbs) return@LaunchedEffect
-        val text = YtMusicRepository.browseSongs(id).getOrNull()?.description.cleanBlurb()
+        delay(BLURB_START_DELAY_MS)
+        val text = blurbGate.withPermit {
+            YtMusicRepository.browseSongs(id).getOrNull()?.description.cleanBlurb()
+        }
         editorialBlurbs[id] = text.orEmpty()
         blurb = text
     }
@@ -228,6 +244,6 @@ private fun EditorialCard(
 /** A blurb as one tidy paragraph: Wikipedia's credit line and stray line breaks gone; null when too thin to read as a sentence. */
 private fun String?.cleanBlurb(): String? =
     this?.substringBefore("From Wikipedia")
-        ?.replace(Regex("\\s+"), " ")
+        ?.replace(BLURB_WHITESPACE, " ")
         ?.trim()
         ?.takeIf { it.length >= 20 }
