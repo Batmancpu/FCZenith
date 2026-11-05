@@ -272,6 +272,8 @@ import com.music.zenith.ui.components.QueueActionNoticeHost
 import com.music.zenith.ui.components.TopBarAccountButton
 import com.music.zenith.ui.screens.SegmentedControl
 import com.music.zenith.ui.screens.LocalMostPlayedArt
+import com.music.zenith.ui.screens.LocalMixCoverBackground
+import com.music.zenith.ui.components.OrganicFluidBackground
 import com.music.zenith.ui.screens.MostPlayedArt
 import com.music.zenith.ui.components.SearchField
 import com.music.zenith.sharedui.resources.Res as SharedRes
@@ -425,6 +427,13 @@ class MainActivity : AppCompatActivity() {
                     LocalSegmentedControlStyle provides AppSegmentedControlStyle,
                     LocalMostPlayedArt provides { covers, motion, modifier ->
                         MostPlayedArt(covers, motion, modifier)
+                    },
+                    LocalMixCoverBackground provides { colors, motion, modifier ->
+                        OrganicFluidBackground(
+                            modifier = modifier,
+                            colors = colors,
+                            animationSpeed = if (motion) 0.6f else 0f,
+                        )
                     },
                     LocalAppBackdrop provides appBackdrop,
                 ) {

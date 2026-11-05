@@ -382,7 +382,13 @@ private fun androidx.compose.foundation.lazy.LazyListScope.itemsIndexedShelves(
             val isQuickPicks = QUICK_PICKS_TITLES.any { shelf.title.trim().equals(it, ignoreCase = true) }
             // Quick picks is one row of square cards, as Recently Played is on
             // Apple Music; Listen again and Recents keep the paged list.
-            if (onPlaySongs != null && shelf.isPlaylistPreviewShelf()) {
+            if (shelf.isMixShelf()) {
+                MixCoverShelf(
+                    shelf = shelf,
+                    onItemClick = openItem,
+                    onItemLongPress = onItemLongPress,
+                )
+            } else if (onPlaySongs != null && shelf.isPlaylistPreviewShelf()) {
                 PlaylistPreviewShelf(
                     shelf = shelf,
                     onItemClick = openItem,
