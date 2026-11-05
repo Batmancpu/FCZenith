@@ -293,7 +293,6 @@ interface PlayerSettingsSource {
 
     fun setLastPlayerScreen(value: LastPlayerScreen)
     fun setLyricsOffsetMs(value: Int)
-    fun setSmartFadeEnabled(value: Boolean)
 }
 
 /** The player's name for the installed host's settings, read where AppSettings used to be. */

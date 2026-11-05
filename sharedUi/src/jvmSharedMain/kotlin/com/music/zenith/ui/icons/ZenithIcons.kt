@@ -330,37 +330,6 @@ object ZenithIcons {
         }.build()
     }
 
-    /** Automix: two overlapping rings, one carrying a dot. */
-    val Automix: ImageVector by lazy {
-        ImageVector.Builder(
-            name = "bc_automix",
-            defaultWidth = 24.dp, defaultHeight = 24.dp,
-            viewportWidth = 24f, viewportHeight = 24f,
-        ).apply {
-            path(
-                stroke = stroke,
-                strokeLineWidth = STROKE,
-                strokeLineCap = StrokeCap.Round,
-                strokeLineJoin = StrokeJoin.Round,
-            ) {
-                moveTo(4f, 12f)
-                arcToRelative(5f, 5f, 0f, isMoreThanHalf = true, isPositiveArc = true, 10f, 0f)
-                arcToRelative(5f, 5f, 0f, isMoreThanHalf = true, isPositiveArc = true, -10f, 0f)
-                close()
-                moveTo(10f, 12f)
-                arcToRelative(5f, 5f, 0f, isMoreThanHalf = true, isPositiveArc = true, 10f, 0f)
-                arcToRelative(5f, 5f, 0f, isMoreThanHalf = true, isPositiveArc = true, -10f, 0f)
-                close()
-            }
-            path(fill = stroke) {
-                moveTo(5.5f, 12f)
-                arcToRelative(1.1f, 1.1f, 0f, isMoreThanHalf = true, isPositiveArc = true, 2.2f, 0f)
-                arcToRelative(1.1f, 1.1f, 0f, isMoreThanHalf = true, isPositiveArc = true, -2.2f, 0f)
-                close()
-            }
-        }.build()
-    }
-
     /** Beamed pair of notes, for instrumental stretches in the lyrics. */
     val MusicNote: ImageVector by lazy {
         ImageVector.Builder(
