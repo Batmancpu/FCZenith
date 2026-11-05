@@ -79,7 +79,6 @@ import androidx.compose.ui.unit.Velocity
 import coil3.compose.AsyncImage
 import com.music.zenith.ui.components.thumbnailBorder
 import com.music.zenith.ui.icons.ZenithIcons
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import com.music.zenith.ui.haptics.Haptic
 import com.music.zenith.ui.haptics.rememberHaptics
