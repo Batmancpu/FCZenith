@@ -130,6 +130,10 @@ import coil3.compose.AsyncImage
 import com.music.zenith.ui.components.coverFlightSource
 import androidx.compose.runtime.CompositionLocalProvider
 import com.music.zenith.ui.components.LocalSettledMosaic
+import com.music.zenith.ui.graphics.forPixelAccess
+import com.music.zenith.ui.graphics.paletteSwatches
+import com.music.zenith.ui.graphics.toImageBitmap
+import androidx.core.graphics.ColorUtils
 import com.music.zenith.ui.components.coverFlightTarget
 import com.music.zenith.ui.components.coverFlightClip
 import com.music.zenith.ui.components.coverFlightClipRendered
@@ -2552,6 +2556,8 @@ private fun MostPlayedHero(
     height: Dp,
     modifier: Modifier = Modifier,
 ) {
+    // Warna atas latar sama dengan seni di bawahnya, untuk perpanjangan saat ditarik.
+    val heroTint = rememberMostPlayedTint(page.covers)
     // Mosaic direkam sekali; salinan blur di kaki memakai rekaman yang sama.
     val shared = rememberGraphicsLayer()
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
@@ -2602,7 +2608,7 @@ private fun MostPlayedHero(
                 .drawBehind {
                     val extra = LIKED_OVERSCROLL.toPx()
                     drawRect(
-                        color = MOST_PLAYED_COLORS[0],
+                        color = heroTint[0],
                         topLeft = Offset(0f, -extra),
                         size = androidx.compose.ui.geometry.Size(size.width, extra + 1f),
                     )
@@ -2751,13 +2757,10 @@ private val LIKED_COLORS = listOf(Color(0xFF7B5CF0), Color(0xFFB45FDB), Color(0x
 private val LIKED_BASE = Brush.verticalGradient(LIKED_COLORS)
 
 /**
- * Most Played: gradien royal-amethyst statis dengan cahaya turquoise dan cyan,
- * dipakai oleh [MostPlayedArt].
+ * Most Played: warna latar bawaan (royal-amethyst), dipakai selama warna dari
+ * cover belum terbaca. Setelah itu latar mengikuti [rememberMostPlayedTint].
  */
 private val MOST_PLAYED_COLORS = listOf(Color(0xFF1B2FB0), Color(0xFF6A33CC), Color(0xFF1A6FD8))
-private val MOST_PLAYED_BASE = Brush.verticalGradient(MOST_PLAYED_COLORS)
-private val MESH_TURQUOISE = Color(0xFF18E6D8)
-private val MESH_CYAN = Color(0xFF35D0F5)
 
 /**
  * Seberapa jauh seni hero menjulur ke atas, melewati tepi atasnya. Di luar layar
@@ -3065,7 +3068,8 @@ object HeroMotion {
 
 /**
  * Cover Most Played versi ringan: kolase statis tiga cover bertumpuk dan miring
- * di atas gradien royal-amethyst, dengan cahaya lembut dan garis grid tipis.
+ * di atas gradien dari warna cover terpilih, dengan cahaya lembut, garis grid
+ * tipis, angka peringkat, dan teks tipografi.
  * Tanpa jam global, tanpa puluhan tile, tanpa mesh yang digambar ulang tiap frame:
  * hanya tiga gambar dan satu latar yang digambar sekali.
  *
@@ -3077,16 +3081,23 @@ object HeroMotion {
  */
 @Composable
 fun MostPlayedArt(covers: List<String>, motion: Boolean, modifier: Modifier = Modifier) {
+    // Warna latar dari tiga cover teratas; sebelum terbaca memakai warna bawaan.
+    val tint = rememberMostPlayedTint(covers)
+    val fade = tween<Color>(700)
+    val top by androidx.compose.animation.animateColorAsState(tint[0], fade, label = "mostPlayedTop")
+    val mid by androidx.compose.animation.animateColorAsState(tint[1], fade, label = "mostPlayedMid")
+    val bottom by androidx.compose.animation.animateColorAsState(tint[2], fade, label = "mostPlayedBottom")
     BoxWithConstraints(
         modifier.drawBehind {
             val w = size.width
             val h = size.height
-            drawRect(MOST_PLAYED_BASE)
-            // Dua cahaya lembut statis: turquoise di kiri atas, cyan di kanan bawah.
+            drawRect(Brush.verticalGradient(listOf(top, mid, bottom)))
+            // Dua cahaya lembut statis, diturunkan dari warna tengah dan bawah.
             val glowA = Offset(w * 0.16f, h * 0.10f)
+            val colorA = mid.lighter(0.45f)
             drawCircle(
                 brush = Brush.radialGradient(
-                    listOf(MESH_TURQUOISE.copy(alpha = 0.50f), MESH_TURQUOISE.copy(alpha = 0f)),
+                    listOf(colorA.copy(alpha = 0.55f), colorA.copy(alpha = 0f)),
                     center = glowA,
                     radius = w * 0.70f,
                 ),
@@ -3094,9 +3105,10 @@ fun MostPlayedArt(covers: List<String>, motion: Boolean, modifier: Modifier = Mo
                 center = glowA,
             )
             val glowB = Offset(w * 0.88f, h * 0.90f)
+            val colorB = bottom.lighter(0.40f)
             drawCircle(
                 brush = Brush.radialGradient(
-                    listOf(MESH_CYAN.copy(alpha = 0.42f), MESH_CYAN.copy(alpha = 0f)),
+                    listOf(colorB.copy(alpha = 0.45f), colorB.copy(alpha = 0f)),
                     center = glowB,
                     radius = w * 0.75f,
                 ),
@@ -3116,26 +3128,152 @@ fun MostPlayedArt(covers: List<String>, motion: Boolean, modifier: Modifier = Mo
         },
     ) {
         if (covers.isEmpty()) return@BoxWithConstraints
+        val density = LocalDensity.current
         val side = minOf(maxWidth, maxHeight)
         val originX = (maxWidth - side) / 2
         val originY = (maxHeight - side) / 2
+        fun fs(f: Float) = with(density) { (side * f).toSp() }
+
+        // Angka raksasa samar di belakang kolase.
+        Text(
+            text = "1",
+            color = Color.White.copy(alpha = 0.10f),
+            fontSize = fs(0.80f),
+            fontWeight = FontWeight.Black,
+            maxLines = 1,
+            softWrap = false,
+            modifier = Modifier.offset(originX + side * 0.56f, originY - side * 0.12f),
+        )
+
+        // Teks vertikal tipis di tepi kiri, dipusatkan agar aman saat hero memotong sisi.
+        val stripW = side * 0.64f
+        val stripH = side * 0.05f
+        Text(
+            text = "MOST PLAYED  •  TOP SONGS",
+            color = Color.White.copy(alpha = 0.60f),
+            fontSize = fs(0.030f),
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = fs(0.005f),
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            softWrap = false,
+            modifier = Modifier
+                .offset(originX + side * 0.115f - stripW / 2, originY + side * 0.41f - stripH / 2)
+                .size(stripW, stripH)
+                .graphicsLayer { rotationZ = -90f },
+        )
+
         // Urutan daftar = urutan gambar: yang terakhir (cover #1) paling depan.
         for (slot in MOST_PLAYED_COLLAGE) {
             val tile = side * slot.size
             val shape = RoundedCornerShape(tile * 0.14f)
-            AsyncImage(
-                model = covers[slot.cover % covers.size].artworkAt(CARD_ART_PX),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
+            Box(
+                Modifier
                     .offset(originX + side * slot.x, originY + side * slot.y)
                     .size(tile)
                     .graphicsLayer { rotationZ = slot.rotation }
                     .clip(shape)
                     .border(1.5.dp, Color.White.copy(alpha = 0.30f), shape),
-            )
+            ) {
+                AsyncImage(
+                    model = covers[slot.cover % covers.size].artworkAt(CARD_ART_PX),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                // Label peringkat di pojok tile.
+                Text(
+                    text = "0${slot.cover + 1}",
+                    color = Color.White,
+                    fontSize = fs(0.040f),
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = fs(0.004f),
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(tile * 0.07f)
+                        .background(Color.Black.copy(alpha = 0.38f), RoundedCornerShape(50))
+                        .padding(horizontal = tile * 0.07f, vertical = tile * 0.025f),
+                )
+            }
         }
     }
+}
+
+private fun Color.lighter(f: Float): Color =
+    Color(red + (1f - red) * f, green + (1f - green) * f, blue + (1f - blue) * f)
+
+/** Warna latar per kombinasi tiga cover teratas, supaya kartu, cover terbang, sleeve, dan hero langsung sama. */
+private val MostPlayedTints = java.util.concurrent.ConcurrentHashMap<String, List<Color>>()
+
+/**
+ * Tiga warna latar (atas, tengah, bawah) dari warna dominan tiap cover teratas,
+ * digelapkan agar teks putih tetap terbaca. Memakai warna bawaan sampai terbaca.
+ */
+@Composable
+private fun rememberMostPlayedTint(covers: List<String>): List<Color> {
+    val context = LocalPlatformContext.current
+    val key = covers.take(3).joinToString("|")
+    var tint by remember(key) { mutableStateOf(MostPlayedTints[key] ?: MOST_PLAYED_COLORS) }
+    LaunchedEffect(key) {
+        if (key.isEmpty() || MostPlayedTints.containsKey(key)) return@LaunchedEffect
+        val picked = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            covers.take(3).mapNotNull { url ->
+                val request = ImageRequest.Builder(context)
+                    .data(url.artworkAt(CARD_ART_PX))
+                    .size(96)
+                    .forPixelAccess()
+                    .build()
+                val result = coil3.SingletonImageLoader.get(context).execute(request)
+                val bitmap = (result as? coil3.request.SuccessResult)?.image?.toImageBitmap()
+                    ?: return@mapNotNull null
+                tintRgbOf(bitmap)
+            }
+        }
+        if (picked.isEmpty()) return@LaunchedEffect
+        val colors = spreadTint(picked).map { Color(it) }
+        MostPlayedTints[key] = colors
+        tint = colors
+    }
+    return tint
+}
+
+/** Warna paling "berwarna" dan dominan di cover, digelapkan dan dijenuhkan. */
+private fun tintRgbOf(bitmap: androidx.compose.ui.graphics.ImageBitmap): Int? {
+    val swatches = paletteSwatches(bitmap, 16, false).ifEmpty { paletteSwatches(bitmap, 16, true) }
+    val hsl = FloatArray(3)
+    val best = swatches.maxByOrNull { s ->
+        ColorUtils.colorToHSL(s.rgb, hsl)
+        s.population * (0.25f + hsl[1])
+    } ?: return null
+    ColorUtils.colorToHSL(best.rgb, hsl)
+    hsl[1] = hsl[1].coerceIn(0.45f, 0.90f)
+    hsl[2] = hsl[2].coerceIn(0.24f, 0.40f)
+    return ColorUtils.HSLToColor(hsl)
+}
+
+/** Selalu tiga warna; yang terlalu mirip dengan sebelumnya digeser hue-nya. */
+private fun spreadTint(picked: List<Int>): List<Int> {
+    val out = mutableListOf<Int>()
+    val hsl = FloatArray(3)
+    for (i in 0 until 3) {
+        var rgb = picked[i % picked.size]
+        if (out.any { rgbClose(it, rgb) }) {
+            ColorUtils.colorToHSL(rgb, hsl)
+            hsl[0] = (hsl[0] + 35f * i) % 360f
+            rgb = ColorUtils.HSLToColor(hsl)
+        }
+        out += rgb
+    }
+    return out
+}
+
+private fun rgbClose(a: Int, b: Int): Boolean {
+    val x = FloatArray(3)
+    val y = FloatArray(3)
+    ColorUtils.colorToHSL(a, x)
+    ColorUtils.colorToHSL(b, y)
+    val gap = kotlin.math.abs(x[0] - y[0]).let { kotlin.math.min(it, 360f - it) }
+    return gap < 20f && kotlin.math.abs(x[2] - y[2]) < 0.12f
 }
 
 /** Satu tile kolase, semua nilai pecahan dari sisi persegi seni. */
