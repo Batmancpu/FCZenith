@@ -2570,8 +2570,6 @@ private fun MostPlayedHero(
     height: Dp,
     modifier: Modifier = Modifier,
 ) {
-    // Warna atas latar sama dengan seni di bawahnya, untuk perpanjangan saat ditarik.
-    val heroTint = rememberMostPlayedTint(page.covers)
     // Mosaic direkam sekali; salinan blur di kaki memakai rekaman yang sama.
     val shared = rememberGraphicsLayer()
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
@@ -2622,7 +2620,7 @@ private fun MostPlayedHero(
                 .drawBehind {
                     val extra = LIKED_OVERSCROLL.toPx()
                     drawRect(
-                        color = heroTint[0],
+                        color = RECAP_SURFACE,
                         topLeft = Offset(0f, -extra),
                         size = androidx.compose.ui.geometry.Size(size.width, extra + 1f),
                     )
@@ -2953,11 +2951,11 @@ object HeroMotion {
 }
 
 /**
- * Cover Most Played versi ringan: bento statis tiga cover (satu besar, dua kecil)
- * di atas gradien dari warna cover terpilih, dengan cahaya lembut, garis grid
- * tipis, angka peringkat, dan teks tipografi.
- * Tanpa jam global, tanpa puluhan tile, tanpa mesh yang digambar ulang tiap frame:
- * hanya tiga gambar dan satu latar yang digambar sekali.
+ * Cover Most Played: komposisi berlapis, satu cover utama besar dengan dua cover
+ * pendukung yang lebih kecil dan sedikit miring di belakangnya, di atas permukaan
+ * gelap #171719 dengan satu cahaya merah tipis. Cover asli tidak diberi filter.
+ * Tanpa jam global dan tanpa animasi terus-menerus; pergantian cover memakai crossfade.
+ * Hanya tiga gambar dan satu latar yang digambar sekali.
  *
  * Satu composable ini dipakai kartu Home, cover terbang, sleeve, dan hero
  * full-bleed, jadi semuanya ikut ringan dan animasi terbang (coverFlightSource /
@@ -2967,148 +2965,58 @@ object HeroMotion {
  */
 @Composable
 fun MostPlayedArt(covers: List<String>, motion: Boolean, modifier: Modifier = Modifier) {
-    // Warna latar dari tiga cover teratas; sebelum terbaca memakai warna bawaan.
-    val tint = rememberMostPlayedTint(covers)
-    val fade = tween<Color>(700)
-    val top by androidx.compose.animation.animateColorAsState(tint[0], fade, label = "mostPlayedTop")
-    val mid by androidx.compose.animation.animateColorAsState(tint[1], fade, label = "mostPlayedMid")
-    val bottom by androidx.compose.animation.animateColorAsState(tint[2], fade, label = "mostPlayedBottom")
     BoxWithConstraints(
         modifier.drawBehind {
-            val w = size.width
-            val h = size.height
-            drawRect(Brush.verticalGradient(listOf(top, mid, bottom)))
-            // Dua cahaya lembut statis, diturunkan dari warna tengah dan bawah.
-            val glowA = Offset(w * 0.16f, h * 0.10f)
-            val colorA = mid.lighter(0.45f)
+            drawRect(RECAP_SURFACE)
+            // Satu cahaya merah tipis dari kiri atas; gradien radial statis.
+            val radius = size.width * 0.75f
+            val center = Offset(size.width * 0.22f, size.height * 0.18f)
             drawCircle(
                 brush = Brush.radialGradient(
-                    listOf(colorA.copy(alpha = 0.55f), colorA.copy(alpha = 0f)),
-                    center = glowA,
-                    radius = w * 0.70f,
+                    listOf(RECAP_ACCENT.copy(alpha = 0.20f), RECAP_ACCENT.copy(alpha = 0f)),
+                    center = center,
+                    radius = radius,
                 ),
-                radius = w * 0.70f,
-                center = glowA,
+                radius = radius,
+                center = center,
             )
-            val glowB = Offset(w * 0.88f, h * 0.90f)
-            val colorB = bottom.lighter(0.40f)
-            drawCircle(
-                brush = Brush.radialGradient(
-                    listOf(colorB.copy(alpha = 0.45f), colorB.copy(alpha = 0f)),
-                    center = glowB,
-                    radius = w * 0.75f,
-                ),
-                radius = w * 0.75f,
-                center = glowB,
-            )
-            // Garis grid vertikal tipis, memberi kesan poster/editorial.
-            val line = Color.White.copy(alpha = 0.09f)
-            val lineW = 1.dp.toPx()
-            for (f in MOST_PLAYED_GRID) {
-                drawRect(
-                    color = line,
-                    topLeft = Offset(w * f, 0f),
-                    size = androidx.compose.ui.geometry.Size(lineW, h),
-                )
-            }
         },
     ) {
-        // Latar cairan: blob mengalir dengan warna dari cover teratas (atas, tengah,
-        // bawah), ditambah dua varian lebih terang supaya ada kilau seperti kartu
-        // Apple Music. Warna ikut beralih halus lewat tint yang beranimasi di atas.
-        OrganicFluidBackground(
-            modifier = Modifier.matchParentSize(),
-            colors = mixContrastPalette(
-                listOf(mid, top, bottom, top.lighter(0.5f), mid.lighter(0.35f)),
-            ),
-            animationSpeed = if (motion && !HeroMotion.frozen) 2.2f else 0f,
-        )
         if (covers.isEmpty()) return@BoxWithConstraints
-        val density = LocalDensity.current
         val side = minOf(maxWidth, maxHeight)
         val originX = (maxWidth - side) / 2
         val originY = (maxHeight - side) / 2
-        fun fs(f: Float) = with(density) { (side * f).toSp() }
 
-        // Tata letak bento rapi: cover besar di kiri, dua cover kecil di kanan.
-
-        // Teks vertikal tipis di tepi kiri, dipusatkan agar aman saat hero memotong sisi.
-        val stripW = side * 0.64f
-        val stripH = side * 0.06f
-        Text(
-            text = "MOST PLAYED  •  TOP SONGS",
-            color = Color.White.copy(alpha = 0.70f),
-            fontSize = fs(0.038f),
-            fontWeight = FontWeight.SemiBold,
-            letterSpacing = fs(0.005f),
-            textAlign = TextAlign.Center,
-            maxLines = 1,
-            softWrap = false,
-            modifier = Modifier
-                .offset(originX + side * 0.07f - stripW / 2, originY + side * 0.43f - stripH / 2)
-                .size(stripW, stripH)
-                .graphicsLayer { rotationZ = -90f },
-        )
-
-        // Tanpa rotasi dan tanpa tumpang tindih; jarak antar tile sama dan radius sudut sebanding.
-        for (slot in MOST_PLAYED_COLLAGE) {
-            if (slot.cover >= covers.size) continue
+        // Dari belakang ke depan; cover utama (0) digambar terakhir.
+        for (slot in MOST_PLAYED_LAYERS) {
+            val url = covers.getOrNull(slot.cover) ?: continue
             val tile = side * slot.size
-            val shape = RoundedCornerShape(tile * 0.12f)
+            val shape = RoundedCornerShape(maxOf(12.dp, minOf(16.dp, tile * 0.10f)))
             Box(
                 Modifier
                     .offset(originX + side * slot.x, originY + side * slot.y)
                     .size(tile)
-                    .shadow(side * 0.02f, shape)
+                    .graphicsLayer { rotationZ = slot.rotation }
+                    .shadow(side * (if (slot.cover == 0) 0.045f else 0.02f), shape)
                     .clip(shape)
-                    .border(1.dp, Color.White.copy(alpha = 0.28f), shape),
+                    .border(0.75.dp, Color.White.copy(alpha = 0.14f), shape),
             ) {
-                AsyncImage(
-                    model = covers[slot.cover].artworkAt(CARD_ART_PX),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
-                )
-                // Label peringkat kecil di pojok kiri bawah tile.
-                Text(
-                    text = "0${slot.cover + 1}",
-                    color = Color.White,
-                    fontSize = fs(0.042f),
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = fs(0.003f),
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(tile * 0.08f)
-                        .background(Color.Black.copy(alpha = 0.38f), RoundedCornerShape(50))
-                        .padding(horizontal = tile * 0.06f, vertical = tile * 0.02f),
-                )
+                androidx.compose.animation.Crossfade(
+                    targetState = url,
+                    animationSpec = tween(600),
+                    label = "mostPlayedCover",
+                ) { shown ->
+                    AsyncImage(
+                        model = shown.artworkAt(CARD_ART_PX),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+                if (slot.dim > 0f) {
+                    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = slot.dim)))
+                }
             }
-        }
-
-        // Baris keterangan di bawah grid: judul tipis dan garis halus memanjang,
-        // mengisi ruang kosong dan menyejajarkan lebar dengan grid.
-        Row(
-            modifier = Modifier
-                .offset(originX + side * 0.125f, originY + side * 0.725f)
-                .width(side * 0.83f),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = "TOP 3",
-                color = Color.White.copy(alpha = 0.90f),
-                fontSize = fs(0.050f),
-                fontWeight = FontWeight.Bold,
-                letterSpacing = fs(0.006f),
-                maxLines = 1,
-                softWrap = false,
-            )
-            Spacer(Modifier.width(side * 0.03f))
-            Box(
-                Modifier
-                    .weight(1f)
-                    .height(1.dp)
-                    .background(Color.White.copy(alpha = 0.28f)),
-            )
         }
     }
 }
@@ -3193,24 +3101,28 @@ private fun rgbClose(a: Int, b: Int): Boolean {
     return gap < 20f && kotlin.math.abs(x[2] - y[2]) < 0.12f
 }
 
-/** Satu tile kolase, semua nilai pecahan dari sisi persegi seni. */
+/** Permukaan kartu Most Played dan aksennya (Z Music). */
+private val RECAP_SURFACE = Color(0xFF171719)
+private val RECAP_ACCENT = Color(0xFFFA243C)
+
+/** Satu cover dalam komposisi berlapis; nilai pecahan dari sisi persegi seni. */
 private class MostPlayedSlot(
     val cover: Int,
     val x: Float,
     val y: Float,
     val size: Float,
+    val rotation: Float,
+    val dim: Float,
 )
 
-// Grid bento: lebar 0.758 (x 0.17..0.928), tinggi 0.497 (y 0.19..0.687), jarak 0.025.
-// Tile besar = 2 tile kecil + 1 jarak, jadi sisi atas dan bawahnya sejajar.
-// Baris keterangan di y 0.715; pudar kaki kartu mulai di y 0.78.
-private val MOST_PLAYED_COLLAGE = listOf(
-    MostPlayedSlot(cover = 0, x = 0.125f, y = 0.160f, size = 0.545f),
-    MostPlayedSlot(cover = 1, x = 0.695f, y = 0.160f, size = 0.260f),
-    MostPlayedSlot(cover = 2, x = 0.695f, y = 0.445f, size = 0.260f),
+// Urutan gambar: belakang ke depan. Cover utama (0) di depan, tegak, dan terbesar;
+// dua cover pendukung sedikit miring dan saling menumpuk di belakangnya.
+// Seluruh komposisi berakhir di y 0.73, di atas blok teks kartu.
+private val MOST_PLAYED_LAYERS = listOf(
+    MostPlayedSlot(cover = 2, x = 0.600f, y = 0.460f, size = 0.270f, rotation = -5f, dim = 0.18f),
+    MostPlayedSlot(cover = 1, x = 0.550f, y = 0.130f, size = 0.310f, rotation = 6f, dim = 0.06f),
+    MostPlayedSlot(cover = 0, x = 0.080f, y = 0.180f, size = 0.540f, rotation = 0f, dim = 0f),
 )
-
-private val MOST_PLAYED_GRID = floatArrayOf(0.14f, 0.31f, 0.50f, 0.69f, 0.86f)
 
 /**
  * Cover untuk hero Liked Music: paling banyak [LIKED_MAX_COVERS], diundi dari

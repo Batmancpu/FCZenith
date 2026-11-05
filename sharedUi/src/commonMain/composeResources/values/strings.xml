@@ -223,7 +223,8 @@
     <string name="top_pick_label_mood">Mood</string>
     <string name="top_pick_label_fresh">Fresh Picks</string>
     <string name="top_pick_label_most_played">On Repeat</string>
-    <string name="top_pick_most_played_eyebrow">Your Top Songs</string>
+    <string name="top_pick_most_played_eyebrow">Your Music Recap</string>
+    <string name="top_pick_most_played_tagline">Your listening, on repeat.</string>
     <string name="top_pick_most_played_title">Most Played</string>
     <string name="top_pick_label_discover">Discover</string>
     <string name="top_pick_label_mix">Mix for You</string>
