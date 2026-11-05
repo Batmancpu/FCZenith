@@ -13,6 +13,7 @@
     <string name="autoplay_empty_description">Musik serupa akan terus diputar</string>
     <string name="add_songs_to_queue">Tambah Lagu ke Antrean</string>
     <string name="add_songs_done">Selesai</string>
+    <string name="add_songs_suggested">Disarankan untukmu</string>
     <string name="autoplay_off">AutoPlay nonaktif</string>
     <string name="autoplay_on">AutoPlay aktif</string>
 

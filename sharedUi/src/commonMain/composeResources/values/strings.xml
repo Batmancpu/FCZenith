@@ -13,6 +13,7 @@
     <string name="autoplay_empty_description">Similar music will keep playing</string>
     <string name="add_songs_to_queue">Add Songs to Queue</string>
     <string name="add_songs_done">Done</string>
+    <string name="add_songs_suggested">Suggested for you</string>
     <string name="autoplay_off">AutoPlay off</string>
     <string name="autoplay_on">AutoPlay on</string>
 

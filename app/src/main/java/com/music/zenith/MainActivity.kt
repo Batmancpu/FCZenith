@@ -301,7 +301,7 @@ import com.music.zenith.ui.player.NowPlayingScreen
 import com.music.zenith.ui.player.MusicVideoEngine
 import com.music.zenith.ui.player.PlayerSheetMotion
 import com.music.zenith.ui.player.AddSongsRequest
-import com.music.zenith.ui.player.AddSongsSheet
+import com.music.zenith.ui.components.AddSongsDialog
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.IntOffset
@@ -4726,7 +4726,27 @@ private fun ZenithApp(
             // tap that opens it (see onOpenMenu), let go once the menu has
             // played its way out. Not under "reduce dynamic blur": the panel
             // is opaque then.
-            val playerMenuUp = songActions != null && songMenuOrigin == null && menuFromPlayer
+            // Add Songs to Queue: popup kaca di tengah player. Memakai query/hasil
+            // yang sama dengan tab Search, jadi dibersihkan saat dibuka dan ditutup.
+            val addSongsOpen by AddSongsRequest.open.collectAsStateWithLifecycle()
+            val addSongsTypeahead by viewModel.typeaheadResults.collectAsStateWithLifecycle()
+            // null = masih dimuat; kosong = tidak ada rekomendasi.
+            var addSongsSuggestions by remember { mutableStateOf<List<Song>?>(null) }
+            LaunchedEffect(addSongsOpen) {
+                if (!addSongsOpen) return@LaunchedEffect
+                if (!reduceDynamicBlur && !playerLiveCanvas) playerBackdrop.capture()
+                viewModel.onQueryChange("")
+                addSongsSuggestions = null
+                val seed = player.song
+                if (seed == null) {
+                    addSongsSuggestions = emptyList()
+                    return@LaunchedEffect
+                }
+                loadAutoplayTracks(existing = player.queue, seedSong = seed, limit = 8)
+                    .onSuccess { addSongsSuggestions = it }
+                    .onFailure { addSongsSuggestions = emptyList() }
+            }
+            val playerMenuUp = (songActions != null && songMenuOrigin == null && menuFromPlayer) || addSongsOpen
             LaunchedEffect(playerMenuUp, reduceDynamicBlur) {
                 if (!playerMenuUp || reduceDynamicBlur) {
                     delay(SNAPSHOT_RELEASE_DELAY_MS)
@@ -4758,6 +4778,21 @@ private fun ZenithApp(
                     ) { song ->
                         songMenuBody(song)
                     }
+                    AddSongsDialog(
+                        open = addSongsOpen,
+                        query = query,
+                        onQueryChange = viewModel::onQueryChange,
+                        onSubmit = viewModel::submitSearch,
+                        results = results,
+                        typeahead = addSongsTypeahead,
+                        suggestions = addSongsSuggestions,
+                        backdrop = if (playerLiveCanvas) livePlayerBackdrop else playerBackdrop,
+                        onAdd = { song -> addToQueue(song) },
+                        onDismiss = {
+                            AddSongsRequest.hide()
+                            viewModel.onQueryChange("")
+                        },
+                    )
                 },
             ) {
                 Box(
@@ -4885,27 +4920,6 @@ private fun ZenithApp(
                     menuFromHistory = false
                 }
             }
-        }
-
-        // ---- Add Songs to Queue (dari panel queue di player) ----
-        // Pencarian di sheet memakai query/hasil yang sama dengan tab Search,
-        // jadi dibersihkan saat dibuka dan ditutup agar tidak saling bocor.
-        val addSongsOpen by AddSongsRequest.open.collectAsStateWithLifecycle()
-        if (addSongsOpen) {
-            LaunchedEffect(Unit) { viewModel.onQueryChange("") }
-            val addSongsTypeahead by viewModel.typeaheadResults.collectAsStateWithLifecycle()
-            AddSongsSheet(
-                query = query,
-                onQueryChange = viewModel::onQueryChange,
-                onSubmit = viewModel::submitSearch,
-                results = results,
-                typeahead = addSongsTypeahead,
-                onAdd = { song -> addToQueue(song) },
-                onDismiss = {
-                    AddSongsRequest.hide()
-                    viewModel.onQueryChange("")
-                },
-            )
         }
 
         // ---- Add to playlist / new playlist ----
