@@ -3149,7 +3149,7 @@ fun MostPlayedArt(covers: List<String>, motion: Boolean, modifier: Modifier = Mo
             maxLines = 1,
             softWrap = false,
             modifier = Modifier
-                .offset(originX + side * 0.115f - stripW / 2, originY + side * 0.41f - stripH / 2)
+                .offset(originX + side * 0.115f - stripW / 2, originY + side * 0.44f - stripH / 2)
                 .size(stripW, stripH)
                 .graphicsLayer { rotationZ = -90f },
         )
@@ -3187,6 +3187,32 @@ fun MostPlayedArt(covers: List<String>, motion: Boolean, modifier: Modifier = Mo
                         .padding(horizontal = tile * 0.06f, vertical = tile * 0.02f),
                 )
             }
+        }
+
+        // Baris keterangan di bawah grid: judul tipis dan garis halus memanjang,
+        // mengisi ruang kosong dan menyejajarkan lebar dengan grid.
+        Row(
+            modifier = Modifier
+                .offset(originX + side * 0.17f, originY + side * 0.715f)
+                .width(side * 0.758f),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "TOP 3",
+                color = Color.White.copy(alpha = 0.85f),
+                fontSize = fs(0.040f),
+                fontWeight = FontWeight.Bold,
+                letterSpacing = fs(0.006f),
+                maxLines = 1,
+                softWrap = false,
+            )
+            Spacer(Modifier.width(side * 0.03f))
+            Box(
+                Modifier
+                    .weight(1f)
+                    .height(1.dp)
+                    .background(Color.White.copy(alpha = 0.28f)),
+            )
         }
     }
 }
@@ -3276,11 +3302,13 @@ private class MostPlayedSlot(
     val size: Float,
 )
 
-// Area aman: di bawah logo kartu (y >= 0.20) dan di atas pudar kaki (y <= 0.66).
+// Grid bento: lebar 0.758 (x 0.17..0.928), tinggi 0.497 (y 0.19..0.687), jarak 0.025.
+// Tile besar = 2 tile kecil + 1 jarak, jadi sisi atas dan bawahnya sejajar.
+// Baris keterangan di y 0.715; pudar kaki kartu mulai di y 0.78.
 private val MOST_PLAYED_COLLAGE = listOf(
-    MostPlayedSlot(cover = 0, x = 0.18f, y = 0.20f, size = 0.46f),
-    MostPlayedSlot(cover = 1, x = 0.66f, y = 0.20f, size = 0.22f),
-    MostPlayedSlot(cover = 2, x = 0.66f, y = 0.44f, size = 0.22f),
+    MostPlayedSlot(cover = 0, x = 0.170f, y = 0.190f, size = 0.497f),
+    MostPlayedSlot(cover = 1, x = 0.692f, y = 0.190f, size = 0.236f),
+    MostPlayedSlot(cover = 2, x = 0.692f, y = 0.451f, size = 0.236f),
 )
 
 private val MOST_PLAYED_GRID = floatArrayOf(0.14f, 0.31f, 0.50f, 0.69f, 0.86f)
