@@ -874,6 +874,164 @@ private fun MostPlayedRecapOverlay(text: CardText, modifier: Modifier) {
     }
 }
 
+/** The colour a branded card's glow is mixed from. */
+private fun glowBase(pick: TopPick): Color = when (pick.kind) {
+    TopPickKind.PERSONAL_STATION -> Color(0xFFFA4A6E)
+    TopPickKind.DISCOVERY_STATION -> Color(0xFF3A52B0)
+    TopPickKind.MOOD -> (pick.mood ?: TopPickMood.FEEL_GOOD).style().background
+    TopPickKind.ARTIST_AND_SIMILAR -> collagePalette(pick.artistName.orEmpty()).bottom
+    else -> Color(0xFF444444)
+}
+
+/** One slow drift of the glow; longer than the stations' breath so the two never line up. */
+private const val GLOW_PERIOD_MS = 14_000
+
+private val GlowAlpha = floatArrayOf(0.30f, 0.26f, 0.20f)
+
+private class GlowBrushes(val radii: FloatArray, val blobs: List<Brush>)
+
+/**
+ * Soft light drifting over a card's colour, the way Friends Mix's backdrop
+ * flows: a pale blob, a blob turned a little around the hue wheel, and a deep
+ * one at the foot. The brushes are built once per card size and only moved,
+ * and the phase is read in the draw pass alone, like the stations' loops.
+ */
+@Composable
+private fun AmbientGlow(base: Color, modifier: Modifier = Modifier) {
+    val phase by loopPhase(GLOW_PERIOD_MS)
+    val tones = remember(base) {
+        val turned = Color(base.green, base.blue, base.red)
+        listOf(
+            lerp(base, Color.White, 0.45f),
+            lerp(base, turned, 0.40f),
+            lerp(base, Color.Black, 0.50f),
+        )
+    }
+    val cache = remember(tones) {
+        SizeCache { size ->
+            val reach = maxOf(size.width, size.height)
+            val radii = floatArrayOf(reach * 0.80f, reach * 0.72f, reach * 0.85f)
+            GlowBrushes(
+                radii = radii,
+                blobs = tones.mapIndexed { i, tone ->
+                    Brush.radialGradient(
+                        0f to tone.copy(alpha = GlowAlpha[i]),
+                        1f to Color.Transparent,
+                        center = Offset(radii[i], radii[i]),
+                        radius = radii[i],
+                    )
+                },
+            )
+        }
+    }
+    Canvas(modifier.then(RetainedArt)) {
+        val w = size.width
+        val h = size.height
+        val glow = cache.get(size)
+        fun blob(index: Int, cx: Float, cy: Float) {
+            val radius = glow.radii[index]
+            translate(left = cx - radius, top = cy - radius) {
+                drawCircle(glow.blobs[index], radius = radius, center = Offset(radius, radius))
+            }
+        }
+        blob(0, w * (0.20f + 0.16f * wave(phase, 0f)), h * (0.18f + 0.10f * wave(phase, 0.25f)))
+        blob(1, w * (0.85f + 0.14f * wave(phase, 0.40f)), h * (0.52f + 0.14f * wave(phase, 0.70f)))
+        blob(2, w * (0.35f + 0.20f * wave(phase, 0.60f)), h * (0.95f + 0.05f * wave(phase, 0.10f)))
+    }
+}
+
+/** The line above the title on a photo card: white, let through, as on Apple Music's phone app. */
+private val PhotoEyebrow = Color.White.copy(alpha = 0.62f)
+
+/**
+ * A release's card, as Apple Music draws one: the cover whole, as a square at
+ * the top, and under it the cover's lower edge running on out of focus,
+ * behind the caption.
+ *
+ * The blur is not a blur pass on screen: [rememberBlurredBackdrop] blurs a
+ * small copy of the cover once, as it loads, and the image cache keeps the
+ * result. A live blur — RenderEffect, Haze — would be re-run on every frame
+ * the page draws, and this row's animated cards draw every frame.
+ *
+ * With a [motion] source, the release's motion cover plays over the square
+ * once found, dissolving into the blur the same way the still does.
+ */
+@Composable
+private fun ReleaseArt(
+    url: String?,
+    modifier: Modifier,
+    coverModifier: Modifier = Modifier,
+    coverHide: Modifier = Modifier,
+    motion: CardMotionSource? = null,
+    onClip: (CanvasArtwork?) -> Unit = {},
+    frameGrab: CanvasFrameGrab? = null,
+) {
+    // How much of the still the clip has covered. Two faded layers stacked
+    // would leave the still showing through the clip's own fade, so the still
+    // steps out as the clip comes in.
+    var covered by remember { mutableFloatStateOf(0f) }
+    Box(modifier.background(Color.Black)) {
+        AsyncImage(
+            model = rememberBlurredBackdrop(url.croppedAt(BACKDROP_SOURCE_PX).whenArtworkReady()),
+            contentDescription = null,
+            contentScale = ContentScale.FillBounds,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .fillMaxHeight(0.42f),
+        )
+        // Toned down toward the caption, as Apple does, so the white text reads
+        // on any cover.
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        0.6f to Color.Black.copy(alpha = 0.08f),
+                        1f to Color.Black.copy(alpha = 0.38f),
+                    ),
+                ),
+        )
+        AsyncImage(
+            model = url.croppedAt(HEADER_ART_PX).whenArtworkReady(),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = coverModifier
+                .fillMaxWidth()
+                .aspectRatio(1f)
+                // Faded out over its last stretch, so the cover runs into the
+                // blur under it instead of ending on a hard line. Offscreen so
+                // the mask cuts the cover alone; the cover never animates, so
+                // the layer is drawn once and reused while it scrolls.
+                .graphicsLayer {
+                    compositingStrategy = CompositingStrategy.Offscreen
+                    alpha = 1f - covered
+                }
+                .drawWithContent {
+                    drawContent()
+                    drawRect(
+                        Brush.verticalGradient(0.78f to Color.Black, 1f to Color.Transparent),
+                        blendMode = BlendMode.DstIn,
+                    )
+                },
+        )
+        CardMotion(
+            motion,
+            Modifier.fillMaxWidth().aspectRatio(1f).then(coverHide),
+            bottomFade = 0.22f,
+            onCover = { covered = it },
+            onCanvas = onClip,
+            frameGrab = frameGrab,
+        )
+    }
+}
+
+/**
+ * Where a card's Apple Music clip comes from: [lookup], asked once per [key]
+ * while the card is on screen.
+ */
+private class CardMotionSource(val key: Any, val lookup: suspend () -> CanvasArtwork?)
+
 /**
  * Seni kartu Most Played: permukaan #171719 yang sama dengan seni di dalamnya, jadi
  * komposisi cover menyatu dengan kaki kartu tanpa blur backdrop dan tanpa layer offscreen.
