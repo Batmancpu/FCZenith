@@ -743,7 +743,7 @@ object AppSettings {
     val pinnedPlaylists = MutableStateFlow<List<String>>(emptyList())
 
     /** How many playlists [pinnedPlaylists] can hold at once. */
-    const val MAX_PINNED_PLAYLISTS = 5
+    const val MAX_PINNED_PLAYLISTS = 6
 
     // ── Scrobbling ──────────────────────────────────────────────────────
 
