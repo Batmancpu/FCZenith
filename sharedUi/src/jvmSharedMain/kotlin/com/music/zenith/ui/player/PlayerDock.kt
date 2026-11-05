@@ -251,6 +251,34 @@ class PlayerDock {
     }
 
     /**
+     * Seberapa jauh (px) tepi kiri ([toRight] false) atau kanan panel sudah
+     * menjauh dari pill, memakai kurva lebar yang sama dengan [panelBounds].
+     * Tab dan Search digeser sebesar ini, jadi jaraknya ke panel tetap sama
+     * seperti saat diam. NaN kalau belum bisa dihitung.
+     */
+    fun panelSideTravel(toRight: Boolean): Float {
+        val open = openFraction()
+        if (open <= 0f) return 0f
+        val pill = miniPillInWindow() ?: return Float.NaN
+        if (pill.top <= 1f || originW <= 0) return Float.NaN
+        val wide = panelWideEase(open)
+        return if (toRight) (originW - pill.right).coerceAtLeast(0f) * wide else pill.left.coerceAtLeast(0f) * wide
+    }
+
+    /**
+     * Seberapa jauh (px) tepi bawah panel sudah turun dari tepi bawah pill.
+     * Baris tab digeser sebesar ini, jadi tetap tepat di bawah panel dengan
+     * jarak diamnya. NaN kalau belum bisa dihitung.
+     */
+    fun panelBottomTravel(): Float {
+        val open = openFraction()
+        if (open <= 0f) return 0f
+        val pill = miniPillInWindow() ?: return Float.NaN
+        if (pill.top <= 1f || originH <= 0) return Float.NaN
+        return (originH - pill.bottom).coerceAtLeast(0f) * open
+    }
+
+    /**
      * Whether the mini player's own cover should stand aside, because the
      * player's is on its way to or from it. Not before the sheet has moved at
      * all: the sheet's window can land a frame after the page's, and a cover

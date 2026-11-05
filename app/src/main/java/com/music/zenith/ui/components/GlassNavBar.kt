@@ -150,11 +150,22 @@ fun GlassNavBar(
     // Seberapa terbuka player (0..1), dibaca saat draw oleh tab bar untuk
     // mendorong tab ke bawah (expanded) atau ke kiri/kanan (inline).
     val chromeProgress = remember(dock) { { dock?.openFraction() ?: 0f } }
+    // Tab/Search (inline) dan baris tab (expanded) mengikuti tepi panel yang
+    // sebenarnya, bukan kurva sendiri, supaya tidak menyentuh panel dan tidak
+    // terdorong lebih jauh dari posisi panel.
+    val chromeSidePush = remember(dock) {
+        dock?.let { d -> { toRight: Boolean -> d.panelSideTravel(toRight) } }
+    }
+    val chromeDownPush = remember(dock) {
+        dock?.let { d -> { d.panelBottomTravel() } }
+    }
 
     FloatingTabBar(
         selectedTabKey = selectedIndex,
         scrollConnection = scrollConnection,
         chromeProgress = chromeProgress,
+        chromeSidePush = chromeSidePush,
+        chromeDownPush = chromeDownPush,
         jellyPush = jellyPush,
         modifier = modifier
             .windowInsetsPadding(floatingBarInsets)

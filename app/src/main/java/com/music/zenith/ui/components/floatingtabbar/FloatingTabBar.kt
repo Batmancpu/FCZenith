@@ -159,20 +159,40 @@ private fun chromePushEase(progress: Float): Float {
     return t * t * (3f - 2f * t)
 }
 
-/** Mode expanded: baris tab turun ke bawah layar mengikuti bukaan player. */
-private fun Modifier.chromePushDown(progress: () -> Float): Modifier = graphicsLayer {
-    val e = chromePushEase(progress())
-    translationY = (size.height + CHROME_PUSH_MARGIN.toPx()) * e
+/**
+ * Mode expanded: baris tab turun tepat di bawah tepi bawah panel, menjaga
+ * jarak yang sama seperti saat diam. [panelDrop] (px) dari PlayerDock; kalau
+ * belum bisa dihitung (NaN) dipakai kurva lama berdasarkan [progress].
+ */
+private fun Modifier.chromePushDown(progress: () -> Float, panelDrop: (() -> Float)?): Modifier = graphicsLayer {
+    val drop = panelDrop?.invoke() ?: Float.NaN
+    translationY = if (!drop.isNaN()) {
+        drop
+    } else {
+        val e = chromePushEase(progress())
+        (size.height + CHROME_PUSH_MARGIN.toPx()) * e
+    }
 }
 
 /** Mode inline: tab terdorong ke kiri dan Search ke kanan mengikuti bukaan player. */
-private fun Modifier.chromePushSide(progress: () -> Float, direction: Float): Modifier = graphicsLayer {
-    val e = chromePushEase(progress())
-    translationX = direction * (size.width + CHROME_PUSH_MARGIN.toPx()) * e
+private fun Modifier.chromePushSide(
+    progress: () -> Float,
+    direction: Float,
+    edgeTravel: ((Boolean) -> Float)?,
+): Modifier = graphicsLayer {
+    // Mengikuti tepi panel yang melebar (kiri atau kanan, fisik), jadi tab dan
+    // Search tidak pernah menyentuh panel; jarak diamnya tetap terjaga.
+    val travel = edgeTravel?.invoke(direction > 0f) ?: Float.NaN
+    translationX = if (!travel.isNaN()) {
+        direction * travel
+    } else {
+        val e = chromePushEase(progress())
+        direction * (size.width + CHROME_PUSH_MARGIN.toPx()) * e
+    }
 }
 
 /** Celah yang tetap dijaga antara pill mini player yang bergoyang dan tombol yang didorongnya. */
-private val JELLY_PUSH_MARGIN = 6.dp
+private val JELLY_PUSH_MARGIN = 10.dp
 
 /**
  * Mode inline: tombol di sisi [direction] (-1 kiri, 1 kanan, sudah dibalik untuk RTL)
@@ -269,6 +289,10 @@ fun FloatingTabBar(
     modifier: Modifier = Modifier,
     /** 0 = bar diam, 1 = player terbuka penuh. Dibaca saat draw saja. */
     chromeProgress: () -> Float = ZeroChromeProgress,
+    /** Jarak (px) tepi kiri/kanan panel menjauh dari pill; NaN = belum diketahui. */
+    chromeSidePush: ((Boolean) -> Float)? = null,
+    /** Jarak (px) tepi bawah panel turun dari pill; NaN = belum diketahui. */
+    chromeDownPush: (() -> Float)? = null,
     /** Goyangan jelly pill accessory inline; tab dan Search terdorong olehnya. */
     jellyPush: JellyPush? = null,
     tabBarContentModifier: @Composable () -> Modifier = DefaultTabBarContentModifier,
@@ -307,6 +331,7 @@ fun FloatingTabBar(
                 InlineBar(
                     scope = scope,
                     chromeProgress = chromeProgress,
+                    chromeSidePush = chromeSidePush,
                     jellyPush = jellyPush,
                     selectedTabKey = selectedTabKey,
                     accessory = inlineAccessory,
@@ -323,6 +348,7 @@ fun FloatingTabBar(
                 ExpandedBar(
                     scope = scope,
                     chromeProgress = chromeProgress,
+                    chromeDownPush = chromeDownPush,
                     selectedTabKey = selectedTabKey,
                     accessory = expandedAccessory,
                     isAccessoryShared = isAccessoryShared,
@@ -504,6 +530,7 @@ interface FloatingTabBarScope {
 private fun SharedTransitionScope.InlineBar(
     scope: FloatingTabBarScopeImpl,
     chromeProgress: () -> Float,
+    chromeSidePush: ((Boolean) -> Float)?,
     jellyPush: JellyPush?,
     selectedTabKey: Any?,
     accessory: (@Composable SharedTransitionScope.(Modifier, AnimatedVisibilityScope) -> Unit)?,
@@ -544,7 +571,7 @@ private fun SharedTransitionScope.InlineBar(
                 animatedVisibilityScope = animatedVisibilityScope,
                 tabBarContentModifier = tabBarContentModifier,
                 modifier = Modifier
-                    .chromePushSide(chromeProgress, startSign)
+                    .chromePushSide(chromeProgress, startSign, chromeSidePush)
                     .jellyPushSide(jellyPush, startSign, sizes.inlineComponentSpacing)
             )
         }
@@ -574,7 +601,7 @@ private fun SharedTransitionScope.InlineBar(
                 modifier = Modifier
                     .fillMaxHeight()
                     .aspectRatio(1f)
-                    .chromePushSide(chromeProgress, -startSign)
+                    .chromePushSide(chromeProgress, -startSign, chromeSidePush)
                     .jellyPushSide(jellyPush, -startSign, sizes.inlineComponentSpacing)
             )
         }
@@ -727,6 +754,7 @@ private fun SharedTransitionScope.InlineAccessory(
 private fun SharedTransitionScope.ExpandedBar(
     scope: FloatingTabBarScopeImpl,
     chromeProgress: () -> Float,
+    chromeDownPush: (() -> Float)?,
     selectedTabKey: Any?,
     accessory: (@Composable SharedTransitionScope.(Modifier, AnimatedVisibilityScope) -> Unit)?,
     isAccessoryShared: Boolean,
@@ -770,7 +798,7 @@ private fun SharedTransitionScope.ExpandedBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(IntrinsicSize.Max)
-                .chromePushDown(chromeProgress)
+                .chromePushDown(chromeProgress, chromeDownPush)
         ) {
             if (hasTabGroup) {
                 ExpandedTabs(
