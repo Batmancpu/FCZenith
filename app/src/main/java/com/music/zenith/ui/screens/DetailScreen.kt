@@ -2751,7 +2751,7 @@ private fun DetailPage.isLikedMusic(): Boolean =
 /** Seberapa jauh blok judul naik menimpa kaki hero. */
 private val LIKED_HERO_OVERLAP = 88.dp
 private const val LIKED_COLUMNS = 3
-private const val LIKED_MAX_COVERS = 6
+private const val LIKED_MAX_COVERS = 9
 
 /** Cover pilihan disimpan selama ini, lalu diundi ulang dari lagu yang ada. */
 private const val LIKED_COVER_TTL_MS = 24L * 60 * 60 * 1000
@@ -2920,14 +2920,9 @@ private fun LikedArt(
 
     BoxWithConstraints(modifier) {
         val width = maxWidth
-        val height = maxHeight
 
-        // Latar cairan: blob gelap-terang yang mengalir; diam selagi player menutup halaman.
-        OrganicFluidBackground(
-            modifier = Modifier.matchParentSize(),
-            colors = LIKED_FLUID_COLORS,
-            animationSpeed = if (HeroMotion.frozen) 0f else 1.6f,
-        )
+        // Latar cairan mengikuti warna dominan cover (cache + crossfade warna).
+        LikedFluidBackground(covers = covers, modifier = Modifier.matchParentSize())
 
         if (covers.isEmpty()) {
             // Belum ada cover (daftar belum datang, atau lagu tanpa gambar).
@@ -2943,41 +2938,35 @@ private fun LikedArt(
             return@BoxWithConstraints
         }
 
-        // Digambar lebih besar dari hero lalu diputar, supaya sudut-sudutnya
-        // tetap terisi setelah miring.
-        val mosaicW = width * 1.3f
-        val mosaicH = height * 1.3f
-        val base = (mosaicW - LIKED_GAP * (LIKED_COLUMNS - 1)) / LIKED_COLUMN_SIZE.sum()
-
-        Box(
-            Modifier
-                .align(Alignment.Center)
-                .requiredSize(mosaicW, mosaicH)
-                .graphicsLayer {
-                    rotationZ = -11f
-                    alpha = enter
-                },
-        ) {
-            var x = 0.dp
-            for (c in 0 until LIKED_COLUMNS) {
-                val s = base * LIKED_COLUMN_SIZE[c]
-                val step = s + LIKED_GAP
-                val colX = x
-                // Cukup tile agar kolom menutup tinggi mosaik.
-                val n = ceil(mosaicH / step).toInt() + 2
-                for (i in 0 until n) {
-                    LikedTile(
-                        url = covers[(c + i * LIKED_COLUMNS) % covers.size],
-                        index = c * 16 + i,
-                        size = s,
-                        x = colX,
-                        y = step * (i - 1 + 0.37f * c),
-                    )
-                }
-                x += step
-            }
-        }
+        // Satu Canvas, satu clock: cover utama + cover dekoratif mengambang.
+        AnimatedAlbumCollage(
+            covers = covers,
+            topInset = topInset,
+            enter = { enter },
+            modifier = Modifier.matchParentSize(),
+        )
     }
+}
+
+/**
+ * Latar Liked: shader fluid yang sama, tapi warnanya dari warna dominan cover
+ * (di-cache di [MostPlayedTints]) dan beralih halus lewat animateColorAsState.
+ * Recomposition akibat transisi warna terisolasi di composable ini.
+ */
+@Composable
+private fun LikedFluidBackground(covers: List<String>, modifier: Modifier = Modifier) {
+    val tint = rememberMostPlayedTint(covers, LIKED_COLORS)
+    val fade = tween<Color>(900)
+    val top by androidx.compose.animation.animateColorAsState(tint[0], fade, label = "likedTop")
+    val mid by androidx.compose.animation.animateColorAsState(tint[1], fade, label = "likedMid")
+    val bottom by androidx.compose.animation.animateColorAsState(tint[2], fade, label = "likedBottom")
+    OrganicFluidBackground(
+        modifier = modifier,
+        colors = mixContrastPalette(
+            listOf(mid, top, bottom, top.lighter(0.5f), mid.lighter(0.35f)),
+        ),
+        animationSpeed = if (HeroMotion.frozen) 0f else 1.6f,
+    )
 }
 
 /**
@@ -3161,10 +3150,13 @@ private val MostPlayedTints = java.util.concurrent.ConcurrentHashMap<String, Lis
  * digelapkan agar teks putih tetap terbaca. Memakai warna bawaan sampai terbaca.
  */
 @Composable
-private fun rememberMostPlayedTint(covers: List<String>): List<Color> {
+private fun rememberMostPlayedTint(
+    covers: List<String>,
+    fallback: List<Color> = MOST_PLAYED_COLORS,
+): List<Color> {
     val context = LocalPlatformContext.current
     val key = covers.take(3).joinToString("|")
-    var tint by remember(key) { mutableStateOf(MostPlayedTints[key] ?: MOST_PLAYED_COLORS) }
+    var tint by remember(key) { mutableStateOf(MostPlayedTints[key] ?: fallback) }
     LaunchedEffect(key) {
         if (key.isEmpty() || MostPlayedTints.containsKey(key)) return@LaunchedEffect
         val picked = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
@@ -3264,8 +3256,11 @@ private fun rememberLikedCovers(pageId: String, songs: List<Song>): List<String>
             ?.filter { it.isNotBlank() }
             .orEmpty()
         val age = now - prefs.getLong("at_$pageId", 0L)
-        if (saved.isNotEmpty() && age in 0L until LIKED_COVER_TTL_MS) return@remember saved
         val pool = songs.mapNotNull { it.thumbnailUrl }.distinct()
+        // Pilihan lama dipakai ulang hanya kalau masih segar dan jumlahnya sudah cukup.
+        val fresh = saved.isNotEmpty() && age in 0L until LIKED_COVER_TTL_MS &&
+            saved.size >= minOf(LIKED_MAX_COVERS, pool.size)
+        if (fresh) return@remember saved
         if (pool.isEmpty()) return@remember saved
         val picked = pool.shuffled().take(LIKED_MAX_COVERS)
         prefs.edit()
