@@ -328,7 +328,9 @@ internal fun InlineQueue(
                     // drag on itself and slides the whole player away.
                     .nestedScroll(keepScroll)
                     .then(if (collapsePlayerOnScroll) Modifier.nestedScroll(controlsOnScroll) else Modifier),
-                contentPadding = PaddingValues(horizontal = PLAYER_GUTTER),
+                // Atas selebar zona fade ([fadingEdges], 28dp): item pertama
+                // (mis. "Add Songs to Queue") berhenti di bawahnya, bukan di dalamnya.
+                contentPadding = PaddingValues(start = PLAYER_GUTTER, end = PLAYER_GUTTER, top = 28.dp),
             ) {
                 if (tracks.history.isNotEmpty()) {
                     item(key = "header-history") {
