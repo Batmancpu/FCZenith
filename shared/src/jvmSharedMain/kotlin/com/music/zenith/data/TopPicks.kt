@@ -119,6 +119,7 @@ object TopPicks {
             }
             artists.getOrNull(2)?.let { andSimilar(it, photos) }?.let(::add)
             discoveryStation(mixes, artists, history)?.let(::add)
+            madeForYouMix(mixes, history, local)?.let(::add)
         }.shuffled().let { shuffled ->
             // Slot 2 always carries real artwork: the New Release Mix's cover
             // first, then an artist card; the rest keep their random order.
@@ -174,6 +175,11 @@ object TopPicks {
     suspend fun queue(pick: TopPick): Result<List<Song>> {
         if (pick.kind == TopPickKind.MOST_PLAYED) {
             return Result.success(pick.songs.map { it.toSong() })
+        }
+        if (pick.kind == TopPickKind.MADE_FOR_YOU_MIX) {
+            if (pick.mood != null) return moodQueue(pick)
+            if (pick.songs.isNotEmpty()) return Result.success(pick.songs.map { it.toSong() }.shuffled())
+            // New Music Mix: YouTube's own New Release Mix, through the watch path below.
         }
         if (pick.kind == TopPickKind.MOOD) return moodQueue(pick)
         val target = pick.watch ?: return Result.failure(IllegalStateException("no queue behind ${pick.kind}"))
@@ -328,6 +334,51 @@ object TopPicks {
             }
             ?: return null
         return TopPick(kind = TopPickKind.PERSONAL_STATION, watch = watch)
+    }
+
+    /**
+     * One of Apple Music's Made for You mixes, picked at random from those that
+     * can be built. YouTube has no mixes by these names, so each is made from
+     * what it does have:
+     *  - Chill / Friends / Get Up!: the Chill, Party (social) and Energize
+     *    mood categories, through [moodQueue];
+     *  - Favorites: the listener's most played songs, shuffled;
+     *  - Replay: their recent history, shuffled;
+     *  - New Music: YouTube's own New Release Mix, when the account has one.
+     * A mix with nothing behind it is left out of the draw.
+     */
+    private fun madeForYouMix(mixes: Map<Mix, ShelfItem>, history: List<Song>, local: LocalTaste): TopPick? {
+        val hints = (local.genres.map { it.lowercase(Locale.ROOT) } + regionHints()).distinct()
+        fun fromMood(title: String, mood: TopPickMood) =
+            TopPick(kind = TopPickKind.MADE_FOR_YOU_MIX, title = title, mood = mood, hints = hints)
+        fun fromSongs(title: String, songs: List<Song>): TopPick? {
+            val picked = songs.distinctBy { it.videoId }.take(30)
+            if (picked.size < 3) return null
+            return TopPick(
+                kind = TopPickKind.MADE_FOR_YOU_MIX,
+                title = title,
+                subtitle = picked.map { it.artist }.filter { it.isNotBlank() }.distinct().take(3).joinToString(", "),
+                songs = picked.map { TopPickSong(it.videoId, it.title, it.artist, it.thumbnailUrl) },
+            )
+        }
+        val candidates = listOfNotNull(
+            fromMood("Chill Mix", TopPickMood.CHILL),
+            fromMood("Friends Mix", TopPickMood.SOCIAL),
+            fromMood("Get Up! Mix", TopPickMood.ENERGY),
+            fromSongs("Favorites Mix", local.topSongs),
+            fromSongs("Replay Mix", history),
+            mixes[Mix.NEW_RELEASE]?.let { mix ->
+                mix.watchTarget()?.let { watch ->
+                    TopPick(
+                        kind = TopPickKind.MADE_FOR_YOU_MIX,
+                        title = "New Music Mix",
+                        subtitle = mix.subtitle,
+                        watch = watch,
+                    )
+                }
+            },
+        )
+        return candidates.randomOrNull()
     }
 
     private fun moodPick(now: LocalDateTime, local: LocalTaste): TopPick =

@@ -42,8 +42,15 @@ enum class TopPickKind {
     /** Music the listener hasn't played yet — YouTube's Discover Mix. */
     DISCOVERY_STATION,
 
-    /** The songs this listener plays most, from the app's own Replay stats. */
+    /** The songns this listener plays most, from the app's own Replay stats. */
     MOST_PLAYED,
+
+    /**
+     * One of Apple Music's named Made for You mixes (Chill, Favorites, Friends,
+     * Get Up!, New Music, Replay), drawn with the fluid blob cover. The name is
+     * in [TopPick.title]; the songs come from a mood, the history or a YouTube mix.
+     */
+    MADE_FOR_YOU_MIX,
 }
 
 /**

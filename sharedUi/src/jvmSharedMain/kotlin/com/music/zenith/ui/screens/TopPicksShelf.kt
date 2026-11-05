@@ -277,6 +277,7 @@ private fun topPickLabel(pick: TopPick): String = when (pick.kind) {
     TopPickKind.NEW_RELEASE_MIX -> stringResource(Res.string.top_pick_label_fresh)
     TopPickKind.DISCOVERY_STATION -> stringResource(Res.string.top_pick_label_discover)
     TopPickKind.MOST_PLAYED -> stringResource(Res.string.top_pick_label_most_played)
+    TopPickKind.MADE_FOR_YOU_MIX -> stringResource(Res.string.top_pick_label_mix)
 }
 
 /** What a card says: the small coloured line, the title, and an optional line under it. */
@@ -332,6 +333,11 @@ private fun cardText(pick: TopPick, listenerName: String?): CardText {
             eyebrow = stringResource(Res.string.top_pick_new_to_you),
             title = stringResource(Res.string.top_pick_discovery_station),
             subtitle = "",
+        )
+        TopPickKind.MADE_FOR_YOU_MIX -> CardText(
+            eyebrow = "",
+            title = pick.title,
+            subtitle = pick.subtitle,
         )
         TopPickKind.MOST_PLAYED -> CardText(
             eyebrow = stringResource(Res.string.top_pick_most_played_eyebrow),
@@ -451,6 +457,12 @@ private fun TopPickCard(
                 eyebrowColor = Color(0xFFE9DCFF)
                 branded = true
             }
+            TopPickKind.MADE_FOR_YOU_MIX -> {
+                MixFluidArt(pick.title, Modifier.fillMaxSize())
+                eyebrowColor = Color.White
+                // Teksnya digambar MixCoverOverlay di bawah; tanpa glow dan band gelap.
+                branded = false
+            }
             TopPickKind.DISCOVERY_STATION -> {
                 DiscoveryStationArt(Modifier.fillMaxSize())
                 eyebrowColor = Color(0xFFCDBDFF)
@@ -539,15 +551,23 @@ private fun TopPickCard(
         }
         // Most Played sekarang memakai overlay yang sama dengan kartu lain
         // (tanpa panel kaca).
-        CardOverlay(
-            text = text,
-            eyebrowColor = eyebrowColor,
-            branded = branded,
-            titleInArt = pick.kind == TopPickKind.MOOD ||
-                pick.kind == TopPickKind.PERSONAL_STATION ||
-                pick.kind == TopPickKind.DISCOVERY_STATION,
-            modifier = Modifier.fillMaxSize().hideDuringCoverFlight(coverToken),
-        )
+        if (pick.kind == TopPickKind.MADE_FOR_YOU_MIX) {
+            MixCoverOverlay(
+                title = text.title,
+                subtitle = text.subtitle,
+                modifier = Modifier.fillMaxSize().hideDuringCoverFlight(coverToken),
+            )
+        } else {
+            CardOverlay(
+                text = text,
+                eyebrowColor = eyebrowColor,
+                branded = branded,
+                titleInArt = pick.kind == TopPickKind.MOOD ||
+                    pick.kind == TopPickKind.PERSONAL_STATION ||
+                    pick.kind == TopPickKind.DISCOVERY_STATION,
+                modifier = Modifier.fillMaxSize().hideDuringCoverFlight(coverToken),
+            )
+        }
     }
 }
 

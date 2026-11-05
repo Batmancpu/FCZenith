@@ -173,7 +173,7 @@ private fun MixCoverCard(
 }
 
 /** "Chill Mix" -> ("Chill", "Mix"); "My Mix 1" -> ("My Mix", "1"); lainnya apa adanya. */
-private fun splitMixTitle(title: String): Pair<String, String?> {
+internal fun splitMixTitle(title: String): Pair<String, String?> {
     val words = title.trim().split(' ').filter { it.isNotEmpty() }
     if (words.size >= 2) {
         val last = words.last()
@@ -193,11 +193,11 @@ private val GreenMix = listOf(Color(0xFF12B886), Color(0xFF2EC4B6), Color(0xFF5B
 private val MixCycle = listOf(TealMix, OrangeMix, IndigoMix, GreenMix, PurpleMix)
 
 /** Warna per jenis mix; "My Mix N" bergilir supaya tiap kartu di baris berbeda warna. */
-private fun mixPalette(title: String): List<Color> {
+internal fun mixPalette(title: String): List<Color> {
     val t = title.lowercase()
     return when {
         "supermix" in t || "new release" in t || "new music" in t -> PinkMix
-        "discover" in t -> PurpleMix
+        "discover" in t || "favorite" in t -> PurpleMix
         "chill" in t -> TealMix
         "get up" in t -> OrangeMix
         "friends" in t -> IndigoMix
