@@ -80,7 +80,7 @@ kotlin {
 }
 
 android {
-    namespace = "com.music.bitchord.sharedui"
+    namespace = "com.music.zenith.sharedui"
     compileSdk = 36
     defaultConfig {
         minSdk = 26
@@ -89,6 +89,6 @@ android {
 
 compose.resources {
     publicResClass = true
-    packageOfResClass = "com.music.bitchord.sharedui.resources"
+    packageOfResClass = "com.music.zenith.sharedui.resources"
     generateResClass = always
 }

@@ -6,7 +6,7 @@
 #   ekstensi: .bak, .log, .orig, .pyc, .swp, .tmp
 #
 # Tambahan kamu (baris di bawah ini yang aktif dibaca tool):
-src/jvmSharedMain/kotlin/com/music/bitchord/ui/components/CoverTransition.kt
+src/jvmSharedMain/kotlin/com/music/zenith/ui/components/CoverTransition.kt
 :find
 import androidx.compose.ui.graphics.graphicsLayer
 :end_find
@@ -15,14 +15,14 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.withFrameNanos
 import kotlinx.coroutines.launch
 :end_replace
-:file sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/components/CoverTransition.kt
+:file sharedUi/src/jvmSharedMain/kotlin/com/music/zenith/ui/components/CoverTransition.kt
 boundsTransform = { _, _ -> tween(durationMillis = 780, easing = CoverEasing) },
 tween(durationMillis = 380, delayMillis = delayMs, easing = FastOutSlowInEasing)
 text = label,
 val baseLabel = topPickLabel(pick)
 val label = if (picks.take(index).any { sharesTopPickLabel(it, pick) }) {
 pick.artistName?.takeIf { it.isNotBlank() } ?: baseLabel
-com/music/bitchord/ui/player/NowPlayingScreen.kt
+com/music/zenith/ui/player/NowPlayingScreen.kt
 internal object CanvasStills {
 var current by mutableStateOf<CanvasStill?>(null)
 ** Lagu pemilik [current]: dipakai selagi klip lagu itu belum selesai dicari di player yang baru dibuka. *

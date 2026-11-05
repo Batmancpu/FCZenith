@@ -15,7 +15,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "BitChord"
+rootProject.name = "Zenith"
 
 // Build speed: reuse task outputs from earlier builds and run modules in parallel.
 // Needs ~/.gradle/caches/build-cache-1 persisted between CI runs (see workflow).
