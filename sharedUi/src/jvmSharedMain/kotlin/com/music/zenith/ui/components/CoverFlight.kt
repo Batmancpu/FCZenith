@@ -3,6 +3,9 @@ package com.music.zenith.ui.components
 import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
@@ -487,6 +490,35 @@ fun Modifier.coverFlightTarget(
 /** Whatever sits on a card around its cover (captions) leaves with it. */
 fun Modifier.hideDuringCoverFlight(token: Any): Modifier =
     this.graphicsLayer { alpha = CoverFlightState.captionAlpha(token) }
+
+/**
+ * Teks kartu yang muncul pelan SESUDAH cover pulang mendarat. Cover terbang
+ * digambar di atas seluruh halaman, jadi teks yang naik selama penerbangan
+ * pulang tersembunyi di bawahnya lalu muncul mendadak saat cover lepas.
+ * Selama penerbangan pulang teks ditahan di 0, begitu cover lepas teks
+ * memudar masuk (dan naik sedikit) di depan kartu.
+ */
+@Composable
+fun Modifier.revealAfterCoverLanding(
+    token: Any,
+    delayMs: Int = 80,
+    rise: Dp = 8.dp,
+): Modifier {
+    val returning = CoverFlightState.flight?.let { it.reverse && it.token === token } == true
+    val shown by animateFloatAsState(
+        targetValue = if (returning) 0f else 1f,
+        animationSpec = if (returning) {
+            snap()
+        } else {
+            tween(durationMillis = 480, delayMillis = delayMs, easing = FastOutSlowInEasing)
+        },
+        label = "coverLandingReveal",
+    )
+    return this.graphicsLayer {
+        alpha = shown
+        translationY = (1f - shown) * rise.toPx()
+    }
+}
 
 /** Pulang: teks dan cover kartu mulai muncul di sini (0..1 dari penerbangan). */
 private const val REVEAL_START = 0.82f

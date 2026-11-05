@@ -131,6 +131,7 @@ import com.music.zenith.ui.components.longPressMenuClickable
 import com.music.zenith.ui.components.thumbnailBorder
 import com.music.zenith.ui.components.coverFlightSource
 import com.music.zenith.ui.components.hideDuringCoverFlight
+import com.music.zenith.ui.components.revealAfterCoverLanding
 import com.music.zenith.ui.components.rememberCoverFlightTap
 import com.music.zenith.ui.components.markCoverTapped
 import com.music.zenith.ui.components.rememberCoverTap
@@ -574,7 +575,10 @@ private fun TopPickCard(
             MixCoverOverlay(
                 title = text.title,
                 subtitle = text.subtitle,
-                modifier = Modifier.fillMaxSize().hideDuringCoverFlight(coverToken),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .hideDuringCoverFlight(coverToken)
+                    .revealAfterCoverLanding(coverToken),
             )
         } else if (pick.kind == TopPickKind.MOST_PLAYED) {
             MostPlayedRecapOverlay(
