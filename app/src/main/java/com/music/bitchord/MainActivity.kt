@@ -232,6 +232,7 @@ import com.music.bitchord.ui.components.menuAnchor
 import com.music.bitchord.ui.components.IosMenuPopover
 import com.music.bitchord.ui.components.SongActionsMenu
 import com.music.bitchord.ui.components.HeldContextMenu
+import com.music.bitchord.ui.components.cancelCoverFlight
 import com.music.bitchord.ui.components.startCoverFlightFor
 import com.music.bitchord.ui.components.HeldItem
 import androidx.media3.session.MediaController
@@ -1209,6 +1210,9 @@ private fun BitChordApp(
         // was last fetched is a change to exactly this page.
         if (currentFeed == MainViewModel.Feed.LIBRARY) viewModel.onLibraryShown()
     }
+    // Pindah tab di tengah penerbangan cover: kartu tujuannya sudah bergeser
+    // atau hilang, jadi penerbangan dihentikan, bukan dibiarkan mengikuti.
+    LaunchedEffect(selectedTab) { cancelCoverFlight() }
 
     val currentPull = when (currentFeed) {
         MainViewModel.Feed.HOME -> homePull

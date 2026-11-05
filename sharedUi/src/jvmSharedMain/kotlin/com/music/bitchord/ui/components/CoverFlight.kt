@@ -374,6 +374,21 @@ fun startCoverFlightFor(browseId: String?) {
     startFlight(browseId, token, null, from, source.cornerPx * s)
 }
 
+/**
+ * Drops the flight in the air at once. Dipanggil saat tab berganti: kartu yang
+ * dituju (atau sleeve yang ditinggalkan) tidak lagi di tempat ia terukur, dan
+ * menyelesaikan penerbangan hanya menggambar cover yang meluncur di atas
+ * halaman yang tidak ada hubungannya dengannya.
+ */
+fun cancelCoverFlight() {
+    val flight = CoverFlightState.flight ?: return
+    if (flight.reverse) CoverFlightState.clips.remove(flight.browseId)
+    CoverFlightState.holding = false
+    CoverFlightState.flight = null
+    CoverFlightState.target = null
+    CoverFlightState.airFlight = null
+}
+
 /** A cover is on its way out of a tapped card; the page it opens may not have answered yet. */
 fun coverFlightPending(): Boolean = CoverFlightState.flight?.reverse == false
 
