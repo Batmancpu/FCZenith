@@ -76,6 +76,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -665,11 +666,17 @@ internal fun PartyCodeField(
     onSubmit: () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
-    // Rebuilt on every change so the selection is pinned back to the end. The
-    // field spans the whole row and shows nothing, so without this a tap
-    // anywhere along it would drop the caret into the middle of the code and
-    // the next character would appear in a cell that isn't the lit one.
-    val field = remember(code) { TextFieldValue(code, TextRange(code.length)) }
+    // The field's own value is kept, not rebuilt from [code] on every change.
+    // Rebuilding it threw away the keyboard's composing region on each key,
+    // and keyboards with word suggestions then lost track of what they had
+    // typed — the first character went in and the rest did not. It is only
+    // replaced when [code] changes from outside, or when a typed value needs
+    // cleaning; the caret is still pinned to the end, so a tap along the row
+    // can't drop it into the middle of the code.
+    var field by remember { mutableStateOf(TextFieldValue(code, TextRange(code.length))) }
+    LaunchedEffect(code) {
+        if (field.text != code) field = TextFieldValue(code, TextRange(code.length))
+    }
 
     Box(Modifier.fillMaxWidth()) {
         Row(
@@ -690,7 +697,18 @@ internal fun PartyCodeField(
         }
         BasicTextField(
             value = field,
-            onValueChange = { onCodeChange(it.text) },
+            onValueChange = { typed ->
+                val cleaned = typed.text
+                    .filter(Char::isLetterOrDigit)
+                    .uppercase()
+                    .take(ListenTogether.CODE_LENGTH)
+                field = if (cleaned == typed.text) {
+                    typed.copy(selection = TextRange(cleaned.length))
+                } else {
+                    TextFieldValue(cleaned, TextRange(cleaned.length))
+                }
+                onCodeChange(cleaned)
+            },
             enabled = enabled,
             singleLine = true,
             // Both invisible: the cells are where the typing shows up, and a
@@ -698,8 +716,13 @@ internal fun PartyCodeField(
             // that this is one field wearing a costume.
             textStyle = TextStyle(color = Color.Transparent),
             cursorBrush = SolidColor(Color.Transparent),
+            // VisiblePassword: letters and digits on one keyboard, with word
+            // suggestions and autocorrect off. A code is not a word, and a
+            // keyboard that treats it as one composes it, "corrects" it, or
+            // swallows keystrokes on some phones.
             keyboardOptions = KeyboardOptions(
                 capitalization = KeyboardCapitalization.Characters,
+                keyboardType = KeyboardType.VisiblePassword,
                 imeAction = ImeAction.Done,
             ),
             keyboardActions = KeyboardActions(
