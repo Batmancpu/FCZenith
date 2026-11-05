@@ -104,8 +104,10 @@ set_property(TARGET zenith_exclusive APPEND PROPERTY LINK_DEPENDS
 # (LGPL-2.1) is built from its pinned release using the source list and
 # config.h it ships for Android (android/jni/libusb.mk). The transport is
 # adapted from Mornye's Rust driver (LGPL-3.0).
+# URL kedua dipakai bila GitHub gagal (mis. HTTP 504); file tetap diverifikasi URL_HASH.
 FetchContent_Declare(libusb
     URL https://github.com/libusb/libusb/releases/download/v1.0.27/libusb-1.0.27.tar.bz2
+        https://downloads.sourceforge.net/project/libusb/libusb-1.0/libusb-1.0.27/libusb-1.0.27.tar.bz2
     URL_HASH SHA256=ffaa41d741a8a3bee244ac8e54a72ea05bf2879663c098c82fc5757853441575)
 FetchContent_MakeAvailable(libusb)
 add_library(zenith_libusb STATIC

@@ -87,8 +87,18 @@ jobs:
       - name: Build release APK
         run: |
           chmod +x gradlew
-          ./gradlew :app:assembleProdRelease --parallel --build-cache --stacktrace \
-            -Dorg.gradle.jvmargs="-Xmx5g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8"
+          # Ulangi sampai 3 kali: unduhan dependensi native (libusb) kadang gagal sementara.
+          n=0
+          until ./gradlew :app:assembleProdRelease --parallel --build-cache --stacktrace \
+            -Dorg.gradle.jvmargs="-Xmx5g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8"; do
+            n=$((n + 1))
+            if [ "$n" -ge 3 ]; then
+              echo "::error::Build gagal setelah $n percobaan."
+              exit 1
+            fi
+            echo "::warning::Build gagal, mengulang ($n/3) dalam 20 detik..."
+            sleep 20
+          done
 
       - name: ccache stats
         if: always()
