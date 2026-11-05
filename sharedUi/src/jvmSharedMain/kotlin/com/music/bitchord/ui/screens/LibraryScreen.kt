@@ -344,7 +344,7 @@ private fun PlaylistShelf(
     onShowAll: () -> Unit,
     pinnedPlaylists: List<String> = emptyList(),
 ) {
-    LibraryGridShelf(
+    LibraryRowShelf(
         shelf = shelf,
         onItemClick = onItemClick,
         onItemLongPress = onItemLongPress,
@@ -404,6 +404,55 @@ internal fun LibraryGridShelf(
             title = shelf.title,
             subtitle = shelf.subtitle,
             onShowAll = onShowAll.takeIf { shelf.items.size + leadingCount > LIBRARY_ROW_MAX_ITEMS },
+        )
+        ShelfRow(
+            state = rememberShelfListState("library:${shelf.title}"),
+            contentPadding = PaddingValues(horizontal = PAGE_GUTTER),
+            horizontalArrangement = Arrangement.spacedBy(LIBRARY_GRID_SPACING),
+        ) {
+            itemsIndexed(leadingCards) { _, card ->
+                card(Modifier.width(SHELF_CARD_WIDTH))
+            }
+            itemsIndexed(visibleItems) { index, item ->
+                ShelfCard(
+                    item = item,
+                    onClick = { onItemClick(item) },
+                    onLongPress = { onItemLongPress(item) },
+                    modifier = Modifier.shelfStagger(index).width(SHELF_CARD_WIDTH),
+                    isPinned = item.browseId != null && item.browseId in pinnedPlaylists,
+                )
+            }
+        }
+    }
+}
+
+/** The Playlists row never swipes past this many cards, tiles included. */
+private const val LIBRARY_ROW_SHELF_MAX = 5
+
+/**
+ * The Playlists shelf: one sideways-scrolling row of [SHELF_CARD_WIDTH] cards
+ * under the Library heading, stopped at [LIBRARY_ROW_SHELF_MAX] with the rest
+ * behind "Show all". Every other shelf stays the two-across [LibraryGridShelf].
+ *
+ * [leadingCards] (New playlist, Import Spotify) take the first slots and count
+ * against that cap. Each is handed the width of a card.
+ */
+@Composable
+private fun LibraryRowShelf(
+    shelf: HomeShelf,
+    onItemClick: (ShelfItem) -> Unit,
+    onItemLongPress: (ShelfItem) -> Unit,
+    onShowAll: () -> Unit,
+    leadingCards: List<@Composable (Modifier) -> Unit> = emptyList(),
+    pinnedPlaylists: List<String> = emptyList(),
+) {
+    val leadingCount = leadingCards.size
+    val visibleItems = shelf.items.take((LIBRARY_ROW_SHELF_MAX - leadingCount).coerceAtLeast(0))
+    Column(Modifier.padding(bottom = 26.dp)) {
+        LibrarySectionHeader(
+            title = shelf.title,
+            subtitle = shelf.subtitle,
+            onShowAll = onShowAll.takeIf { shelf.items.size + leadingCount > LIBRARY_ROW_SHELF_MAX },
         )
         ShelfRow(
             state = rememberShelfListState("library:${shelf.title}"),
