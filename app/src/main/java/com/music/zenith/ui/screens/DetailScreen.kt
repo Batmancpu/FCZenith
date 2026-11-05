@@ -2748,6 +2748,9 @@ private const val LIKED_MAX_COVERS = 9
 /** Cover pilihan disimpan selama ini, lalu diundi ulang dari lagu yang ada. */
 private const val LIKED_COVER_TTL_MS = 24L * 60 * 60 * 1000
 
+/** Naikkan angka ini untuk membuang pilihan cover lama yang tersimpan di perangkat. */
+private const val LIKED_COVER_CACHE_VERSION = 2
+
 /** Salinan ter-blur di kaki hero direkam ulang tiap sekian ms, bukan tiap frame. */
 private const val FOOT_REFRESH_MS = 300L
 
@@ -3137,11 +3140,11 @@ private fun rememberLikedCovers(pageId: String, songs: List<Song>): List<String>
     return remember(pageId, hasSongs) {
         val prefs = context.getSharedPreferences("liked_hero", Context.MODE_PRIVATE)
         val now = System.currentTimeMillis()
-        val saved = prefs.getString("covers_$pageId", null)
+        val saved = prefs.getString("covers_v${LIKED_COVER_CACHE_VERSION}_$pageId", null)
             ?.split('\n')
             ?.filter { it.isNotBlank() }
             .orEmpty()
-        val age = now - prefs.getLong("at_$pageId", 0L)
+        val age = now - prefs.getLong("at_v${LIKED_COVER_CACHE_VERSION}_$pageId", 0L)
         val pool = songs.mapNotNull { it.thumbnailUrl }.distinct()
         // Pilihan lama dipakai ulang hanya kalau masih segar dan jumlahnya sudah cukup.
         val fresh = saved.isNotEmpty() && age in 0L until LIKED_COVER_TTL_MS &&
@@ -3150,8 +3153,8 @@ private fun rememberLikedCovers(pageId: String, songs: List<Song>): List<String>
         if (pool.isEmpty()) return@remember saved
         val picked = pool.shuffled().take(LIKED_MAX_COVERS)
         prefs.edit()
-            .putString("covers_$pageId", picked.joinToString("\n"))
-            .putLong("at_$pageId", now)
+            .putString("covers_v${LIKED_COVER_CACHE_VERSION}_$pageId", picked.joinToString("\n"))
+            .putLong("at_v${LIKED_COVER_CACHE_VERSION}_$pageId", now)
             .apply()
         picked
     }
