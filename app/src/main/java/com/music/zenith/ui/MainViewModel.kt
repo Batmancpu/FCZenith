@@ -2347,6 +2347,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         runSearch()
     }
 
+    /** Cari query saat ini tanpa mencatat riwayat; dipakai popup Add Songs saat mengetik. */
+    fun searchQuiet() {
+        if (_query.value.isBlank() || _searchSource.value != SearchSource.YOUTUBE) return
+        searchSubmitted = true
+        _suggestions.value = emptyList()
+        _typeaheadResults.value = emptyList()
+        runSearch()
+    }
+
     /**
      * A search asked for, as a request the pipeline below decides what to do
      * with.

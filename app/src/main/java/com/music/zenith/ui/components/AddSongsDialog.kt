@@ -14,8 +14,16 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.isImeVisible
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import com.music.zenith.data.model.SearchFilter
+import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -88,6 +96,7 @@ import org.jetbrains.compose.resources.stringResource
  *
  * [suggestions] null berarti masih dimuat.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AddSongsDialog(
     open: Boolean,
@@ -99,10 +108,33 @@ fun AddSongsDialog(
     suggestions: List<Song>?,
     backdrop: Backdrop?,
     onAdd: (Song) -> Unit,
+    filter: SearchFilter,
+    onFilterChange: (SearchFilter) -> Unit,
+    onLiveSearch: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val reduceMotion by AppSettings.reduceAnimation.collectAsStateWithLifecycle()
-    PlayerBackHandler(enabled = open, onBack = onDismiss)
+    // Back: kalau keyboard sedang tampil, hanya keyboard yang ditutup, popup tetap.
+    val imeVisible = rememberUpdatedState(WindowInsets.isImeVisible)
+    val focusManager = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
+    PlayerBackHandler(
+        enabled = open,
+        onBack = {
+            if (imeVisible.value) {
+                keyboard?.hide()
+                focusManager.clearFocus()
+            } else {
+                onDismiss()
+            }
+        },
+    )
+    // Cari otomatis saat mengetik (jeda singkat), tanpa menunggu tombol cari.
+    LaunchedEffect(open, query) {
+        if (!open || query.isBlank()) return@LaunchedEffect
+        delay(450)
+        onLiveSearch()
+    }
     var added by remember { mutableStateOf(emptySet<String>()) }
     LaunchedEffect(open) { if (!open) added = emptySet() }
     val colors = iosMenuColors()
@@ -243,6 +275,36 @@ fun AddSongsDialog(
                         )
                     }
                 }
+                Spacer(Modifier.height(10.dp))
+                Row(
+                    Modifier
+                        .padding(horizontal = 16.dp)
+                        .fillMaxWidth()
+                        .height(34.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(colors.pressed)
+                        .padding(2.dp),
+                ) {
+                    ADD_SONGS_FILTERS.forEach { option ->
+                        val selected = option == filter
+                        Box(
+                            Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (selected) colors.label.copy(alpha = 0.18f) else Color.Transparent)
+                                .clickable { onFilterChange(option) },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = option.label,
+                                color = if (selected) colors.label else colors.secondaryLabel,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
+                    }
+                }
                 Spacer(Modifier.height(6.dp))
                 Box(Modifier.weight(1f).fillMaxWidth()) {
                     if (loading) {
@@ -282,6 +344,8 @@ fun AddSongsDialog(
         }
     }
 }
+
+private val ADD_SONGS_FILTERS = listOf(SearchFilter.ALL, SearchFilter.SONGS, SearchFilter.VIDEOS)
 
 @Composable
 private fun AddSongRow(song: Song, added: Boolean, colors: IosMenuColors, onClick: () -> Unit) {

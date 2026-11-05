@@ -4732,10 +4732,13 @@ private fun ZenithApp(
             val addSongsTypeahead by viewModel.typeaheadResults.collectAsStateWithLifecycle()
             // null = masih dimuat; kosong = tidak ada rekomendasi.
             var addSongsSuggestions by remember { mutableStateOf<List<Song>?>(null) }
+            var addSongsPrevFilter by remember { mutableStateOf<SearchFilter?>(null) }
             LaunchedEffect(addSongsOpen) {
                 if (!addSongsOpen) return@LaunchedEffect
                 if (!reduceDynamicBlur && !playerLiveCanvas) playerBackdrop.capture()
                 viewModel.onQueryChange("")
+                addSongsPrevFilter = filter
+                viewModel.onFilterChange(SearchFilter.ALL)
                 addSongsSuggestions = null
                 val seed = player.song
                 if (seed == null) {
@@ -4786,11 +4789,16 @@ private fun ZenithApp(
                         results = results,
                         typeahead = addSongsTypeahead,
                         suggestions = addSongsSuggestions,
+                        filter = filter,
+                        onFilterChange = viewModel::onFilterChange,
+                        onLiveSearch = viewModel::searchQuiet,
                         backdrop = if (playerLiveCanvas) livePlayerBackdrop else playerBackdrop,
                         onAdd = { song -> addToQueue(song) },
                         onDismiss = {
                             AddSongsRequest.hide()
                             viewModel.onQueryChange("")
+                            addSongsPrevFilter?.let { viewModel.onFilterChange(it) }
+                            addSongsPrevFilter = null
                         },
                     )
                 },
