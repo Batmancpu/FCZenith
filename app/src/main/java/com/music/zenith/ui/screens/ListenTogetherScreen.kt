@@ -716,13 +716,13 @@ internal fun PartyCodeField(
             // that this is one field wearing a costume.
             textStyle = TextStyle(color = Color.Transparent),
             cursorBrush = SolidColor(Color.Transparent),
-            // VisiblePassword: letters and digits on one keyboard, with word
+            // Password: letters and digits on one keyboard, with word
             // suggestions and autocorrect off. A code is not a word, and a
             // keyboard that treats it as one composes it, "corrects" it, or
             // swallows keystrokes on some phones.
             keyboardOptions = KeyboardOptions(
                 capitalization = KeyboardCapitalization.Characters,
-                keyboardType = KeyboardType.VisiblePassword,
+                keyboardType = KeyboardType.Password,
                 imeAction = ImeAction.Done,
             ),
             keyboardActions = KeyboardActions(
