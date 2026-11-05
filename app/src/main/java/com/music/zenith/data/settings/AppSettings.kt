@@ -1042,6 +1042,16 @@ object AppSettings {
                 "LRC_RED,BINI_LYRICS,BETTER_LYRICS,BETTER_LYRICS_PORTATO,PAXSENIX,PAXSENIX_SPOTIFY,PAXSENIX_MUSIXMATCH,LYRICS_PLUS,UNISON,YOUTUBE_TRANSCRIPT,YOUTUBE_MUSIC,KUGOU,LRCLIB,MUSIXMATCH,GENIUS",
             )
             .putString(KEY_TRANSLATION_LANGUAGE, language)
+            .putString(KEY_THEME, "DARK")
+            .putString(KEY_ACCENT_COLOR, "RED")
+            .putString(KEY_APP_FONT, "DEFAULT")
+            .putBoolean(KEY_HIGH_PERFORMANCE_MODE, false)
+            .putBoolean(KEY_REDUCE_ANIMATION, lowRam)
+            .putBoolean(KEY_REDUCE_BLUR, lowRam)
+            .putBoolean(KEY_PROGRESSIVE_BLUR, false)
+            .putBoolean(KEY_LEGACY_MESH_GRADIENT, false)
+            .putBoolean(KEY_LYRICS_BLUR, !lowRam)
+            .putBoolean(KEY_ANIMATED_CANVAS, !lowRam)
             .apply()
     }
 
