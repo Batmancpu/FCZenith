@@ -1,6 +1,7 @@
 package com.music.zenith.ui.screens
 
 import com.music.zenith.ui.components.trackArtSize
+import com.music.zenith.ui.components.OrganicFluidBackground
 import android.os.Build
 import android.content.Context
 import android.os.SystemClock
@@ -3040,6 +3041,14 @@ fun MostPlayedArt(covers: List<String>, motion: Boolean, modifier: Modifier = Mo
             }
         },
     ) {
+        // Latar cairan: blob mengalir dengan warna dari cover teratas (atas, tengah,
+        // bawah), ditambah dua varian lebih terang supaya ada kilau seperti kartu
+        // Apple Music. Warna ikut beralih halus lewat tint yang beranimasi di atas.
+        OrganicFluidBackground(
+            modifier = Modifier.matchParentSize(),
+            colors = listOf(top, mid, bottom, mid.lighter(0.35f), top.lighter(0.45f)),
+            animationSpeed = if (motion && !HeroMotion.frozen) 0.5f else 0f,
+        )
         if (covers.isEmpty()) return@BoxWithConstraints
         val density = LocalDensity.current
         val side = minOf(maxWidth, maxHeight)
