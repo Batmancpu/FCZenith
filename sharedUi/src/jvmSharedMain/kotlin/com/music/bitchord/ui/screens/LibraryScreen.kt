@@ -376,17 +376,17 @@ private fun PlaylistShelf(
     )
 }
 
-/** A Library shelf's preview shows at most this many cells, two across. */
+/** A Library shelf's preview row never swipes past this many cards. */
 private const val LIBRARY_ROW_MAX_ITEMS = 6
 
 /**
  * A Library shelf in the Apple Music style: a bold heading with "Show all"
- * beside it, then the cards as a two-across grid that stops at
- * [LIBRARY_ROW_MAX_ITEMS] cells, with the rest behind "Show all"
+ * beside it, then one sideways-scrolling row of [SHELF_CARD_WIDTH] cards,
+ * stopped at [LIBRARY_ROW_MAX_ITEMS] — the rest is behind "Show all"
  * ([LibraryGridPage]).
  *
- * [leadingCards], if given, take the first cells and count against that cap —
- * see [PlaylistShelf]. Each is handed the weighted [Modifier] of its cell.
+ * [leadingCards], if given, take the first slots in the row and count against
+ * that cap — see [PlaylistShelf]. Each is handed the width of a card.
  */
 @Composable
 internal fun LibraryGridShelf(
@@ -399,39 +399,28 @@ internal fun LibraryGridShelf(
 ) {
     val leadingCount = leadingCards.size
     val visibleItems = shelf.items.take((LIBRARY_ROW_MAX_ITEMS - leadingCount).coerceAtLeast(0))
-    val total = leadingCount + visibleItems.size
-    val rows = (total + 1) / 2
     Column(Modifier.padding(bottom = 26.dp)) {
         LibrarySectionHeader(
             title = shelf.title,
             subtitle = shelf.subtitle,
             onShowAll = onShowAll.takeIf { shelf.items.size + leadingCount > LIBRARY_ROW_MAX_ITEMS },
         )
-        Column(
-            modifier = Modifier.padding(horizontal = PAGE_GUTTER),
-            verticalArrangement = Arrangement.spacedBy(20.dp),
+        ShelfRow(
+            state = rememberShelfListState("library:${shelf.title}"),
+            contentPadding = PaddingValues(horizontal = PAGE_GUTTER),
+            horizontalArrangement = Arrangement.spacedBy(LIBRARY_GRID_SPACING),
         ) {
-            for (row in 0 until rows) {
-                Row(horizontalArrangement = Arrangement.spacedBy(LIBRARY_GRID_SPACING)) {
-                    for (col in 0 until 2) {
-                        val cell = row * 2 + col
-                        when {
-                            cell < leadingCount -> leadingCards[cell](Modifier.weight(1f))
-                            cell < total -> {
-                                val index = cell - leadingCount
-                                val item = visibleItems[index]
-                                ShelfCard(
-                                    item = item,
-                                    onClick = { onItemClick(item) },
-                                    onLongPress = { onItemLongPress(item) },
-                                    modifier = Modifier.weight(1f).shelfStagger(index),
-                                    isPinned = item.browseId != null && item.browseId in pinnedPlaylists,
-                                )
-                            }
-                            else -> Spacer(Modifier.weight(1f))
-                        }
-                    }
-                }
+            itemsIndexed(leadingCards) { _, card ->
+                card(Modifier.width(SHELF_CARD_WIDTH))
+            }
+            itemsIndexed(visibleItems) { index, item ->
+                ShelfCard(
+                    item = item,
+                    onClick = { onItemClick(item) },
+                    onLongPress = { onItemLongPress(item) },
+                    modifier = Modifier.shelfStagger(index).width(SHELF_CARD_WIDTH),
+                    isPinned = item.browseId != null && item.browseId in pinnedPlaylists,
+                )
             }
         }
     }
