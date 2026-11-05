@@ -131,11 +131,19 @@ object TopPicks {
         // lands at a random slot on every build, anywhere but the first.
         val cards = listOfNotNull(lead) + rest
         val mostPlayed = mostPlayed(local)
-        if (mostPlayed == null) {
+        val all = if (mostPlayed == null) {
             cards
         } else {
             val at = if (cards.isEmpty()) 0 else Random.nextInt(1, cards.size + 1)
             cards.toMutableList().also { it.add(at, mostPlayed) }
+        }
+        // Made for You Mix (New Music Mix dll) selalu di posisi 2 atau 3.
+        val mix = all.firstOrNull { it.kind == TopPickKind.MADE_FOR_YOU_MIX }
+        if (mix == null || all.size < 2) {
+            all
+        } else {
+            val without = all.filter { it !== mix }
+            without.toMutableList().also { it.add(Random.nextInt(1, 3).coerceAtMost(without.size), mix) }
         }
     }
 
