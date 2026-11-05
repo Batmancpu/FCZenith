@@ -79,6 +79,8 @@ import androidx.compose.ui.unit.Velocity
 import coil3.compose.AsyncImage
 import com.music.zenith.ui.components.thumbnailBorder
 import com.music.zenith.ui.icons.ZenithIcons
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
 import com.music.zenith.ui.haptics.Haptic
 import com.music.zenith.ui.haptics.rememberHaptics
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -353,6 +355,11 @@ internal fun InlineQueue(
                     // this list and carries the Clear button.
                     queueSection(tracks.user, QueueSection.USER, drag, controlsLocked, onJumpTo, onRemove)
                 }
+                if (!controlsLocked) {
+                    item(key = "add-songs") {
+                        AddSongsRow(onClick = AddSongsRequest::show, modifier = queueMotion())
+                    }
+                }
                 if (tracks.context.isNotEmpty()) {
                     item(key = "header-context") {
                         QueueHeading(
@@ -425,6 +432,40 @@ private fun LazyListScope.queueSection(
             onDrag = drag::drag,
             onDragEnd = { drag.end(track.key) },
             modifier = if (held) Modifier.alpha(0f) else queueMotion(),
+        )
+    }
+}
+
+/** "Add Songs to Queue": opens the search sheet the host draws over the player. */
+@Composable
+private fun AddSongsRow(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(Color.White.copy(alpha = 0.14f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Add,
+                contentDescription = null,
+                tint = Color.White.copy(alpha = 0.9f),
+                modifier = Modifier.size(24.dp),
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Text(
+            text = stringResource(Res.string.add_songs_to_queue),
+            style = MaterialTheme.typography.bodyLarge,
+            color = Color.White,
         )
     }
 }

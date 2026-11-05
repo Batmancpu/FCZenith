@@ -300,6 +300,8 @@ import com.music.zenith.ui.screens.MoodGridPage
 import com.music.zenith.ui.player.NowPlayingScreen
 import com.music.zenith.ui.player.MusicVideoEngine
 import com.music.zenith.ui.player.PlayerSheetMotion
+import com.music.zenith.ui.player.AddSongsRequest
+import com.music.zenith.ui.player.AddSongsSheet
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.IntOffset
@@ -4883,6 +4885,27 @@ private fun ZenithApp(
                     menuFromHistory = false
                 }
             }
+        }
+
+        // ---- Add Songs to Queue (dari panel queue di player) ----
+        // Pencarian di sheet memakai query/hasil yang sama dengan tab Search,
+        // jadi dibersihkan saat dibuka dan ditutup agar tidak saling bocor.
+        val addSongsOpen by AddSongsRequest.open.collectAsStateWithLifecycle()
+        if (addSongsOpen) {
+            LaunchedEffect(Unit) { viewModel.onQueryChange("") }
+            val addSongsTypeahead by viewModel.typeaheadResults.collectAsStateWithLifecycle()
+            AddSongsSheet(
+                query = query,
+                onQueryChange = viewModel::onQueryChange,
+                onSubmit = viewModel::submitSearch,
+                results = results,
+                typeahead = addSongsTypeahead,
+                onAdd = { song -> addToQueue(song) },
+                onDismiss = {
+                    AddSongsRequest.hide()
+                    viewModel.onQueryChange("")
+                },
+            )
         }
 
         // ---- Add to playlist / new playlist ----
