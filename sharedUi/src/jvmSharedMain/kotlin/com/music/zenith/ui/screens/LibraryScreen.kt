@@ -245,6 +245,13 @@ fun LibraryScreen(
                                     onShowAll = { onShowAll(pinnedFirst) },
                                     pinnedPlaylists = pinnedPlaylists,
                                 )
+                            } else if (shelf.title == ARTISTS_SHELF) {
+                                LibraryTwoColumnShelf(
+                                    shelf = shelf,
+                                    onItemClick = onShelfItemClick,
+                                    onItemLongPress = onShelfItemLongPress,
+                                    onShowAll = { onShowAll(shelf) },
+                                )
                             } else {
                                 LibraryGridShelf(
                                     shelf = shelf,
@@ -421,6 +428,49 @@ internal fun LibraryGridShelf(
                     modifier = Modifier.shelfStagger(index).width(SHELF_CARD_WIDTH),
                     isPinned = item.browseId != null && item.browseId in pinnedPlaylists,
                 )
+            }
+        }
+    }
+}
+
+/** Judul shelf Artists di Library, seperti yang dikirim YtMusicRepository. */
+private const val ARTISTS_SHELF = "Artists"
+
+/**
+ * Shelf Artists: grid dua kolom (bukan satu baris geser), paling banyak
+ * [LIBRARY_ROW_MAX_ITEMS] kartu; sisanya di balik "Show all".
+ */
+@Composable
+private fun LibraryTwoColumnShelf(
+    shelf: HomeShelf,
+    onItemClick: (ShelfItem) -> Unit,
+    onItemLongPress: (ShelfItem) -> Unit,
+    onShowAll: () -> Unit,
+) {
+    Column(Modifier.padding(bottom = 26.dp)) {
+        LibrarySectionHeader(
+            title = shelf.title,
+            subtitle = shelf.subtitle,
+            onShowAll = onShowAll.takeIf { shelf.items.size > LIBRARY_ROW_MAX_ITEMS },
+        )
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = PAGE_GUTTER),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            shelf.items.take(LIBRARY_ROW_MAX_ITEMS).chunked(2).forEach { rowItems ->
+                Row(horizontalArrangement = Arrangement.spacedBy(LIBRARY_GRID_SPACING)) {
+                    rowItems.forEach { item ->
+                        ShelfCard(
+                            item = item,
+                            onClick = { onItemClick(item) },
+                            onLongPress = { onItemLongPress(item) },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    repeat(2 - rowItems.size) { Spacer(Modifier.weight(1f)) }
+                }
             }
         }
     }
