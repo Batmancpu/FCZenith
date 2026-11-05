@@ -2683,7 +2683,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     companion object {
         /** Today's Top Picks row, kept so the next launch paints it before any request. */
-        private const val TOP_PICKS_FILE = "top_picks_v6_5.json"
+        private const val TOP_PICKS_FILE = "top_picks_v6_6.json"
 
         /** Peta artwork kategori Explore, kunci "browseId|params" lalu URL dipisah tab. */
         private const val MOOD_ARTWORK_FILE = "explore_mood_art_v1.txt"
