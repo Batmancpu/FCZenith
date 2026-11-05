@@ -465,9 +465,13 @@ object AudioCache {
                 val rendition = QualityUpgrade.cacheTag(spec.uri)
                 when {
                     rendition != null -> "$videoId#$rendition"
-                    SourceResolver.canSubstituteForYouTube() ->
-                        "$videoId#alt${atmosKeySuffix()}".let { completeSibling(videoId, it) ?: it }
-                    else -> completeSibling(videoId, videoId) ?: videoId
+                    else -> keptLosslessCopy(videoId)
+                        ?.takeIf { spec.uri.getQueryParameter(WATCH_READ_PARAM) == null }
+                        ?: when {
+                            SourceResolver.canSubstituteForYouTube() ->
+                                "$videoId#alt${atmosKeySuffix()}".let { completeSibling(videoId, it) ?: it }
+                            else -> completeSibling(videoId, videoId) ?: videoId
+                        }
                 }
             }
             // A source-backed track keys on the source and its track id alone.
@@ -576,6 +580,19 @@ object AudioCache {
             cache.getCachedSpans(key).isNotEmpty() &&
                 cache.getContentMetadata(key).get(META_ORIGIN, null as String?) == Origin.YOUTUBE.name
         }.getOrDefault(false)
+    }
+
+    /**
+     * Key of a complete FLAC copy of [videoId] already on disk, whatever the
+     * current quality ceiling says. A complete entry is never written to
+     * again, so reading it cannot create a mixed-file seam, and the decoder's
+     * own mime then lights the Lossless badge.
+     */
+    private fun keptLosslessCopy(videoId: String): String? {
+        if (!::cache.isInitialized) return null
+        return cache.keys
+            .filter { key -> key.startsWith("$videoId#") && !key.endsWith("#watch") }
+            .firstOrNull { key -> isComplete(key) && containerOf(key)?.first == "flac" }
     }
 
     /** Whether every byte of the entry [key] is on disk. */
@@ -1129,7 +1146,9 @@ object AudioCache {
      *    song. WebM, MP4 and FLAC pass, as [cachedContainerOf] reads them.
      */
     private fun keepsAddonCopy(key: String): Boolean =
-        !key.contains("#hifi") && isComplete(key) && containerOf(key) != null
+        isComplete(key) && containerOf(key).let { container ->
+            container != null && (!key.contains("#hifi") || container.first == "flac")
+        }
 
     /** The part of a cache key that names the track, before any `#rendition`; see [keyFactory]. */
     private fun cacheKeyBaseOf(mediaId: String): String =
