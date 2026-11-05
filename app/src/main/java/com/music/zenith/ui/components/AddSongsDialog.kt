@@ -14,6 +14,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -275,34 +277,22 @@ fun AddSongsDialog(
                         )
                     }
                 }
-                Spacer(Modifier.height(10.dp))
-                Row(
-                    Modifier
-                        .padding(horizontal = 16.dp)
-                        .fillMaxWidth()
-                        .height(34.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(colors.pressed)
-                        .padding(2.dp),
+                AnimatedVisibility(
+                    visible = searching,
+                    enter = fadeIn(tween(if (reduceMotion) 90 else 220)) +
+                        (if (reduceMotion) EnterTransition.None else expandVertically(tween(260))),
+                    exit = fadeOut(tween(if (reduceMotion) 90 else 160)) +
+                        (if (reduceMotion) ExitTransition.None else shrinkVertically(tween(200))),
                 ) {
-                    ADD_SONGS_FILTERS.forEach { option ->
-                        val selected = option == filter
-                        Box(
-                            Modifier
-                                .weight(1f)
-                                .fillMaxHeight()
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(if (selected) colors.label.copy(alpha = 0.18f) else Color.Transparent)
-                                .clickable { onFilterChange(option) },
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                text = option.label,
-                                color = if (selected) colors.label else colors.secondaryLabel,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                        }
+                    Column {
+                        Spacer(Modifier.height(10.dp))
+                        GlassSegmentedControl(
+                            options = ADD_SONGS_FILTERS.map { it.label },
+                            selectedIndex = ADD_SONGS_FILTERS.indexOf(filter).coerceAtLeast(0),
+                            onSelect = { onFilterChange(ADD_SONGS_FILTERS[it]) },
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                            liquid = true,
+                        )
                     }
                 }
                 Spacer(Modifier.height(6.dp))
