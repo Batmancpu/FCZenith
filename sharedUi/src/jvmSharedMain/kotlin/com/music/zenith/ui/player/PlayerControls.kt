@@ -1288,7 +1288,7 @@ internal const val MARQUEE_ARTIST_STAGGER_MS = 3_000L
  * edge. Same width as the end fade, but Apple's hugs the edge, so more of the
  * title stays readable.
  */
-private val MARQUEE_START_SHIFT = 16.dp
+private val MARQUEE_START_SHIFT = 26.dp
 
 /**
  * A single line of text that scrolls in place, only when it is too long for
