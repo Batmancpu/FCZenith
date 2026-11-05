@@ -432,7 +432,7 @@ class MainActivity : AppCompatActivity() {
                         OrganicFluidBackground(
                             modifier = modifier,
                             colors = colors,
-                            animationSpeed = if (motion) 0.6f else 0f,
+                            animationSpeed = if (motion) 2.2f else 0f,
                         )
                     },
                     LocalAppBackdrop provides appBackdrop,
