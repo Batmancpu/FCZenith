@@ -1216,6 +1216,15 @@ private fun BitChordApp(
         MainViewModel.Feed.LIBRARY -> libraryPull
         null -> null
     }
+    // Kotak pull yang dilepas dari layar saat refresh berjalan (pindah tab,
+    // halaman mood dibuka di atas Explore) tidak melihat refresh selesai, dan
+    // state-nya tertinggal di threshold sehingga puck di bar membeku. Rapikan
+    // setiap kali feed yang tampil tidak sedang refresh.
+    val currentFeedRefreshing = currentFeed != null && currentFeed in refreshing
+    LaunchedEffect(currentFeed, currentFeedRefreshing) {
+        val pull = currentPull ?: return@LaunchedEffect
+        if (!currentFeedRefreshing && pull.distanceFraction > 0f) pull.animateToHidden()
+    }
     val scrolled by remember(currentListState) {
         derivedStateOf {
             currentListState.firstVisibleItemIndex > 0 ||

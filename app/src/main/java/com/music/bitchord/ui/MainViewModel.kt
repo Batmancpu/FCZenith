@@ -1630,12 +1630,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val identity = listenerKey()
         _refreshing.value = _refreshing.value + feed
         viewModelScope.launch {
-            when (feed) {
-                Feed.HOME -> refreshHome(identity)
-                Feed.EXPLORE -> fetchExplore()
-                Feed.LIBRARY -> fetchLibrary(identity)
+            try {
+                when (feed) {
+                    Feed.HOME -> refreshHome(identity)
+                    Feed.EXPLORE -> fetchExplore()
+                    Feed.LIBRARY -> fetchLibrary(identity)
+                }
+            } finally {
+                _refreshing.value = _refreshing.value - feed
             }
-            _refreshing.value = _refreshing.value - feed
         }
     }
 
