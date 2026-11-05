@@ -67,6 +67,20 @@ fun mixContrastPalette(base: List<Color>): List<Color> {
     )
 }
 
+/** Deskripsi singkat per jenis mix, dipakai kalau mix tidak punya subtitle (daftar artis). */
+private fun mixDescription(title: String): String {
+    val t = title.lowercase()
+    return when {
+        "new music" in t || "new release" in t -> "Fresh releases picked for you, updated often."
+        "chill" in t -> "Laid-back tracks to unwind to, picked from what you love."
+        "friends" in t -> "Songs to share with friends, tuned to your taste."
+        "get up" in t -> "High-energy tracks to get you moving."
+        "favorite" in t -> "The songs you keep coming back to, all in one mix."
+        "replay" in t -> "Your recent listening, ready to play again."
+        else -> "A mix made just for you, from the music you love."
+    }
+}
+
 /** Teks di atas [MixFluidArt]; bayangan lembut menjaga keterbacaan di atas warna terang. */
 @Composable
 fun MixCoverOverlay(title: String, subtitle: String, modifier: Modifier = Modifier) {
@@ -140,9 +154,10 @@ fun MixCoverOverlay(title: String, subtitle: String, modifier: Modifier = Modifi
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            if (subtitle.isNotBlank()) {
+            val detail = subtitle.ifBlank { mixDescription(title) }
+            if (detail.isNotBlank()) {
                 Text(
-                    text = subtitle,
+                    text = detail,
                     color = Color.White.copy(alpha = 0.88f),
                     style = MaterialTheme.typography.bodyMedium.copy(
                         fontSize = 13.sp,
