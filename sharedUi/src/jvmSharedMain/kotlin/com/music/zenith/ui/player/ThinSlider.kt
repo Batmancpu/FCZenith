@@ -254,6 +254,26 @@ fun ThinSlider(
                     cornerRadius = radius,
                 )
             }
+            // While an Automix blend runs, a soft band of light travels the whole
+            // bar on the blend's own clock. A drag in progress always shows the finger.
+            val shineStrength = if (dragging) 0f else mixPulse?.shineStrength ?: 0f
+            if (mixPulse != null && shineStrength > 0.01f) {
+                val band = size.width * MIX_SHINE_BAND_FRACTION
+                val center = -band + mixPulse.shine * (size.width + 2 * band)
+                drawRoundRect(
+                    brush = Brush.horizontalGradient(
+                        colorStops = arrayOf(
+                            0f to Color.Transparent,
+                            0.5f to Color.White.copy(alpha = shineStrength),
+                            1f to Color.Transparent,
+                        ),
+                        startX = center - band,
+                        endX = center + band,
+                    ),
+                    size = size,
+                    cornerRadius = radius,
+                )
+            }
         }
         // Composed only while switching or mixing. The infinite animation therefore costs no
         // frames during ordinary playback, and AnimatedVisibility lets it leave gracefully.
@@ -315,6 +335,15 @@ class MixPulse internal constructor(private val blend: () -> MixBlend?) {
     internal val coverAnim = Animatable(0f)
     internal val depthAnim = Animatable(0f)
     internal var level by mutableFloatStateOf(0f)
+
+    /** 0..1 position of the travelling shine, advanced by the same clock as [level]. */
+    internal var shine by mutableFloatStateOf(0f)
+
+    /**
+     * How visible the shine is: zero until a blend claims the bar, and again once the beat
+     * pulse has settled (paused, or reduced motion), so a still bar never carries a frozen band.
+     */
+    val shineStrength: Float get() = cover * depthAnim.value
 
     /** Kept across restarts of the clock, so a blend ending never jumps the phase. */
     internal var phase = 0.0
@@ -394,6 +423,7 @@ fun rememberMixPulse(mixBlend: () -> MixBlend?, enabled: Boolean): MixPulse {
                 phase -= kotlin.math.floor(phase)
                 pulse.phase = phase
                 pulse.level = beatShape(phase.toFloat())
+                pulse.shine = ((pulse.shine + dt / MIX_SHINE_NANOS) % 1.0).toFloat()
             }
         }
         pulse.locked = false
@@ -412,6 +442,12 @@ private const val PULSE_REST = 0.1f
 
 /** Share of the remaining phase error corrected each frame; small enough to be invisible. */
 private const val PHASE_PULL = 0.06
+
+/** One pass of the shine across the bar and the "Mixing" label. */
+private const val MIX_SHINE_NANOS = 2_000_000_000.0
+
+/** Width of the shine band, as a share of the bar. */
+private const val MIX_SHINE_BAND_FRACTION = 0.3f
 
 /** Breathing period when neither track's tempo is known. */
 private const val BREATH_NANOS = 1_800_000_000.0

@@ -281,6 +281,7 @@ internal fun PlayerScrubber(
  */
 @Composable
 private fun MixingLabel(pulse: MixPulse, modifier: Modifier = Modifier) {
+    val tint = LocalPlayerTint.current
     Text(
         text = stringResource(Res.string.mixing),
         modifier = modifier
@@ -291,7 +292,28 @@ private fun MixingLabel(pulse: MixPulse, modifier: Modifier = Modifier) {
                 indication = null,
                 interactionSource = remember { MutableInteractionSource() },
             ) { MixViewRequest.open = true }
-            .graphicsLayer { alpha = pulse.cover * pulse.alpha(1f, restShare = MIXING_LABEL_REST) },
+            .graphicsLayer { alpha = pulse.cover * pulse.alpha(1f, restShare = MIXING_LABEL_REST) }
+            // Offscreen, so the shine below recolours only the glyphs and not
+            // whatever the label is drawn over.
+            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+            .drawWithContent {
+                drawContent()
+                val strength = pulse.shineStrength
+                if (strength > 0.01f) {
+                    val width = size.width
+                    val band = width * 0.6f
+                    val center = -band + pulse.shine * (width + 2 * band)
+                    val base = tint.copy(alpha = 0.85f - 0.3f * strength)
+                    drawRect(
+                        brush = Brush.linearGradient(
+                            colorStops = arrayOf(0f to base, 0.5f to tint, 1f to base),
+                            start = Offset(center - band, 0f),
+                            end = Offset(center + band, 0f),
+                        ),
+                        blendMode = BlendMode.SrcIn,
+                    )
+                }
+            },
         style = MaterialTheme.typography.labelMedium.copy(
             fontWeight = FontWeight.Medium,
             fontSize = (MaterialTheme.typography.labelMedium.fontSize.value + BADGE_SIZE_BUMP).sp,
