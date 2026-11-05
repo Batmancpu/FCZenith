@@ -1284,6 +1284,13 @@ private const val MARQUEE_REST_MS = 5_000L
 internal const val MARQUEE_ARTIST_STAGGER_MS = 3_000L
 
 /**
+ * Width of the fade at the start of a crawling line. Apple's is much tighter
+ * than the one at the end: it hugs the left edge instead of washing over the
+ * first stretch of text.
+ */
+private val MARQUEE_START_FADE = 12.dp
+
+/**
  * A single line of text that scrolls in place, only when it is too long for
  * [modifier]'s width to show in full.
  *
@@ -1398,14 +1405,15 @@ private fun Modifier.marqueeFade(overflows: Boolean, travelPx: Int, offset: () -
         this
     } else {
         composed {
-            val fadePx = with(LocalDensity.current) { LINE_FADE.toPx() }
+            val startFadePx = with(LocalDensity.current) { MARQUEE_START_FADE.toPx() }
             fadingEdges(
                 LINE_FADE,
                 start = {
                     val moved = -offset()
-                    minOf(moved, travelPx - moved) / fadePx
+                    minOf(moved, travelPx - moved) / startFadePx
                 },
                 end = { 1f },
+                startWidth = MARQUEE_START_FADE,
             )
         }
     }
