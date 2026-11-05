@@ -2,7 +2,9 @@ package com.music.zenith.ui.screens
 
 import com.music.zenith.ui.components.trackArtSize
 import android.os.Build
+import android.content.Context
 import android.os.SystemClock
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import com.music.zenith.R
@@ -2732,7 +2734,10 @@ private fun DetailPage.isLikedMusic(): Boolean =
 /** Seberapa jauh blok judul naik menimpa kaki hero. */
 private val LIKED_HERO_OVERLAP = 88.dp
 private const val LIKED_COLUMNS = 3
-private const val LIKED_MAX_COVERS = 21
+private const val LIKED_MAX_COVERS = 6
+
+/** Cover pilihan disimpan selama ini, lalu diundi ulang dari lagu yang ada. */
+private const val LIKED_COVER_TTL_MS = 24L * 60 * 60 * 1000
 private const val LIKED_DRIFT_MS = 70_000
 private const val LIKED_PULSE_MS = 9_000
 
@@ -2773,8 +2778,8 @@ private val LIKED_MAX_PULL = 40.dp
 
 /**
  * Header Liked Music: full-bleed sampai di bawah bar, isinya mosaik abstrak
- * dari cover lagu yang ada di playlist, urutannya diacak setiap halaman dibuka
- * dan bergeser pelan. Bagian bawahnya di-blur lalu larut ke warna halaman.
+ * dari beberapa cover lagu di playlist. Statis dan ringan: tanpa blur, tanpa
+ * animasi terus-menerus. Bagian bawahnya larut ke warna halaman.
  * Judul dan meta di bawahnya naik menimpa kaki hero, lihat [LIKED_HERO_OVERLAP].
  */
 @Composable
@@ -2785,48 +2790,11 @@ private fun LikedMusicHero(
     height: Dp,
     modifier: Modifier = Modifier,
 ) {
-    // Mosaic direkam sekali; salinan blur di kaki memakai rekaman yang sama.
-    val shared = rememberGraphicsLayer()
-    val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
-    val blurFoot = !reduceDynamicBlur && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
-    val footLayer = rememberGraphicsLayer()
-    val foot = remember { FootSnapshot() }
-    var onScreen by remember { mutableStateOf(true) }
-
-    // Satu seed per pembukaan: acak, tapi tidak berubah saat list di-scroll
-    // keluar dan kembali, atau saat urutan lagu diganti.
-    val seed = rememberSaveable { System.nanoTime() }
-    val covers = remember(songs.isNotEmpty(), seed) {
-        songs.mapNotNull { it.thumbnailUrl }
-            .distinct()
-            .shuffled(Random(seed))
-            .take(LIKED_MAX_COVERS)
-    }
-
-    // Satu jam untuk semua lapisan, dibaca hanya lewat lambda (fase layout/draw).
-    // Berdetak 30 fps, berhenti saat player menutupi halaman atau hero keluar layar,
-    // dan melanjutkan dari posisi terakhir (tanpa loncat).
-    var clock by remember { mutableLongStateOf(SystemClock.uptimeMillis()) }
-    val running = !HeroMotion.frozen && onScreen
-    LaunchedEffect(running) {
-        if (!running) return@LaunchedEffect
-        var last = SystemClock.uptimeMillis()
-        while (true) {
-            withFrameMillis { }
-            val now = SystemClock.uptimeMillis()
-            val dt = now - last
-            if (dt < HERO_FRAME_MS) continue
-            last = now
-            clock += dt
-        }
-    }
+    // Beberapa cover saja, diundi sekali lalu dipakai ulang selama 24 jam.
+    val covers = rememberLikedCovers(page.browseId, songs)
 
     Box(
         modifier
-            .onGloballyPositioned { c ->
-                val v = c.isAttached && !c.boundsInWindow().isEmpty
-                if (v != onScreen) onScreen = v
-            }
             // Paling luar: tinggi yang dilaporkan lebih pendek, sehingga
             // judul di bawahnya tergambar di atas kaki hero.
             .layout { measurable, constraints ->
@@ -2854,7 +2822,6 @@ private fun LikedMusicHero(
             .coverFlightTarget(page.browseId, 0.dp, palette.background),
     ) {
         // Seni sengaja lebih tinggi daripada hero: kelebihannya menjulur ke atas.
-        // Layar dan salinan blurnya berada di kotak yang sama, jadi tetap sejajar.
         Box(
             Modifier.layout { measurable, constraints ->
                 val extra = LIKED_OVERSCROLL.roundToPx()
@@ -2866,58 +2833,9 @@ private fun LikedMusicHero(
         ) {
             LikedArt(
                 covers = covers,
-                drift = { (clock % LIKED_DRIFT_MS) / LIKED_DRIFT_MS.toFloat() },
-                pulse = { (clock % LIKED_PULSE_MS) / LIKED_PULSE_MS.toFloat() },
                 topInset = LIKED_OVERSCROLL,
-                modifier = Modifier.matchParentSize().drawWithContent {
-                    shared.record(
-                        size = IntSize(
-                            size.width.roundToInt().coerceAtLeast(1),
-                            size.height.roundToInt().coerceAtLeast(1),
-                        ),
-                    ) { this@drawWithContent.drawContent() }
-                    drawLayer(shared)
-                    if (blurFoot) {
-                        val stamp = SystemClock.uptimeMillis()
-                        if (stamp - foot.at >= FOOT_REFRESH_MS) {
-                            foot.at = stamp
-                            footLayer.record(
-                                size = IntSize(
-                                    size.width.roundToInt().coerceAtLeast(1),
-                                    size.height.roundToInt().coerceAtLeast(1),
-                                ),
-                            ) { drawLayer(shared) }
-                        }
-                    }
-                },
+                modifier = Modifier.matchParentSize(),
             )
-
-            // Salinan yang di-blur, dimunculkan di bagian bawah lewat mask.
-            if (blurFoot) {
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        // Offscreen agar mask memotong hasil blur, bukan tiap gambar di bawahnya.
-                        .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-                        .drawWithContent {
-                            drawContent()
-                            // Mask dihitung dari bawah (72% tinggi hero), bukan dari tinggi
-                            // kotak yang kini lebih panjang ke atas.
-                            drawRect(
-                                brush = Brush.verticalGradient(
-                                    0.00f to Color.Transparent,
-                                    0.47f to Color.Black.copy(alpha = 0.85f),
-                                    1.00f to Color.Black,
-                                    startY = size.height - height.toPx() * 0.72f,
-                                    endY = size.height,
-                                ),
-                                blendMode = BlendMode.DstIn,
-                            )
-                        }
-                        .blur(LIKED_FOOT_BLUR, BlurredEdgeTreatment.Rectangle)
-                        .drawBehind { drawLayer(footLayer) },
-                )
-            }
         }
 
         // Berakhir di warna halaman penuh, jadi tidak ada tepi tempat seni berhenti.
@@ -2928,11 +2846,11 @@ private fun LikedMusicHero(
                 .background(
                     Brush.verticalGradient(
                         0.00f to page0,
-                        0.56f to page0,
-                        0.66f to palette.background.copy(alpha = 0.20f),
-                        0.76f to palette.background.copy(alpha = 0.52f),
-                        0.86f to palette.background.copy(alpha = 0.82f),
-                        0.94f to palette.background.copy(alpha = 0.96f),
+                        0.50f to page0,
+                        0.62f to palette.background.copy(alpha = 0.25f),
+                        0.74f to palette.background.copy(alpha = 0.60f),
+                        0.86f to palette.background.copy(alpha = 0.88f),
+                        0.94f to palette.background.copy(alpha = 0.97f),
                         1.00f to palette.background,
                     ),
                 ),
@@ -2954,30 +2872,38 @@ private fun LikedMusicHero(
 }
 
 /**
- * Isi hero: gradien ungu ke pink, blob cahaya yang melayang, dan tiga kolom
- * cover berbentuk beragam yang miring dan bergeser terus (kolom 2 berlawanan arah).
- * Tiap tile juga bernapas pelan dan masuk bergantian saat halaman dibuka.
+ * Isi hero: gradien ungu ke pink, blob cahaya, dan tiga kolom cover berbentuk
+ * beragam yang miring. Semuanya statis: digambar sekali, tidak ada jam global
+ * dan tidak ada animasi per tile. Hanya satu fade-in saat halaman dibuka.
  */
 @Composable
 private fun LikedArt(
     covers: List<String>,
-    drift: () -> Float,
-    pulse: () -> Float,
     // Bagian seni yang menjulur di atas tepi hero; icon digeser turun setengahnya
     // supaya tetap di tengah area yang terlihat.
     topInset: Dp = 0.dp,
     modifier: Modifier = Modifier,
 ) {
+    // Mosaic yang sudah tampil di kartu lalu terbang tidak mengulang fade-in.
+    val settled = LocalSettledMosaic.current
+    var shown by remember { mutableStateOf(settled) }
+    LaunchedEffect(Unit) { shown = true }
+    val enter by animateFloatAsState(
+        targetValue = if (shown) 1f else 0f,
+        animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing),
+        label = "likedArtEnter",
+    )
+
     BoxWithConstraints(
         modifier.drawBehind {
+            // Latar statis: tidak membaca state, jadi digambar sekali, bukan tiap frame.
             drawRect(LIKED_BASE)
-            val t = pulse() * 2f * PI.toFloat()
             val w = size.width
             val h = size.height
-            fun blob(color: Color, cx: Float, cy: Float, r: Float, alpha: Float = 0.75f) {
+            fun blob(color: Color, cx: Float, cy: Float, r: Float) {
                 drawCircle(
                     brush = Brush.radialGradient(
-                        listOf(color.copy(alpha = alpha), color.copy(alpha = 0f)),
+                        listOf(color.copy(alpha = 0.75f), color.copy(alpha = 0f)),
                         center = Offset(cx, cy),
                         radius = r,
                     ),
@@ -2985,9 +2911,9 @@ private fun LikedArt(
                     center = Offset(cx, cy),
                 )
             }
-            blob(Color(0xFF5CC8FF), w * (0.22f + 0.14f * sin(t)), h * (0.22f + 0.10f * cos(t)), w * 0.75f)
-            blob(Color(0xFFFF7AB8), w * (0.82f + 0.12f * cos(t)), h * (0.68f + 0.10f * sin(t)), w * 0.80f)
-            blob(Color(0xFF9B6CFF), w * (0.45f + 0.18f * sin(2f * t)), h * (0.95f + 0.05f * cos(2f * t)), w * 0.70f)
+            blob(Color(0xFF5CC8FF), w * 0.22f, h * 0.32f, w * 0.75f)
+            blob(Color(0xFFFF7AB8), w * 0.94f, h * 0.68f, w * 0.80f)
+            blob(Color(0xFF9B6CFF), w * 0.45f, h * 1.00f, w * 0.70f)
         },
     ) {
         val width = maxWidth
@@ -3002,56 +2928,43 @@ private fun LikedArt(
                 modifier = Modifier
                     .align(Alignment.Center)
                     .size(width * 0.34f)
-                    .graphicsLayer {
-                        translationY = topInset.toPx() / 2f
-                        val s = 1f + 0.06f * sin(pulse() * 2f * PI.toFloat())
-                        scaleX = s
-                        scaleY = s
-                    },
+                    .graphicsLayer { translationY = topInset.toPx() / 2f },
             )
             return@BoxWithConstraints
         }
 
         // Digambar lebih besar dari hero lalu diputar, supaya sudut-sudutnya
         // tetap terisi setelah miring.
-        val mosaicW = width * 1.5f
-        val mosaicH = height * 1.5f
+        val mosaicW = width * 1.3f
+        val mosaicH = height * 1.3f
         val base = (mosaicW - LIKED_GAP * (LIKED_COLUMNS - 1)) / LIKED_COLUMN_SIZE.sum()
 
         Box(
             Modifier
                 .align(Alignment.Center)
                 .requiredSize(mosaicW, mosaicH)
-                .graphicsLayer { rotationZ = -11f },
+                .graphicsLayer {
+                    rotationZ = -11f
+                    alpha = enter
+                },
         ) {
             var x = 0.dp
             for (c in 0 until LIKED_COLUMNS) {
                 val s = base * LIKED_COLUMN_SIZE[c]
+                val step = s + LIKED_GAP
                 val colX = x
-                // Cukup tile agar kolom selalu menutup tinggi mosaik.
-                val n = maxOf(
-                    LIKED_COLUMN_COUNT[c],
-                    ceil(mosaicH / (s + LIKED_GAP)).toInt() + 2,
-                )
+                // Cukup tile agar kolom menutup tinggi mosaik.
+                val n = ceil(mosaicH / step).toInt() + 2
                 for (i in 0 until n) {
-                    val k = c * 16 + i
                     LikedTile(
                         url = covers[(c + i * LIKED_COLUMNS) % covers.size],
-                        index = k,
+                        index = c * 16 + i,
                         size = s,
-                        pulse = pulse,
-                        // Digeser di fase draw (graphicsLayer), bukan offset layout:
-                        // tidak ada pengukuran ulang puluhan tile di setiap frame.
-                        place = {
-                            val step = (s + LIKED_GAP).toPx()
-                            val cycle = step * n
-                            val raw = (i * step + LIKED_COLUMN_DIR[c] * drift() * cycle + c * 0.37f * step) % cycle
-                            val y = (if (raw < 0f) raw + cycle else raw) - step
-                            Offset(colX.toPx(), y)
-                        },
+                        x = colX,
+                        y = step * (i - 1 + 0.37f * c),
                     )
                 }
-                x += s + LIKED_GAP
+                x += step
             }
         }
     }
@@ -3313,6 +3226,36 @@ private val MOST_PLAYED_COLLAGE = listOf(
 
 private val MOST_PLAYED_GRID = floatArrayOf(0.14f, 0.31f, 0.50f, 0.69f, 0.86f)
 
+/**
+ * Cover untuk hero Liked Music: paling banyak [LIKED_MAX_COVERS], diundi dari
+ * lagu di playlist lalu disimpan [LIKED_COVER_TTL_MS]. Selama masih segar, membuka
+ * halaman tidak mengundi ulang dan tidak memuat gambar lain. Kalau daftar lagu
+ * belum datang, pilihan lama (jika ada) dipakai dan jam undian tidak dimulai.
+ */
+@Composable
+private fun rememberLikedCovers(pageId: String, songs: List<Song>): List<String> {
+    val context = LocalContext.current.applicationContext
+    val hasSongs = songs.isNotEmpty()
+    return remember(pageId, hasSongs) {
+        val prefs = context.getSharedPreferences("liked_hero", Context.MODE_PRIVATE)
+        val now = System.currentTimeMillis()
+        val saved = prefs.getString("covers_$pageId", null)
+            ?.split('\n')
+            ?.filter { it.isNotBlank() }
+            .orEmpty()
+        val age = now - prefs.getLong("at_$pageId", 0L)
+        if (saved.isNotEmpty() && age in 0L until LIKED_COVER_TTL_MS) return@remember saved
+        val pool = songs.mapNotNull { it.thumbnailUrl }.distinct()
+        if (pool.isEmpty()) return@remember saved
+        val picked = pool.shuffled().take(LIKED_MAX_COVERS)
+        prefs.edit()
+            .putString("covers_$pageId", picked.joinToString("\n"))
+            .putLong("at_$pageId", now)
+            .apply()
+        picked
+    }
+}
+
 private fun likedTileShape(k: Int): Shape = when (k % 4) {
     0 -> RoundedCornerShape(26.dp)
     1 -> CircleShape
@@ -3320,30 +3263,18 @@ private fun likedTileShape(k: Int): Shape = when (k % 4) {
     else -> RoundedCornerShape(topStart = 10.dp, topEnd = 60.dp, bottomEnd = 10.dp, bottomStart = 60.dp)
 }
 
-/** Satu cover: masuk bergantian, lalu membesar-mengecil dan miring tipis. */
+/** Satu cover, statis: posisi, miring, dan skala tetap. Tanpa animasi per tile. */
 @Composable
 private fun LikedTile(
     url: String,
     index: Int,
     size: Dp,
-    pulse: () -> Float,
-    place: GraphicsLayerScope.() -> Offset,
+    x: Dp,
+    y: Dp,
     modifier: Modifier = Modifier,
 ) {
-    // Mosaic yang sudah tampil di kartu lalu terbang tidak mengulang animasi masuk tile.
-    val settled = LocalSettledMosaic.current
-    var shown by remember { mutableStateOf(settled) }
-    LaunchedEffect(Unit) { shown = true }
-    val enter by animateFloatAsState(
-        targetValue = if (shown) 1f else 0f,
-        animationSpec = tween(
-            durationMillis = 800,
-            delayMillis = (index % 9) * 70,
-            easing = FastOutSlowInEasing,
-        ),
-        label = "likedTileEnter",
-    )
     val tileShape = remember(index) { likedTileShape(index) }
+    val wobble = remember(index) { sin(index * 0.173f * 2f * PI.toFloat()) }
 
     AsyncImage(
         model = url.artworkAt(CARD_ART_PX),
@@ -3352,19 +3283,15 @@ private fun LikedTile(
         modifier = modifier
             .size(size)
             .graphicsLayer {
-                val a = sin((pulse() + index * 0.173f) * 2f * PI.toFloat())
-                val o = place()
-                translationX = o.x
-                translationY = o.y
-                val s = (0.82f + 0.18f * enter) * (1f + 0.035f * a)
+                translationX = x.toPx()
+                translationY = y.toPx()
+                val s = 1f + 0.035f * wobble
                 scaleX = s
                 scaleY = s
-                rotationZ = 2.5f * a * (if (index % 2 == 0) 1f else -1f)
-                alpha = 0.94f * enter
+                rotationZ = 2.5f * wobble * (if (index % 2 == 0) 1f else -1f)
                 shape = tileShape
                 clip = true
             }
-            .background(Color.White.copy(alpha = 0.12f), tileShape)
             .border(1.dp, Color.White.copy(alpha = 0.22f), tileShape),
     )
 }
