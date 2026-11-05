@@ -210,7 +210,7 @@ private object CoverFlightState {
         val f = flight ?: return 1f
         if (f.token !== token) return 1f
         return if (f.reverse) {
-            if (flying) revealAt(flightProgress) else 1f
+            revealAt(flightProgress)
         } else {
             1f - smooth(flightProgress / DEPART_FADE_SPAN)
         }
@@ -489,7 +489,7 @@ fun Modifier.hideDuringCoverFlight(token: Any): Modifier =
     this.graphicsLayer { alpha = CoverFlightState.captionAlpha(token) }
 
 /** Pulang: teks dan cover kartu mulai muncul di sini (0..1 dari penerbangan). */
-private const val REVEAL_START = 0.5f
+private const val REVEAL_START = 0.82f
 
 /** Pulang: kemajuan penerbangan (eased) saat cover kartu boleh muncul di bawah gambar terbang. */
 private const val LAND_AT = 0.98f

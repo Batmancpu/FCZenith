@@ -1095,6 +1095,15 @@ private fun ReleaseHeader(
                     title = mixTitle,
                     modifier = Modifier.matchParentSize().clip(SLEEVE_SHAPE),
                 )
+                // Teks/logo sampul ikut muncul pelan setelah cover mendarat.
+                MixCoverOverlay(
+                    title = mixTitle,
+                    subtitle = "",
+                    modifier = Modifier
+                        .matchParentSize()
+                        .clip(SLEEVE_SHAPE)
+                        .flightReveal(delayMs = 0, rise = 0.dp, afterFlight = true),
+                )
             }
             // Animated cover art, inside the same frame. Always running:
             // unlike the player's sleeve there is no transport here to follow,

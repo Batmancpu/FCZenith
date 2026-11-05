@@ -69,7 +69,7 @@ fun mixContrastPalette(base: List<Color>): List<Color> {
 
 /** Teks di atas [MixFluidArt]; bayangan lembut menjaga keterbacaan di atas warna terang. */
 @Composable
-internal fun MixCoverOverlay(title: String, subtitle: String, modifier: Modifier = Modifier) {
+fun MixCoverOverlay(title: String, subtitle: String, modifier: Modifier = Modifier) {
     val (name, tail) = remember(title) { splitMixTitle(title) }
     val style = MaterialTheme.typography.headlineMedium.copy(
         fontSize = 34.sp,
