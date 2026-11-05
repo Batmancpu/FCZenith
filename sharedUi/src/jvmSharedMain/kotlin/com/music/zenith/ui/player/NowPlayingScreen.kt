@@ -4275,6 +4275,17 @@ fun NowPlayingScreen(
                                 },
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
+                            // How far the title and artist may run out past the left of
+                            // the row, to the screen's edge, where their fade is. Only
+                            // while the credits are the screen: collapsed, that edge is
+                            // the thumbnail.
+                            val bleedNow = {
+                                if (!(lyricsOpen || queueOpen || queueDragging) && !collapsePastSettling) {
+                                    PLAYER_GUTTER
+                                } else {
+                                    0.dp
+                                }
+                            }
                             Column(
                                 Modifier
                                     .weight(1f)
@@ -4286,6 +4297,26 @@ fun NowPlayingScreen(
                                         scaleX = scale
                                         scaleY = scale
                                         transformOrigin = TransformOrigin(0f, 0.5f)
+                                    }
+                                    // Wider to the left by the bleed, reporting its old
+                                    // width, so the buttons beside it stay where they were
+                                    // while the clip and fade of the lines inside reach
+                                    // the screen's edge.
+                                    .layout { measurable, constraints ->
+                                        val bleed = bleedNow().roundToPx()
+                                        val placeable = measurable.measure(
+                                            constraints.copy(
+                                                minWidth = constraints.minWidth + bleed,
+                                                maxWidth = if (constraints.hasBoundedWidth) {
+                                                    constraints.maxWidth + bleed
+                                                } else {
+                                                    constraints.maxWidth
+                                                },
+                                            ),
+                                        )
+                                        layout((placeable.width - bleed).coerceAtLeast(0), placeable.height) {
+                                            placeable.placeRelative(-bleed, 0)
+                                        }
                                     },
                             ) {
                                 // Only the title's own overflow gates the artist's stagger
@@ -4314,6 +4345,7 @@ fun NowPlayingScreen(
                                 // it.
                                 TrackTextSwitch(song, Modifier.fillMaxWidth()) { shown ->
                                     val scrolling = scrolls()
+                                    val bleed = bleedNow()
                                     val artistColor = LocalPlayerTint.current.copy(alpha = 0.55f)
                                     Column {
                                         MarqueeText(
@@ -4323,6 +4355,7 @@ fun NowPlayingScreen(
                                             ),
                                             color = Color.White,
                                             enabled = scrolling,
+                                            edgeBleed = bleed,
                                             leading = if (shown.isExplicit == true) {
                                                 { ExplicitBadge(color = artistColor) }
                                             } else {
@@ -4342,6 +4375,7 @@ fun NowPlayingScreen(
                                             ),
                                             color = artistColor,
                                             enabled = scrolling,
+                                            edgeBleed = bleed,
                                             startDelayMillis = if (titleOverflowing) MARQUEE_ARTIST_STAGGER_MS else 0L,
                                             onOpenArtist = onOpenArtist,
                                         )

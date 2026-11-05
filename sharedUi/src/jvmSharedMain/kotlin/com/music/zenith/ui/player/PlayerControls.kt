@@ -1283,12 +1283,7 @@ private const val MARQUEE_REST_MS = 5_000L
 /** Artist's head start is ceded to the title when both are scrolling, so they don't start as one block. */
 internal const val MARQUEE_ARTIST_STAGGER_MS = 3_000L
 
-/**
- * How far the fade at the start of a crawling line sits out past the left
- * edge. Same width as the end fade, but Apple's hugs the edge, so more of the
- * title stays readable.
- */
-private val MARQUEE_START_SHIFT = 26.dp
+
 
 /**
  * A single line of text that scrolls in place, only when it is too long for
@@ -1327,16 +1322,23 @@ internal fun MarqueeText(
     leading: (@Composable () -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
     onOverflowChange: (Boolean) -> Unit = {},
+    // Room the parent has given this line to its left, out to the screen's edge:
+    // the line rests this far in, and crawls and fades out across it.
+    edgeBleed: Dp = 0.dp,
 ) {
     val density = LocalDensity.current
     val textMeasurer = rememberTextMeasurer()
+    // Without a badge the room sits inside the line's own box, so the crawl and
+    // its fade reach the edge. With one, it sits in front of the badge.
+    val lineInset = if (leading == null) edgeBleed else 0.dp
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
         if (leading != null) {
+            Spacer(Modifier.width(edgeBleed))
             leading()
             Spacer(Modifier.width(6.dp))
         }
         BoxWithConstraints(Modifier.weight(1f, fill = false).clipToBounds()) {
-            val maxWidthPx = constraints.maxWidth
+            val maxWidthPx = constraints.maxWidth - with(density) { lineInset.roundToPx() }
             val layout = remember(text, style, maxWidthPx) {
                 textMeasurer.measure(text = text, style = style, maxLines = 1, softWrap = false)
             }
@@ -1376,6 +1378,7 @@ internal fun MarqueeText(
                 // it sideways just moves an already-cut string.
                 modifier = Modifier
                     .marqueeFade(overflowing, travelPx) { offsetX.value }
+                    .padding(start = lineInset)
                     .wrapContentWidth(align = Alignment.Start, unbounded = true)
                     .offset { IntOffset(offsetX.value.roundToInt(), 0) },
                 verticalAlignment = Alignment.CenterVertically,
@@ -1413,7 +1416,6 @@ private fun Modifier.marqueeFade(overflows: Boolean, travelPx: Int, offset: () -
                     minOf(moved, travelPx - moved) / fadePx
                 },
                 end = { 1f },
-                startShift = MARQUEE_START_SHIFT,
             )
         }
     }
@@ -1469,6 +1471,8 @@ internal fun ArtistCreditsMarquee(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     startDelayMillis: Long = 0L,
+    // As on [MarqueeText]: room to the left, out to the screen's edge.
+    edgeBleed: Dp = 0.dp,
 ) {
     val density = LocalDensity.current
     val textMeasurer = rememberTextMeasurer()
@@ -1476,7 +1480,7 @@ internal fun ArtistCreditsMarquee(
 
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
         BoxWithConstraints(Modifier.weight(1f, fill = false).clipToBounds()) {
-            val maxWidthPx = constraints.maxWidth
+            val maxWidthPx = constraints.maxWidth - with(density) { edgeBleed.roundToPx() }
             // Measured as one string, exactly as the single-line version measured
             // it, so the line starts crawling at the same moment and travels the
             // same distance.
@@ -1510,6 +1514,7 @@ internal fun ArtistCreditsMarquee(
             Row(
                 modifier = Modifier
                     .marqueeFade(overflowing, travelPx) { offsetX.value }
+                    .padding(start = edgeBleed)
                     .wrapContentWidth(align = Alignment.Start, unbounded = true)
                     .offset { IntOffset(offsetX.value.roundToInt(), 0) },
                 verticalAlignment = Alignment.CenterVertically,
