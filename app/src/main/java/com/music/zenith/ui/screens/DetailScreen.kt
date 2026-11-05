@@ -213,10 +213,6 @@ import com.music.zenith.ui.player.CanvasArtworkPlayer
 import com.music.zenith.ui.theme.ArtworkPalette
 import com.music.zenith.ui.theme.rememberArtworkPalette
 import kotlin.math.roundToInt
-import kotlin.math.PI
-import kotlin.math.ceil
-import kotlin.math.cos
-import kotlin.math.sin
 import kotlin.random.Random
 import java.util.Locale
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -226,7 +222,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.foundation.layout.requiredSize
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.translate
 import com.music.zenith.data.YtMusicRepository
@@ -2750,16 +2745,10 @@ private fun DetailPage.isLikedMusic(): Boolean =
 
 /** Seberapa jauh blok judul naik menimpa kaki hero. */
 private val LIKED_HERO_OVERLAP = 88.dp
-private const val LIKED_COLUMNS = 3
 private const val LIKED_MAX_COVERS = 9
 
 /** Cover pilihan disimpan selama ini, lalu diundi ulang dari lagu yang ada. */
 private const val LIKED_COVER_TTL_MS = 24L * 60 * 60 * 1000
-private const val LIKED_DRIFT_MS = 70_000
-private const val LIKED_PULSE_MS = 9_000
-
-/** Animasi hero cukup 30 fps: geraknya pelan, setengah frame tidak terlihat bedanya. */
-private const val HERO_FRAME_MS = 33L
 
 /** Salinan ter-blur di kaki hero direkam ulang tiap sekian ms, bukan tiap frame. */
 private const val FOOT_REFRESH_MS = 300L
@@ -2767,24 +2756,9 @@ private const val FOOT_REFRESH_MS = 300L
 private class FootSnapshot {
     var at = 0L
 }
-private val LIKED_GAP = 16.dp
 private val LIKED_FOOT_BLUR = 36.dp
 
-/** Lebar relatif, arah geser, dan jumlah minimal tile per kolom. */
-private val LIKED_COLUMN_SIZE = floatArrayOf(0.86f, 1.12f, 0.92f)
-private val LIKED_COLUMN_DIR = floatArrayOf(1f, -1f, 1f)
-private val LIKED_COLUMN_COUNT = intArrayOf(6, 5, 7)
-
 private val LIKED_COLORS = listOf(Color(0xFF7B5CF0), Color(0xFFB45FDB), Color(0xFFFF5FA8))
-/** Palet latar cairan Liked: indigo gelap, ungu, pink, biru muda, lilac terang. */
-private val LIKED_FLUID_COLORS = listOf(
-    Color(0xFF2B1065),
-    Color(0xFF7B5CF0),
-    Color(0xFFFF5FA8),
-    Color(0xFF5CC8FF),
-    Color(0xFFE9C6FF),
-)
-
 /**
  * Most Played: warna latar bawaan (royal-amethyst), dipakai selama warna dari
  * cover belum terbaca. Setelah itu latar mengikuti [rememberMostPlayedTint].
@@ -2896,9 +2870,9 @@ private fun LikedMusicHero(
 }
 
 /**
- * Isi hero: latar cairan [OrganicFluidBackground] yang mengalir, dan tiga kolom
- * cover berbentuk beragam yang miring. Tile statis, tanpa animasi per tile;
- * hanya latarnya yang bergerak, ditambah satu fade-in saat halaman dibuka.
+ * Isi hero: latar cairan [LikedFluidBackground] yang warnanya mengikuti cover, dan
+ * [AnimatedAlbumCollage] (cover utama + cover dekoratif mengambang dalam satu Canvas),
+ * dengan satu fade-in saat halaman dibuka.
  */
 @Composable
 private fun LikedArt(
@@ -3269,46 +3243,6 @@ private fun rememberLikedCovers(pageId: String, songs: List<Song>): List<String>
             .apply()
         picked
     }
-}
-
-private fun likedTileShape(k: Int): Shape = when (k % 4) {
-    0 -> RoundedCornerShape(26.dp)
-    1 -> CircleShape
-    2 -> RoundedCornerShape(topStart = 70.dp, topEnd = 10.dp, bottomEnd = 70.dp, bottomStart = 10.dp)
-    else -> RoundedCornerShape(topStart = 10.dp, topEnd = 60.dp, bottomEnd = 10.dp, bottomStart = 60.dp)
-}
-
-/** Satu cover, statis: posisi, miring, dan skala tetap. Tanpa animasi per tile. */
-@Composable
-private fun LikedTile(
-    url: String,
-    index: Int,
-    size: Dp,
-    x: Dp,
-    y: Dp,
-    modifier: Modifier = Modifier,
-) {
-    val tileShape = remember(index) { likedTileShape(index) }
-    val wobble = remember(index) { sin(index * 0.173f * 2f * PI.toFloat()) }
-
-    AsyncImage(
-        model = url.artworkAt(CARD_ART_PX),
-        contentDescription = null,
-        contentScale = ContentScale.Crop,
-        modifier = modifier
-            .size(size)
-            .graphicsLayer {
-                translationX = x.toPx()
-                translationY = y.toPx()
-                val s = 1f + 0.035f * wobble
-                scaleX = s
-                scaleY = s
-                rotationZ = 2.5f * wobble * (if (index % 2 == 0) 1f else -1f)
-                shape = tileShape
-                clip = true
-            }
-            .border(1.dp, Color.White.copy(alpha = 0.22f), tileShape),
-    )
 }
 
 /** The glyph on a release page's placeholder sleeve: what kind of thing has no cover. */
