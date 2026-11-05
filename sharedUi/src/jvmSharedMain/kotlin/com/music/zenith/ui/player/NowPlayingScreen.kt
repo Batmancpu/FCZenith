@@ -2387,11 +2387,7 @@ fun NowPlayingScreen(
                                         drawContent()
                                     }
                                 }
-                                // Not while lyrics or the queue are up: the panel
-                                // fills the middle of the screen, and a sideways
-                                // drag over it is a stray finger, not a request to
-                                // change the song.
-                                .then(if (lyricsOpen || queueOpen) Modifier else skipSwipeGesture)
+                                .then(skipSwipeGesture)
                                 .graphicsLayer {
                                     // The paused shrink and the swipe nudge are
                                     // let go of on the way, as the portrait
@@ -2991,7 +2987,10 @@ fun NowPlayingScreen(
                             enabled = spotifyCanvasPresentation && !transitionHold,
                             onToggle = { spotifyCanvasControlsOpen = !spotifyCanvasControlsOpen },
                         )
-                        .then(skipSwipeGesture),
+                        // Not while lyrics or the queue are up: the panel fills the
+                        // middle of the screen, and a sideways drag over it is a
+                        // stray finger, not a request to change the song.
+                        .then(if (lyricsOpen || queueOpen) Modifier else skipSwipeGesture),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     // The only strip that passes drags through to the sheet, so the
