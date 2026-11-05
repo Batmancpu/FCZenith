@@ -1012,7 +1012,7 @@ object AppSettings {
             .putString(KEY_OUTPUT_PCM_MODE, if (floatOk) "FLOAT_32" else "PCM_16")
             .putBoolean(KEY_DIRECT_SOURCE_STREAM, true)
             .putBoolean(KEY_SPATIAL_AUDIO, true)
-            .putString(KEY_QUALITY_CELLULAR, "LOW")
+            .putString(KEY_QUALITY_CELLULAR, "LOSSLESS")
             .putBoolean(KEY_WIFI_ONLY_DOWNLOADS, false)
             .putBoolean(KEY_EXPORT_DOWNLOADS, true)
             .putBoolean(KEY_STOP_ON_TASK_REMOVED, false)
