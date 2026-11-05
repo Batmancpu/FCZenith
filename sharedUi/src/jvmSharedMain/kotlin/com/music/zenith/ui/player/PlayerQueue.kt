@@ -349,14 +349,8 @@ internal fun InlineQueue(
                 }
 
                 if (tracks.user.isNotEmpty()) {
-                    item(key = "header-user-queue") {
-                        QueueHeading(
-                            title = stringResource(Res.string.next_in_queue),
-                            modifier = Modifier.padding(top = 16.dp, bottom = 6.dp).then(queueMotion()),
-                        ) {
-                            QueueClearButton(MaterialTheme.typography.labelLarge, controlsLocked, onClear)
-                        }
-                    }
+                    // No heading of its own: the "Queue" title above already names
+                    // this list and carries the Clear button.
                     queueSection(tracks.user, QueueSection.USER, drag, controlsLocked, onJumpTo, onRemove)
                 }
                 if (tracks.context.isNotEmpty()) {
