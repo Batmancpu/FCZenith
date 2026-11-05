@@ -4733,6 +4733,16 @@ private fun ZenithApp(
             // null = masih dimuat; kosong = tidak ada rekomendasi.
             var addSongsSuggestions by remember { mutableStateOf<List<Song>?>(null) }
             var addSongsPrevFilter by remember { mutableStateOf<SearchFilter?>(null) }
+            DisposableEffect(Unit) {
+                AddSongsRequest.hide()
+                onDispose {
+                    if (AddSongsRequest.open.value) {
+                        viewModel.onQueryChange("")
+                        addSongsPrevFilter?.let { viewModel.onFilterChange(it) }
+                    }
+                    AddSongsRequest.hide()
+                }
+            }
             LaunchedEffect(addSongsOpen) {
                 if (!addSongsOpen) return@LaunchedEffect
                 if (!reduceDynamicBlur && !playerLiveCanvas) playerBackdrop.capture()
