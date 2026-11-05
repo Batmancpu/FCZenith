@@ -86,6 +86,7 @@ fun AccountProfileSelector(
     var managing by remember { mutableStateOf(false) }
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
     val reduceMotion by AppSettings.reduceAnimation.collectAsStateWithLifecycle()
+    val profileOverride by AppSettings.profileOverride.collectAsStateWithLifecycle()
     val touch = rememberIosMenuTouch(reduceMotion)
     val shape = RoundedCornerShape(22.dp)
     val surface = MaterialTheme.colorScheme.surface
@@ -216,10 +217,23 @@ fun AccountProfileSelector(
                         modifier = Modifier.padding(18.dp, 8.dp, 18.dp, 2.dp))
                 }
                 items(account.profiles.size) { index ->
-                    val profile = account.profiles[index]
+                    val raw = account.profiles[index]
+                    val selected = account.accountId == activeAccountId && raw.profileId == activeProfileId
+                    // Nama dan foto buatan pengguna berlaku untuk profil yang sedang aktif.
+                    val profile = if (selected && profileOverride.owner == AppSettings.profileOwnerOf(account.email)) {
+                        val photo = profileOverride.photoPath
+                            .takeIf { it.isNotEmpty() && java.io.File(it).exists() }
+                            ?.let { "file://$it" }
+                        raw.copy(
+                            name = profileOverride.name.ifBlank { raw.name },
+                            avatar = photo ?: raw.avatar,
+                        )
+                    } else {
+                        raw
+                    }
                     ProfileRow(
                         profile = profile,
-                        selected = account.accountId == activeAccountId && profile.profileId == activeProfileId,
+                        selected = selected,
                         managing = managing,
                         reveal = { reveal.value },
                         onClick = { onSelect(account, profile); close(onDismiss) },

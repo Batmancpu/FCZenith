@@ -1471,7 +1471,10 @@ object ListenTogether {
         val account = store.activeSession ?: return null
         val profile = account.profiles.firstOrNull { it.profileId == account.activeProfileId }
             ?: account.profiles.firstOrNull()
+        val override = AppSettings.profileOverride.value
+            .takeIf { it.owner == AppSettings.profileOwnerOf(account.email) }
         val name = nickname.trim().takeIf { it.isNotBlank() }
+            ?: override?.name?.takeIf { it.isNotBlank() }
             ?: profile?.name?.takeIf { it.isNotBlank() }
             ?: account.name.takeIf { it.isNotBlank() }
             ?: account.email.substringBefore('@').takeIf { it.isNotBlank() }
@@ -1551,7 +1554,19 @@ object ListenTogether {
      * screen shows what will actually be sent rather than a second guess at it
      * — including answering null in the cases a party cannot be joined at all.
      */
-    fun myAvatarUrl(): String? = identity()?.avatar
+    fun myAvatarUrl(): String? {
+        val id = identity() ?: return null
+        // Foto buatan pengguna hanya ada di perangkat ini, jadi hanya dipakai untuk
+        // tampilan lokal. Yang dikirim ke party tetap [Identity.avatar] (URL http).
+        val account = BitChordApplication.authStore.activeSession
+        val override = AppSettings.profileOverride.value
+        if (account != null && override.owner == AppSettings.profileOwnerOf(account.email)) {
+            override.photoPath
+                .takeIf { it.isNotEmpty() && java.io.File(it).exists() }
+                ?.let { return "file://$it" }
+        }
+        return id.avatar
+    }
 
     /**
      * This install's identity to the party, independent of who is signed in.

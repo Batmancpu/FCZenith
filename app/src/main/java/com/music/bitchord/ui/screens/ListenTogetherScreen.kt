@@ -960,9 +960,11 @@ private fun MemberRow(member: PartyMember, isYou: Boolean, canKick: Boolean = fa
                 .background(MaterialTheme.colorScheme.surface),
             contentAlignment = Alignment.Center,
         ) {
-            if (member.avatarUrl != null) {
+            // Baris diri sendiri memakai foto buatan pengguna bila ada.
+            val avatar = if (isYou) ListenTogether.myAvatarUrl() ?: member.avatarUrl else member.avatarUrl
+            if (avatar != null) {
                 AsyncImage(
-                    model = member.avatarUrl,
+                    model = avatar,
                     contentDescription = null,
                     modifier = Modifier.size(32.dp).clip(CircleShape),
                 )
