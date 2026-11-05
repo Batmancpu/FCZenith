@@ -60,13 +60,9 @@ internal fun HomeShelf.isPlaylistPreviewShelf(): Boolean {
     if (layout != ShelfLayout.CARDS || items.isEmpty()) return false
     if (!items.all { it.browseId != null && it.videoId == null }) return false
     val normalized = title.trim().replace('\u2019', '\'')
-    val byTitle = PLAYLIST_PREVIEW_TITLES.any { normalized.equals(it, ignoreCase = true) }
-    // Judul tidak dikenal pun dipakai bila isinya playlist semua (browse id VL/PL/RDCLAK).
-    val allPlaylists = items.all { item ->
-        val id = item.browseId.orEmpty()
-        id.startsWith("VL") || id.startsWith("PL") || id.startsWith("RDCLAK")
-    }
-    return byTitle || allPlaylists
+    // Hanya shelf terpilih (lihat PLAYLIST_PREVIEW_TITLES) yang jadi kartu besar;
+    // shelf playlist lain, mis. "From the community", tetap kartu album biasa.
+    return PLAYLIST_PREVIEW_TITLES.any { normalized.equals(it, ignoreCase = true) }
 }
 
 private fun Song.asShelfItem(): ShelfItem =
