@@ -2751,7 +2751,7 @@ private const val FOOT_REFRESH_MS = 300L
 private class FootSnapshot {
     var at = 0L
 }
-private val LIKED_GAP = 12.dp
+private val LIKED_GAP = 16.dp
 private val LIKED_FOOT_BLUR = 36.dp
 
 /** Lebar relatif, arah geser, dan jumlah minimal tile per kolom. */
@@ -2760,7 +2760,14 @@ private val LIKED_COLUMN_DIR = floatArrayOf(1f, -1f, 1f)
 private val LIKED_COLUMN_COUNT = intArrayOf(6, 5, 7)
 
 private val LIKED_COLORS = listOf(Color(0xFF7B5CF0), Color(0xFFB45FDB), Color(0xFFFF5FA8))
-private val LIKED_BASE = Brush.verticalGradient(LIKED_COLORS)
+/** Palet latar cairan Liked: indigo gelap, ungu, pink, biru muda, lilac terang. */
+private val LIKED_FLUID_COLORS = listOf(
+    Color(0xFF2B1065),
+    Color(0xFF7B5CF0),
+    Color(0xFFFF5FA8),
+    Color(0xFF5CC8FF),
+    Color(0xFFE9C6FF),
+)
 
 /**
  * Most Played: warna latar bawaan (royal-amethyst), dipakai selama warna dari
@@ -2779,8 +2786,8 @@ private val LIKED_MAX_PULL = 40.dp
 
 /**
  * Header Liked Music: full-bleed sampai di bawah bar, isinya mosaik abstrak
- * dari beberapa cover lagu di playlist. Statis dan ringan: tanpa blur, tanpa
- * animasi terus-menerus. Bagian bawahnya larut ke warna halaman.
+ * dari beberapa cover lagu di playlist, di atas latar cairan yang mengalir
+ * pelan (berhenti saat player terbuka). Bagian bawahnya larut ke warna halaman.
  * Judul dan meta di bawahnya naik menimpa kaki hero, lihat [LIKED_HERO_OVERLAP].
  */
 @Composable
@@ -2873,9 +2880,9 @@ private fun LikedMusicHero(
 }
 
 /**
- * Isi hero: gradien ungu ke pink, blob cahaya, dan tiga kolom cover berbentuk
- * beragam yang miring. Semuanya statis: digambar sekali, tidak ada jam global
- * dan tidak ada animasi per tile. Hanya satu fade-in saat halaman dibuka.
+ * Isi hero: latar cairan [OrganicFluidBackground] yang mengalir, dan tiga kolom
+ * cover berbentuk beragam yang miring. Tile statis, tanpa animasi per tile;
+ * hanya latarnya yang bergerak, ditambah satu fade-in saat halaman dibuka.
  */
 @Composable
 private fun LikedArt(
@@ -2895,30 +2902,16 @@ private fun LikedArt(
         label = "likedArtEnter",
     )
 
-    BoxWithConstraints(
-        modifier.drawBehind {
-            // Latar statis: tidak membaca state, jadi digambar sekali, bukan tiap frame.
-            drawRect(LIKED_BASE)
-            val w = size.width
-            val h = size.height
-            fun blob(color: Color, cx: Float, cy: Float, r: Float) {
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        listOf(color.copy(alpha = 0.75f), color.copy(alpha = 0f)),
-                        center = Offset(cx, cy),
-                        radius = r,
-                    ),
-                    radius = r,
-                    center = Offset(cx, cy),
-                )
-            }
-            blob(Color(0xFF5CC8FF), w * 0.22f, h * 0.32f, w * 0.75f)
-            blob(Color(0xFFFF7AB8), w * 0.94f, h * 0.68f, w * 0.80f)
-            blob(Color(0xFF9B6CFF), w * 0.45f, h * 1.00f, w * 0.70f)
-        },
-    ) {
+    BoxWithConstraints(modifier) {
         val width = maxWidth
         val height = maxHeight
+
+        // Latar cairan: blob gelap-terang yang mengalir; diam selagi player menutup halaman.
+        OrganicFluidBackground(
+            modifier = Modifier.matchParentSize(),
+            colors = LIKED_FLUID_COLORS,
+            animationSpeed = if (HeroMotion.frozen) 0f else 1.6f,
+        )
 
         if (covers.isEmpty()) {
             // Belum ada cover (daftar belum datang, atau lagu tanpa gambar).
