@@ -357,8 +357,10 @@ internal fun PlaybackQualityLabel(
     // should keep saying "loading" through that stretch rather than going
     // blank only to possibly say "loading" again a moment later.
     val racingLossless by NerdStats.racingLossless.collectAsStateWithLifecycle()
+    val dolbyAtmosActive by PlayerSettings.dolbyAtmosActive.collectAsStateWithLifecycle()
     LosslessOrStats(
         isLoading = isLoading,
+        dolbyAtmosActive = dolbyAtmosActive,
         stillRacing = song.videoId in racingLossless,
         losslessRequested = effectiveQuality == AudioQuality.LOSSLESS,
         nerdStats = nerdStats,
@@ -1641,6 +1643,7 @@ private fun LosslessOrStats(
     stillRacing: Boolean,
     losslessRequested: Boolean,
     nerdStats: NerdStats.Snapshot?,
+    dolbyAtmosActive: Boolean,
     modifier: Modifier = Modifier,
 ) {
     when {
@@ -1686,7 +1689,7 @@ private fun LosslessOrStats(
             animated = true,
             modifier = modifier,
         )
-        nerdStats?.isDolbyAtmos == true -> LosslessLabel(
+        nerdStats?.isDolbyAtmos == true || dolbyAtmosActive -> LosslessLabel(
             text = "Dolby Atmos",
             animated = true,
             iconPainter = painterResource(Res.drawable.ic_dolby_atmos),

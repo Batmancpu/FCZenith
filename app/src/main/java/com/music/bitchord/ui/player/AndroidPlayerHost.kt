@@ -22,6 +22,7 @@ import com.music.bitchord.data.lyrics.LyricsTranslation
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.data.settings.LastPlayerScreen
+import com.music.bitchord.data.sources.DeviceCodecs
 import com.music.bitchord.playback.AudioOutputStatus
 import com.music.bitchord.playback.AudioRouting
 import com.music.bitchord.playback.audio.bitperfect.BitPerfectOutput
@@ -79,6 +80,10 @@ class AndroidPlayerHost(context: Context) : PlayerHost {
         override val prioritizeSpotifyCanvas get() = AppSettings.prioritizeSpotifyCanvas
         override val reduceAnimation get() = AppSettings.reduceAnimation
         override val reduceDynamicBlur get() = AppSettings.reduceDynamicBlur
+        override val dolbyAtmosActive: StateFlow<Boolean> =
+            combine(AppSettings.dolbyAtmos, BitPerfectOutput.ready) { enabled, bitPerfect ->
+                DeviceCodecs.playsDolbyAtmos && enabled && !bitPerfect
+            }.stateIn(scope, SharingStarted.Eagerly, DeviceCodecs.atmosWanted)
         override val showNerdStats get() = AppSettings.showNerdStats
         override val showListenTogetherButton get() = AppSettings.showListenTogetherButton
         override val smartAnalysis get() = AppSettings.smartAnalysis
