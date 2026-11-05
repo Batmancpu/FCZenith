@@ -3071,18 +3071,18 @@ fun MostPlayedArt(covers: List<String>, motion: Boolean, modifier: Modifier = Mo
 
         // Teks vertikal tipis di tepi kiri, dipusatkan agar aman saat hero memotong sisi.
         val stripW = side * 0.64f
-        val stripH = side * 0.05f
+        val stripH = side * 0.06f
         Text(
             text = "MOST PLAYED  •  TOP SONGS",
-            color = Color.White.copy(alpha = 0.60f),
-            fontSize = fs(0.030f),
+            color = Color.White.copy(alpha = 0.70f),
+            fontSize = fs(0.038f),
             fontWeight = FontWeight.SemiBold,
             letterSpacing = fs(0.005f),
             textAlign = TextAlign.Center,
             maxLines = 1,
             softWrap = false,
             modifier = Modifier
-                .offset(originX + side * 0.115f - stripW / 2, originY + side * 0.44f - stripH / 2)
+                .offset(originX + side * 0.07f - stripW / 2, originY + side * 0.43f - stripH / 2)
                 .size(stripW, stripH)
                 .graphicsLayer { rotationZ = -90f },
         )
@@ -3110,7 +3110,7 @@ fun MostPlayedArt(covers: List<String>, motion: Boolean, modifier: Modifier = Mo
                 Text(
                     text = "0${slot.cover + 1}",
                     color = Color.White,
-                    fontSize = fs(0.032f),
+                    fontSize = fs(0.042f),
                     fontWeight = FontWeight.Bold,
                     letterSpacing = fs(0.003f),
                     modifier = Modifier
@@ -3126,14 +3126,14 @@ fun MostPlayedArt(covers: List<String>, motion: Boolean, modifier: Modifier = Mo
         // mengisi ruang kosong dan menyejajarkan lebar dengan grid.
         Row(
             modifier = Modifier
-                .offset(originX + side * 0.17f, originY + side * 0.715f)
-                .width(side * 0.758f),
+                .offset(originX + side * 0.125f, originY + side * 0.725f)
+                .width(side * 0.83f),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 text = "TOP 3",
-                color = Color.White.copy(alpha = 0.85f),
-                fontSize = fs(0.040f),
+                color = Color.White.copy(alpha = 0.90f),
+                fontSize = fs(0.050f),
                 fontWeight = FontWeight.Bold,
                 letterSpacing = fs(0.006f),
                 maxLines = 1,
@@ -3239,9 +3239,9 @@ private class MostPlayedSlot(
 // Tile besar = 2 tile kecil + 1 jarak, jadi sisi atas dan bawahnya sejajar.
 // Baris keterangan di y 0.715; pudar kaki kartu mulai di y 0.78.
 private val MOST_PLAYED_COLLAGE = listOf(
-    MostPlayedSlot(cover = 0, x = 0.170f, y = 0.190f, size = 0.497f),
-    MostPlayedSlot(cover = 1, x = 0.692f, y = 0.190f, size = 0.236f),
-    MostPlayedSlot(cover = 2, x = 0.692f, y = 0.451f, size = 0.236f),
+    MostPlayedSlot(cover = 0, x = 0.125f, y = 0.160f, size = 0.545f),
+    MostPlayedSlot(cover = 1, x = 0.695f, y = 0.160f, size = 0.260f),
+    MostPlayedSlot(cover = 2, x = 0.695f, y = 0.445f, size = 0.260f),
 )
 
 private val MOST_PLAYED_GRID = floatArrayOf(0.14f, 0.31f, 0.50f, 0.69f, 0.86f)
