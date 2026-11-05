@@ -127,6 +127,8 @@ fun GlassNavBar(
     val selectedColor = MaterialTheme.colorScheme.primary
     val unselectedColor = contentColor.copy(alpha = 0.65f)
     val haptics = rememberHaptics()
+    // Goyangan jelly pill now playing, dibagikan ke tab dan Search di sebelahnya.
+    val jellyPush = remember { JellyPush() }
 
     // The tab content lambdas below are captured once per contentKey and held
     // until it changes, so a click handler that reached back to this call's
@@ -153,6 +155,7 @@ fun GlassNavBar(
         selectedTabKey = selectedIndex,
         scrollConnection = scrollConnection,
         chromeProgress = chromeProgress,
+        jellyPush = jellyPush,
         modifier = modifier
             .windowInsetsPadding(floatingBarInsets)
             .padding(horizontal = NAV_BAR_GUTTER)
@@ -164,6 +167,7 @@ fun GlassNavBar(
                 GlassNowPlaying(
                     song = current,
                     isInline = true,
+                    jellyPush = jellyPush,
                     isPlaying = isPlaying,
                     isLoading = isLoading,
                     contentColor = contentColor,
@@ -326,6 +330,7 @@ private fun GlassNowPlaying(
     onBlockedControl: () -> Unit,
     dock: PlayerDock?,
     pull: MiniPlayerPull?,
+    jellyPush: JellyPush? = null,
     modifier: Modifier = Modifier,
 ) {
     val haptics = rememberHaptics()
@@ -378,6 +383,7 @@ private fun GlassNowPlaying(
                 },
                 locked = controlsLocked,
                 onBlocked = onBlockedControl,
+                push = jellyPush,
             )
             .graphicsLayer {
                 // Level while the panel is up: the player's cover flies to and

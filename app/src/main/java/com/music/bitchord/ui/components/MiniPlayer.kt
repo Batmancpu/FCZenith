@@ -41,6 +41,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
@@ -172,6 +173,33 @@ private const val JELLY_SQUASH_Y = 0.10f
 private const val JELLY_DAMPING = 0.3f
 
 /**
+ * Goyangan jelly mini player yang dibagikan ke tetangganya di bar inline (tab dan
+ * Search). [miniPlayerGestures] menulisnya, tab bar membacanya saat draw untuk
+ * mendorong tombol di sebelah pill. Semua isinya hanya dibaca di layer, jadi
+ * tidak ada recomposition.
+ */
+class JellyPush {
+    internal val offset = mutableFloatStateOf(0f)
+    internal val squish = mutableFloatStateOf(0f)
+    internal val phase = mutableFloatStateOf(0f)
+    internal val width = mutableFloatStateOf(0f)
+
+    /**
+     * Seberapa jauh (px) tepi kiri atau kanan pill maju melewati posisi diamnya,
+     * dihitung dari geseran ditambah setengah regangannya. Nol kalau tepi itu
+     * justru mundur.
+     */
+    fun advance(towardLeft: Boolean): Float {
+        val p = phase.floatValue
+        val s = squish.floatValue * p
+        val shift = offset.floatValue * p
+        val grow = width.floatValue * JELLY_STRETCH_X * s / 2f
+        val edge = if (towardLeft) -shift + grow else shift + grow
+        return edge.coerceAtLeast(0f)
+    }
+}
+
+/**
  * How far the bar rises for [pulled] pixels of finger: [PULL_LIFT_RATE] of the
  * finger to begin with, slowing the further it goes — a rubber band with no
  * end to it, so the bar keeps creeping up for as long as the finger does
@@ -226,6 +254,8 @@ internal fun Modifier.miniPlayerGestures(
     /** Listening in a party whose host holds the controls. Swipes say so instead of skipping. */
     locked: Boolean = false,
     onBlocked: () -> Unit = {},
+    /** Kalau diisi, goyangan jelly dibagikan agar tab dan Search di sebelah pill ikut terdorong. */
+    push: JellyPush? = null,
 ): Modifier {
     // Playback state updates can recompose the bar while a finger is down.
     // Keep the gesture coroutine alive through those updates while still
@@ -241,9 +271,9 @@ internal fun Modifier.miniPlayerGestures(
     val lift = remember { mutableFloatStateOf(0f) }
     val settle = remember { arrayOfNulls<Job>(1) }
     // Jelly: geser, gepeng, dan fase pantulan. Hanya dibaca saat draw.
-    val jOffset = remember { mutableFloatStateOf(0f) }
-    val jSquish = remember { mutableFloatStateOf(0f) }
-    val jPhase = remember { mutableFloatStateOf(0f) }
+    val jOffset = push?.offset ?: remember { mutableFloatStateOf(0f) }
+    val jSquish = push?.squish ?: remember { mutableFloatStateOf(0f) }
+    val jPhase = push?.phase ?: remember { mutableFloatStateOf(0f) }
     val jellyJob = remember { arrayOfNulls<Job>(1) }
     return pointerInput(Unit) {
         val trackThreshold = TRACK_SWIPE_THRESHOLD.toPx()
@@ -351,7 +381,9 @@ internal fun Modifier.miniPlayerGestures(
                 ) { value, _ -> lift.floatValue = value }
             }
         }
-    }.graphicsLayer {
+    }.then(
+        if (push == null) Modifier else Modifier.onSizeChanged { push.width.floatValue = it.width.toFloat() },
+    ).graphicsLayer {
         val p = jPhase.floatValue
         val s = jSquish.floatValue * p
         translationX = jOffset.floatValue * p

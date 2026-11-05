@@ -115,6 +115,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.ui.components.GlassSpring
+import com.music.bitchord.ui.components.JellyPush
 import com.music.bitchord.ui.components.LocalGlassExport
 import com.music.bitchord.ui.components.backdrop.backdrops.layerBackdrop
 import com.music.bitchord.ui.components.backdrop.backdrops.rememberLayerBackdrop
@@ -168,6 +169,23 @@ private fun Modifier.chromePushDown(progress: () -> Float): Modifier = graphicsL
 private fun Modifier.chromePushSide(progress: () -> Float, direction: Float): Modifier = graphicsLayer {
     val e = chromePushEase(progress())
     translationX = direction * (size.width + CHROME_PUSH_MARGIN.toPx()) * e
+}
+
+/** Celah yang tetap dijaga antara pill mini player yang bergoyang dan tombol yang didorongnya. */
+private val JELLY_PUSH_MARGIN = 6.dp
+
+/**
+ * Mode inline: tombol di sisi [direction] (-1 kiri, 1 kanan, sudah dibalik untuk RTL)
+ * terdorong menjauh begitu tepi pill mini player, yang bergoyang karena jelly,
+ * melewati celah [gap] di antara mereka. Dibaca saat draw saja.
+ */
+private fun Modifier.jellyPushSide(push: JellyPush?, direction: Float, gap: Dp): Modifier {
+    if (push == null) return this
+    return graphicsLayer {
+        val room = (gap - JELLY_PUSH_MARGIN).toPx().coerceAtLeast(0f)
+        val over = (push.advance(towardLeft = direction < 0f) - room).coerceAtLeast(0f)
+        translationX = direction * over
+    }
 }
 
 /**
@@ -251,6 +269,8 @@ fun FloatingTabBar(
     modifier: Modifier = Modifier,
     /** 0 = bar diam, 1 = player terbuka penuh. Dibaca saat draw saja. */
     chromeProgress: () -> Float = ZeroChromeProgress,
+    /** Goyangan jelly pill accessory inline; tab dan Search terdorong olehnya. */
+    jellyPush: JellyPush? = null,
     tabBarContentModifier: @Composable () -> Modifier = DefaultTabBarContentModifier,
     inlineAccessory: (@Composable SharedTransitionScope.(Modifier, AnimatedVisibilityScope) -> Unit)? = null,
     expandedAccessory: (@Composable SharedTransitionScope.(Modifier, AnimatedVisibilityScope) -> Unit)? = null,
@@ -287,6 +307,7 @@ fun FloatingTabBar(
                 InlineBar(
                     scope = scope,
                     chromeProgress = chromeProgress,
+                    jellyPush = jellyPush,
                     selectedTabKey = selectedTabKey,
                     accessory = inlineAccessory,
                     isAccessoryShared = isAccessoryShared,
@@ -483,6 +504,7 @@ interface FloatingTabBarScope {
 private fun SharedTransitionScope.InlineBar(
     scope: FloatingTabBarScopeImpl,
     chromeProgress: () -> Float,
+    jellyPush: JellyPush?,
     selectedTabKey: Any?,
     accessory: (@Composable SharedTransitionScope.(Modifier, AnimatedVisibilityScope) -> Unit)?,
     isAccessoryShared: Boolean,
@@ -521,7 +543,9 @@ private fun SharedTransitionScope.InlineBar(
                 elevations = elevations,
                 animatedVisibilityScope = animatedVisibilityScope,
                 tabBarContentModifier = tabBarContentModifier,
-                modifier = Modifier.chromePushSide(chromeProgress, startSign)
+                modifier = Modifier
+                    .chromePushSide(chromeProgress, startSign)
+                    .jellyPushSide(jellyPush, startSign, sizes.inlineComponentSpacing)
             )
         }
 
@@ -551,6 +575,7 @@ private fun SharedTransitionScope.InlineBar(
                     .fillMaxHeight()
                     .aspectRatio(1f)
                     .chromePushSide(chromeProgress, -startSign)
+                    .jellyPushSide(jellyPush, -startSign, sizes.inlineComponentSpacing)
             )
         }
     }
