@@ -3,6 +3,8 @@ package com.music.zenith.ui.screens
 import com.music.zenith.ui.components.trackArtSize
 import android.os.Build
 import android.os.SystemClock
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import com.music.zenith.R
 
 import androidx.compose.animation.AnimatedContent
@@ -2556,8 +2558,15 @@ private fun MostPlayedHero(
     val shared = rememberGraphicsLayer()
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
     val blurFoot = !reduceDynamicBlur && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+    val footLayer = rememberGraphicsLayer()
+    val foot = remember { FootSnapshot() }
+    var onScreen by remember { mutableStateOf(true) }
     Box(
         modifier
+            .onGloballyPositioned { c ->
+                val v = c.isAttached && !c.boundsInWindow().isEmpty
+                if (v != onScreen) onScreen = v
+            }
             // Paling luar: tinggi yang dilaporkan lebih pendek, sehingga
             // judul di bawahnya tergambar di atas kaki hero.
             .layout { measurable, constraints ->
@@ -2616,7 +2625,7 @@ private fun MostPlayedHero(
             CompositionLocalProvider(LocalSettledMosaic provides true) {
                 MostPlayedArt(
                     covers = page.covers,
-                    motion = !HeroMotion.frozen,
+                    motion = !HeroMotion.frozen && onScreen,
                     modifier = Modifier.fillMaxSize().drawWithContent {
                         shared.record(
                             size = IntSize(
@@ -2625,6 +2634,18 @@ private fun MostPlayedHero(
                             ),
                         ) { this@drawWithContent.drawContent() }
                         drawLayer(shared)
+                        if (blurFoot) {
+                            val stamp = SystemClock.uptimeMillis()
+                            if (stamp - foot.at >= FOOT_REFRESH_MS) {
+                                foot.at = stamp
+                                footLayer.record(
+                                    size = IntSize(
+                                        size.width.roundToInt().coerceAtLeast(1),
+                                        size.height.roundToInt().coerceAtLeast(1),
+                                    ),
+                                ) { drawLayer(shared) }
+                            }
+                        }
                     },
                 )
             }
@@ -2662,7 +2683,7 @@ private fun MostPlayedHero(
                         layout(w, h) { placeable.place((w - side) / 2, (h - side) / 2) }
                     },
                 ) {
-                    Box(Modifier.fillMaxSize().drawBehind { drawLayer(shared) })
+                    Box(Modifier.fillMaxSize().drawBehind { drawLayer(footLayer) })
                 }
             }
         }
@@ -2712,6 +2733,16 @@ private const val LIKED_COLUMNS = 3
 private const val LIKED_MAX_COVERS = 21
 private const val LIKED_DRIFT_MS = 70_000
 private const val LIKED_PULSE_MS = 9_000
+
+/** Animasi hero cukup 30 fps: geraknya pelan, setengah frame tidak terlihat bedanya. */
+private const val HERO_FRAME_MS = 33L
+
+/** Salinan ter-blur di kaki hero direkam ulang tiap sekian ms, bukan tiap frame. */
+private const val FOOT_REFRESH_MS = 300L
+
+private class FootSnapshot {
+    var at = 0L
+}
 private val LIKED_GAP = 12.dp
 private val LIKED_FOOT_BLUR = 36.dp
 
@@ -2811,6 +2842,9 @@ private fun LikedMusicHero(
     val shared = rememberGraphicsLayer()
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
     val blurFoot = !reduceDynamicBlur && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+    val footLayer = rememberGraphicsLayer()
+    val foot = remember { FootSnapshot() }
+    var onScreen by remember { mutableStateOf(true) }
 
     // Satu seed per pembukaan: acak, tapi tidak berubah saat list di-scroll
     // keluar dan kembali, atau saat urutan lagu diganti.
@@ -2822,24 +2856,30 @@ private fun LikedMusicHero(
             .take(LIKED_MAX_COVERS)
     }
 
-    // Satu jam untuk semua lapisan, dibaca hanya lewat lambda (fase layout/draw),
-    // jadi tidak ada recomposition per frame dan salinan blur tetap sinkron.
-    val transition = rememberInfiniteTransition(label = "likedHero")
-    val drift by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(LIKED_DRIFT_MS, easing = LinearEasing)),
-        label = "likedDrift",
-    )
-    val pulse by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(LIKED_PULSE_MS, easing = LinearEasing)),
-        label = "likedPulse",
-    )
+    // Satu jam untuk semua lapisan, dibaca hanya lewat lambda (fase layout/draw).
+    // Berdetak 30 fps, berhenti saat player menutupi halaman atau hero keluar layar,
+    // dan melanjutkan dari posisi terakhir (tanpa loncat).
+    var clock by remember { mutableLongStateOf(SystemClock.uptimeMillis()) }
+    val running = !HeroMotion.frozen && onScreen
+    LaunchedEffect(running) {
+        if (!running) return@LaunchedEffect
+        var last = SystemClock.uptimeMillis()
+        while (true) {
+            withFrameMillis { }
+            val now = SystemClock.uptimeMillis()
+            val dt = now - last
+            if (dt < HERO_FRAME_MS) continue
+            last = now
+            clock += dt
+        }
+    }
 
     Box(
         modifier
+            .onGloballyPositioned { c ->
+                val v = c.isAttached && !c.boundsInWindow().isEmpty
+                if (v != onScreen) onScreen = v
+            }
             // Paling luar: tinggi yang dilaporkan lebih pendek, sehingga
             // judul di bawahnya tergambar di atas kaki hero.
             .layout { measurable, constraints ->
@@ -2879,8 +2919,8 @@ private fun LikedMusicHero(
         ) {
             LikedArt(
                 covers = covers,
-                drift = { drift },
-                pulse = { pulse },
+                drift = { (clock % LIKED_DRIFT_MS) / LIKED_DRIFT_MS.toFloat() },
+                pulse = { (clock % LIKED_PULSE_MS) / LIKED_PULSE_MS.toFloat() },
                 topInset = LIKED_OVERSCROLL,
                 modifier = Modifier.matchParentSize().drawWithContent {
                     shared.record(
@@ -2890,6 +2930,18 @@ private fun LikedMusicHero(
                         ),
                     ) { this@drawWithContent.drawContent() }
                     drawLayer(shared)
+                    if (blurFoot) {
+                        val stamp = SystemClock.uptimeMillis()
+                        if (stamp - foot.at >= FOOT_REFRESH_MS) {
+                            foot.at = stamp
+                            footLayer.record(
+                                size = IntSize(
+                                    size.width.roundToInt().coerceAtLeast(1),
+                                    size.height.roundToInt().coerceAtLeast(1),
+                                ),
+                            ) { drawLayer(shared) }
+                        }
+                    }
                 },
             )
 
@@ -2916,7 +2968,7 @@ private fun LikedMusicHero(
                             )
                         }
                         .blur(LIKED_FOOT_BLUR, BlurredEdgeTreatment.Rectangle)
-                        .drawBehind { drawLayer(shared) },
+                        .drawBehind { drawLayer(footLayer) },
                 )
             }
         }
@@ -3107,6 +3159,7 @@ fun MostPlayedArt(covers: List<String>, motion: Boolean, modifier: Modifier = Mo
             withFrameMillis { }
             val now = SystemClock.uptimeMillis()
             val dt = now - last
+            if (dt < HERO_FRAME_MS) continue
             last = now
             val behind = now - nowMs - dt
             nowMs += dt + (behind * 0.06f).toLong()
