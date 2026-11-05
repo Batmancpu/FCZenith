@@ -186,6 +186,11 @@ class PlayerDock {
     /** From the panel's root, once placed: where its window starts on screen. */
     fun panelPlaced(coordinates: LayoutCoordinates) {
         windowOrigin = coordinates.localToScreen(Offset.Zero)
+        // Ukuran window panel sendiri, dipakai panelSideTravel/panelBottomTravel.
+        // Sebelumnya hanya diisi playerMorph() yang tidak lagi dipasang, jadi
+        // keduanya NaN dan tab bar memakai kurva cadangan yang tidak menempel panel.
+        originW = coordinates.size.width
+        originH = coordinates.size.height
         panelShown = true
     }
 
