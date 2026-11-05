@@ -56,7 +56,7 @@ internal fun MixFluidArt(title: String, modifier: Modifier = Modifier) {
  * satu diputihkan, supaya blob cairan punya bayangan dan sorot, bukan satu warna rata.
  * Urutan mengikuti shader: dasar mengambil warna ke-2 dan ke-3, blob berputar di kelimanya.
  */
-private fun mixContrastPalette(base: List<Color>): List<Color> {
+fun mixContrastPalette(base: List<Color>): List<Color> {
     fun at(i: Int) = base[i % base.size]
     return listOf(
         lerp(at(3), Color.Black, 0.62f),

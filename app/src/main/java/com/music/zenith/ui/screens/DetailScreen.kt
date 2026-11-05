@@ -3039,8 +3039,10 @@ fun MostPlayedArt(covers: List<String>, motion: Boolean, modifier: Modifier = Mo
         // Apple Music. Warna ikut beralih halus lewat tint yang beranimasi di atas.
         OrganicFluidBackground(
             modifier = Modifier.matchParentSize(),
-            colors = listOf(top, mid, bottom, mid.lighter(0.35f), top.lighter(0.45f)),
-            animationSpeed = if (motion && !HeroMotion.frozen) 0.5f else 0f,
+            colors = mixContrastPalette(
+                listOf(mid, top, bottom, top.lighter(0.5f), mid.lighter(0.35f)),
+            ),
+            animationSpeed = if (motion && !HeroMotion.frozen) 2.2f else 0f,
         )
         if (covers.isEmpty()) return@BoxWithConstraints
         val density = LocalDensity.current
