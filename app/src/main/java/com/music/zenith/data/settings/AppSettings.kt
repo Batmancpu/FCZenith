@@ -1,8 +1,12 @@
 package com.music.zenith.data.settings
 
 import com.music.zenith.data.webdav.update
+import android.app.ActivityManager
 import android.content.Context
 import android.content.SharedPreferences
+import android.media.AudioFormat
+import android.media.AudioTrack
+import android.os.Build
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
@@ -946,6 +950,7 @@ object AppSettings {
      */
     fun init(context: Context, authStore: AuthStore) {
         prefs = context.getSharedPreferences("bitchord_settings", Context.MODE_PRIVATE)
+        seedFirstInstallDefaults(context)
         this.authStore = authStore
         com.music.zenith.data.spotify.LocalPlaylistStore.init(context)
         com.music.zenith.data.OfflinePlaylists.init(
@@ -970,6 +975,74 @@ object AppSettings {
     fun reload() {
         if (!this::prefs.isInitialized) return
         readAll()
+    }
+
+    /**
+     * Setelan awal untuk instalasi baru: hanya saat file preferensi masih kosong,
+     * jadi pengguna lama dan hasil restore tidak pernah tertimpa. Nilai yang bergantung
+     * pada kemampuan HP diberi fallback ke nilai konservatif.
+     */
+    private fun seedFirstInstallDefaults(context: Context) {
+        if (prefs.all.isNotEmpty()) return
+        val lowRam = runCatching {
+            (context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager)?.isLowRamDevice == true
+        }.getOrDefault(false)
+        // HP kuat: cukup core dan RAM untuk analisis Automix di latar belakang.
+        val capable = !lowRam && Runtime.getRuntime().availableProcessors() >= 6
+        // Output float 32-bit hanya jika AudioTrack perangkat benar-benar menerimanya.
+        val floatOk = runCatching {
+            AudioTrack.getMinBufferSize(
+                48000,
+                AudioFormat.CHANNEL_OUT_STEREO,
+                AudioFormat.ENCODING_PCM_FLOAT,
+            ) > 0
+        }.getOrDefault(false)
+        // Cache 1 GB hanya jika penyimpanan lega; selain itu pakai batas bawaan.
+        val roomy = runCatching { context.cacheDir.usableSpace >= 4L * 1024 * 1024 * 1024 }
+            .getOrDefault(false)
+        val language = java.util.Locale.getDefault().language
+            .let { if (it == "in") "id" else it }
+            .takeIf { it.length in 2..3 }
+            .orEmpty()
+        prefs.edit()
+            .putInt(KEY_CROSSFADE, 10)
+            .putBoolean(KEY_SMART_FADE, capable)
+            .putString(KEY_AUTOMIX_PERFORMANCE_MODE, if (capable) "PERFORMANCE" else "BALANCED")
+            .putBoolean(KEY_SKIP_SILENCE, true)
+            .putString(KEY_OUTPUT_PCM_MODE, if (floatOk) "FLOAT_32" else "PCM_16")
+            .putBoolean(KEY_DIRECT_SOURCE_STREAM, true)
+            .putBoolean(KEY_SPATIAL_AUDIO, true)
+            .putString(KEY_QUALITY_CELLULAR, "LOW")
+            .putBoolean(KEY_WIFI_ONLY_DOWNLOADS, false)
+            .putBoolean(KEY_EXPORT_DOWNLOADS, true)
+            .putBoolean(KEY_STOP_ON_TASK_REMOVED, false)
+            .putBoolean(KEY_HIDE_VOLUME_BAR, true)
+            .putBoolean(KEY_SHOW_MUSIC_VIDEO, false)
+            .putBoolean(KEY_HIDE_SONG_STATUS, true)
+            .putBoolean(KEY_SHOW_QUEUE_HISTORY, true)
+            .putBoolean(KEY_SWIPE_TO_PLAY_NEXT, true)
+            .putBoolean(KEY_DONT_REPEAT_SUGGESTIONS, true)
+            .putBoolean(KEY_LIQUID_GLASS, Build.VERSION.SDK_INT >= 31 && !lowRam)
+            .putBoolean(KEY_FULL_BLEED_ARTWORK, false)
+            .putBoolean(KEY_PRIORITIZE_SYLLABLE_SYNC, true)
+            .putBoolean(KEY_SHOW_CACHE_FOLDER, true)
+            .putString(KEY_LOCAL_MUSIC_SORT, "DATE_ADDED")
+            .putLong(KEY_CACHE_LIMIT, if (roomy) 1024L * 1024 * 1024 else DEFAULT_CACHE_LIMIT_BYTES)
+            .putLong(KEY_CANVAS_CACHE_LIMIT, if (roomy) 1024L * 1024 * 1024 else DEFAULT_CANVAS_CACHE_LIMIT_BYTES)
+            .putString(
+                KEY_LYRICS_SOURCE_ORDER,
+                "BETTER_LYRICS,BETTER_LYRICS_PORTATO,LRC_RED,BINI_LYRICS,PAXSENIX,PAXSENIX_SPOTIFY,PAXSENIX_MUSIXMATCH,LYRICS_PLUS,UNISON,YOUTUBE_TRANSCRIPT,YOUTUBE_MUSIC,KUGOU,LRCLIB,MUSIXMATCH,GENIUS",
+            )
+            .putString(
+                KEY_LYRICS_SOURCES,
+                "LRC_RED,BINI_LYRICS,BETTER_LYRICS,PAXSENIX,PAXSENIX_SPOTIFY,PAXSENIX_MUSIXMATCH,LYRICS_PLUS,UNISON,YOUTUBE_TRANSCRIPT,YOUTUBE_MUSIC,KUGOU,LRCLIB,MUSIXMATCH,GENIUS,BETTER_LYRICS_PORTATO",
+            )
+            .putString(
+                KEY_LYRICS_SOURCES_SEEN,
+                "LRC_RED,BINI_LYRICS,BETTER_LYRICS,BETTER_LYRICS_PORTATO,PAXSENIX,PAXSENIX_SPOTIFY,PAXSENIX_MUSIXMATCH,LYRICS_PLUS,UNISON,YOUTUBE_TRANSCRIPT,YOUTUBE_MUSIC,KUGOU,LRCLIB,MUSIXMATCH,GENIUS",
+            )
+            .putString(KEY_TRANSLATION_LANGUAGE, language)
+            .apply()
     }
 
     private fun readAll() {
