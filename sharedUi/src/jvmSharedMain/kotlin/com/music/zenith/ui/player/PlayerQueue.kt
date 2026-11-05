@@ -330,7 +330,7 @@ internal fun InlineQueue(
                     .then(if (collapsePlayerOnScroll) Modifier.nestedScroll(controlsOnScroll) else Modifier),
                 // Zona fade [fadingEdges] 28dp; padding atas sengaja lebih kecil
                 // supaya "Add Songs to Queue" naik dan hanya sedikit masuk fade.
-                contentPadding = PaddingValues(start = PLAYER_GUTTER, end = PLAYER_GUTTER, top = 12.dp),
+                contentPadding = PaddingValues(start = PLAYER_GUTTER, end = PLAYER_GUTTER, top = 4.dp),
             ) {
                 if (tracks.history.isNotEmpty()) {
                     item(key = "header-history") {
