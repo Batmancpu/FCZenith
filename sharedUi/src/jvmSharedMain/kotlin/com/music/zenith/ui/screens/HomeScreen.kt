@@ -110,6 +110,22 @@ private const val RECENTS_TITLE = "Recents"
 private const val RECENT_TRACKS_PER_COLUMN = 4
 
 private val LISTEN_AGAIN_TITLES = listOf("Listen again", "Nghe lại", "もう一度聴く")
+private val QUICK_PICKS_TITLES = listOf("Quick picks", "Lựa chọn nhanh", "Chọn nhanh đài phát", "クイック ミックス")
+
+/**
+ * Quick picks menempati slot Listen again (baris kartu persegi di depan),
+ * dan Listen again pindah ke slot Quick picks (daftar berhalaman).
+ * Dibiarkan apa adanya bila salah satunya tidak ada.
+ */
+private fun List<HomeShelf>.withQuickPicksInListenAgainSlot(): List<HomeShelf> {
+    val quick = indexOfFirst { shelf -> QUICK_PICKS_TITLES.any { shelf.title.trim().equals(it, ignoreCase = true) } }
+    val again = indexOfFirst { shelf -> LISTEN_AGAIN_TITLES.any { shelf.title.trim().equals(it, ignoreCase = true) } }
+    if (quick < 0 || again < 0 || quick == again) return this
+    return toMutableList().also {
+        it[quick] = this[again]
+        it[again] = this[quick]
+    }
+}
 
 /**
  * Recents and YouTube's Listen again trade places: Listen again leads the
@@ -133,7 +149,7 @@ private fun List<HomeShelf>.withListenAgainFirst(): List<HomeShelf> {
  * Dibiarkan apa adanya bila semua shelf di bawahnya berbentuk kartu.
  */
 private fun List<HomeShelf>.withOtherModelBelowListenAgain(): List<HomeShelf> {
-    val again = indexOfFirst { shelf -> LISTEN_AGAIN_TITLES.any { shelf.title.trim().equals(it, ignoreCase = true) } }
+    val again = indexOfFirst { shelf -> QUICK_PICKS_TITLES.any { shelf.title.trim().equals(it, ignoreCase = true) } }
     if (again < 0 || again + 1 >= size) return this
     fun HomeShelf.isPagedList() =
         layout == ShelfLayout.LIST || title.trim().equals(RECENTS_TITLE, ignoreCase = true)
@@ -351,7 +367,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.itemsIndexedShelves(
     onMoodsShowAll: () -> Unit = {},
     onPlaySongs: ((List<Song>) -> Unit)? = null,
 ) {
-    val ordered = shelves.withListenAgainFirst().withOtherModelBelowListenAgain()
+    val ordered = shelves.withListenAgainFirst().withQuickPicksInListenAgainSlot().withOtherModelBelowListenAgain()
     // Find Your Mood sits right after Recents, so it never follows another
     // row of cards directly. Without Recents (a guest) it goes after the second shelf.
     val moodAt = (ordered.indexOfFirst { it.title.trim().equals(RECENTS_TITLE, ignoreCase = true) }
@@ -363,8 +379,9 @@ private fun androidx.compose.foundation.lazy.LazyListScope.itemsIndexedShelves(
         item(key = shelf.title + index) {
             val openItem: (ShelfItem) -> Unit = { item -> onItemClick(item, shelf.title) }
             val isListenAgain = LISTEN_AGAIN_TITLES.any { shelf.title.trim().equals(it, ignoreCase = true) }
-            // Listen again is one row of square cards, as Recently Played is on
-            // Apple Music; Quick picks and Recents keep the paged list.
+            val isQuickPicks = QUICK_PICKS_TITLES.any { shelf.title.trim().equals(it, ignoreCase = true) }
+            // Quick picks is one row of square cards, as Recently Played is on
+            // Apple Music; Listen again and Recents keep the paged list.
             if (onPlaySongs != null && shelf.isPlaylistPreviewShelf()) {
                 PlaylistPreviewShelf(
                     shelf = shelf,
@@ -374,9 +391,11 @@ private fun androidx.compose.foundation.lazy.LazyListScope.itemsIndexedShelves(
                     currentSong = currentSong,
                     isPlaying = isPlaying,
                 )
-            } else if (!isListenAgain && (
-                    shelf.layout == ShelfLayout.LIST ||
-                        shelf.title.equals(RECENTS_TITLE, ignoreCase = true)
+            } else if (isListenAgain || (
+                    !isQuickPicks && (
+                        shelf.layout == ShelfLayout.LIST ||
+                            shelf.title.equals(RECENTS_TITLE, ignoreCase = true)
+                        )
                     )
             ) {
                 RecentShelf(
@@ -396,7 +415,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.itemsIndexedShelves(
                 )
             } else {
                 Shelf(
-                    shelf = if (isListenAgain) {
+                    shelf = if (isQuickPicks || isListenAgain) {
                         shelf.copy(
                             title = localizeShelfTitle(shelf.title),
                             subtitle = localizeShelfSubtitle(shelf.subtitle),
