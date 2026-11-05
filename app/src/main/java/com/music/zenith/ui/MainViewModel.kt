@@ -2819,6 +2819,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         subtitle: String = "",
         thumbnailUrl: String? = null,
         type: BrowseType = BrowseType.OTHER,
+        mix: String? = null,
     ) {
         // A fast double tap used to push two identical loading pages and launch
         // two identical browse requests. Besides wasting the connection, both
@@ -2841,6 +2842,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             thumbnailUrl = thumbnailUrl,
             songs = UiState.Loading,
             type = resolved,
+            mix = mix,
         )
         viewModelScope.launch {
             var sections = emptyList<HomeShelf>()
@@ -3110,6 +3112,42 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             songs = if (songs.isEmpty()) UiState.Error(text(R.string.no_tracks_here)) else UiState.Success(songs),
             covers = pick.images,
         )
+    }
+
+    /**
+     * Membuka halaman sebuah Made for You Mix. New Music Mix memakai playlist
+     * YouTube-nya; mix lain membuka halaman `local:` yang langsung terisi
+     * (Favorites, Replay) atau memuat lagunya dulu (Chill, Friends, Get Up!).
+     * Sleeve-nya blob cairan yang sama dengan kartu, jadi cover bisa terbang.
+     */
+    fun openMix(pick: TopPick, label: String) {
+        val id = pick.mixPageId
+        if (_detailStack.value.lastOrNull()?.browseId == id) return
+        val title = pick.title.ifBlank { label }
+        if (!id.startsWith("local:")) {
+            openDetail(browseId = id, title = title, subtitle = pick.subtitle, thumbnailUrl = null, mix = title)
+            return
+        }
+        val ready = pick.songs.map { it.toSong() }
+        _detailStack.value += DetailPage(
+            browseId = id,
+            title = title,
+            subtitle = pick.subtitle,
+            thumbnailUrl = null,
+            songs = if (ready.isNotEmpty()) UiState.Success(ready) else UiState.Loading,
+            mix = title,
+        )
+        if (ready.isNotEmpty()) return
+        viewModelScope.launch {
+            val songs = TopPicks.queue(pick).getOrNull().orEmpty()
+            _detailStack.value = _detailStack.value.map { page ->
+                if (page.browseId == id) {
+                    page.copy(
+                        songs = if (songs.isEmpty()) UiState.Error(text(R.string.couldnt_load_tracks)) else UiState.Success(songs),
+                    )
+                } else page
+            }
+        }
     }
 
     /** Renames an open page in place — a device playlist, whose title is the store's. */

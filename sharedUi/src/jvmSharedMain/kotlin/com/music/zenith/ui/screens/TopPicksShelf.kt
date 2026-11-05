@@ -371,6 +371,7 @@ private fun TopPickCard(
         TopPickKind.MOST_PLAYED ->
             MOST_PLAYED_BROWSE_ID.takeIf { pick.images.isNotEmpty() && LocalArtworkImages.current }
         TopPickKind.FEATURED_ARTIST -> pick.artistBrowseId
+        TopPickKind.MADE_FOR_YOU_MIX -> pick.mixPageId
         TopPickKind.NEW_RELEASE_MIX ->
             pick.watch?.playlistId
                 ?.takeIf { it.isNotBlank() && !it.startsWith("RDAMVM") }
@@ -458,7 +459,18 @@ private fun TopPickCard(
                 branded = true
             }
             TopPickKind.MADE_FOR_YOU_MIX -> {
-                MixFluidArt(pick.title, Modifier.fillMaxSize())
+                // Blob cairan inilah yang terbang ke sleeve halaman mix.
+                MixFluidArt(
+                    pick.title,
+                    Modifier
+                        .fillMaxSize()
+                        .coverFlightSource(
+                            coverToken,
+                            null,
+                            TopPickCorner,
+                            content = { m -> MixFluidArt(pick.title, m) },
+                        ),
+                )
                 eyebrowColor = Color.White
                 // Teksnya digambar MixCoverOverlay di bawah; tanpa glow dan band gelap.
                 branded = false

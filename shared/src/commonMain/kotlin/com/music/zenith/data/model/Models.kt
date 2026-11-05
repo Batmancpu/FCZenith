@@ -599,6 +599,8 @@ data class DetailPage(
     val subscription: SubscriptionState? = null,
     /** Cover-cover yang membentuk mosaic sleeve (halaman Most Played); kosong untuk halaman lain. */
     val covers: List<String> = emptyList(),
+    /** Judul Made for You Mix: sleeve halaman ini menggambar blob cairan mix itu. */
+    val mix: String? = null,
 )
 
 /**

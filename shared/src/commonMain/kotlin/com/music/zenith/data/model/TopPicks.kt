@@ -164,7 +164,17 @@ data class TopPick(
     val hints: List<String> = emptyList(),
     /** The tracks a [TopPickKind.MOST_PLAYED] card plays, in rank order. */
     val songs: List<TopPickSong> = emptyList(),
-)
+) {
+    /**
+     * Page id halaman sebuah Made for You Mix: playlist YouTube-nya bila punya
+     * (New Music Mix), kalau tidak halaman `local:` yang diisi saat dibuka.
+     */
+    val mixPageId: String
+        get() = watch?.playlistId
+            ?.takeIf { it.isNotBlank() && !it.startsWith("RDAMVM") }
+            ?.let { if (it.startsWith("VL")) it else "VL$it" }
+            ?: "local:mix:$title"
+}
 
 /** Page id halaman Most Played: halaman `local:` yang langsung menampilkan lagunya, tanpa fetch. */
 const val MOST_PLAYED_BROWSE_ID = "local:most_played"

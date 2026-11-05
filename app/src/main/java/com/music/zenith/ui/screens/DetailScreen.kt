@@ -1089,6 +1089,13 @@ private fun ReleaseHeader(
                     modifier = Modifier.matchParentSize().clip(SLEEVE_SHAPE),
                 )
             }
+            // Halaman Made for You Mix: sleeve-nya blob cairan yang sama dengan kartu.
+            page.mix?.let { mixTitle ->
+                MixFluidArt(
+                    title = mixTitle,
+                    modifier = Modifier.matchParentSize().clip(SLEEVE_SHAPE),
+                )
+            }
             // Animated cover art, inside the same frame. Always running:
             // unlike the player's sleeve there is no transport here to follow,
             // and the page is only up while it's being read.

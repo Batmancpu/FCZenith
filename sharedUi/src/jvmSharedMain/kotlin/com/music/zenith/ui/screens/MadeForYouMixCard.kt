@@ -35,7 +35,7 @@ import org.jetbrains.compose.resources.stringResource
 
 /** Latar cairan; Android memasok AGSL lewat [LocalMixCoverBackground], lainnya mesh gradient. */
 @Composable
-internal fun MixFluidArt(title: String, modifier: Modifier = Modifier) {
+fun MixFluidArt(title: String, modifier: Modifier = Modifier) {
     val palette = remember(title) { mixContrastPalette(mixPalette(title)) }
     val background = LocalMixCoverBackground.current
     val motion = LocalArtworkMotion.current
