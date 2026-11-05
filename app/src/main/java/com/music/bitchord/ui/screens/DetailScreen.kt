@@ -1035,8 +1035,19 @@ private fun ReleaseHeader(
             // placeholder sleeve rather than an empty square. Not shown while a
             // real one is still on its way, so a loading cover doesn't flash
             // a glyph first.
-            var artFailed by remember(page.thumbnailUrl) { mutableStateOf(false) }
-            if (page.thumbnailUrl == null || artFailed) {
+            // Halaman folder Downloads, Local Music dan Cached songs tidak punya
+            // sampul sendiri, jadi memakai sampul lagu pertama di halamannya.
+            val coverUrl = page.thumbnailUrl ?: if (
+                page.browseId == "local:downloads" ||
+                page.browseId == "local:all" ||
+                page.browseId == CACHE_FOLDER_BROWSE_ID
+            ) {
+                songs.firstOrNull { it.thumbnailUrl != null }?.thumbnailUrl
+            } else {
+                null
+            }
+            var artFailed by remember(coverUrl) { mutableStateOf(false) }
+            if (coverUrl == null || artFailed) {
                 CoverPlaceholder(
                     icon = page.placeholderIcon(),
                     base = palette.elevated,
@@ -1048,13 +1059,13 @@ private fun ReleaseHeader(
             // is on screen from the first frame of the flight, instead of an
             // empty sleeve flying over until the larger one has downloaded.
             AsyncImage(
-                model = page.thumbnailUrl.artworkAt(CARD_ART_PX),
+                model = coverUrl.artworkAt(CARD_ART_PX),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.matchParentSize(),
             )
             AsyncImage(
-                model = page.thumbnailUrl.artworkAt(HEADER_ART_PX),
+                model = coverUrl.artworkAt(HEADER_ART_PX),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 onState = { artFailed = it is AsyncImagePainter.State.Error },
