@@ -286,16 +286,9 @@ internal fun InlineQueue(
     }
 
     Column(modifier.fillMaxWidth()) {
-        // Pinned above the list, Apple Music style: the current song, then the
-        // playback modes directly beneath it, then the queue itself.
-        if (nowPlaying != null) {
-            QueueNowPlaying(
-                song = nowPlaying.song,
-                locked = controlsLocked,
-                onClick = { onJumpTo(nowPlaying.timelineIndex) },
-            )
-            Spacer(Modifier.height(14.dp))
-        }
+        // The current song is already shown by the player's collapsed header
+        // (the sleeve flies into it), so the playback modes sit directly under it.
+        Spacer(Modifier.height(10.dp))
         QueueModeRow(
             shuffleEnabled = shuffleEnabled,
             repeatMode = repeatMode,
@@ -470,49 +463,6 @@ private fun QueueClearButton(style: TextStyle, locked: Boolean, onClear: () -> U
             .clickable(enabled = !locked, onClick = onClear)
             .padding(horizontal = 8.dp, vertical = 4.dp),
     )
-}
-
-/** The song that is playing now, pinned above the queue list. */
-@Composable
-private fun QueueNowPlaying(
-    song: Song,
-    locked: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .clickable(enabled = !locked, onClick = onClick),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        AsyncImage(
-            model = rememberRemoteArtworkUrl(song),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .trackArtSize(60.dp, song.isVideo)
-                .clip(RoundedCornerShape(8.dp))
-                .thumbnailBorder(RoundedCornerShape(8.dp))
-                .background(Color.White.copy(alpha = 0.08f)),
-        )
-        Spacer(Modifier.width(14.dp))
-        Column(Modifier.weight(1f)) {
-            ExplicitSongTitle(
-                song = song,
-                style = MaterialTheme.typography.titleMedium,
-                color = Color.White,
-            )
-            Text(
-                text = song.artist,
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color.White.copy(alpha = 0.6f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
 }
 
 /** Shuffle, repeat and AutoPlay as one row of equal buttons. */
