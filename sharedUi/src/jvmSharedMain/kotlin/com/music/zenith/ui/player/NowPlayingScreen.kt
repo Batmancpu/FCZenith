@@ -548,6 +548,14 @@ private fun dockFlyEase(t: Float): Float = panelWideEase(t)
 private const val DOCK_RIDE_SHARE = 1f
 
 /**
+ * Jarak antara kaki cover terbang (tanpa canvas) dan tepi bawah panel selagi
+ * panel di-drag. Jarak ini tumbuh dari 0 di mini player sampai penuh pada
+ * [DOCK_GAP_FULL_AT] terbuka, jadi cover tetap mendarat pas di mini player.
+ */
+private val DOCK_PANEL_BOTTOM_GAP = 14.dp
+private const val DOCK_GAP_FULL_AT = 0.3f
+
+/**
  * How much of the way to its target the artwork's ride share moves each frame.
  * Switching the share outright whenever the sheet changed direction put the
  * cover on a different path for the same sheet position: drag up and it was
@@ -3506,11 +3514,19 @@ fun NowPlayingScreen(
                             // Tepi bawah panel di koordinat kotak ini: cover diangkat supaya
                             // bagian bawahnya tidak tertutup panel yang masih setinggi pill.
                             val panelBottom = if (dock != null && playerBounds.height > 0) {
+                                // Cover tanpa canvas tidak boleh menempel di tepi bawah panel.
+                                // Banner full-bleed (canvas) tetap seperti semula.
+                                val gap = if (heroMode) {
+                                    0f
+                                } else {
+                                    with(density) { DOCK_PANEL_BOTTOM_GAP.toPx() } *
+                                        (dock.openFraction() / DOCK_GAP_FULL_AT).coerceIn(0f, 1f)
+                                }
                                 bannerTopPx + (
                                     dock.panelBounds(
                                         Size(playerBounds.width.toFloat(), playerBounds.height.toFloat()),
                                     ).bottom - dockFrame.offset
-                                    )
+                                    ) - gap
                             } else {
                                 Float.MAX_VALUE
                             }
