@@ -3141,38 +3141,97 @@ object HeroMotion {
     var frozen by mutableStateOf(false)
 }
 
-/** The Liked Music mosaic as a standalone cover, for Home's Most Played card. */
+/**
+ * Cover Most Played versi ringan: kolase statis tiga cover bertumpuk dan miring
+ * di atas gradien royal-amethyst, dengan cahaya lembut dan garis grid tipis.
+ * Tanpa jam global, tanpa puluhan tile, tanpa mesh yang digambar ulang tiap frame:
+ * hanya tiga gambar dan satu latar yang digambar sekali.
+ *
+ * Satu composable ini dipakai kartu Home, cover terbang, sleeve, dan hero
+ * full-bleed, jadi semuanya ikut ringan dan animasi terbang (coverFlightSource /
+ * coverFlightTarget) tidak tersentuh. Isi diposisikan relatif terhadap sisi
+ * persegi terkecil dan dipusatkan, jadi aman saat hero memotong sisi kiri-kanan.
+ * [motion] dipertahankan demi kompatibilitas pemanggil.
+ */
 @Composable
 fun MostPlayedArt(covers: List<String>, motion: Boolean, modifier: Modifier = Modifier) {
-    // Satu jam global untuk semua mosaic (kartu, cover terbang, halaman):
-    // fasenya dihitung dari waktu, bukan dari saat komposisi dimulai, sehingga
-    // posisi dan miring tile selalu sama di ketiganya dan tidak loncat saat
-    // cover mendarat.
-    var nowMs by remember { mutableLongStateOf(SystemClock.uptimeMillis()) }
-    // Saat [motion] mati (Home tertutup player/halaman), jam ini berhenti dan
-    // mosaic tetap di posisi terakhirnya, bukan kembali ke susunan awal.
-    // Saat nyala lagi, jam menyusul waktu global secara halus (bukan loncat).
-    LaunchedEffect(motion) {
-        if (!motion) return@LaunchedEffect
-        var last = SystemClock.uptimeMillis()
-        while (true) {
-            withFrameMillis { }
-            val now = SystemClock.uptimeMillis()
-            val dt = now - last
-            if (dt < HERO_FRAME_MS) continue
-            last = now
-            val behind = now - nowMs - dt
-            nowMs += dt + (behind * 0.06f).toLong()
+    BoxWithConstraints(
+        modifier.drawBehind {
+            val w = size.width
+            val h = size.height
+            drawRect(MOST_PLAYED_BASE)
+            // Dua cahaya lembut statis: turquoise di kiri atas, cyan di kanan bawah.
+            val glowA = Offset(w * 0.16f, h * 0.10f)
+            drawCircle(
+                brush = Brush.radialGradient(
+                    listOf(MESH_TURQUOISE.copy(alpha = 0.50f), MESH_TURQUOISE.copy(alpha = 0f)),
+                    center = glowA,
+                    radius = w * 0.70f,
+                ),
+                radius = w * 0.70f,
+                center = glowA,
+            )
+            val glowB = Offset(w * 0.88f, h * 0.90f)
+            drawCircle(
+                brush = Brush.radialGradient(
+                    listOf(MESH_CYAN.copy(alpha = 0.42f), MESH_CYAN.copy(alpha = 0f)),
+                    center = glowB,
+                    radius = w * 0.75f,
+                ),
+                radius = w * 0.75f,
+                center = glowB,
+            )
+            // Garis grid vertikal tipis, memberi kesan poster/editorial.
+            val line = Color.White.copy(alpha = 0.09f)
+            val lineW = 1.dp.toPx()
+            for (f in MOST_PLAYED_GRID) {
+                drawRect(
+                    color = line,
+                    topLeft = Offset(w * f, 0f),
+                    size = androidx.compose.ui.geometry.Size(lineW, h),
+                )
+            }
+        },
+    ) {
+        if (covers.isEmpty()) return@BoxWithConstraints
+        val side = minOf(maxWidth, maxHeight)
+        val originX = (maxWidth - side) / 2
+        val originY = (maxHeight - side) / 2
+        // Urutan daftar = urutan gambar: yang terakhir (cover #1) paling depan.
+        for (slot in MOST_PLAYED_COLLAGE) {
+            val tile = side * slot.size
+            val shape = RoundedCornerShape(tile * 0.14f)
+            AsyncImage(
+                model = covers[slot.cover % covers.size].artworkAt(CARD_ART_PX),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .offset(originX + side * slot.x, originY + side * slot.y)
+                    .size(tile)
+                    .graphicsLayer { rotationZ = slot.rotation }
+                    .clip(shape)
+                    .border(1.5.dp, Color.White.copy(alpha = 0.30f), shape),
+            )
         }
     }
-    LikedArt(
-        covers = covers.take(LIKED_MAX_COVERS),
-        mesh = true,
-        drift = { (nowMs % LIKED_DRIFT_MS) / LIKED_DRIFT_MS.toFloat() },
-        pulse = { (nowMs % LIKED_PULSE_MS) / LIKED_PULSE_MS.toFloat() },
-        modifier = modifier,
-    )
 }
+
+/** Satu tile kolase, semua nilai pecahan dari sisi persegi seni. */
+private class MostPlayedSlot(
+    val cover: Int,
+    val x: Float,
+    val y: Float,
+    val size: Float,
+    val rotation: Float,
+)
+
+private val MOST_PLAYED_COLLAGE = listOf(
+    MostPlayedSlot(cover = 1, x = 0.43f, y = 0.32f, size = 0.38f, rotation = 6f),
+    MostPlayedSlot(cover = 2, x = 0.25f, y = 0.54f, size = 0.27f, rotation = -4f),
+    MostPlayedSlot(cover = 0, x = 0.19f, y = 0.11f, size = 0.46f, rotation = -7f),
+)
+
+private val MOST_PLAYED_GRID = floatArrayOf(0.14f, 0.31f, 0.50f, 0.69f, 0.86f)
 
 private fun likedTileShape(k: Int): Shape = when (k % 4) {
     0 -> RoundedCornerShape(26.dp)
