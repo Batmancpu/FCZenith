@@ -3067,7 +3067,7 @@ object HeroMotion {
 }
 
 /**
- * Cover Most Played versi ringan: kolase statis tiga cover bertumpuk dan miring
+ * Cover Most Played versi ringan: bento statis tiga cover (satu besar, dua kecil)
  * di atas gradien dari warna cover terpilih, dengan cahaya lembut, garis grid
  * tipis, angka peringkat, dan teks tipografi.
  * Tanpa jam global, tanpa puluhan tile, tanpa mesh yang digambar ulang tiap frame:
@@ -3134,16 +3134,7 @@ fun MostPlayedArt(covers: List<String>, motion: Boolean, modifier: Modifier = Mo
         val originY = (maxHeight - side) / 2
         fun fs(f: Float) = with(density) { (side * f).toSp() }
 
-        // Angka raksasa samar di belakang kolase.
-        Text(
-            text = "1",
-            color = Color.White.copy(alpha = 0.10f),
-            fontSize = fs(0.80f),
-            fontWeight = FontWeight.Black,
-            maxLines = 1,
-            softWrap = false,
-            modifier = Modifier.offset(originX + side * 0.56f, originY - side * 0.12f),
-        )
+        // Tata letak bento rapi: cover besar di kiri, dua cover kecil di kanan.
 
         // Teks vertikal tipis di tepi kiri, dipusatkan agar aman saat hero memotong sisi.
         val stripW = side * 0.64f
@@ -3163,36 +3154,37 @@ fun MostPlayedArt(covers: List<String>, motion: Boolean, modifier: Modifier = Mo
                 .graphicsLayer { rotationZ = -90f },
         )
 
-        // Urutan daftar = urutan gambar: yang terakhir (cover #1) paling depan.
+        // Tanpa rotasi dan tanpa tumpang tindih; jarak antar tile sama dan radius sudut sebanding.
         for (slot in MOST_PLAYED_COLLAGE) {
+            if (slot.cover >= covers.size) continue
             val tile = side * slot.size
-            val shape = RoundedCornerShape(tile * 0.14f)
+            val shape = RoundedCornerShape(tile * 0.12f)
             Box(
                 Modifier
                     .offset(originX + side * slot.x, originY + side * slot.y)
                     .size(tile)
-                    .graphicsLayer { rotationZ = slot.rotation }
+                    .shadow(side * 0.02f, shape)
                     .clip(shape)
-                    .border(1.5.dp, Color.White.copy(alpha = 0.30f), shape),
+                    .border(1.dp, Color.White.copy(alpha = 0.28f), shape),
             ) {
                 AsyncImage(
-                    model = covers[slot.cover % covers.size].artworkAt(CARD_ART_PX),
+                    model = covers[slot.cover].artworkAt(CARD_ART_PX),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
                 )
-                // Label peringkat di pojok tile.
+                // Label peringkat kecil di pojok kiri bawah tile.
                 Text(
                     text = "0${slot.cover + 1}",
                     color = Color.White,
-                    fontSize = fs(0.040f),
+                    fontSize = fs(0.032f),
                     fontWeight = FontWeight.Bold,
-                    letterSpacing = fs(0.004f),
+                    letterSpacing = fs(0.003f),
                     modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(tile * 0.07f)
+                        .align(Alignment.BottomStart)
+                        .padding(tile * 0.08f)
                         .background(Color.Black.copy(alpha = 0.38f), RoundedCornerShape(50))
-                        .padding(horizontal = tile * 0.07f, vertical = tile * 0.025f),
+                        .padding(horizontal = tile * 0.06f, vertical = tile * 0.02f),
                 )
             }
         }
@@ -3282,13 +3274,13 @@ private class MostPlayedSlot(
     val x: Float,
     val y: Float,
     val size: Float,
-    val rotation: Float,
 )
 
+// Area aman: di bawah logo kartu (y >= 0.20) dan di atas pudar kaki (y <= 0.66).
 private val MOST_PLAYED_COLLAGE = listOf(
-    MostPlayedSlot(cover = 1, x = 0.43f, y = 0.32f, size = 0.38f, rotation = 6f),
-    MostPlayedSlot(cover = 2, x = 0.25f, y = 0.54f, size = 0.27f, rotation = -4f),
-    MostPlayedSlot(cover = 0, x = 0.19f, y = 0.11f, size = 0.46f, rotation = -7f),
+    MostPlayedSlot(cover = 0, x = 0.18f, y = 0.20f, size = 0.46f),
+    MostPlayedSlot(cover = 1, x = 0.66f, y = 0.20f, size = 0.22f),
+    MostPlayedSlot(cover = 2, x = 0.66f, y = 0.44f, size = 0.22f),
 )
 
 private val MOST_PLAYED_GRID = floatArrayOf(0.14f, 0.31f, 0.50f, 0.69f, 0.86f)
