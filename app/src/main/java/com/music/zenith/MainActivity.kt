@@ -1740,7 +1740,8 @@ private fun ZenithApp(
         val pageId = when (pick.kind) {
             TopPickKind.LATEST_RELEASE -> pick.browseId
             TopPickKind.FEATURED_ARTIST, TopPickKind.ARTIST_AND_SIMILAR -> pick.artistBrowseId
-            TopPickKind.PERSONAL_STATION, TopPickKind.NEW_RELEASE_MIX, TopPickKind.DISCOVERY_STATION ->
+            TopPickKind.PERSONAL_STATION, TopPickKind.NEW_RELEASE_MIX, TopPickKind.DISCOVERY_STATION,
+            TopPickKind.MADE_FOR_YOU_MIX ->
                 pick.watch?.playlistId
                     ?.takeIf { it.isNotBlank() && !it.startsWith("RDAMVM") }
                     ?.let { if (it.startsWith("VL")) it else "VL$it" }
