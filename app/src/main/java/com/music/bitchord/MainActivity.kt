@@ -3417,6 +3417,7 @@ private fun BitChordApp(
                                 },
                                 onMoodClick = playMood,
                                 onMoodsShowAll = { navigator.push(AppRoute.Moods) },
+                                onPlaySongs = { songs -> play(songs, 0) },
                                 artworkMotion = artworkMotion,
                                 onTopPickLongPress = { pick ->
                                     pick.browseId?.let { browseId ->

@@ -208,6 +208,8 @@ fun HomeScreen(
     onMoodsShowAll: () -> Unit = {},
     /** Whether the Top Picks and mood artwork may animate — see [LocalArtworkMotion]. */
     artworkMotion: Boolean = true,
+    /** Memutar daftar lagu dari awal; dipakai tombol play di kartu playlist. */
+    onPlaySongs: ((List<Song>) -> Unit)? = null,
 ) {
     // Top Picks' pictures and motion wait for the feed — see LocalArtworkImages.
     val feedReady = state !is UiState.Loading
@@ -303,6 +305,7 @@ fun HomeScreen(
                         currentSong = currentSong,
                         isPlaying = isPlaying,
                         firstIsHero = leadHero && !recentlyPlayedLoading,
+                        onPlaySongs = onPlaySongs,
                     )
                     if (loadingMore) feedMoreSkeleton()
                 }
@@ -346,6 +349,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.itemsIndexedShelves(
     firstIsHero: Boolean = true,
     onMoodClick: ((TopPickMood, String) -> Unit)? = null,
     onMoodsShowAll: () -> Unit = {},
+    onPlaySongs: ((List<Song>) -> Unit)? = null,
 ) {
     val ordered = shelves.withListenAgainFirst().withOtherModelBelowListenAgain()
     // Find Your Mood sits right after Recents, so it never follows another
@@ -361,7 +365,16 @@ private fun androidx.compose.foundation.lazy.LazyListScope.itemsIndexedShelves(
             val isListenAgain = LISTEN_AGAIN_TITLES.any { shelf.title.trim().equals(it, ignoreCase = true) }
             // Listen again is one row of square cards, as Recently Played is on
             // Apple Music; Quick picks and Recents keep the paged list.
-            if (!isListenAgain && (
+            if (onPlaySongs != null && shelf.isPlaylistPreviewShelf()) {
+                PlaylistPreviewShelf(
+                    shelf = shelf,
+                    onItemClick = openItem,
+                    onItemLongPress = onItemLongPress,
+                    onPlaySongs = onPlaySongs,
+                    currentSong = currentSong,
+                    isPlaying = isPlaying,
+                )
+            } else if (!isListenAgain && (
                     shelf.layout == ShelfLayout.LIST ||
                         shelf.title.equals(RECENTS_TITLE, ignoreCase = true)
                     )
