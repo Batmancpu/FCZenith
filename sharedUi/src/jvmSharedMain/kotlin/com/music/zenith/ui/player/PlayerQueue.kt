@@ -10,6 +10,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -77,6 +79,10 @@ import androidx.compose.ui.unit.Velocity
 import coil3.compose.AsyncImage
 import com.music.zenith.ui.components.thumbnailBorder
 import com.music.zenith.ui.icons.ZenithIcons
+import com.music.zenith.ui.haptics.Haptic
+import com.music.zenith.ui.haptics.rememberHaptics
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.semantics
 import com.music.zenith.data.model.QueueTier
 import com.music.zenith.data.model.Song
 import com.music.zenith.playback.autoplaySectionStart
@@ -235,6 +241,12 @@ internal fun InlineQueue(
     collapsePlayerOnScroll: Boolean = false,
     onRevealPlayer: () -> Unit = {},
     onHidePlayer: () -> Unit = {},
+    /** Playback modes, shown as a row of buttons right under the current song. */
+    shuffleEnabled: Boolean = false,
+    repeatMode: Int = RepeatModes.OFF,
+    onToggleShuffle: () -> Unit = {},
+    onCycleRepeat: () -> Unit = {},
+    onToggleAutoplay: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
@@ -274,6 +286,25 @@ internal fun InlineQueue(
     }
 
     Column(modifier.fillMaxWidth()) {
+        // Pinned above the list, Apple Music style: the current song, then the
+        // playback modes directly beneath it, then the queue itself.
+        if (nowPlaying != null) {
+            QueueNowPlaying(
+                song = nowPlaying.song,
+                locked = controlsLocked,
+                onClick = { onJumpTo(nowPlaying.timelineIndex) },
+            )
+            Spacer(Modifier.height(14.dp))
+        }
+        QueueModeRow(
+            shuffleEnabled = shuffleEnabled,
+            repeatMode = repeatMode,
+            autoplayEnabled = autoplayEnabled,
+            onToggleShuffle = onToggleShuffle,
+            onCycleRepeat = onCycleRepeat,
+            onToggleAutoplay = onToggleAutoplay,
+        )
+        Spacer(Modifier.height(18.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -323,24 +354,7 @@ internal fun InlineQueue(
                         )
                     }
                 }
-                if (nowPlaying != null) {
-                    item(key = "header-now-playing") {
-                        QueueHeading(
-                            title = stringResource(Res.string.now_playing),
-                            modifier = Modifier.padding(top = 12.dp, bottom = 6.dp),
-                        )
-                    }
-                    item(key = nowPlaying.key) {
-                        InlineQueueRow(
-                            song = nowPlaying.song,
-                            isCurrent = true,
-                            onClick = { onJumpTo(nowPlaying.timelineIndex) },
-                            onRemove = { onRemove(nowPlaying.timelineIndex) },
-                            locked = controlsLocked,
-                            modifier = queueMotion(),
-                        )
-                    }
-                }
+
                 if (tracks.user.isNotEmpty()) {
                     item(key = "header-user-queue") {
                         QueueHeading(
@@ -456,6 +470,163 @@ private fun QueueClearButton(style: TextStyle, locked: Boolean, onClear: () -> U
             .clickable(enabled = !locked, onClick = onClear)
             .padding(horizontal = 8.dp, vertical = 4.dp),
     )
+}
+
+/** The song that is playing now, pinned above the queue list. */
+@Composable
+private fun QueueNowPlaying(
+    song: Song,
+    locked: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .clickable(enabled = !locked, onClick = onClick),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        AsyncImage(
+            model = rememberRemoteArtworkUrl(song),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .trackArtSize(60.dp, song.isVideo)
+                .clip(RoundedCornerShape(8.dp))
+                .thumbnailBorder(RoundedCornerShape(8.dp))
+                .background(Color.White.copy(alpha = 0.08f)),
+        )
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            ExplicitSongTitle(
+                song = song,
+                style = MaterialTheme.typography.titleMedium,
+                color = Color.White,
+            )
+            Text(
+                text = song.artist,
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.White.copy(alpha = 0.6f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+/** Shuffle, repeat and AutoPlay as one row of equal buttons. */
+@Composable
+private fun QueueModeRow(
+    shuffleEnabled: Boolean,
+    repeatMode: Int,
+    autoplayEnabled: Boolean,
+    onToggleShuffle: () -> Unit,
+    onCycleRepeat: () -> Unit,
+    onToggleAutoplay: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        QueueModeButton(
+            icon = ZenithIcons.Shuffle,
+            contentDescription = stringResource(
+                if (shuffleEnabled) Res.string.shuffle_on else Res.string.shuffle_off,
+            ),
+            highlighted = shuffleEnabled,
+            haptic = if (shuffleEnabled) Haptic.ToggleOff else Haptic.ToggleOn,
+            // Toggling replaces the upcoming stretch of the queue; a second tap
+            // before that lands would undo work that hasn't happened yet.
+            tapWindowMs = 400L,
+            onClick = onToggleShuffle,
+            modifier = Modifier.weight(1f),
+        )
+        QueueModeButton(
+            icon = ZenithIcons.Repeat,
+            label = if (repeatMode == RepeatModes.ONE) "1" else null,
+            contentDescription = when (repeatMode) {
+                RepeatModes.ONE -> stringResource(Res.string.repeat_one)
+                RepeatModes.ALL -> stringResource(Res.string.repeat_all)
+                else -> stringResource(Res.string.repeat_off)
+            },
+            highlighted = repeatMode != RepeatModes.OFF,
+            haptic = when (repeatMode) {
+                RepeatModes.OFF -> Haptic.ToggleOn
+                RepeatModes.ONE -> Haptic.ToggleOff
+                else -> Haptic.Select
+            },
+            onClick = onCycleRepeat,
+            modifier = Modifier.weight(1f),
+        )
+        QueueModeButton(
+            icon = ZenithIcons.Infinity,
+            contentDescription = stringResource(
+                if (autoplayEnabled) Res.string.autoplay_on else Res.string.autoplay_off,
+            ),
+            highlighted = autoplayEnabled,
+            haptic = if (autoplayEnabled) Haptic.ToggleOff else Haptic.ToggleOn,
+            // AutoPlay's toggle goes to the playback service and may hit the
+            // network, so it ignores taps for longer than shuffle does.
+            tapWindowMs = 700L,
+            onClick = onToggleAutoplay,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+@Composable
+private fun QueueModeButton(
+    icon: ImageVector,
+    contentDescription: String,
+    highlighted: Boolean,
+    haptic: Haptic,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    label: String? = null,
+    tapWindowMs: Long = 0L,
+) {
+    val haptics = rememberHaptics()
+    val lastTap = remember { LongArray(1) }
+    val container by animateColorAsState(
+        targetValue = if (highlighted) Color.White.copy(alpha = 0.88f) else Color.White.copy(alpha = 0.14f),
+        label = "queueModeFill",
+    )
+    val tint = if (highlighted) Color.Black.copy(alpha = 0.82f) else Color.White.copy(alpha = 0.9f)
+    Box(
+        modifier = modifier
+            .height(40.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(container)
+            .clickable {
+                val now = System.currentTimeMillis()
+                if (now - lastTap[0] >= tapWindowMs) {
+                    lastTap[0] = now
+                    haptics.play(haptic)
+                    onClick()
+                }
+            }
+            .semantics { this.contentDescription = contentDescription },
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = tint,
+                modifier = Modifier.size(20.dp),
+            )
+            if (label != null) {
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = tint,
+                )
+            }
+        }
+    }
 }
 
 @Composable
