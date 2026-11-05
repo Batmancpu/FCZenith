@@ -85,6 +85,9 @@ jobs:
             "$STORE_PASS" "$ALIAS" "$KEY_PASS" > keystore.properties
 
       - name: Build release APK
+        env:
+          LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
+          LASTFM_SECRET: ${{ secrets.LASTFM_SECRET }}
         run: |
           chmod +x gradlew
           # Ulangi sampai 3 kali: unduhan dependensi native (libusb) kadang gagal sementara.
