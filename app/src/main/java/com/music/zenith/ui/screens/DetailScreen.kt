@@ -1073,16 +1073,14 @@ private fun ReleaseHeader(
                 onState = { artFailed = it is AsyncImagePainter.State.Error },
                 modifier = Modifier.matchParentSize(),
             )
-            // Halaman Most Played: sleeve-nya mosaic hidup yang sama dengan kartu,
-            // jadi mosaic yang terbang mendarat di atas dirinya sendiri.
+            // Halaman Most Played: sleeve-nya kolase statis yang sama dengan kartu,
+            // jadi cover yang terbang mendarat di atas dirinya sendiri.
             if (page.covers.isNotEmpty()) {
-                CompositionLocalProvider(LocalSettledMosaic provides true) {
-                    MostPlayedArt(
-                        covers = page.covers,
-                        motion = true,
-                        modifier = Modifier.matchParentSize().clip(SLEEVE_SHAPE),
-                    )
-                }
+                MostPlayedArt(
+                    covers = page.covers,
+                    motion = true,
+                    modifier = Modifier.matchParentSize().clip(SLEEVE_SHAPE),
+                )
             }
             // Animated cover art, inside the same frame. Always running:
             // unlike the player's sleeve there is no transport here to follow,
@@ -2622,33 +2620,31 @@ private fun MostPlayedHero(
                 layout(w, h) { placeable.place((w - side) / 2, (h - side) / 2) }
             },
         ) {
-            CompositionLocalProvider(LocalSettledMosaic provides true) {
-                MostPlayedArt(
-                    covers = page.covers,
-                    motion = !HeroMotion.frozen && onScreen,
-                    modifier = Modifier.fillMaxSize().drawWithContent {
-                        shared.record(
-                            size = IntSize(
-                                size.width.roundToInt().coerceAtLeast(1),
-                                size.height.roundToInt().coerceAtLeast(1),
-                            ),
-                        ) { this@drawWithContent.drawContent() }
-                        drawLayer(shared)
-                        if (blurFoot) {
-                            val stamp = SystemClock.uptimeMillis()
-                            if (stamp - foot.at >= FOOT_REFRESH_MS) {
-                                foot.at = stamp
-                                footLayer.record(
-                                    size = IntSize(
-                                        size.width.roundToInt().coerceAtLeast(1),
-                                        size.height.roundToInt().coerceAtLeast(1),
-                                    ),
-                                ) { drawLayer(shared) }
-                            }
+            MostPlayedArt(
+                covers = page.covers,
+                motion = !HeroMotion.frozen && onScreen,
+                modifier = Modifier.fillMaxSize().drawWithContent {
+                    shared.record(
+                        size = IntSize(
+                            size.width.roundToInt().coerceAtLeast(1),
+                            size.height.roundToInt().coerceAtLeast(1),
+                        ),
+                    ) { this@drawWithContent.drawContent() }
+                    drawLayer(shared)
+                    if (blurFoot) {
+                        val stamp = SystemClock.uptimeMillis()
+                        if (stamp - foot.at >= FOOT_REFRESH_MS) {
+                            foot.at = stamp
+                            footLayer.record(
+                                size = IntSize(
+                                    size.width.roundToInt().coerceAtLeast(1),
+                                    size.height.roundToInt().coerceAtLeast(1),
+                                ),
+                            ) { drawLayer(shared) }
                         }
-                    },
-                )
-            }
+                    }
+                },
+            )
         }
         // Salinan mosaic yang di-blur, dimunculkan di kaki lewat mask, seperti
         // blur cover #1 di kartu: kaki hero masuk dulu ke warna cover sebenarnya,
@@ -2755,65 +2751,13 @@ private val LIKED_COLORS = listOf(Color(0xFF7B5CF0), Color(0xFFB45FDB), Color(0x
 private val LIKED_BASE = Brush.verticalGradient(LIKED_COLORS)
 
 /**
- * Most Played: mesh gradient mengalir, biru royal, ungu amethyst, dan turquoise-cyan
- * yang berdenyut pelan. Dasarnya gradien halus; warna-warna lain menggenang
- * sebagai blob lembut yang bergerak tidak linear.
+ * Most Played: gradien royal-amethyst statis dengan cahaya turquoise dan cyan,
+ * dipakai oleh [MostPlayedArt].
  */
 private val MOST_PLAYED_COLORS = listOf(Color(0xFF1B2FB0), Color(0xFF6A33CC), Color(0xFF1A6FD8))
 private val MOST_PLAYED_BASE = Brush.verticalGradient(MOST_PLAYED_COLORS)
 private val MESH_TURQUOISE = Color(0xFF18E6D8)
 private val MESH_CYAN = Color(0xFF35D0F5)
-private val MESH_AMETHYST = Color(0xFF9A4DE8)
-private val MESH_ROYAL = Color(0xFF2D4DE0)
-
-private const val HALF_PI = 1.5707964f
-
-/**
- * Satu blob mesh: pusat bergerak di (x + ax*sin(fx*t + px), y + ay*sin(fy*t + py))
- * relatif terhadap lebar/tinggi, berjari-jari r * lebar, dengan alpha yang bisa
- * berdenyut sebesar [alphaAmp].
- */
-private class MeshBlob(
-    val color: Color,
-    val x: Float, val ax: Float, val fx: Float, val px: Float,
-    val y: Float, val ay: Float, val fy: Float, val py: Float,
-    val r: Float,
-    val alpha: Float,
-    val alphaAmp: Float = 0f,
-    val alphaPhase: Float = 0f,
-)
-
-private val MESH_BLOBS = listOf(
-    MeshBlob(MESH_TURQUOISE, 0.14f, 0.16f, 1f, 0f, 0.30f, 0.12f, 1f, HALF_PI, 0.90f, 0.78f, 0.12f, 0f),
-    MeshBlob(MESH_AMETHYST, 0.86f, 0.10f, 1f, HALF_PI, 0.20f, 0.10f, 1f, 1.3f, 0.85f, 0.85f),
-    MeshBlob(MESH_ROYAL, 0.58f, 0.18f, 2f, 0f, 0.58f, 0.08f, 2f, HALF_PI, 0.80f, 0.90f),
-    MeshBlob(MESH_CYAN, 0.90f, 0.08f, 1f, 2f, 0.92f, 0.05f, 1f, HALF_PI, 0.75f, 0.70f, 0.10f, HALF_PI),
-    // Cahaya lembut di dalam, memberi kedalaman tanpa grain.
-    MeshBlob(Color.White, 0.50f, 0.20f, 1f, 0.5f, 0.42f, 0.08f, 1f, 0.5f + HALF_PI, 0.55f, 0.14f),
-)
-
-/**
- * Shader gradien tiap blob dibuat sekali per lebar (berpusat di nol, alpha penuh)
- * lalu dipakai ulang setiap frame; yang bergerak hanya translate dan alpha.
- */
-private class MeshBrushCache {
-    private var width = -1f
-    private var brushes: List<Brush> = emptyList()
-
-    fun get(w: Float): List<Brush> {
-        if (w != width) {
-            width = w
-            brushes = MESH_BLOBS.map { b ->
-                Brush.radialGradient(
-                    listOf(b.color, b.color.copy(alpha = 0f)),
-                    center = Offset.Zero,
-                    radius = b.r * w,
-                )
-            }
-        }
-        return brushes
-    }
-}
 
 /**
  * Seberapa jauh seni hero menjulur ke atas, melewati tepi atasnya. Di luar layar
@@ -3019,14 +2963,11 @@ private fun LikedArt(
     // Bagian seni yang menjulur di atas tepi hero; icon digeser turun setengahnya
     // supaya tetap di tengah area yang terlihat.
     topInset: Dp = 0.dp,
-    // Latar mesh biru-amethyst-turquoise (Most Played) alih-alih ungu-pink Liked Music.
-    mesh: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
-    val meshCache = remember { MeshBrushCache() }
     BoxWithConstraints(
         modifier.drawBehind {
-            drawRect(if (mesh) MOST_PLAYED_BASE else LIKED_BASE)
+            drawRect(LIKED_BASE)
             val t = pulse() * 2f * PI.toFloat()
             val w = size.width
             val h = size.height
@@ -3041,28 +2982,9 @@ private fun LikedArt(
                     center = Offset(cx, cy),
                 )
             }
-            if (mesh) {
-                // Tiap blob punya frekuensi dan fase sendiri supaya pusaran warnanya
-                // organik, bukan sejajar. Shader dipakai ulang dari cache.
-                val brushes = meshCache.get(w)
-                for (i in MESH_BLOBS.indices) {
-                    val b = MESH_BLOBS[i]
-                    val cx = w * (b.x + b.ax * sin(b.fx * t + b.px))
-                    val cy = h * (b.y + b.ay * sin(b.fy * t + b.py))
-                    translate(cx, cy) {
-                        drawCircle(
-                            brush = brushes[i],
-                            radius = b.r * w,
-                            center = Offset.Zero,
-                            alpha = b.alpha + b.alphaAmp * sin(t + b.alphaPhase),
-                        )
-                    }
-                }
-            } else {
-                blob(Color(0xFF5CC8FF), w * (0.22f + 0.14f * sin(t)), h * (0.22f + 0.10f * cos(t)), w * 0.75f)
-                blob(Color(0xFFFF7AB8), w * (0.82f + 0.12f * cos(t)), h * (0.68f + 0.10f * sin(t)), w * 0.80f)
-                blob(Color(0xFF9B6CFF), w * (0.45f + 0.18f * sin(2f * t)), h * (0.95f + 0.05f * cos(2f * t)), w * 0.70f)
-            }
+            blob(Color(0xFF5CC8FF), w * (0.22f + 0.14f * sin(t)), h * (0.22f + 0.10f * cos(t)), w * 0.75f)
+            blob(Color(0xFFFF7AB8), w * (0.82f + 0.12f * cos(t)), h * (0.68f + 0.10f * sin(t)), w * 0.80f)
+            blob(Color(0xFF9B6CFF), w * (0.45f + 0.18f * sin(2f * t)), h * (0.95f + 0.05f * cos(2f * t)), w * 0.70f)
         },
     ) {
         val width = maxWidth
