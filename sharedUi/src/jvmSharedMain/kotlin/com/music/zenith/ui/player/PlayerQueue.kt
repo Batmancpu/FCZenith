@@ -470,6 +470,7 @@ private fun QueueModeRow(
     onToggleAutoplay: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val automixEnabled by PlayerSettings.smartFadeEnabled.collectAsStateWithLifecycle()
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -515,6 +516,17 @@ private fun QueueModeRow(
             // network, so it ignores taps for longer than shuffle does.
             tapWindowMs = 700L,
             onClick = onToggleAutoplay,
+            modifier = Modifier.weight(1f),
+        )
+        QueueModeButton(
+            icon = ZenithIcons.Automix,
+            contentDescription = stringResource(
+                if (automixEnabled) Res.string.automix_on else Res.string.automix_off,
+            ),
+            highlighted = automixEnabled,
+            haptic = if (automixEnabled) Haptic.ToggleOff else Haptic.ToggleOn,
+            tapWindowMs = 400L,
+            onClick = { PlayerSettings.setSmartFadeEnabled(!automixEnabled) },
             modifier = Modifier.weight(1f),
         )
     }

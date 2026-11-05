@@ -13,6 +13,8 @@
     <string name="autoplay_empty_description">Similar music will keep playing</string>
     <string name="autoplay_off">AutoPlay off</string>
     <string name="autoplay_on">AutoPlay on</string>
+    <string name="automix_off">Automix off</string>
+    <string name="automix_on">Automix on</string>
     <string name="autoplay_queue_description">Similar music, selected to play next</string>
     <string name="bit_depth">%1$d-bit</string>
     <string name="cancel">Cancel</string>

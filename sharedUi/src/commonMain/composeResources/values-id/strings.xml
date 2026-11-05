@@ -13,6 +13,8 @@
     <string name="autoplay_empty_description">Musik serupa akan terus diputar</string>
     <string name="autoplay_off">AutoPlay nonaktif</string>
     <string name="autoplay_on">AutoPlay aktif</string>
+    <string name="automix_off">Automix nonaktif</string>
+    <string name="automix_on">Automix aktif</string>
     <string name="autoplay_queue_description">Musik serupa, dipilih untuk diputar berikutnya</string>
     <string name="bit_depth">%1$d-bit</string>
     <string name="cancel">Batal</string>
