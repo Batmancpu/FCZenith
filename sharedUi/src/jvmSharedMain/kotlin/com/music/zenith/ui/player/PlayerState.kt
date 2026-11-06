@@ -391,6 +391,7 @@ internal fun rememberArtworkDissolve(
     skipFadeMs: Long = 0L,
 ): ArtworkDissolve {
     val reduceAnimation by PlayerSettings.reduceAnimation.collectAsStateWithLifecycle()
+    val coverSlide by PlayerSettings.coverSlideAnimation.collectAsStateWithLifecycle()
     val dissolve = remember { ArtworkDissolve(art) }
     // Dilakukan saat komposisi, sebelum sleeve membacanya: frame pertama cover
     // baru harus sudah punya cover lama di atasnya, kalau tidak frame itu
@@ -405,7 +406,7 @@ internal fun rememberArtworkDissolve(
         // lagu 1 muncul di lagu 2 alih-alih gambar terakhir canvas.
         dissolve.retarget(
             art,
-            enabled = !reduceAnimation && dissolve.fullFrame == null &&
+            enabled = !reduceAnimation && coverSlide && dissolve.fullFrame == null &&
                 (dissolve.frame != null || !dissolve.lastClipShowing),
             queueIndex = queueIndex,
         )

@@ -216,6 +216,8 @@
     <string name="theme">Tema</string>
     <string name="reduce_animation">Kurangi animasi</string>
     <string name="reduce_animation_subtitle">Membekukan gradien pemutar utama alih-alih bergerak</string>
+    <string name="cover_slide_animation">Animasi pindah cover</string>
+    <string name="cover_slide_animation_subtitle">Cover bergeser ke lagu baru saat ganti lagu</string>
     <string name="reduce_dynamic_blur">Kurangi blur dinamis</string>
     <string name="reduce_dynamic_blur_subtitle">Mengganti kaca buram dengan warna solid di seluruh aplikasi</string>
     <string name="full_screen_cover_art">Sampul layar penuh</string>

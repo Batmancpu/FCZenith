@@ -252,6 +252,7 @@ fun SettingsScreen(
     val listenTogetherButton by AppSettings.showListenTogetherButton.collectAsStateWithLifecycle()
     val listenTogetherTab by AppSettings.showListenTogetherTab.collectAsStateWithLifecycle()
     val reduceAnimation by AppSettings.reduceAnimation.collectAsStateWithLifecycle()
+    val coverSlideAnimation by AppSettings.coverSlideAnimation.collectAsStateWithLifecycle()
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
     val liquidGlass by AppSettings.liquidGlass.collectAsStateWithLifecycle()
     val progressiveBlur by AppSettings.progressiveBlur.collectAsStateWithLifecycle()
@@ -955,6 +956,21 @@ fun SettingsScreen(
                         )
                     },
                     onClick = { AppSettings.setReduceAnimation(!reduceAnimation) },
+                )
+            }
+            val coverSlideTitle = stringResource(R.string.cover_slide_animation)
+            row(coverSlideTitle, "cover", "slide", "animation", "animasi", "sampul") {
+                SettingsRow(
+                    icon = SfIcons.Animation,
+                    title = coverSlideTitle,
+                    subtitle = stringResource(R.string.cover_slide_animation_subtitle),
+                    trailing = {
+                        IosSwitch(
+                            checked = coverSlideAnimation,
+                            onCheckedChange = AppSettings::setCoverSlideAnimation,
+                        )
+                    },
+                    onClick = { AppSettings.setCoverSlideAnimation(!coverSlideAnimation) },
                 )
             }
             val reduceDynamicBlurTitle = stringResource(R.string.reduce_dynamic_blur)

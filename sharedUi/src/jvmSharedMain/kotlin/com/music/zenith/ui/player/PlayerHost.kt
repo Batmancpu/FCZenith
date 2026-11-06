@@ -259,6 +259,8 @@ interface PlayerSettingsSource {
     val preferUsbDac: StateFlow<Boolean>
     val prioritizeSpotifyCanvas: StateFlow<Boolean>
     val reduceAnimation: StateFlow<Boolean>
+    /** Whether the cover slides/sweeps to the new song's on a song change, rather than cutting. */
+    val coverSlideAnimation: StateFlow<Boolean>
     val reduceDynamicBlur: StateFlow<Boolean>
     /** Whether Dolby Atmos is both playable on this device and switched on, so the player can show its badge. */
     val dolbyAtmosActive: StateFlow<Boolean>

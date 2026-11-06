@@ -470,6 +470,9 @@ object AppSettings {
     /** Freezes the main player's mesh gradient instead of letting it drift/crossfade. */
     val reduceAnimation = MutableStateFlow(false)
 
+    /** Cover pemutar bergeser/menyapu ke lagu baru saat ganti lagu; mati = cover langsung berganti. */
+    val coverSlideAnimation = MutableStateFlow(true)
+
     /**
      * Whether the welcome pages (party name, then YouTube sign-in) have been
      * through. Absent rather than true for anyone updating from a build that
@@ -1121,6 +1124,7 @@ object AppSettings {
         showListenTogetherButton.value = prefs.getBoolean(KEY_LISTEN_TOGETHER_BUTTON, false)
         showListenTogetherTab.value = prefs.getBoolean(KEY_LISTEN_TOGETHER_TAB, true)
         reduceAnimation.value = prefs.getBoolean(KEY_REDUCE_ANIMATION, false)
+        coverSlideAnimation.value = prefs.getBoolean(KEY_COVER_SLIDE_ANIMATION, true)
         onboardingComplete.value = prefs.getBoolean(KEY_ONBOARDING_COMPLETE, false)
         highPerformanceMode.value = prefs.getBoolean(KEY_HIGH_PERFORMANCE_MODE, false)
         performanceRefreshRate.value = normalizePerformanceRefreshRate(
@@ -1512,6 +1516,11 @@ object AppSettings {
     fun setAppFont(value: AppFont) {
         appFont.value = value
         prefs.edit().putString(KEY_APP_FONT, value.name).apply()
+    }
+
+    fun setCoverSlideAnimation(value: Boolean) {
+        coverSlideAnimation.value = value
+        prefs.edit().putBoolean(KEY_COVER_SLIDE_ANIMATION, value).apply()
     }
 
     fun setAccentColor(value: AccentColor) {
@@ -2377,6 +2386,7 @@ object AppSettings {
     private const val KEY_CACHE_LIMIT = "audio_cache_limit_bytes"
     private const val KEY_CANVAS_CACHE_LIMIT = "canvas_cache_limit_bytes"
     private const val KEY_REDUCE_ANIMATION = "reduce_animation"
+    private const val KEY_COVER_SLIDE_ANIMATION = "cover_slide_animation"
     private const val KEY_ONBOARDING_COMPLETE = "onboarding_complete"
     private const val KEY_HIGH_PERFORMANCE_MODE = "high_performance_mode"
     private const val KEY_PERFORMANCE_REFRESH_RATE = "performance_refresh_rate"
