@@ -300,6 +300,8 @@ object AudioCache {
         analysisHeads.clear()
         analysisHeadsInFlight.clear()
         analysisHeadWant.clear()
+        analysisHeadFailures.clear()
+        analysisHeadRetryAt.clear()
         renditionKeys.clear()
         scope.launch {
             cache.keys.toList().forEach { runCatching { cache.removeResource(it) } }
@@ -1704,6 +1706,12 @@ object AudioCache {
      */
     private val analysisHeadWant = ConcurrentHashMap<String, Long>()
 
+    /** Berapa kali round head untuk sebuah video gagal, supaya retry dibatasi. */
+    private val analysisHeadFailures = ConcurrentHashMap<String, Int>()
+
+    /** Waktu (elapsedRealtime) paling cepat retry berikutnya boleh dimulai. */
+    private val analysisHeadRetryAt = ConcurrentHashMap<String, Long>()
+
     /**
      * Pulls [uri]'s recording onto disk under the plain YouTube key, so Smart
      * Fade has something to measure; sized by [analysisHeadSize].
@@ -1781,6 +1789,12 @@ object AudioCache {
      */
     private const val HEAD_ROUND_SETTLE_MS = 500L
 
+    /** Batas percobaan ulang head analisis yang gagal, di luar awaitAnalysisHead. */
+    private const val MAX_ANALYSIS_HEAD_ATTEMPTS = 4
+
+    /** Jeda dasar antar retry; dikali jumlah kegagalan. */
+    private const val ANALYSIS_HEAD_RETRY_MS = 2_500L
+
     /**
      * Pulls the analysis head for [uri] if needed and waits until enough of
      * the opening is on disk to align two versions of a track.
@@ -1808,7 +1822,7 @@ object AudioCache {
         if (videoId !in analysisHeadsInFlight) {
             analysisHeads.remove(videoId)
         }
-        requestAnalysisHead(opus)
+        requestAnalysisHead(opus, force = true)
         var rounds = 1
         var askedAt = SystemClock.elapsedRealtime()
         val deadline = askedAt + timeoutMs
@@ -1831,7 +1845,7 @@ object AudioCache {
                     // [MAX_ALIGNMENT_HEAD_ROUNDS] still bounds how often.
                     if (alignmentPrefixBytes(videoId) < MIN_ALIGNMENT_PREFIX_BYTES) {
                         analysisHeads.remove(videoId)
-                        requestAnalysisHead(opus)
+                        requestAnalysisHead(opus, force = true)
                         rounds++
                     }
                     askedAt = now
@@ -1882,7 +1896,7 @@ object AudioCache {
         )
     }
 
-    fun requestAnalysisHead(uri: Uri) {
+    fun requestAnalysisHead(uri: Uri, force: Boolean = false) {
         // Each of these gates used to stop a head dead with nothing in the
         // log to show for it: an unwired cache or upstream looked from the
         // outside exactly like a network that refuses everything.
@@ -1895,6 +1909,11 @@ object AudioCache {
             return
         }
         val videoId = uri.getQueryParameter("v") ?: return
+        // Round yang gagal boleh diulang, tapi tidak tiap tick: tunggu jedanya.
+        if (!force) {
+            val retryAt = analysisHeadRetryAt[videoId]
+            if (retryAt != null && SystemClock.elapsedRealtime() < retryAt) return
+        }
         // One round per track per session, and it is sized correctly up front
         // rather than grown into. See [analysisHeadSize] for why growing it was
         // the wrong shape.
@@ -1968,6 +1987,21 @@ object AudioCache {
                 }
             } finally {
                 analysisHeadsInFlight.remove(videoId)
+                if (alignmentPrefixBytes(videoId) >= MIN_ALIGNMENT_PREFIX_BYTES) {
+                    analysisHeadFailures.remove(videoId)
+                    analysisHeadRetryAt.remove(videoId)
+                } else {
+                    // Round gagal atau terlewat: lepaskan klaim "sekali per sesi"
+                    // setelah jeda, supaya tick analyzer berikutnya mencoba lagi
+                    // alih-alih membuat lagu berikutnya menunggu selamanya.
+                    val failures = (analysisHeadFailures[videoId] ?: 0) + 1
+                    analysisHeadFailures[videoId] = failures
+                    if (failures < MAX_ANALYSIS_HEAD_ATTEMPTS) {
+                        analysisHeadRetryAt[videoId] =
+                            SystemClock.elapsedRealtime() + ANALYSIS_HEAD_RETRY_MS * failures
+                        analysisHeads.remove(videoId)
+                    }
+                }
             }
         }
     }
