@@ -253,6 +253,14 @@ class TrackAnalyzer(private val context: Context, private val cache: AudioCache)
     fun analysisFor(trackId: String): TrackAnalysis = results[trackId] ?: TrackAnalysis(trackId = trackId)
 
     /**
+     * Seperti [analysisFor], tapi jatuh ke penyimpanan disk bila belum ada di memori.
+     * Membaca file, jadi hanya untuk pemanggil yang sudah di luar thread pemutaran
+     * (mis. pengurutan saran AutoPlay). Null bila tidak ada hasil yang bisa dipakai.
+     */
+    fun storedAnalysis(trackId: String): TrackAnalysis? =
+        (results[trackId] ?: store.load(trackId))?.takeIf { it.isUsable }
+
+    /**
      * Looks [trackId] up on disk, once, off the playback thread.
      *
      * Deliberately not folded into [analysisFor], which is called several times

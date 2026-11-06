@@ -639,6 +639,7 @@ class PlaybackService : MediaLibraryService() {
 
     /** Automix's DSP analyzer — see [com.music.zenith.playback.smart.TrackAnalyzer]. */
     private val trackAnalyzer = com.music.zenith.playback.smart.TrackAnalyzer(this, AudioCache)
+        .also { analyzer -> AutoplayMixRanking.analysisOf = analyzer::storedAnalysis }
 
     /** Shared with the crossfade's tail player, so both read the same disk cache. */
     private var mediaSourceFactory: DefaultMediaSourceFactory? = null
@@ -7610,6 +7611,7 @@ class PlaybackService : MediaLibraryService() {
         serviceLyricsJob = null
         serviceLyrics = null
         cancelPrefetch()
+        AutoplayMixRanking.analysisOf = null
         trackAnalyzer.release()
         loudnessRetryJob?.cancel()
         // The YouTube Music history entry for whatever was playing, closed out
