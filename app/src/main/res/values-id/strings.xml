@@ -226,6 +226,10 @@
     <string name="cover_style_off">Mati</string>
     <string name="cover_style_slide">Slide</string>
     <string name="cover_style_fluid">Cair</string>
+    <string name="cover_section_transition">Transisi cover</string>
+    <string name="cover_section_animated">Sampul animasi</string>
+    <string name="cover_section_spotify">Spotify Canvas</string>
+    <string name="animated_cover_locked">Aktifkan sampul animasi dulu</string>
     <string name="reduce_dynamic_blur">Kurangi blur dinamis</string>
     <string name="reduce_dynamic_blur_subtitle">Mengganti kaca buram dengan warna solid di seluruh aplikasi</string>
     <string name="full_screen_cover_art">Sampul layar penuh</string>

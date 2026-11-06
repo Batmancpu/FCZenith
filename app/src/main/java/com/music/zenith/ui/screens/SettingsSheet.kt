@@ -260,8 +260,6 @@ fun SettingsScreen(
     val liquidGlassSupported = isGlassSupported()
     val lyricsBlur by AppSettings.lyricsBlur.collectAsStateWithLifecycle()
     val liquidFlow by AppSettings.liquidFlow.collectAsStateWithLifecycle()
-    val animatedCanvas by AppSettings.animatedCanvas.collectAsStateWithLifecycle()
-    val canvasOverCellular by AppSettings.canvasOverCellular.collectAsStateWithLifecycle()
     val signatureApiEnabled by AppSettings.signatureApiEnabled.collectAsStateWithLifecycle()
     val signatureApiUrl by AppSettings.signatureApiUrl.collectAsStateWithLifecycle()
     val fullBleedArtwork by AppSettings.fullBleedArtwork.collectAsStateWithLifecycle()
@@ -968,7 +966,7 @@ fun SettingsScreen(
                     else -> R.string.cover_style_slide
                 },
             )
-            row(coverSlideTitle, "cover", "slide", "animation", "animasi", "sampul", "fluid", "liquid", "morph", "cair") {
+            row(coverSlideTitle, "cover", "slide", "animation", "animasi", "sampul", "fluid", "liquid", "morph", "cair", "canvas", "video", "spotify", "cellular", "seluler", "animated") {
                 SettingsRow(
                     icon = SfIcons.Animation,
                     title = coverSlideTitle,
@@ -1064,59 +1062,7 @@ fun SettingsScreen(
                     onClick = { AppSettings.setLegacyMeshGradient(!legacyMeshGradient) },
                 )
             }
-            val animatedCoverArtTitle = stringResource(R.string.animated_cover_art)
-            // Carries the keywords of the rows that only appear once it is on,
-            // so searching "spotify" with animated covers switched off turns up
-            // the switch that brings the Spotify row back rather than nothing.
-            row(animatedCoverArtTitle, "canvas", "video", "spotify") {
-                SettingsRow(
-                    icon = SfIcons.Animation,
-                    title = animatedCoverArtTitle,
-                    subtitle = stringResource(R.string.animated_cover_art_subtitle),
-                    trailing = {
-                        IosSwitch(
-                            checked = animatedCanvas,
-                            onCheckedChange = AppSettings::setAnimatedCanvas,
-                        )
-                    },
-                    onClick = { AppSettings.setAnimatedCanvas(!animatedCanvas) },
-                )
-            }
-            // Reads as part of the Animated cover art option above it, not
-            // as a separate setting. Nothing to narrow while the clip itself
-            // is off. Defaults to off: a clip loops for as long as its track
-            // plays, so on cellular this is not a one-time video cost but
-            // that cost repeated on every loop — see AppSettings.canvasOverCellular.
-            if (animatedCanvas) {
-                val coverCellularTitle = stringResource(R.string.animated_cover_cellular)
-                row(coverCellularTitle, "canvas", "cellular", divided = false) {
-                    SettingsSubRow(
-                        title = coverCellularTitle,
-                        checked = canvasOverCellular,
-                        onCheckedChange = AppSettings::setCanvasOverCellular,
-                    )
-                }
-                val spotifyCanvasTitle = stringResource(R.string.integrate_spotify_canvas)
-                row(spotifyCanvasTitle, "spotify", "canvas", divided = false) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable(onClick = onSpotifyCanvasAuth)
-                            .padding(start = ROW_INSET, end = ROW_INSET, top = 4.dp, bottom = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            text = spotifyCanvasTitle,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onBackground,
-                            modifier = Modifier.weight(1f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Chevron()
-                    }
-                }
-            }
+            // Sampul animasi, data seluler, dan Spotify Canvas ada di halaman Cover animation.
             val artistSignaturesTitle = stringResource(R.string.artist_signatures)
             row(artistSignaturesTitle, "signature", "artist", "logo") {
                 SettingsRow(
@@ -2911,6 +2857,8 @@ fun SettingsChoicePage(
     onChosen: () -> Unit,
     /** Asks before a bit-perfect mode is turned on — see [SettingsScreen]. */
     onConfirmBitPerfect: (BitPerfectMode) -> Unit,
+    /** Opens the Spotify Canvas sign-in, from the Cover animation page. */
+    onSpotifyCanvasAuth: () -> Unit = {},
     contentPadding: PaddingValues,
     modifier: Modifier = Modifier,
 ) {
@@ -3008,14 +2956,17 @@ fun SettingsChoicePage(
                 AccentColorPicker(selected = selected, onSelect = AppSettings::setAccentColor)
             }
 
-            // Animasi pindah cover dan efek cair dalam satu halaman. Efek cair hanya
-            // bermakna bila animasinya hidup, jadi terkunci (nilainya tetap tersimpan)
-            // selama animasi pindah cover mati.
+            // Semua animasi cover dalam satu halaman, dibagi tiga blok: transisi
+            // pindah cover, sampul animasi, dan Spotify Canvas. Efek cair terkunci
+            // selama animasi pindah cover mati; data seluler dan Spotify Canvas
+            // terkunci selama sampul animasi mati (nilainya tetap tersimpan).
             SettingsChoiceKind.COVER_ANIMATION -> {
                 val slide by AppSettings.coverSlideAnimation.collectAsStateWithLifecycle()
                 val fluid by AppSettings.coverFluidAnimation.collectAsStateWithLifecycle()
                 val mixOnly by AppSettings.coverMixOnlyEffects.collectAsStateWithLifecycle()
-                SettingsGroup {
+                val animatedCanvas by AppSettings.animatedCanvas.collectAsStateWithLifecycle()
+                val canvasOverCellular by AppSettings.canvasOverCellular.collectAsStateWithLifecycle()
+                SettingsGroup(header = stringResource(R.string.cover_section_transition)) {
                     SettingsRow(
                         icon = SfIcons.Animation,
                         title = stringResource(R.string.cover_slide_animation),
@@ -3031,7 +2982,7 @@ fun SettingsChoicePage(
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                         RowDivider()
                         SettingsRow(
-                            icon = SfIcons.Animation,
+                            icon = SfIcons.Waves,
                             title = stringResource(R.string.cover_fluid_animation),
                             subtitle = stringResource(
                                 if (slide) R.string.cover_fluid_animation_subtitle else R.string.cover_fluid_animation_locked,
@@ -3049,7 +3000,7 @@ fun SettingsChoicePage(
                     }
                     RowDivider()
                     SettingsRow(
-                        icon = SfIcons.Animation,
+                        icon = SfIcons.AutoAwesome,
                         title = stringResource(R.string.cover_mix_only_animation),
                         subtitle = stringResource(
                             if (slide) R.string.cover_mix_only_animation_subtitle else R.string.cover_fluid_animation_locked,
@@ -3063,6 +3014,48 @@ fun SettingsChoicePage(
                             )
                         },
                         onClick = { AppSettings.setCoverMixOnlyEffects(!mixOnly) },
+                    )
+                }
+                // Default mati: klip berulang selama lagu diputar, jadi di data
+                // seluler biayanya terulang di setiap putaran — lihat
+                // AppSettings.canvasOverCellular.
+                SettingsGroup(header = stringResource(R.string.cover_section_animated)) {
+                    SettingsRow(
+                        icon = SfIcons.Video,
+                        title = stringResource(R.string.animated_cover_art),
+                        subtitle = stringResource(R.string.animated_cover_art_subtitle),
+                        trailing = {
+                            IosSwitch(
+                                checked = animatedCanvas,
+                                onCheckedChange = AppSettings::setAnimatedCanvas,
+                            )
+                        },
+                        onClick = { AppSettings.setAnimatedCanvas(!animatedCanvas) },
+                    )
+                    RowDivider()
+                    SettingsRow(
+                        icon = SfIcons.SignalCellularAlt,
+                        title = stringResource(R.string.animated_cover_cellular),
+                        subtitle = if (animatedCanvas) null else stringResource(R.string.animated_cover_locked),
+                        enabled = animatedCanvas,
+                        trailing = {
+                            IosSwitch(
+                                checked = canvasOverCellular,
+                                onCheckedChange = AppSettings::setCanvasOverCellular,
+                                enabled = animatedCanvas,
+                            )
+                        },
+                        onClick = { AppSettings.setCanvasOverCellular(!canvasOverCellular) },
+                    )
+                }
+                SettingsGroup(header = stringResource(R.string.cover_section_spotify)) {
+                    SettingsRow(
+                        icon = SfIcons.Key,
+                        title = stringResource(R.string.integrate_spotify_canvas),
+                        subtitle = if (animatedCanvas) null else stringResource(R.string.animated_cover_locked),
+                        enabled = animatedCanvas,
+                        trailing = { Chevron() },
+                        onClick = onSpotifyCanvasAuth,
                     )
                 }
             }

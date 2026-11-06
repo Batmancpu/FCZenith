@@ -3128,6 +3128,7 @@ private fun ZenithApp(
                                 choice = pageRoute.choice,
                                 onChosen = { navigator.pop() },
                                 onConfirmBitPerfect = { confirmBitPerfect = it },
+                                onSpotifyCanvasAuth = { showSpotifyCanvasAuth = true },
                                 contentPadding = listPadding,
                             )
                         } else if (pageRoute == AppRoute.Settings || pageRoute is AppRoute.SettingsSection) {
