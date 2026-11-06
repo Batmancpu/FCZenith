@@ -229,14 +229,14 @@ private const val UNSUNG_ALPHA_STRIP = 0.55f
  * — so a line of quick syllables has no glow at all and a carried note lights
  * up letter by letter, which is where the light was always meant to come from.
  */
-private const val GLOW_ALPHA = 0.14f
+private const val GLOW_ALPHA = 0.10f
 
 /**
  * How far the bloom spreads off a letter. Tight, because it is a letter's worth
  * of light now rather than a word's: a wide radius on something this small is
  * a smudge behind the text instead of a glow coming off it.
  */
-private val GLOW_RADIUS = 2.dp
+private val GLOW_RADIUS = 1.5.dp
 
 /**
  * Room reserved inside each copy of a line for the halo to spread into.
