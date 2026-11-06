@@ -300,6 +300,12 @@ object AppSettings {
     val skipCrossfadeMs = MutableStateFlow(0L)
 
     /**
+     * Lama mix/crossfade yang sedang berjalan, dalam ms; 0 selain saat itu.
+     * Dibaca UI agar transisi cover berjalan sepanjang mix.
+     */
+    val mixFadeMs = MutableStateFlow(0L)
+
+    /**
      * Lets Automix's analyzer decide the transition's timing and length
      * from each track's tempo, energy and structure, replacing the fixed
      * [crossfadeSeconds] window rather than needing it set to anything first

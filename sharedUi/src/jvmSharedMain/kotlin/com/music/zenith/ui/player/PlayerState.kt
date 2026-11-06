@@ -466,6 +466,7 @@ internal fun rememberArtworkDissolve(
     clipShowing: Boolean = false,
     queueIndex: Int = -1,
     skipFadeMs: Long = 0L,
+    mixFadeMs: Long = 0L,
 ): ArtworkDissolve {
     val reduceAnimation by PlayerSettings.reduceAnimation.collectAsStateWithLifecycle()
     val coverSlide by PlayerSettings.coverSlideAnimation.collectAsStateWithLifecycle()
@@ -522,6 +523,7 @@ internal fun rememberArtworkDissolve(
     }
     val mixingNow by rememberUpdatedState(mixing)
     val skipFadeNow by rememberUpdatedState(skipFadeMs)
+    val mixFadeNow by rememberUpdatedState(mixFadeMs)
     val mixOnlyNow by rememberUpdatedState(coverMixOnly)
     LaunchedEffect(art) {
         if (dissolve.outgoing == null) {
@@ -552,11 +554,11 @@ internal fun rememberArtworkDissolve(
         // setelah cover berganti, dan cover baru sudah termuat di titik ini.
         dissolve.light = mixOnlyNow && (!mixingNow || skipFadeNow > 0L) && dissolve.frame == null
         val duration = when {
-            // Efek penuh hanya untuk mix: next/prev (juga saat crossfade next/prev) tetap ringan.
-            dissolve.light -> LIGHT_DISSOLVE_MS
             // Crossfade next/prev: cover lama melebur ke cover baru selama
             // audio-nya memudar, bukan lebih cepat atau lebih lambat.
             mixingNow && skipFadeNow > 0L -> skipFadeNow.toInt().coerceIn(400, 6_000)
+            // Mix/crossfade otomatis: transisi cover sepanjang lama mix-nya.
+            mixingNow && mixFadeNow > 0L -> mixFadeNow.toInt().coerceIn(400, 12_000)
             mixingNow -> MIX_DISSOLVE_MS
             dissolve.frame != null -> FRAME_DISSOLVE_MS
             dissolve.light -> LIGHT_DISSOLVE_MS

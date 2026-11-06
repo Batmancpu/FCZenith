@@ -1797,6 +1797,9 @@ class CrossfadeController(
         // the old sheen for a mix flag with no blend beside it, and would flash
         // it for a frame otherwise.
         publishBlend(out, into, force = true)
+        // Lama blend dipublikasikan sebelum flag mix, satu tick, supaya cover
+        // sudah tahu durasinya saat transisi dimulai.
+        AppSettings.mixFadeMs.value = plannedBlend?.fadeMs ?: fadeMs
         AppSettings.crossfadeRunning.value = true
         AppSettings.smartMixInProgress.value = isRealMix()
         if (isRealMix()) publishMixView(out, into)
@@ -2976,6 +2979,7 @@ class CrossfadeController(
         handedOff = false
         manualFade = false
         AppSettings.skipCrossfadeMs.value = 0L
+        AppSettings.mixFadeMs.value = 0L
         outgoingItemIndex = C.INDEX_UNSET
         queuedItemCount = 0
         incomingCueTimeMs = 0L

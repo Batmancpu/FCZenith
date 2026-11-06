@@ -1033,6 +1033,8 @@ fun NowPlayingScreen(
     // Lama crossfade next/prev yang sedang berjalan: dissolve cover memakai
     // durasi yang sama supaya gambar dan audio berganti bersamaan.
     val skipCrossfadeMs by PlayerSettings.skipCrossfadeMs.collectAsStateWithLifecycle()
+    // Lama mix/crossfade yang sedang berjalan: transisi cover berlangsung selama itu.
+    val mixFadeMs by PlayerSettings.mixFadeMs.collectAsStateWithLifecycle()
     // Begitu mix atau crossfade berjalan, clip animasi cover dipadamkan halus
     // sehingga yang tersisa adalah cover thumbnail; transisi ke cover lagu
     // berikutnya lalu berangkat dari gambar diam, bukan dari video yang masih
@@ -1538,6 +1540,7 @@ fun NowPlayingScreen(
         clipShowing = canvas != null && canvasRendered && !mixing && !crossfading,
         queueIndex = queueIndex,
         skipFadeMs = skipCrossfadeMs,
+        mixFadeMs = mixFadeMs,
     )
     // Pegangan yang diisi clip canvas dengan pembaca frame hidupnya. Frame itu
     // diambil sesaat sebelum skip, lalu sleeve menganimasikannya keluar menuju
