@@ -247,7 +247,28 @@ private fun DrawScope.drawMotion(
     active: Color
 ) {
     val riseDist = rt.fontPx * MotionTuning.RiseDistanceEm
-    val glowBase = rt.fontPx * MotionTuning.GlowRadiusEm
+    // Lapisan glow: gradien radial lembut, digambar SEBELUM teks dan tanpa clip,
+    // alpha kontinu (tanpa ambang) sehingga tidak berkedip dan tepinya memudar penuh.
+    val glowR = rt.fontPx * MotionTuning.GlowRadiusEm
+    for (i in 0 until lay.count) {
+        if (i >= rt.rise.size) break
+        val sw0 = rt.swell[i]
+        val prox0 = 1f - smoothstep(abs(rt.head - lay.charIndex[i] - 1f) / MotionTuning.GlowSpanChars)
+        val a = (rt.bloomA[0] * prox0 * (0.35f + 0.65f * sw0) * 0.5f).coerceIn(0f, 1f)
+        if (a < 0.004f) continue
+        val cx = (lay.left[i] + lay.right[i]) / 2f
+        val cy = (lay.top[i] + lay.bottom[i]) / 2f + (1f - rt.rise[i]) * riseDist
+        val rad = glowR * (1f + 0.5f * sw0)
+        drawCircle(
+            brush = Brush.radialGradient(
+                0f to active.copy(alpha = a),
+                0.45f to active.copy(alpha = a * 0.45f),
+                1f to active.copy(alpha = 0f),
+                center = Offset(cx, cy), radius = rad
+            ),
+            radius = rad, center = Offset(cx, cy)
+        )
+    }
     for (i in 0 until lay.count) {
         if (i >= rt.rise.size) break
         val l = lay.left[i]; val r = lay.right[i]
@@ -259,11 +280,7 @@ private fun DrawScope.drawMotion(
         val g = lay.glyphs[i]
         val tl = Offset(l, lay.glyphY[i])
         val dist = rt.head - lay.charIndex[i]
-        val prox = 1f - smoothstep(abs(dist - 1f) / MotionTuning.GlowSpanChars)
-        val glow = (rt.bloomA[0] * prox * (0.4f + 0.6f * sw)).coerceIn(0f, 1f)
-        val shadow = if (glow > 0.03f) {
-            Shadow(active.copy(alpha = 0.85f * glow), Offset.Zero, glowBase * (0.6f + 0.8f * sw))
-        } else null
+        val shadow: Shadow? = null
         withTransform({
             translate(0f, dy)
             scale(s, s, pivot)
@@ -280,7 +297,9 @@ private fun DrawScope.drawMotion(
                 }
             }
         }
-        if (sw > 0.12f) drawParticles(i, l + w / 2f, lay.top[i] + dy, w, rt, active, sw)
+        if (sw > 0.01f) {
+            drawParticles(i, l + w / 2f, lay.top[i] + dy, w, rt, active, smoothstep(sw / 0.35f))
+        }
     }
 }
 

@@ -29,12 +29,12 @@ internal object MotionTuning {
     const val HoldMinMs = 450f
     const val HoldRangeMs = 700f
     const val GlowSpanChars = 5f
-    const val GlowRadiusEm = 0.35f
+    const val GlowRadiusEm = 0.75f
     const val ParticleCount = 3
     const val ParticleSpeed = 0.55f
     const val ParticleRiseEm = 1.0f
-    const val BleedXDp = 14
-    const val BleedYDp = 20
+    const val BleedXDp = 36
+    const val BleedYDp = 36
     const val NoLigatures = "liga 0, clig 0"
 }
 
