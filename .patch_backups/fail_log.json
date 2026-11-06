@@ -22,5 +22,29 @@
     "block": 1,
     "layer": "not_found_in_project",
     "file": "sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/screens/LibraryScreen.kt"
+  },
+  {
+    "timestamp": "2026-11-06 10:34:05",
+    "block": 2,
+    "layer": "not_found_in_project",
+    "file": "app/src/main/java/com/music/zenith/playback/CrossfadeController.kt"
+  },
+  {
+    "timestamp": "2026-11-06 10:34:06",
+    "block": 3,
+    "layer": "not_found_in_project",
+    "file": "app/src/main/java/com/music/zenith/playback/CrossfadeController.kt"
+  },
+  {
+    "timestamp": "2026-11-06 10:34:09",
+    "block": 7,
+    "layer": "not_found_in_project",
+    "file": "app/src/main/java/com/music/zenith/playback/CrossfadeController.kt"
+  },
+  {
+    "timestamp": "2026-11-06 10:34:09",
+    "block": 8,
+    "layer": "not_found_in_project",
+    "file": "app/src/main/java/com/music/zenith/playback/CrossfadeController.kt"
   }
 ]

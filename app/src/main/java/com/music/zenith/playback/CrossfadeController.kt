@@ -3625,7 +3625,12 @@ class CrossfadeController(
         }
         // + = track masuk mendahului, jadi mundurkan sebesar error.
         val shiftMs = (median * 1000).roundToLong()
-        val lossMs = seekLossMs.roundToLong()
+        // Lag seek berubah-ubah (terutama saat jaringan jelek), jadi hanya sebagian
+        // yang dikompensasi dan ada batas atas. Lebih baik kurang sedikit lalu
+        // dikoreksi seek berikutnya daripada kelewatan.
+        val lossMs = (seekLossMs * PHASE_SEEK_COMP_FACTOR)
+            .coerceAtMost(PHASE_SEEK_COMP_MAX_MS)
+            .roundToLong()
         val target = (inClock.read(into) - shiftMs + lossMs).toLong().coerceAtLeast(0L)
         // Jaga progress blend tetap kontinu: elapsed = posisi - cue.
         incomingCueTimeMs = (incomingCueTimeMs - shiftMs + lossMs).coerceAtLeast(0L)
@@ -3635,7 +3640,8 @@ class CrossfadeController(
         seekQuietUntil = now + PHASE_SEEK_SETTLE_MS
         TrackLog.d(
             TAG,
-            "phase seek #$phaseSeeks: ${"%+.1f".format(Locale.ROOT, median * 1000)}ms -> seek ${target}ms",
+            "phase seek #$phaseSeeks: ${"%+.1f".format(Locale.ROOT, median * 1000)}ms " +
+                "comp=${lossMs}ms -> seek ${target}ms",
             about = into.currentMediaItem?.mediaId,
         )
         inClock.reset()
@@ -4168,12 +4174,18 @@ class CrossfadeController(
         /** Lag seek yang masih masuk akal; lebih dari ini berarti seek tidak bekerja seperti dugaan. */
         const val PHASE_SEEK_MAX_LOSS_MS = 200.0
 
+        /** Bagian dari lag seek terukur yang dikompensasi pada seek berikutnya. */
+        const val PHASE_SEEK_COMP_FACTOR = 0.6
+
+        /** Kompensasi lag tidak pernah melebihi ini. */
+        const val PHASE_SEEK_COMP_MAX_MS = 80.0
+
         /** Hanya selagi track masuk masih di awal blend dan nyaris tak terdengar. */
         const val PHASE_SEEK_UNTIL = 0.25f
         const val PHASE_SEEK_MAX_GAIN = 0.3f
 
         /** Di bawah ini dianggap sefase. */
-        const val PHASE_SEEK_DEADBAND_SECONDS = 0.012
+        const val PHASE_SEEK_DEADBAND_SECONDS = 0.02
 
         /** Tunggu posisi player stabil sebelum mengukur lagi setelah seek. */
         const val PHASE_SEEK_SETTLE_MS = 700L
