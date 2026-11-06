@@ -4021,20 +4021,24 @@ fun NowPlayingScreen(
                                         // Efek cair memakai mask shader, bukan sapuan + kilau.
                                         if (dissolve.fluid || dissolve.light) return@drawWithContent
                                         val feather = size.width * 0.75f
-                                        val travel = size.width + feather
                                         val forward = dissolve.direction >= 0f
                                         // Tepi sapuan: next menyapu dari kanan ke kiri,
-                                        // previous dari kiri ke kanan.
-                                        val start = if (forward) {
-                                            size.width - travel * dissolve.progress
-                                        } else {
-                                            -feather + travel * dissolve.progress
-                                        }
+                                        // previous dari kiri ke kanan. Tepi pudar sudah
+                                        // masuk ke dalam cover sejak awal (lead), jadi sisi
+                                        // yang disapu langsung terlihat memudar halus, bukan
+                                        // datar dulu. Kekuatannya naik pelan (ramp) supaya
+                                        // frame pertama tidak melompat.
+                                        val lead = feather * 0.6f
+                                        val ramp = smootherStep((dissolve.progress / 0.22f).coerceIn(0f, 1f))
+                                        val startEdge = if (forward) size.width - lead else -feather + lead
+                                        val endEdge = if (forward) -feather else size.width
+                                        val start = startEdge + (endEdge - startEdge) * dissolve.progress
                                         drawRect(
                                             brush = Brush.horizontalGradient(
                                                 colorStops = Array(FADE_CURVE_STOPS + 1) { i ->
                                                     val t = i / FADE_CURVE_STOPS.toFloat()
-                                                    val keep = if (forward) 1f - smootherStep(t) else smootherStep(t)
+                                                    val base = if (forward) 1f - smootherStep(t) else smootherStep(t)
+                                                    val keep = 1f - (1f - base) * ramp
                                                     t to Color.Black.copy(alpha = keep)
                                                 },
                                                 startX = start,
