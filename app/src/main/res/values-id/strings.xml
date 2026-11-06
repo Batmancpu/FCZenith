@@ -216,12 +216,12 @@
     <string name="theme">Tema</string>
     <string name="reduce_animation">Kurangi animasi</string>
     <string name="reduce_animation_subtitle">Membekukan gradien pemutar utama alih-alih bergerak</string>
-    <string name="cover_slide_animation">Animasi pindah cover</string>
+    <string name="cover_slide_animation">Animasi cover</string>
     <string name="cover_slide_animation_subtitle">Cover bergeser ke lagu baru saat ganti lagu</string>
     <string name="cover_fluid_animation">Efek cover cair</string>
     <string name="cover_fluid_animation_subtitle">Cover meleleh dan berubah organik ke lagu baru</string>
     <string name="cover_fluid_animation_locked">Aktifkan animasi pindah cover dulu</string>
-    <string name="cover_mix_only_animation">Efek penuh hanya saat mix</string>
+    <string name="cover_mix_only_animation">Efek penuh saat mix</string>
     <string name="cover_mix_only_animation_subtitle">Next/prev memakai transisi ringan; efek cair atau geser menyala otomatis saat Automix atau crossfade berjalan</string>
     <string name="cover_style_off">Mati</string>
     <string name="cover_style_slide">Slide</string>
