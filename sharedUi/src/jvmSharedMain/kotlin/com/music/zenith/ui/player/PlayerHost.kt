@@ -287,6 +287,8 @@ interface PlayerSettingsSource {
     val skipCrossfadeMs: StateFlow<Long>
     /** Lama mix/crossfade yang sedang berjalan (ms), 0 bila tidak ada. */
     val mixFadeMs: StateFlow<Long>
+    /** Cover lagu tujuan selama mix/crossfade berjalan, null bila tidak ada. */
+    val mixIncomingArtworkUrl: StateFlow<String?>
     /** The Automix blend in flight, for the scrubber's beat glow; null between blends. */
     val smartMixBlend: StateFlow<MixBlend?>
     /** The Automix blend in flight laid out for the mix popup; null between blends. */

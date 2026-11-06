@@ -1528,7 +1528,10 @@ fun NowPlayingScreen(
     // had and never re-emits, so the `onState` that is the sole writer here
     // never fires again. Keyed on the cover there is nothing to reset: the
     // bitmap really is still loaded, so the state stays true.
-    val art = rememberPlayerArtwork(remoteArt)
+    // Selama mix/crossfade, sleeve sudah menuju cover lagu tujuan (bukan menunggu
+    // lagu berganti), sehingga transisi cover mulai bersamaan dengan teks mixing.
+    val mixIncomingArt by PlayerSettings.mixIncomingArtworkUrl.collectAsStateWithLifecycle()
+    val art = rememberPlayerArtwork(mixIncomingArt ?: remoteArt)
     PrefetchNeighbourArtwork(queue, queueIndex)
     // clipShowing: lagu yang sedang tampil punya clip animasi yang benar-benar
     // terlihat (bukan sedang dipadamkan oleh mix). Kalau begitu dan lagu diganti

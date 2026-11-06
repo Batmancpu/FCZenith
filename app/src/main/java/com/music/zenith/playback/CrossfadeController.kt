@@ -1800,6 +1800,7 @@ class CrossfadeController(
         // Lama blend dipublikasikan sebelum flag mix, satu tick, supaya cover
         // sudah tahu durasinya saat transisi dimulai.
         AppSettings.mixFadeMs.value = plannedBlend?.fadeMs ?: fadeMs
+        AppSettings.mixIncomingArtworkUrl.value = into.currentMediaItem?.mediaMetadata?.artworkUri?.toString()
         AppSettings.crossfadeRunning.value = true
         AppSettings.smartMixInProgress.value = isRealMix()
         if (isRealMix()) publishMixView(out, into)
@@ -2980,6 +2981,7 @@ class CrossfadeController(
         manualFade = false
         AppSettings.skipCrossfadeMs.value = 0L
         AppSettings.mixFadeMs.value = 0L
+        AppSettings.mixIncomingArtworkUrl.value = null
         outgoingItemIndex = C.INDEX_UNSET
         queuedItemCount = 0
         incomingCueTimeMs = 0L

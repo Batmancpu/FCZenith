@@ -306,6 +306,12 @@ object AppSettings {
     val mixFadeMs = MutableStateFlow(0L)
 
     /**
+     * Cover lagu tujuan selama mix/crossfade berjalan; null selain saat itu.
+     * Sleeve pindah ke cover ini sejak mix mulai, bukan menunggu lagu berganti.
+     */
+    val mixIncomingArtworkUrl = MutableStateFlow<String?>(null)
+
+    /**
      * Lets Automix's analyzer decide the transition's timing and length
      * from each track's tempo, energy and structure, replacing the fixed
      * [crossfadeSeconds] window rather than needing it set to anything first
