@@ -4036,7 +4036,7 @@ class CrossfadeController(
         /** Phase readings per decision; the median of these is what gets corrected. */
         const val LOCK_SAMPLES = 5
         const val PHASE_LOG_SAMPLES = 5
-        val PHASE_LOG_CHECKPOINTS = floatArrayOf(0.05f, 0.5f, 0.9f)
+        val PHASE_LOG_CHECKPOINTS = floatArrayOf(0.05f, 0.25f, 0.4f, 0.9f)
 
         /** Under this the two beats are together as far as anyone can hear. */
         const val LOCK_DEADBAND_SECONDS = 0.008
