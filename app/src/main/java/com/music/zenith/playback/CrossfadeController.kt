@@ -1761,8 +1761,7 @@ class CrossfadeController(
         seekCount = 0
         seekQuietUntil = fadeStartedAt + PHASE_SEEK_START_MS
         seekPending = false
-        // Tebakan awal lag seek (re-buffer) untuk seek pertama; diperbarui dari ukuran nyata.
-        seekLossMs = PHASE_SEEK_INITIAL_LOSS_MS
+        seekLossMs = 0.0
         seekCompMs = 0.0
         // However the ramp went — a late arm, a slow buffer — the blend starts
         // on the incoming tempo.
@@ -3614,10 +3613,7 @@ class CrossfadeController(
             // Sisa error setelah seek = waktu yang hilang saat seek (re-buffer).
             // Dipakai untuk mengimbangi seek berikutnya.
             seekPending = false
-            // Lag tiap seek berubah-ubah (79-174ms di log), jadi dihaluskan supaya
-            // satu seek yang kebetulan lambat/cepat tidak membuat koreksi berikutnya meleset.
-            val measuredLossMs = (seekCompMs - median * 1000).coerceAtLeast(0.0)
-            seekLossMs = seekLossMs * 0.4 + measuredLossMs * 0.6
+            seekLossMs = (seekCompMs - median * 1000).coerceAtLeast(0.0)
             TrackLog.d(
                 TAG,
                 "phase seek lag: ${"%.0f".format(Locale.ROOT, seekLossMs)}ms " +
@@ -3630,13 +3626,17 @@ class CrossfadeController(
                 return
             }
         }
-        if (abs(median) < PHASE_SEEK_DEADBAND_SECONDS) {
+        // Sasaran sedikit di belakang (bukan nol): lagu keluar makin cepat sepanjang
+        // blend sehingga error naik sekitar +70ms. Dibidik di -AIM, errornya terpusat di
+        // sekitar nol saat kedua lagu paling keras.
+        val aimed = median + PHASE_SEEK_AIM_SECONDS
+        if (abs(aimed) < PHASE_SEEK_DEADBAND_SECONDS) {
             // Sudah sefase: selesai.
             phaseSeeks = PHASE_SEEK_MAX
             return
         }
-        // + = track masuk mendahului, jadi mundurkan sebesar error.
-        val shiftMs = (median * 1000).roundToLong()
+        // + = track masuk mendahului, jadi mundurkan sebesar error (terhadap sasaran).
+        val shiftMs = (aimed * 1000).roundToLong()
         // Lag seek berubah-ubah (terutama saat jaringan jelek), jadi hanya sebagian
         // yang dikompensasi dan ada batas atas. Lebih baik kurang sedikit lalu
         // dikoreksi seek berikutnya daripada kelewatan.
@@ -4187,20 +4187,20 @@ class CrossfadeController(
         const val PHASE_SEEK_MAX_LOSS_MS = 200.0
 
         /** Bagian dari lag seek terukur yang dikompensasi pada seek berikutnya. */
-        const val PHASE_SEEK_COMP_FACTOR = 0.85
+        const val PHASE_SEEK_COMP_FACTOR = 0.0
 
-        /** Perkiraan lag seek sebelum ada pengukuran (ms); dari log nyata sekitar 80-170ms. */
-        const val PHASE_SEEK_INITIAL_LOSS_MS = 100.0
+        /** Sasaran fase track masuk: sedikit tertinggal (detik), mengimbangi drift saat blend. */
+        const val PHASE_SEEK_AIM_SECONDS = 0.04
 
         /** Kompensasi lag tidak pernah melebihi ini. */
-        const val PHASE_SEEK_COMP_MAX_MS = 160.0
+        const val PHASE_SEEK_COMP_MAX_MS = 80.0
 
         /** Hanya selagi track masuk masih di awal blend dan nyaris tak terdengar. */
         const val PHASE_SEEK_UNTIL = 0.45f
         const val PHASE_SEEK_MAX_GAIN = 0.5f
 
         /** Di bawah ini dianggap sefase. */
-        const val PHASE_SEEK_DEADBAND_SECONDS = 0.012
+        const val PHASE_SEEK_DEADBAND_SECONDS = 0.03
 
         /** Tunggu posisi player stabil sebelum mengukur lagi setelah seek. */
         const val PHASE_SEEK_SETTLE_MS = 1_200L
