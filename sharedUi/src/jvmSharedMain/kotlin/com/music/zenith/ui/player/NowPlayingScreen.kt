@@ -3700,14 +3700,14 @@ fun NowPlayingScreen(
                                     // collapse, once the dissolve has all but gone. Let
                                     // go of on the way to the mini player, whose cover
                                     // sits flat in its bar.
-                                    shadowElevation = if (art.loaded || dissolve.outgoing != null) {
+                                    shadowElevation = if (art.loaded || dissolve.outgoing != null || dissolve.cutHold) {
                                         10.dp.toPx() * (1f - 2f * shown).coerceAtLeast(0f) * dockT()
                                     } else {
                                         0f
                                     }
                                     shape = dockFrame.cornerShape(sleeveCorner())
                                     // What `.shadow` did: it clips only when it casts.
-                                    clip = art.loaded || dissolve.outgoing != null
+                                    clip = art.loaded || dissolve.outgoing != null || dissolve.cutHold
                                 }
                                 .graphicsLayer {
                                     // Clipped a second time, as `.shadow` and then
@@ -3799,7 +3799,7 @@ fun NowPlayingScreen(
                                     .background(Color.Black.copy(alpha = 0.18f)),
                                 contentAlignment = Alignment.Center,
                             ) {
-                                if (!art.loaded && !canvasRendered && dissolve.outgoing == null) {
+                                if (!art.loaded && !canvasRendered && dissolve.outgoing == null && !dissolve.cutHold) {
                                     Icon(
                                         imageVector = ZenithIcons.MusicNote,
                                         contentDescription = null,
@@ -3947,6 +3947,7 @@ fun NowPlayingScreen(
                                             framed -> 1f
                                             sweeping && dissolve.fluid -> 1f
                                             sweeping -> 1f - smootherStep(((t - 0.62f) / 0.38f).coerceIn(0f, 1f))
+                                            dissolve.cutHold -> 1f
                                             else -> 0f
                                         }
                                         // Cover lama ikut terbawa searah gerak (next ke

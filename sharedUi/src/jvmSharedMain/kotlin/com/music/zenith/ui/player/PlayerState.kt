@@ -261,6 +261,15 @@ internal class ArtworkDissolve(first: PlayerArtwork) {
     var progress by mutableFloatStateOf(1f)
 
     /**
+     * Tanpa efek (slide mati): cover lama ditahan penuh di layer [held] sampai
+     * cover baru benar-benar termuat, lalu diganti seketika (cut). Tanpa ini
+     * sleeve langsung kosong saat cover baru belum termuat lalu cover baru
+     * pop-in, terlihat sebagai cover muncul dua kali.
+     */
+    var cutHold by mutableStateOf(false)
+        private set
+
+    /**
      * Frame terakhir clip canvas, diambil tepat saat next/prev ditekan. Selama
      * ada, layer cover lama menggambar frame ini (bukan thumbnail) dan
      * transisinya memakai blur-zoom dissolve, bukan sapuan geser.
@@ -302,7 +311,7 @@ internal class ArtworkDissolve(first: PlayerArtwork) {
     var heldBlur by mutableStateOf<ImageBitmap?>(null)
         private set
 
-    internal fun retarget(next: PlayerArtwork, enabled: Boolean, queueIndex: Int = -1) {
+    internal fun retarget(next: PlayerArtwork, enabled: Boolean, queueIndex: Int = -1, holdOld: Boolean = false) {
         val old = current
         if (old === next) return
         current = next
@@ -320,12 +329,27 @@ internal class ArtworkDissolve(first: PlayerArtwork) {
         val inFlight = androidx.compose.runtime.snapshots.Snapshot.withoutReadObservation { outgoing }
         val flightProgress = androidx.compose.runtime.snapshots.Snapshot.withoutReadObservation { progress }
         val visible = if (inFlight != null && flightProgress < RETARGET_KEEP_PROGRESS) inFlight else old
+        val pendingCut = androidx.compose.runtime.snapshots.Snapshot.withoutReadObservation { cutHold }
+        // Saat cut masih menunggu, cover yang benar-benar terlihat ada di layer [held], bukan [old].
+        val onScreen = if (pendingCut) {
+            androidx.compose.runtime.snapshots.Snapshot.withoutReadObservation { held }
+        } else {
+            old
+        }
         if (enabled && next.url != null && (visible.url != null || framed)) {
+            cutHold = false
             held = visible
             outgoing = visible
             progress = 0f
             if (visible !== inFlight) heldBlur = shownBlur
+        } else if (holdOld && !framed && next.url != null && onScreen.url != null) {
+            held = onScreen
+            outgoing = null
+            progress = 1f
+            heldBlur = null
+            cutHold = true
         } else {
+            cutHold = false
             held = next
             outgoing = null
             progress = 1f
@@ -335,6 +359,7 @@ internal class ArtworkDissolve(first: PlayerArtwork) {
     }
 
     internal fun finish() {
+        cutHold = false
         progress = 1f
         outgoing = null
         held = current
@@ -426,6 +451,8 @@ internal fun rememberArtworkDissolve(
             enabled = !reduceAnimation && coverSlide && dissolve.fullFrame == null &&
                 (dissolve.frame != null || !dissolve.lastClipShowing),
             queueIndex = queueIndex,
+            holdOld = (reduceAnimation || !coverSlide) && dissolve.fullFrame == null &&
+                !dissolve.lastClipShowing,
         )
     }
     SideEffect {
@@ -451,6 +478,16 @@ internal fun rememberArtworkDissolve(
     val mixingNow by rememberUpdatedState(mixing)
     val skipFadeNow by rememberUpdatedState(skipFadeMs)
     LaunchedEffect(art) {
+        if (dissolve.outgoing == null) {
+            // Tanpa efek: cover lama ditahan sampai cover baru termuat dan
+            // tergambar, lalu diganti seketika tanpa frame kosong.
+            if (!dissolve.cutHold) return@LaunchedEffect
+            withTimeoutOrNull(ART_DISSOLVE_WAIT_MS) { snapshotFlow { art.loaded || art.failed }.first { it } }
+            androidx.compose.runtime.withFrameNanos { }
+            androidx.compose.runtime.withFrameNanos { }
+            dissolve.finish()
+            return@LaunchedEffect
+        }
         val shown = dissolve.outgoing ?: return@LaunchedEffect
         // Cover baru harus sudah ada untuk dijadikan tujuan dissolve; cover
         // yang tidak kunjung datang ditinggalkan, bukan ditutupi yang lama.
