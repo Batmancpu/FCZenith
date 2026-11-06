@@ -1754,6 +1754,9 @@ class CrossfadeController(
         inClock.reset()
         // The incoming player's clock is still settling off its start.
         lockQuietUntil = fadeStartedAt + LOCK_START_MS
+        phaseSeeks = 0
+        seekCount = 0
+        seekQuietUntil = fadeStartedAt + LOCK_START_MS
         // However the ramp went — a late arm, a slow buffer — the blend starts
         // on the incoming tempo.
         if (rampSteps > 0 && rampStep < rampSteps) {
@@ -1937,6 +1940,7 @@ class CrossfadeController(
         )
         if (render.phaseLock) holdPhase(out, player, progress)
         logPhase(out, player, progress)
+        alignPhaseOnce(out, player, progress)
 
         // The midpoint, or sooner if the outgoing track is about to run out
         // from under it: until the handoff its queue still runs on past the
@@ -3558,6 +3562,55 @@ class CrossfadeController(
         nudgeUntil = now + (abs(median) / (base * abs(factor - 1f)) * 1000).roundToLong().coerceIn(1L, MAX_NUDGE_MS)
     }
 
+    // ---- One-shot phase seek ------------------------------------------------
+    // phaseLock sengaja mati (pulse kecepatan memicu retak di AudioTrack). Akibatnya
+    // offset awal (cue + latency start) tidak pernah dikoreksi: log menunjukkan
+    // -109ms / -88ms yang tetap sepanjang blend. Di sini offset itu ditutup dengan
+    // seek kecil saat track masuk masih nyaris tak terdengar. Tidak ada perubahan
+    // PlaybackParameters, jadi tidak ada risiko retak mid-buffer.
+
+    private var phaseSeeks = 0
+    private var seekCount = 0
+    private var seekQuietUntil = 0L
+    private val seekErrors = DoubleArray(LOCK_SAMPLES)
+
+    private fun alignPhaseOnce(out: ExoPlayer, into: ExoPlayer, progress: Float) {
+        if (!render.advanced || phaseSeeks >= PHASE_SEEK_MAX) return
+        if (progress > PHASE_SEEK_UNTIL || into.volume > PHASE_SEEK_MAX_GAIN) return
+        val now = SystemClock.elapsedRealtime()
+        if (now < seekQuietUntil) return
+        if (!out.isPlaying || !into.isPlaying) {
+            seekCount = 0
+            return
+        }
+        val error = phaseError(out, into)
+        if (error.isNaN()) return
+        seekErrors[seekCount++] = error
+        if (seekCount < LOCK_SAMPLES) return
+        seekCount = 0
+        seekErrors.sort()
+        val median = seekErrors[LOCK_SAMPLES / 2]
+        if (abs(median) < PHASE_SEEK_DEADBAND_SECONDS) {
+            // Sudah sefase: selesai.
+            phaseSeeks = PHASE_SEEK_MAX
+            return
+        }
+        // + = track masuk mendahului, jadi mundurkan sebesar error.
+        val shiftMs = (median * 1000).roundToLong()
+        val target = (inClock.read(into) - shiftMs).toLong().coerceAtLeast(0L)
+        // Jaga progress blend tetap kontinu: elapsed = posisi - cue.
+        incomingCueTimeMs = (incomingCueTimeMs - shiftMs).coerceAtLeast(0L)
+        phaseSeeks++
+        seekQuietUntil = now + PHASE_SEEK_SETTLE_MS
+        TrackLog.d(
+            TAG,
+            "phase seek #$phaseSeeks: ${"%+.1f".format(Locale.ROOT, median * 1000)}ms -> seek ${target}ms",
+            about = into.currentMediaItem?.mediaId,
+        )
+        inClock.reset()
+        into.seekTo(target)
+    }
+
     // ---- Phase log ----------------------------------------------------------
     // Hanya mengukur, tidak mengoreksi: seberapa jauh dua beat sebenarnya bergeser di
     // lagu nyata, di awal, tengah, dan akhir overlap. Filter Logcat: ZenithCrossfade.
@@ -4074,6 +4127,19 @@ class CrossfadeController(
          * nudging toward it would only make it worse.
          */
         const val LOCK_MAX_BEATS = 0.3
+
+        /** Koreksi seek: paling banyak dua kali (kedua mengoreksi sisa akibat latency seek). */
+        const val PHASE_SEEK_MAX = 2
+
+        /** Hanya selagi track masuk masih di awal blend dan nyaris tak terdengar. */
+        const val PHASE_SEEK_UNTIL = 0.2f
+        const val PHASE_SEEK_MAX_GAIN = 0.3f
+
+        /** Di bawah ini dianggap sefase. */
+        const val PHASE_SEEK_DEADBAND_SECONDS = 0.012
+
+        /** Tunggu posisi player stabil sebelum mengukur lagi setelah seek. */
+        const val PHASE_SEEK_SETTLE_MS = 700L
 
         /**
          * The most the tempo moves in one beat, ramping up or easing back.
