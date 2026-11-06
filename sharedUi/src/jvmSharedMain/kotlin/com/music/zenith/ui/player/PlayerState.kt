@@ -482,7 +482,7 @@ internal fun rememberArtworkDissolve(
             // Tanpa efek: cover lama ditahan sampai cover baru termuat dan
             // tergambar, lalu diganti seketika tanpa frame kosong.
             if (!dissolve.cutHold) return@LaunchedEffect
-            withTimeoutOrNull(ART_DISSOLVE_WAIT_MS) { snapshotFlow { art.loaded || art.failed }.first { it } }
+            withTimeoutOrNull(CUT_HOLD_WAIT_MS) { snapshotFlow { art.loaded || art.failed }.first { it } }
             androidx.compose.runtime.withFrameNanos { }
             androidx.compose.runtime.withFrameNanos { }
             dissolve.finish()
@@ -521,6 +521,9 @@ internal fun rememberArtworkDissolve(
 }
 
 private const val ART_DISSOLVE_WAIT_MS = 2_500L
+
+/** Tanpa efek: batas cover lama ditahan menunggu cover baru, supaya ganti lagu tetap terasa responsif. */
+private const val CUT_HOLD_WAIT_MS = 500L
 
 /**
  * Bentuk klip hero saat frame-nya ditahan: [portrait] bila klip dimuat portrait rata atas
