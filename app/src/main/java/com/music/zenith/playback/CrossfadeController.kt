@@ -3575,7 +3575,9 @@ class CrossfadeController(
     private val seekErrors = DoubleArray(LOCK_SAMPLES)
 
     private fun alignPhaseOnce(out: ExoPlayer, into: ExoPlayer, progress: Float) {
-        if (!render.advanced || phaseSeeks >= PHASE_SEEK_MAX) return
+        // Setelah handoff player masuk sudah dipantau listener sesi; seek di sana
+        // bisa terbaca sebagai seek pengguna dan mengganggu blend.
+        if (handedOff || !render.advanced || phaseSeeks >= PHASE_SEEK_MAX) return
         if (progress > PHASE_SEEK_UNTIL || into.volume > PHASE_SEEK_MAX_GAIN) return
         val now = SystemClock.elapsedRealtime()
         if (now < seekQuietUntil) return
