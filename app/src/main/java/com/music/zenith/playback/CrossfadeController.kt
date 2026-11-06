@@ -1764,6 +1764,25 @@ class CrossfadeController(
         incomingAnalysis = into.currentMediaItem?.let(analysisFor) ?: TrackAnalysis()
 
         Log.d(TAG, "blend start at cue=${into.currentPosition}ms out=${out.currentPosition}ms")
+        val plannedBlend = planInFlight
+        TrackLog.d(
+            TAG,
+            "blend plan: " + (
+                if (plannedBlend == null) {
+                    "standard fade ${fadeMs}ms"
+                } else {
+                    "${plannedBlend.reason} style=${plannedBlend.transitionStyle} fade=${plannedBlend.fadeMs}ms " +
+                        "beats=${plannedBlend.transitionBeats} " +
+                        "rate=${"%.4f".format(Locale.ROOT, plannedBlend.incomingPlaybackRate)} " +
+                        "cue=${"%.2f".format(Locale.ROOT, plannedBlend.incomingCueTime)}s " +
+                        "bassSwap=${"%.2f".format(Locale.ROOT, plannedBlend.bassSwapFraction)} " +
+                        "variant=${plannedBlend.filterVariant} " +
+                        "vocal=${"%.2f".format(Locale.ROOT, plannedBlend.vocalOverlap)} " +
+                        "lock=${plannedBlend.phaseLock}"
+                }
+                ),
+            about = into.currentMediaItem?.mediaId,
+        )
 
         // Published before the mix flag, in the same tick: the scrubber shows
         // the old sheen for a mix flag with no blend beside it, and would flash
