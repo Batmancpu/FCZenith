@@ -18,6 +18,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -39,8 +40,10 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.withFrameNanos
 import kotlinx.coroutines.delay
 import kotlin.math.abs
+import kotlin.math.PI
 import kotlin.math.floor
 import kotlin.math.min
+import kotlin.math.sin
 
 internal class MotionRuntime {
     var layout: MotionLayout? = null
@@ -52,6 +55,7 @@ internal class MotionRuntime {
     val bloomA = FloatArray(1); val bloomV = FloatArray(1)
     var head = 0f
     var maxSwell = 0f
+    var timeSec = 0f
     var headX = 0f; var headY = 0f; var headRtl = false
     var lastPos = Long.MIN_VALUE
     var idle = -1
@@ -72,6 +76,7 @@ internal class MotionRuntime {
         val h = out.head
         head = h
         val step = dt.coerceIn(0.001f, 0.05f)
+        timeSec += step
         var maxS = 0f
         for (l in 0 until n) {
             val wi = lay.wordIndex[l]
@@ -86,7 +91,8 @@ internal class MotionRuntime {
                     smoothstep((h - c + MotionTuning.LetterRiseLeadChars) / MotionTuning.LetterRiseSpanChars)
                 riseTarget = wordRise + (letterRise - wordRise) * MotionTuning.LetterRiseShare
                 val hold = smoothstep(((w.endMs - w.startMs) - MotionTuning.HoldMinMs) / MotionTuning.HoldRangeMs)
-                val sw = (h - c + MotionTuning.LetterSwellLeadChars) / MotionTuning.LetterSwellSpanChars
+                val tail = if (pos > w.endMs) (pos - w.endMs) / 1000f * MotionTuning.SwellTailCharsPerSec else 0f
+                val sw = (h - c + MotionTuning.LetterSwellLeadChars + tail) / MotionTuning.LetterSwellSpanChars
                 swellTarget = hold *
                     smoothstep(sw / MotionTuning.SwellAttackFraction) *
                     smoothstep((1f - sw) / MotionTuning.SwellReleaseFraction)
@@ -138,11 +144,7 @@ fun MotionLyricLine(
         style.copy(fontFeatureSettings = MotionTuning.NoLigatures, color = Color.Unspecified)
     }
     val rt = remember(text, words, motionStyle) { MotionRuntime() }
-    val shader = remember {
-        if (Build.VERSION.SDK_INT >= 33) {
-            try { BloomAgsl.newShader() } catch (_: Throwable) { null }
-        } else null
-    }
+    // Bloom kini digambar langsung per huruf (tanpa RenderEffect) agar tidak ada ghosting.
 
     LaunchedEffect(rt, words) {
         var last = -1L
@@ -198,77 +200,87 @@ fun MotionLyricLine(
                 val p = measurable.measure(Constraints.fixed(w + 2 * bleedX, h + 2 * bleedY))
                 layout(w, h) { p.place(-bleedX, -bleedY) }
             }
-            .graphicsLayer {
-                clip = false
-                if (rt.tick < 0) return@graphicsLayer
-                val b = rt.bloom
-                renderEffect = if (Build.VERSION.SDK_INT >= 33 && shader != null && b > 0.01f) {
-                    val cw = rt.fontPx * MotionTuning.CharWidthEm
-                    BloomAgsl.effect(
-                        shader, size.width, size.height,
-                        rt.headX + bleedX, if (rt.headRtl) -1f else 1f, b,
-                        rt.fontPx * MotionTuning.BloomRadiusEm,
-                        cw * MotionTuning.BloomLagChars,
-                        cw * MotionTuning.BloomSpanChars
-                    )
-                } else null
-            }
+            .graphicsLayer { clip = false }
             .drawBehind {
                 val lay = rt.layout ?: return@drawBehind
                 if (rt.tick < 0) return@drawBehind
                 translate(bleedX.toFloat(), bleedY.toFloat()) {
-                    drawMotion(lay, rt, inactiveColor, activeColor, useFallbackBloom = Build.VERSION.SDK_INT < 33 || shader == null)
+                    drawMotion(lay, rt, inactiveColor, activeColor)
                 }
             }
     )
+}
+
+private fun hash01(n: Int): Float {
+    var x = n * 374761393 + 668265263
+    x = (x xor (x ushr 13)) * 1274126177
+    x = x xor (x ushr 16)
+    return (x and 0xFFFF) / 65535f
+}
+
+private fun DrawScope.drawParticles(
+    i: Int,
+    cx: Float,
+    top: Float,
+    w: Float,
+    rt: MotionRuntime,
+    color: Color,
+    sw: Float
+) {
+    val fp = rt.fontPx
+    for (k in 0 until MotionTuning.ParticleCount) {
+        val seed = i * 31 + k * 17
+        val phase = (rt.timeSec * MotionTuning.ParticleSpeed + hash01(seed)) % 1f
+        val px = cx + (hash01(seed + 7) - 0.5f) * (w + fp * 0.5f)
+        val py = top + fp * 0.2f - phase * fp * MotionTuning.ParticleRiseEm
+        val a = sin(PI * phase).toFloat() * sw
+        val rad = fp * 0.028f * (0.6f + hash01(seed + 13))
+        drawCircle(color, rad * 2.6f, Offset(px, py), alpha = (a * 0.12f).coerceIn(0f, 1f))
+        drawCircle(color, rad, Offset(px, py), alpha = (a * 0.75f).coerceIn(0f, 1f))
+    }
 }
 
 private fun DrawScope.drawMotion(
     lay: MotionLayout,
     rt: MotionRuntime,
     inactive: Color,
-    active: Color,
-    useFallbackBloom: Boolean
+    active: Color
 ) {
-    if (useFallbackBloom) {
-        val b = rt.bloom
-        if (b > 0.01f) {
-            val r = rt.fontPx * 1.4f
-            drawCircle(
-                brush = Brush.radialGradient(
-                    listOf(active.copy(alpha = (0.28f * b).coerceAtMost(0.6f)), Color.Transparent),
-                    center = Offset(rt.headX, rt.headY), radius = r
-                ),
-                radius = r, center = Offset(rt.headX, rt.headY)
-            )
-        }
-    }
     val riseDist = rt.fontPx * MotionTuning.RiseDistanceEm
+    val glowBase = rt.fontPx * MotionTuning.GlowRadiusEm
     for (i in 0 until lay.count) {
         if (i >= rt.rise.size) break
         val l = lay.left[i]; val r = lay.right[i]
         val w = r - l
+        val sw = rt.swell[i]
         val dy = (1f - rt.rise[i]) * riseDist
-        val s = 1f + MotionTuning.SwellScale * rt.swell[i]
+        val s = 1f + MotionTuning.SwellScale * sw
         val pivot = Offset(l + w / 2f, (lay.top[i] + lay.bottom[i]) / 2f)
         val g = lay.glyphs[i]
         val tl = Offset(l, lay.glyphY[i])
+        val dist = rt.head - lay.charIndex[i]
+        val prox = 1f - smoothstep(abs(dist - 1f) / MotionTuning.GlowSpanChars)
+        val glow = (rt.bloomA[0] * prox * (0.4f + 0.6f * sw)).coerceIn(0f, 1f)
+        val shadow = if (glow > 0.03f) {
+            Shadow(active.copy(alpha = 0.85f * glow), Offset.Zero, glowBase * (0.6f + 0.8f * sw))
+        } else null
         withTransform({
             translate(0f, dy)
             scale(s, s, pivot)
         }) {
             drawText(g, color = inactive, topLeft = tl)
-            val frac = (rt.head - lay.charIndex[i]).coerceIn(0f, 1f)
+            val frac = dist.coerceIn(0f, 1f)
             if (frac >= 1f) {
-                drawText(g, color = active, topLeft = tl)
+                drawText(g, color = active, topLeft = tl, shadow = shadow)
             } else if (frac > 0f) {
                 val cl = if (lay.rtl[i]) r - frac * w else l
                 val cr = if (lay.rtl[i]) r else l + frac * w
                 clipRect(cl, lay.top[i] - 60f, cr, lay.bottom[i] + 60f) {
-                    drawText(g, color = active, topLeft = tl)
+                    drawText(g, color = active, topLeft = tl, shadow = shadow)
                 }
             }
         }
+        if (sw > 0.12f) drawParticles(i, l + w / 2f, lay.top[i] + dy, w, rt, active, sw)
     }
 }
 
