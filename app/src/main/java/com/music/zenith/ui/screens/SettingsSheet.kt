@@ -2998,6 +2998,7 @@ fun SettingsChoicePage(
             SettingsChoiceKind.COVER_ANIMATION -> {
                 val slide by AppSettings.coverSlideAnimation.collectAsStateWithLifecycle()
                 val fluid by AppSettings.coverFluidAnimation.collectAsStateWithLifecycle()
+                val mixOnly by AppSettings.coverMixOnlyEffects.collectAsStateWithLifecycle()
                 SettingsGroup {
                     SettingsRow(
                         icon = SfIcons.Animation,
@@ -3030,6 +3031,23 @@ fun SettingsChoicePage(
                             onClick = { AppSettings.setCoverFluidAnimation(!fluid) },
                         )
                     }
+                    RowDivider()
+                    SettingsRow(
+                        icon = SfIcons.Animation,
+                        title = stringResource(R.string.cover_mix_only_animation),
+                        subtitle = stringResource(
+                            if (slide) R.string.cover_mix_only_animation_subtitle else R.string.cover_fluid_animation_locked,
+                        ),
+                        enabled = slide,
+                        trailing = {
+                            IosSwitch(
+                                checked = mixOnly,
+                                onCheckedChange = AppSettings::setCoverMixOnlyEffects,
+                                enabled = slide,
+                            )
+                        },
+                        onClick = { AppSettings.setCoverMixOnlyEffects(!mixOnly) },
+                    )
                 }
             }
 

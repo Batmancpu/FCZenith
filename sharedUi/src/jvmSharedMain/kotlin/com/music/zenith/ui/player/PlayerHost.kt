@@ -263,6 +263,8 @@ interface PlayerSettingsSource {
     val coverSlideAnimation: StateFlow<Boolean>
     /** Whether that change uses the fluid shader morph instead of the sweep (API 33+ only). */
     val coverFluidAnimation: StateFlow<Boolean>
+    /** Whether the full cover effect (fluid or slide) runs only while Automix or a crossfade is playing. */
+    val coverMixOnlyEffects: StateFlow<Boolean>
     val reduceDynamicBlur: StateFlow<Boolean>
     /** Whether Dolby Atmos is both playable on this device and switched on, so the player can show its badge. */
     val dolbyAtmosActive: StateFlow<Boolean>

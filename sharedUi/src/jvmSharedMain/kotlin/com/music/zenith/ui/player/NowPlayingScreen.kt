@@ -3862,14 +3862,16 @@ fun NowPlayingScreen(
                                         // blur + sedikit zoom ke tajam, tanpa geser.
                                         val framed = dissolve.frame != null
                                         val fluid = dissolve.fluid && dissolve.outgoing != null && !framed
-                                        val settle = if (fluid) {
+                                        val settle = if (dissolve.light) {
+                                            1f + 0.02f * ease
+                                        } else if (fluid) {
                                             1f + 0.045f * dissolve.punch * ease
                                         } else {
                                             1f + (if (framed) 0.07f else 0.12f) * dissolve.punch * ease
                                         }
                                         scaleX = settle
                                         scaleY = settle
-                                        translationX = if (framed || fluid) {
+                                        translationX = if (framed || fluid || dissolve.light) {
                                             0f
                                         } else {
                                             dissolve.direction * dissolve.punch * size.width * 0.05f * ease
@@ -3947,6 +3949,7 @@ fun NowPlayingScreen(
                                             framed && sweeping -> 1f - t
                                             framed -> 1f
                                             sweeping && dissolve.fluid -> 1f
+                                            sweeping && dissolve.light -> 1f - smootherStep(t)
                                             sweeping -> 1f - smootherStep(((t - 0.62f) / 0.38f).coerceIn(0f, 1f))
                                             dissolve.cutHold -> 1f
                                             else -> 0f
@@ -3955,16 +3958,17 @@ fun NowPlayingScreen(
                                         // kiri, previous ke kanan), mengecil sedikit dan
                                         // miring seperti kartu yang dilepas.
                                         val move = dissolve.direction * dissolve.punch
-                                        translationX = if (sweeping && !framed && !dissolve.fluid) -move * size.width * 0.30f * t else 0f
+                                        translationX = if (sweeping && !framed && !dissolve.fluid && !dissolve.light) -move * size.width * 0.30f * t else 0f
                                         val shrink = when {
                                             sweeping && framed -> 1f + 0.09f * dissolve.punch * t
                                             sweeping && dissolve.fluid -> 1f + 0.035f * dissolve.punch * smootherStep(t)
+                                            sweeping && dissolve.light -> 1f - 0.02f * t
                                             sweeping -> 1f - 0.08f * dissolve.punch * t
                                             else -> 1f
                                         }
                                         scaleX = shrink
                                         scaleY = shrink
-                                        rotationY = if (sweeping && !framed && !dissolve.fluid) move * 9f * t else 0f
+                                        rotationY = if (sweeping && !framed && !dissolve.fluid && !dissolve.light) move * 9f * t else 0f
                                         renderEffect = if (sweeping && !framed && dissolve.fluid) {
                                             dissolve.shaderOut.effect(
                                                 incoming = false,
@@ -3975,7 +3979,7 @@ fun NowPlayingScreen(
                                                 width = size.width,
                                                 height = size.height,
                                             )
-                                        } else if (sweeping && renderEffectBlurSupported) {
+                                        } else if (sweeping && !dissolve.light && renderEffectBlurSupported) {
                                             val radius = if (framed) {
                                                 30f * dissolve.punch * smootherStep((t * 1.4f).coerceIn(0f, 1f))
                                             } else {
@@ -4009,7 +4013,7 @@ fun NowPlayingScreen(
                                         drawContent()
                                         if (dissolve.outgoing == null) return@drawWithContent
                                         // Efek cair memakai mask shader, bukan sapuan + kilau.
-                                        if (dissolve.fluid) return@drawWithContent
+                                        if (dissolve.fluid || dissolve.light) return@drawWithContent
                                         val feather = size.width * 0.75f
                                         val travel = size.width + feather
                                         val forward = dissolve.direction >= 0f

@@ -221,6 +221,8 @@
     <string name="cover_fluid_animation">Efek cover cair</string>
     <string name="cover_fluid_animation_subtitle">Cover meleleh dan berubah organik ke lagu baru</string>
     <string name="cover_fluid_animation_locked">Aktifkan animasi pindah cover dulu</string>
+    <string name="cover_mix_only_animation">Efek penuh hanya saat mix</string>
+    <string name="cover_mix_only_animation_subtitle">Next/prev memakai transisi ringan; efek cair atau geser menyala otomatis saat Automix atau crossfade berjalan</string>
     <string name="cover_style_off">Mati</string>
     <string name="cover_style_slide">Slide</string>
     <string name="cover_style_fluid">Cair</string>

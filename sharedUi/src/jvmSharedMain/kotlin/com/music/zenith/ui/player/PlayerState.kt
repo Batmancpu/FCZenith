@@ -261,11 +261,20 @@ internal class ArtworkDissolve(first: PlayerArtwork) {
     /** Seberapa besar gerakan transisi: 1 untuk skip, kecil saat mix otomatis. */
     var punch by mutableFloatStateOf(1f)
 
+    /** Pengaturan efek cair dari user; hanya dibaca per frame lewat [fluid]. */
+    internal var fluidWanted = false
+
+    /**
+     * Transisi ringan (crossfade lembut tanpa sapuan/cair) untuk next/prev saat
+     * "efek penuh hanya saat mix" aktif dan tidak ada mix/crossfade berjalan.
+     */
+    internal var light = false
+
     /**
      * Efek cair (shader AGSL) menggantikan sapuan geser. Hanya dibaca per frame
      * selama transisi berjalan (progress sudah memicunya), jadi properti biasa.
      */
-    internal var fluid = false
+    internal val fluid: Boolean get() = fluidWanted && !light
 
     /** Benih pola noise transisi ini; beda tiap lagu supaya morph tidak identik. */
     internal var seed = 0f
@@ -461,9 +470,10 @@ internal fun rememberArtworkDissolve(
     val reduceAnimation by PlayerSettings.reduceAnimation.collectAsStateWithLifecycle()
     val coverSlide by PlayerSettings.coverSlideAnimation.collectAsStateWithLifecycle()
     val coverFluid by PlayerSettings.coverFluidAnimation.collectAsStateWithLifecycle()
+    val coverMixOnly by PlayerSettings.coverMixOnlyEffects.collectAsStateWithLifecycle()
     val dissolve = remember { ArtworkDissolve(art) }
     // Properti biasa, ditulis di komposisi sebelum retarget memulai transisi.
-    dissolve.fluid = coverFluid && fluidArtworkSupported
+    dissolve.fluidWanted = coverFluid && fluidArtworkSupported
     // Dilakukan saat komposisi, sebelum sleeve membacanya: frame pertama cover
     // baru harus sudah punya cover lama di atasnya, kalau tidak frame itu
     // adalah cut-nya.
@@ -471,6 +481,8 @@ internal fun rememberArtworkDissolve(
     // ke cover berikutnya, tanpa memunculkan thumbnail lama dulu.
     remember(art) {
         dissolve.punch = if (mixing) 0.35f else 1f
+        // Next/prev biasa: transisi ringan. Mix/crossfade: efek penuh pilihan user.
+        dissolve.light = coverMixOnly && !mixing && dissolve.frame == null
         // Spotify Canvas layar penuh sudah menahan frame terakhirnya sendiri
         // (fullFrame) dan memudarkannya ke layar lagu baru. Sleeve tidak boleh
         // ikut menyapu thumbnail lagu lama di bawahnya, kalau tidak thumbnail
@@ -506,6 +518,7 @@ internal fun rememberArtworkDissolve(
     }
     val mixingNow by rememberUpdatedState(mixing)
     val skipFadeNow by rememberUpdatedState(skipFadeMs)
+    val mixOnlyNow by rememberUpdatedState(coverMixOnly)
     LaunchedEffect(art) {
         if (dissolve.outgoing == null) {
             // Tanpa efek: cover lama ditahan sampai cover baru termuat dan
@@ -531,12 +544,16 @@ internal fun rememberArtworkDissolve(
         // bukan menyapu ke layar kosong lalu pop-in di tengah animasi.
         androidx.compose.runtime.withFrameNanos { }
         androidx.compose.runtime.withFrameNanos { }
+        // Dinilai ulang saat animasi mulai: flag mix/crossfade bisa menyala sesaat
+        // setelah cover berganti, dan cover baru sudah termuat di titik ini.
+        dissolve.light = mixOnlyNow && !mixingNow && dissolve.frame == null
         val duration = when {
             // Crossfade next/prev: cover lama melebur ke cover baru selama
             // audio-nya memudar, bukan lebih cepat atau lebih lambat.
             mixingNow && skipFadeNow > 0L -> skipFadeNow.toInt().coerceIn(400, 6_000)
             mixingNow -> MIX_DISSOLVE_MS
             dissolve.frame != null -> FRAME_DISSOLVE_MS
+            dissolve.light -> LIGHT_DISSOLVE_MS
             dissolve.fluid -> FLUID_DISSOLVE_MS
             else -> SKIP_DISSOLVE_MS
         }
@@ -567,6 +584,9 @@ private const val MIX_DISSOLVE_MS = 1_800
 private const val SKIP_DISSOLVE_MS = 950
 private const val FLUID_DISSOLVE_MS = 1_000
 private const val FRAME_DISSOLVE_MS = 1_100
+
+/** Transisi ringan next/prev saat efek penuh hanya untuk mix. */
+private const val LIGHT_DISSOLVE_MS = 450
 private const val FRAME_HOLD_TIMEOUT_MS = 5_000L
 
 /** Mirip easeOutQuint: meluncur cepat di awal, lalu mengendap sangat halus. */

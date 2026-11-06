@@ -477,6 +477,13 @@ object AppSettings {
     val coverFluidAnimation = MutableStateFlow(false)
 
     /**
+     * Efek penuh (cair/geser) hanya menyala saat Automix atau crossfade berjalan.
+     * Ganti lagu manual (next/prev) memakai transisi ringan. Hanya bermakna bila
+     * [coverSlideAnimation] hidup.
+     */
+    val coverMixOnlyEffects = MutableStateFlow(false)
+
+    /**
      * Whether the welcome pages (party name, then YouTube sign-in) have been
      * through. Absent rather than true for anyone updating from a build that
      * had no onboarding, so they get it once too — they have no party name yet.
@@ -1129,6 +1136,7 @@ object AppSettings {
         reduceAnimation.value = prefs.getBoolean(KEY_REDUCE_ANIMATION, false)
         coverSlideAnimation.value = prefs.getBoolean(KEY_COVER_SLIDE_ANIMATION, true)
         coverFluidAnimation.value = prefs.getBoolean(KEY_COVER_FLUID_ANIMATION, false)
+        coverMixOnlyEffects.value = prefs.getBoolean(KEY_COVER_MIX_ONLY_EFFECTS, false)
         onboardingComplete.value = prefs.getBoolean(KEY_ONBOARDING_COMPLETE, false)
         highPerformanceMode.value = prefs.getBoolean(KEY_HIGH_PERFORMANCE_MODE, false)
         performanceRefreshRate.value = normalizePerformanceRefreshRate(
@@ -1530,6 +1538,11 @@ object AppSettings {
     fun setCoverFluidAnimation(value: Boolean) {
         coverFluidAnimation.value = value
         prefs.edit().putBoolean(KEY_COVER_FLUID_ANIMATION, value).apply()
+    }
+
+    fun setCoverMixOnlyEffects(value: Boolean) {
+        coverMixOnlyEffects.value = value
+        prefs.edit().putBoolean(KEY_COVER_MIX_ONLY_EFFECTS, value).apply()
     }
 
     fun setAccentColor(value: AccentColor) {
@@ -2397,6 +2410,7 @@ object AppSettings {
     private const val KEY_REDUCE_ANIMATION = "reduce_animation"
     private const val KEY_COVER_SLIDE_ANIMATION = "cover_slide_animation"
     private const val KEY_COVER_FLUID_ANIMATION = "cover_fluid_animation"
+    private const val KEY_COVER_MIX_ONLY_EFFECTS = "cover_mix_only_effects"
     private const val KEY_ONBOARDING_COMPLETE = "onboarding_complete"
     private const val KEY_HIGH_PERFORMANCE_MODE = "high_performance_mode"
     private const val KEY_PERFORMANCE_REFRESH_RATE = "performance_refresh_rate"
