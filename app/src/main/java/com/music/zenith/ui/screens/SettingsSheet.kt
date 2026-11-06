@@ -960,36 +960,20 @@ fun SettingsScreen(
                 )
             }
             val coverSlideTitle = stringResource(R.string.cover_slide_animation)
-            row(coverSlideTitle, "cover", "slide", "animation", "animasi", "sampul") {
+            val coverStyleValue = stringResource(
+                when {
+                    !coverSlideAnimation -> R.string.cover_style_off
+                    coverFluidAnimation && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU -> R.string.cover_style_fluid
+                    else -> R.string.cover_style_slide
+                },
+            )
+            row(coverSlideTitle, "cover", "slide", "animation", "animasi", "sampul", "fluid", "liquid", "morph", "cair") {
                 SettingsRow(
                     icon = SfIcons.Animation,
                     title = coverSlideTitle,
-                    subtitle = stringResource(R.string.cover_slide_animation_subtitle),
-                    trailing = {
-                        IosSwitch(
-                            checked = coverSlideAnimation,
-                            onCheckedChange = AppSettings::setCoverSlideAnimation,
-                        )
-                    },
-                    onClick = { AppSettings.setCoverSlideAnimation(!coverSlideAnimation) },
+                    value = coverStyleValue,
+                    onClick = { onOpenChoice(SettingsChoiceKind.COVER_ANIMATION) },
                 )
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                val coverFluidTitle = stringResource(R.string.cover_fluid_animation)
-                row(coverFluidTitle, "cover", "fluid", "liquid", "morph", "animation", "animasi", "sampul", "cair") {
-                    SettingsRow(
-                        icon = SfIcons.Animation,
-                        title = coverFluidTitle,
-                        subtitle = stringResource(R.string.cover_fluid_animation_subtitle),
-                        trailing = {
-                            IosSwitch(
-                                checked = coverFluidAnimation,
-                                onCheckedChange = AppSettings::setCoverFluidAnimation,
-                            )
-                        },
-                        onClick = { AppSettings.setCoverFluidAnimation(!coverFluidAnimation) },
-                    )
-                }
             }
             val reduceDynamicBlurTitle = stringResource(R.string.reduce_dynamic_blur)
             row(reduceDynamicBlurTitle, "blur", "performance") {
@@ -2881,6 +2865,7 @@ enum class SettingsChoiceKind(@param:StringRes val title: Int) {
     BIT_PERFECT(R.string.bit_perfect_output),
     FONT(R.string.font),
     ACCENT(R.string.accent_color),
+    COVER_ANIMATION(R.string.cover_slide_animation),
 }
 
 /** The main page's list of categories: a glyph and a name each, and a chevron into it. */
@@ -3005,6 +2990,47 @@ fun SettingsChoicePage(
                 // taking hold behind the swatches before going back.
                 val selected by AppSettings.accentColor.collectAsStateWithLifecycle()
                 AccentColorPicker(selected = selected, onSelect = AppSettings::setAccentColor)
+            }
+
+            // Animasi pindah cover dan efek cair dalam satu halaman. Efek cair hanya
+            // bermakna bila animasinya hidup, jadi terkunci (nilainya tetap tersimpan)
+            // selama animasi pindah cover mati.
+            SettingsChoiceKind.COVER_ANIMATION -> {
+                val slide by AppSettings.coverSlideAnimation.collectAsStateWithLifecycle()
+                val fluid by AppSettings.coverFluidAnimation.collectAsStateWithLifecycle()
+                SettingsGroup {
+                    SettingsRow(
+                        icon = SfIcons.Animation,
+                        title = stringResource(R.string.cover_slide_animation),
+                        subtitle = stringResource(R.string.cover_slide_animation_subtitle),
+                        trailing = {
+                            IosSwitch(
+                                checked = slide,
+                                onCheckedChange = AppSettings::setCoverSlideAnimation,
+                            )
+                        },
+                        onClick = { AppSettings.setCoverSlideAnimation(!slide) },
+                    )
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        RowDivider()
+                        SettingsRow(
+                            icon = SfIcons.Animation,
+                            title = stringResource(R.string.cover_fluid_animation),
+                            subtitle = stringResource(
+                                if (slide) R.string.cover_fluid_animation_subtitle else R.string.cover_fluid_animation_locked,
+                            ),
+                            enabled = slide,
+                            trailing = {
+                                IosSwitch(
+                                    checked = fluid,
+                                    onCheckedChange = AppSettings::setCoverFluidAnimation,
+                                    enabled = slide,
+                                )
+                            },
+                            onClick = { AppSettings.setCoverFluidAnimation(!fluid) },
+                        )
+                    }
+                }
             }
 
             SettingsChoiceKind.FONT -> {
