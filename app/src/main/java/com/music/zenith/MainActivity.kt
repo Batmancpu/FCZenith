@@ -272,6 +272,9 @@ import com.music.zenith.ui.components.QueueActionNoticeHost
 import com.music.zenith.ui.components.TopBarAccountButton
 import com.music.zenith.ui.screens.SegmentedControl
 import com.music.zenith.ui.screens.LocalMostPlayedArt
+import com.music.zenith.ui.player.LocalMotionLyricLine
+import com.motion.lyrics.MotionLyricLine
+import com.motion.lyrics.toMotionWords
 import com.music.zenith.ui.screens.LocalMixCoverBackground
 import com.music.zenith.ui.components.OrganicFluidBackground
 import com.music.zenith.ui.screens.MostPlayedArt
@@ -436,6 +439,18 @@ class MainActivity : AppCompatActivity() {
                         )
                     },
                     LocalAppBackdrop provides appBackdrop,
+                    LocalMotionLyricLine provides { line, position, style, inactive, active, modifier ->
+                        val motionWords = remember(line) { line.toMotionWords() }
+                        MotionLyricLine(
+                            text = line.text,
+                            words = motionWords,
+                            positionProvider = position,
+                            style = style,
+                            inactiveColor = inactive,
+                            activeColor = active,
+                            modifier = modifier,
+                        )
+                    },
                 ) {
                 // The window's width, measured rather than asked for.
                 //

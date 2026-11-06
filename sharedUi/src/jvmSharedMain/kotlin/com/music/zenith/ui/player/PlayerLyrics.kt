@@ -2759,7 +2759,32 @@ private fun PanelVoice(
         targetValue = if (isActive || !synced) Color.White else LocalPlayerTint.current,
         label = "lyricLineColor",
     )
-    if (line.isWordSynced && !browsing) {
+    val motionLine = LocalMotionLyricLine.current
+    val motionOff by PlayerSettings.reduceAnimation.collectAsStateWithLifecycle()
+    if (motionLine != null && rise && !motionOff && line.isWordSynced && line.timingSource == null) {
+        // Efek Motion: huruf naik, membesar, dan bloom mengikuti kepala karaoke.
+        val motionTail by animateFloatAsState(
+            targetValue = if (sung) 1f else UNSUNG_ALPHA,
+            label = "motionTail",
+        )
+        Box(
+            modifier = modifier.padding(room),
+            contentAlignment = if (alignsRight(line.text, alignEnd, laneLocked)) {
+                AbsoluteAlignment.TopRight
+            } else {
+                AbsoluteAlignment.TopLeft
+            },
+        ) {
+            motionLine(
+                line,
+                { clock.longValue },
+                lyricStyle,
+                color.copy(alpha = motionTail),
+                color,
+                Modifier,
+            )
+        }
+    } else if (line.isWordSynced && !browsing) {
         // Every word-synced line goes through the sweep, not just the playing
         // one — a line that has already been sung is fully revealed and one
         // still to come is not, which falls out of the same arithmetic.
