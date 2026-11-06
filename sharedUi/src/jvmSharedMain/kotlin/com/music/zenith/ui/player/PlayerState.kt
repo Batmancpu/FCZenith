@@ -480,9 +480,13 @@ internal fun rememberArtworkDissolve(
     // Lagu lama yang clip-nya sedang berputar lalu diganti (next/prev): langsung
     // ke cover berikutnya, tanpa memunculkan thumbnail lama dulu.
     remember(art) {
-        dissolve.punch = if (mixing) 0.35f else 1f
-        // Next/prev biasa: transisi ringan. Mix/crossfade: efek penuh pilihan user.
-        dissolve.light = coverMixOnly && !mixing && dissolve.frame == null
+        // Crossfade next/prev (skipFadeMs > 0) dihitung sebagai skip, bukan mix:
+        // bila "efek penuh hanya saat mix" aktif, efek cover tetap mati.
+        val skipOnlyLight = coverMixOnly && skipFadeMs > 0L
+        dissolve.punch = if (mixing && !skipOnlyLight) 0.35f else 1f
+        // Next/prev biasa (termasuk crossfade next/prev): transisi ringan.
+        // Automix/crossfade otomatis: efek penuh pilihan user.
+        dissolve.light = coverMixOnly && (!mixing || skipFadeMs > 0L) && dissolve.frame == null
         // Spotify Canvas layar penuh sudah menahan frame terakhirnya sendiri
         // (fullFrame) dan memudarkannya ke layar lagu baru. Sleeve tidak boleh
         // ikut menyapu thumbnail lagu lama di bawahnya, kalau tidak thumbnail
@@ -546,8 +550,10 @@ internal fun rememberArtworkDissolve(
         androidx.compose.runtime.withFrameNanos { }
         // Dinilai ulang saat animasi mulai: flag mix/crossfade bisa menyala sesaat
         // setelah cover berganti, dan cover baru sudah termuat di titik ini.
-        dissolve.light = mixOnlyNow && !mixingNow && dissolve.frame == null
+        dissolve.light = mixOnlyNow && (!mixingNow || skipFadeNow > 0L) && dissolve.frame == null
         val duration = when {
+            // Efek penuh hanya untuk mix: next/prev (juga saat crossfade next/prev) tetap ringan.
+            dissolve.light -> LIGHT_DISSOLVE_MS
             // Crossfade next/prev: cover lama melebur ke cover baru selama
             // audio-nya memudar, bukan lebih cepat atau lebih lambat.
             mixingNow && skipFadeNow > 0L -> skipFadeNow.toInt().coerceIn(400, 6_000)
