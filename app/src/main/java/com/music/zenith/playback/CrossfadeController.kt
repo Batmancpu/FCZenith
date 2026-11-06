@@ -3596,7 +3596,9 @@ class CrossfadeController(
         if (progress > PHASE_SEEK_UNTIL || into.volume > PHASE_SEEK_MAX_GAIN) return
         val now = SystemClock.elapsedRealtime()
         if (now < seekQuietUntil) return
-        if (!out.isPlaying || !into.isPlaying) {
+        // Ukur hanya setelah player masuk benar-benar siap: posisi yang dibaca
+        // selagi seek/re-buffer masih berjalan basi dan memicu koreksi ganda.
+        if (!out.isPlaying || !into.isPlaying || into.playbackState != Player.STATE_READY) {
             seekCount = 0
             return
         }
@@ -4172,7 +4174,7 @@ class CrossfadeController(
         const val LOCK_MAX_BEATS = 0.3
 
         /** Koreksi seek: paling banyak dua kali (kedua mengoreksi sisa akibat latency seek). */
-        const val PHASE_SEEK_MAX = 3
+        const val PHASE_SEEK_MAX = 5
 
         /** Posisi player baru bisa dipercaya sekitar sini setelah start; lebih awal terbaca meleset. */
         const val PHASE_SEEK_START_MS = 1_000L
@@ -4181,20 +4183,20 @@ class CrossfadeController(
         const val PHASE_SEEK_MAX_LOSS_MS = 200.0
 
         /** Bagian dari lag seek terukur yang dikompensasi pada seek berikutnya. */
-        const val PHASE_SEEK_COMP_FACTOR = 0.6
+        const val PHASE_SEEK_COMP_FACTOR = 0.0
 
         /** Kompensasi lag tidak pernah melebihi ini. */
         const val PHASE_SEEK_COMP_MAX_MS = 80.0
 
         /** Hanya selagi track masuk masih di awal blend dan nyaris tak terdengar. */
-        const val PHASE_SEEK_UNTIL = 0.25f
-        const val PHASE_SEEK_MAX_GAIN = 0.3f
+        const val PHASE_SEEK_UNTIL = 0.45f
+        const val PHASE_SEEK_MAX_GAIN = 0.5f
 
         /** Di bawah ini dianggap sefase. */
-        const val PHASE_SEEK_DEADBAND_SECONDS = 0.02
+        const val PHASE_SEEK_DEADBAND_SECONDS = 0.012
 
         /** Tunggu posisi player stabil sebelum mengukur lagi setelah seek. */
-        const val PHASE_SEEK_SETTLE_MS = 700L
+        const val PHASE_SEEK_SETTLE_MS = 1_200L
 
         /**
          * The most the tempo moves in one beat, ramping up or easing back.
