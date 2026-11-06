@@ -232,6 +232,19 @@ internal class ArtworkDissolve(first: PlayerArtwork) {
     /** Seberapa besar gerakan transisi: 1 untuk skip, kecil saat mix otomatis. */
     var punch by mutableFloatStateOf(1f)
 
+    /**
+     * Efek cair (shader AGSL) menggantikan sapuan geser. Hanya dibaca per frame
+     * selama transisi berjalan (progress sudah memicunya), jadi properti biasa.
+     */
+    internal var fluid = false
+
+    /** Benih pola noise transisi ini; beda tiap lagu supaya morph tidak identik. */
+    internal var seed = 0f
+
+    /** Satu shader per layer, dibuat sekali saat pertama dipakai. */
+    internal val shaderIn by lazy(LazyThreadSafetyMode.NONE) { FluidArtworkShader() }
+    internal val shaderOut by lazy(LazyThreadSafetyMode.NONE) { FluidArtworkShader() }
+
     /** Cover yang sedang dipudarkan, atau null kalau tidak ada. */
     var outgoing by mutableStateOf<PlayerArtwork?>(null)
         private set
@@ -293,6 +306,7 @@ internal class ArtworkDissolve(first: PlayerArtwork) {
         val old = current
         if (old === next) return
         current = next
+        seed = (((next.url?.hashCode() ?: 0) and 0x7FFFFFFF) % 1000) / 100f
         // Indeks antrean mundur = previous. Selain itu (next, auto-advance)
         // dianggap maju.
         direction = if (queueIndex >= 0 && lastQueueIndex >= 0 && queueIndex < lastQueueIndex) -1f else 1f
@@ -392,7 +406,10 @@ internal fun rememberArtworkDissolve(
 ): ArtworkDissolve {
     val reduceAnimation by PlayerSettings.reduceAnimation.collectAsStateWithLifecycle()
     val coverSlide by PlayerSettings.coverSlideAnimation.collectAsStateWithLifecycle()
+    val coverFluid by PlayerSettings.coverFluidAnimation.collectAsStateWithLifecycle()
     val dissolve = remember { ArtworkDissolve(art) }
+    // Properti biasa, ditulis di komposisi sebelum retarget memulai transisi.
+    dissolve.fluid = coverFluid && fluidArtworkSupported
     // Dilakukan saat komposisi, sebelum sleeve membacanya: frame pertama cover
     // baru harus sudah punya cover lama di atasnya, kalau tidak frame itu
     // adalah cut-nya.
@@ -454,9 +471,11 @@ internal fun rememberArtworkDissolve(
             mixingNow && skipFadeNow > 0L -> skipFadeNow.toInt().coerceIn(400, 6_000)
             mixingNow -> MIX_DISSOLVE_MS
             dissolve.frame != null -> FRAME_DISSOLVE_MS
+            dissolve.fluid -> FLUID_DISSOLVE_MS
             else -> SKIP_DISSOLVE_MS
         }
-        animate(0f, 1f, animationSpec = tween(duration, easing = ARTWORK_FLOW_EASING)) { value, _ ->
+        val easing = if (dissolve.fluid && dissolve.frame == null) FLUID_EASING else ARTWORK_FLOW_EASING
+        animate(0f, 1f, animationSpec = tween(duration, easing = easing)) { value, _ ->
             dissolve.progress = value
         }
         dissolve.finish()
@@ -477,11 +496,15 @@ internal class HeldClipFrame(val portrait: Boolean, val bannerHeightPx: Float, v
 private const val RETARGET_KEEP_PROGRESS = 0.3f
 private const val MIX_DISSOLVE_MS = 1_800
 private const val SKIP_DISSOLVE_MS = 950
+private const val FLUID_DISSOLVE_MS = 1_000
 private const val FRAME_DISSOLVE_MS = 1_100
 private const val FRAME_HOLD_TIMEOUT_MS = 5_000L
 
 /** Mirip easeOutQuint: meluncur cepat di awal, lalu mengendap sangat halus. */
 private val ARTWORK_FLOW_EASING = CubicBezierEasing(0.32f, 0.08f, 0.14f, 1f)
+
+/** Efek cair: percepatan halus di awal, perlambatan panjang tanpa berhenti mendadak. */
+private val FLUID_EASING = CubicBezierEasing(0.45f, 0f, 0.2f, 1f)
 
 /**
  * The seek bar's own state: a drag in progress, and where the handle was

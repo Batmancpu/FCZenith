@@ -3860,15 +3860,30 @@ fun NowPlayingScreen(
                                         // Setelah frame canvas: cover baru muncul dari
                                         // blur + sedikit zoom ke tajam, tanpa geser.
                                         val framed = dissolve.frame != null
-                                        val settle = 1f + (if (framed) 0.07f else 0.12f) * dissolve.punch * ease
+                                        val fluid = dissolve.fluid && dissolve.outgoing != null && !framed
+                                        val settle = if (fluid) {
+                                            1f + 0.045f * dissolve.punch * ease
+                                        } else {
+                                            1f + (if (framed) 0.07f else 0.12f) * dissolve.punch * ease
+                                        }
                                         scaleX = settle
                                         scaleY = settle
-                                        translationX = if (framed) {
+                                        translationX = if (framed || fluid) {
                                             0f
                                         } else {
                                             dissolve.direction * dissolve.punch * size.width * 0.05f * ease
                                         }
-                                        renderEffect = if (framed && renderEffectBlurSupported && ease > 0.01f) {
+                                        renderEffect = if (fluid) {
+                                            dissolve.shaderIn.effect(
+                                                incoming = true,
+                                                progress = dissolve.progress,
+                                                direction = dissolve.direction,
+                                                punch = dissolve.punch,
+                                                seed = dissolve.seed,
+                                                width = size.width,
+                                                height = size.height,
+                                            )
+                                        } else if (framed && renderEffectBlurSupported && ease > 0.01f) {
                                             val radius = 24f * dissolve.punch * ease
                                             BlurEffect(radius, radius, TileMode.Clamp)
                                         } else {
@@ -3930,6 +3945,7 @@ fun NowPlayingScreen(
                                         alpha = when {
                                             framed && sweeping -> 1f - t
                                             framed -> 1f
+                                            sweeping && dissolve.fluid -> 1f
                                             sweeping -> 1f - smootherStep(((t - 0.62f) / 0.38f).coerceIn(0f, 1f))
                                             else -> 0f
                                         }
@@ -3937,16 +3953,27 @@ fun NowPlayingScreen(
                                         // kiri, previous ke kanan), mengecil sedikit dan
                                         // miring seperti kartu yang dilepas.
                                         val move = dissolve.direction * dissolve.punch
-                                        translationX = if (sweeping && !framed) -move * size.width * 0.30f * t else 0f
+                                        translationX = if (sweeping && !framed && !dissolve.fluid) -move * size.width * 0.30f * t else 0f
                                         val shrink = when {
                                             sweeping && framed -> 1f + 0.09f * dissolve.punch * t
+                                            sweeping && dissolve.fluid -> 1f + 0.035f * dissolve.punch * smootherStep(t)
                                             sweeping -> 1f - 0.08f * dissolve.punch * t
                                             else -> 1f
                                         }
                                         scaleX = shrink
                                         scaleY = shrink
-                                        rotationY = if (sweeping && !framed) move * 9f * t else 0f
-                                        renderEffect = if (sweeping && renderEffectBlurSupported) {
+                                        rotationY = if (sweeping && !framed && !dissolve.fluid) move * 9f * t else 0f
+                                        renderEffect = if (sweeping && !framed && dissolve.fluid) {
+                                            dissolve.shaderOut.effect(
+                                                incoming = false,
+                                                progress = t,
+                                                direction = dissolve.direction,
+                                                punch = dissolve.punch,
+                                                seed = dissolve.seed,
+                                                width = size.width,
+                                                height = size.height,
+                                            )
+                                        } else if (sweeping && renderEffectBlurSupported) {
                                             val radius = if (framed) {
                                                 30f * dissolve.punch * smootherStep((t * 1.4f).coerceIn(0f, 1f))
                                             } else {
@@ -3979,6 +4006,8 @@ fun NowPlayingScreen(
                                         }
                                         drawContent()
                                         if (dissolve.outgoing == null) return@drawWithContent
+                                        // Efek cair memakai mask shader, bukan sapuan + kilau.
+                                        if (dissolve.fluid) return@drawWithContent
                                         val feather = size.width * 0.75f
                                         val travel = size.width + feather
                                         val forward = dissolve.direction >= 0f

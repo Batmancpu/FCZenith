@@ -378,6 +378,8 @@
     <string name="reduce_animation_subtitle">Freezes the main player\'s gradient instead of drifting</string>
     <string name="cover_slide_animation">Cover change animation</string>
     <string name="cover_slide_animation_subtitle">Slide the cover to the new song when the song changes</string>
+    <string name="cover_fluid_animation">Fluid cover effect</string>
+    <string name="cover_fluid_animation_subtitle">The cover melts and morphs organically into the new song (Android 13+, needs cover change animation on)</string>
     <string name="reduce_dynamic_blur">Reduce dynamic blur</string>
     <string name="reduce_dynamic_blur_subtitle">Swaps frosted glass for solid fills across the app</string>
     <string name="liquid_glass">Liquid Glass</string>

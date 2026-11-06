@@ -1,6 +1,7 @@
 package com.music.zenith.ui.player
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.RenderEffect
 import androidx.compose.ui.graphics.drawscope.DrawScope
 
 /** Milliseconds on the clock `SystemClock.uptimeMillis` reads on the phone. */
@@ -8,6 +9,32 @@ internal expect fun uptimeMillis(): Long
 
 /** Whether `Modifier.blur` actually blurs here, rather than being a no-op. */
 internal expect val renderEffectBlurSupported: Boolean
+
+/** Whether the fluid cover morph (an AGSL shader) can run here. */
+internal expect val fluidArtworkSupported: Boolean
+
+/**
+ * The shader behind the fluid cover morph, one per layer. Built once and reused:
+ * [effect] only sets uniforms and wraps the same shader, so nothing is compiled
+ * or allocated per frame beyond the effect object itself.
+ */
+internal expect class FluidArtworkShader() {
+    /**
+     * The layer effect for [progress] (0 = old cover whole, 1 = new cover whole),
+     * or null where the shader can't run or the layer has no size yet.
+     * [incoming] picks the new cover's layer (distortion relaxes) over the old
+     * one's (distortion builds and the cover melts away through a noise mask).
+     */
+    fun effect(
+        incoming: Boolean,
+        progress: Float,
+        direction: Float,
+        punch: Float,
+        seed: Float,
+        width: Float,
+        height: Float,
+    ): RenderEffect?
+}
 
 /** Holds off the display's idle timeout for as long as [enabled]. */
 @Composable
