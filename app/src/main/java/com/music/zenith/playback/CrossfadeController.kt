@@ -1761,7 +1761,8 @@ class CrossfadeController(
         seekCount = 0
         seekQuietUntil = fadeStartedAt + PHASE_SEEK_START_MS
         seekPending = false
-        seekLossMs = 0.0
+        // Tebakan awal lag seek (re-buffer) untuk seek pertama; diperbarui dari ukuran nyata.
+        seekLossMs = PHASE_SEEK_INITIAL_LOSS_MS
         seekCompMs = 0.0
         // However the ramp went — a late arm, a slow buffer — the blend starts
         // on the incoming tempo.
@@ -3613,7 +3614,10 @@ class CrossfadeController(
             // Sisa error setelah seek = waktu yang hilang saat seek (re-buffer).
             // Dipakai untuk mengimbangi seek berikutnya.
             seekPending = false
-            seekLossMs = (seekCompMs - median * 1000).coerceAtLeast(0.0)
+            // Lag tiap seek berubah-ubah (79-174ms di log), jadi dihaluskan supaya
+            // satu seek yang kebetulan lambat/cepat tidak membuat koreksi berikutnya meleset.
+            val measuredLossMs = (seekCompMs - median * 1000).coerceAtLeast(0.0)
+            seekLossMs = seekLossMs * 0.4 + measuredLossMs * 0.6
             TrackLog.d(
                 TAG,
                 "phase seek lag: ${"%.0f".format(Locale.ROOT, seekLossMs)}ms " +
@@ -4183,10 +4187,13 @@ class CrossfadeController(
         const val PHASE_SEEK_MAX_LOSS_MS = 200.0
 
         /** Bagian dari lag seek terukur yang dikompensasi pada seek berikutnya. */
-        const val PHASE_SEEK_COMP_FACTOR = 0.0
+        const val PHASE_SEEK_COMP_FACTOR = 0.85
+
+        /** Perkiraan lag seek sebelum ada pengukuran (ms); dari log nyata sekitar 80-170ms. */
+        const val PHASE_SEEK_INITIAL_LOSS_MS = 100.0
 
         /** Kompensasi lag tidak pernah melebihi ini. */
-        const val PHASE_SEEK_COMP_MAX_MS = 80.0
+        const val PHASE_SEEK_COMP_MAX_MS = 160.0
 
         /** Hanya selagi track masuk masih di awal blend dan nyaris tak terdengar. */
         const val PHASE_SEEK_UNTIL = 0.45f
