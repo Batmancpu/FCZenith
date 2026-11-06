@@ -72,9 +72,9 @@ data class TransitionTrackInfo(
  * dense pop.
  */
 private const val AUTO_TRANSITION_MAX_BEATS = 16.0
-private const val AUTO_MIN_SECONDS = 4.0
-private const val AUTO_FAST_TRACK_MIN_SECONDS = 6.0
-private const val AUTO_TRANSITION_MAX_SECONDS = 12.0
+private const val AUTO_MIN_SECONDS = 8.0
+private const val AUTO_FAST_TRACK_MIN_SECONDS = 8.0
+private const val AUTO_TRANSITION_MAX_SECONDS = 20.0
 private const val AUTO_FALLBACK_SECONDS = 8.0
 
 /**
@@ -1211,8 +1211,8 @@ private const val VOCAL_CONFLICT_PROBABILITY = 0.62
 // ---------------------------------------------------------------------------
 
 /** Longest overlap a calm-into-calm pair may stretch to, in beats and in seconds. */
-private const val MAX_ADVANCED_BEATS = 32
-private const val CALM_MAX_SECONDS = 16.0
+private const val MAX_ADVANCED_BEATS = 48
+private const val CALM_MAX_SECONDS = 24.0
 
 /** How much of each side's edge is averaged to judge its energy. */
 private const val ENERGY_WINDOW_BEATS = 8
@@ -1349,14 +1349,14 @@ private fun adaptiveOverlap(
         // every fallback sound like the same ordinary crossfade.
         val base = if (traits.tempoFar) {
             when (filterVariant) {
-                FilterTransitionVariant.SWEEP -> 12
+                FilterTransitionVariant.SWEEP -> 16
                 FilterTransitionVariant.BASS_HANDOFF,
-                FilterTransitionVariant.ECHO_RIDE -> 8
+                FilterTransitionVariant.ECHO_RIDE -> 12
             }
         } else if (traits.keyClash || traits.vocalConflict) {
-            8
+            12
         } else {
-            16
+            24
         }
         (base * energy).roundToInt().coerceIn(MIN_FADE_BEATS, MAX_ADVANCED_BEATS)
     }
@@ -1774,9 +1774,9 @@ private fun mixPlan(
     }
     val maxBeats = if (traits != null) MAX_ADVANCED_BEATS.toDouble() else AUTO_TRANSITION_MAX_BEATS
     val fallbackMaxSeconds = when (filterVariant) {
-        FilterTransitionVariant.SWEEP -> 8.0
-        FilterTransitionVariant.BASS_HANDOFF -> 7.0
-        FilterTransitionVariant.ECHO_RIDE -> 7.0
+        FilterTransitionVariant.SWEEP -> 12.0
+        FilterTransitionVariant.BASS_HANDOFF -> 10.0
+        FilterTransitionVariant.ECHO_RIDE -> 10.0
     }
     val maxSeconds = when {
         traits != null && !sameBeatBlend -> fallbackMaxSeconds
@@ -1824,7 +1824,7 @@ private fun mixPlan(
 
     if (sameBeatBlend && beatSeconds > 0) {
         val introDropTime = incomingHandoffTime / max(0.8, incomingPlaybackRate)
-        val clamped = clamp(introDropTime, min(12.0, maximumOverlap), maximumOverlap)
+        val clamped = clamp(introDropTime, min(16.0, maximumOverlap), maximumOverlap)
         val totalOverlap = if (traits != null) wholeBars(clamped, beatSeconds, maximumOverlap) else clamped
         val targetStart = max(0.0, mixEnd - totalOverlap)
         val earliestTransitionStart = max(0.0, mixEnd - maximumOverlap)
