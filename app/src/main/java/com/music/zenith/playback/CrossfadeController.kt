@@ -2901,6 +2901,14 @@ class CrossfadeController(
         val wasTransitioning = phase != Phase.IDLE
         if (phase != Phase.IDLE) {
             Log.d(TAG, "finish from $phase")
+            if (phase == Phase.FADING) {
+                TrackLog.d(
+                    TAG,
+                    "blend end: ran ${SystemClock.elapsedRealtime() - fadeStartedAt}ms of planned ${fadeMs}ms, " +
+                        "handedOff=$handedOff",
+                    about = incoming?.currentMediaItem?.mediaId,
+                )
+            }
             // Stamped under this guard rather than beside the assignment at the
             // bottom, because this function is idempotent and gets called with
             // nothing in flight: marking every one of those as a transition
