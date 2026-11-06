@@ -1001,7 +1001,7 @@ private fun rememberOutputGlyph(): OutputGlyph {
             // No active row is the phone too — the caption under the pill
             // says "This phone" in the same case. Cast rather than a phone:
             // on the phone itself the button's job is to send it elsewhere.
-            null, AudioOutputKind.PHONE -> OutputGlyph(Icons.Rounded.Cast, PILL_OUTPUT_WIDE_SIZE)
+            null, AudioOutputKind.PHONE -> OutputGlyph(vectorResource(Res.drawable.ic_output_airplay))
             AudioOutputKind.BLUETOOTH -> when (active.form) {
                 BluetoothForm.BUDS -> OutputGlyph(vectorResource(Res.drawable.ic_output_buds))
                 BluetoothForm.SPEAKER -> OutputGlyph(vectorResource(Res.drawable.ic_output_speaker))
