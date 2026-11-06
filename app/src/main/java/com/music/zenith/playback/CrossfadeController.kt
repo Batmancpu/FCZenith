@@ -1761,7 +1761,8 @@ class CrossfadeController(
         seekCount = 0
         seekQuietUntil = fadeStartedAt + PHASE_SEEK_START_MS
         seekPending = false
-        seekLossMs = 0.0
+        // Lag seek (re-buffer) di log nyata berkisar 95-180ms dan selalu menunda track masuk.
+        seekLossMs = PHASE_SEEK_INITIAL_LOSS_MS
         seekCompMs = 0.0
         // However the ramp went — a late arm, a slow buffer — the blend starts
         // on the incoming tempo.
@@ -3602,7 +3603,9 @@ class CrossfadeController(
             seekCount = 0
             return
         }
-        val error = phaseError(out, into)
+        // Seek di awal blend boleh mengoreksi offset sampai setengah beat: itu hanya
+        // beat terdekat, bukan dua grid yang saling tidak setuju.
+        val error = phaseError(out, into, PHASE_SEEK_MAX_BEATS)
         if (error.isNaN()) return
         seekErrors[seekCount++] = error
         if (seekCount < LOCK_SAMPLES) return
@@ -3613,7 +3616,11 @@ class CrossfadeController(
             // Sisa error setelah seek = waktu yang hilang saat seek (re-buffer).
             // Dipakai untuk mengimbangi seek berikutnya.
             seekPending = false
-            seekLossMs = (seekCompMs - median * 1000).coerceAtLeast(0.0)
+            // Lag = kompensasi yang diberikan dikurangi sisa error terhadap sasaran bidik.
+            // Dihaluskan karena lag tiap seek berubah-ubah.
+            val measuredLossMs = (seekCompMs - (median + PHASE_SEEK_AIM_SECONDS) * 1000)
+                .coerceAtLeast(0.0)
+            seekLossMs = seekLossMs * 0.5 + measuredLossMs * 0.5
             TrackLog.d(
                 TAG,
                 "phase seek lag: ${"%.0f".format(Locale.ROOT, seekLossMs)}ms " +
@@ -3743,7 +3750,7 @@ class CrossfadeController(
      * so a track counted at half or double time against the other still
      * locks on the shared pulse.
      */
-    private fun phaseError(out: ExoPlayer, into: ExoPlayer): Double {
+    private fun phaseError(out: ExoPlayer, into: ExoPlayer, maxBeats: Double = LOCK_MAX_BEATS): Double {
         if (!beatAt(outgoingAnalysis, positionMs(out) / 1000.0)) return Double.NaN
         val outSince = beatScratch[0]
         val outBeat = beatScratch[1]
@@ -3752,7 +3759,7 @@ class CrossfadeController(
         val period = minOf(outBeat, beatScratch[1] / rate)
         var diff = (beatScratch[0] / rate - outSince) % period
         if (diff > period / 2) diff -= period else if (diff < -period / 2) diff += period
-        if (abs(diff) > period * LOCK_MAX_BEATS) return Double.NaN
+        if (abs(diff) > period * maxBeats) return Double.NaN
         return diff * rate
     }
 
@@ -4178,7 +4185,13 @@ class CrossfadeController(
         const val LOCK_MAX_BEATS = 0.3
 
         /** Koreksi seek: paling banyak dua kali (kedua mengoreksi sisa akibat latency seek). */
-        const val PHASE_SEEK_MAX = 5
+        const val PHASE_SEEK_MAX = 3
+
+        /** Jangkauan error yang boleh dikoreksi seek, dalam beat (0,5 = beat terdekat). */
+        const val PHASE_SEEK_MAX_BEATS = 0.5
+
+        /** Perkiraan lag seek sebelum ada pengukuran (ms); dari log nyata sekitar 95-180ms. */
+        const val PHASE_SEEK_INITIAL_LOSS_MS = 130.0
 
         /** Posisi player baru bisa dipercaya sekitar sini setelah start; lebih awal terbaca meleset. */
         const val PHASE_SEEK_START_MS = 1_000L
@@ -4187,13 +4200,13 @@ class CrossfadeController(
         const val PHASE_SEEK_MAX_LOSS_MS = 200.0
 
         /** Bagian dari lag seek terukur yang dikompensasi pada seek berikutnya. */
-        const val PHASE_SEEK_COMP_FACTOR = 0.0
+        const val PHASE_SEEK_COMP_FACTOR = 0.9
 
         /** Sasaran fase track masuk: sedikit tertinggal (detik), mengimbangi drift saat blend. */
         const val PHASE_SEEK_AIM_SECONDS = 0.04
 
         /** Kompensasi lag tidak pernah melebihi ini. */
-        const val PHASE_SEEK_COMP_MAX_MS = 80.0
+        const val PHASE_SEEK_COMP_MAX_MS = 200.0
 
         /** Hanya selagi track masuk masih di awal blend dan nyaris tak terdengar. */
         const val PHASE_SEEK_UNTIL = 0.45f
