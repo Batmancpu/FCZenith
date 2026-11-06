@@ -4400,6 +4400,7 @@ fun NowPlayingScreen(
                                     active = liked,
                                     haptic = if (liked) Haptic.ToggleOff else Haptic.ToggleOn,
                                     size = 28.dp,
+                                    popOnActive = true,
                                 )
                                 Spacer(Modifier.width(16.dp))
                             }

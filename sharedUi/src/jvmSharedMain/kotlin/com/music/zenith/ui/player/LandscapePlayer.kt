@@ -476,6 +476,7 @@ internal fun LandscapeCredits(
                 onClick = onToggleLike,
                 active = liked,
                 haptic = if (liked) Haptic.ToggleOff else Haptic.ToggleOn,
+                popOnActive = true,
             )
             Spacer(Modifier.width(8.dp))
         }

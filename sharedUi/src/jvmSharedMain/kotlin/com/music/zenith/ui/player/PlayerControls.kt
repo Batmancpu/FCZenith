@@ -99,6 +99,11 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.vectorResource
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.drawscope.Stroke
+import kotlinx.coroutines.launch
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -702,8 +707,41 @@ internal fun CircleGlyph(
     haptic: Haptic = Haptic.Tap,
     size: Dp = 34.dp,
     modifier: Modifier = Modifier,
+    /** Memainkan animasi pop saat [active] berubah (tombol suka). */
+    popOnActive: Boolean = false,
 ) {
     val haptics = rememberHaptics()
+    val ringColor = LocalPlayerTint.current
+    val pop = remember { Animatable(1f) }
+    val tilt = remember { Animatable(0f) }
+    val burst = remember { Animatable(0f) }
+    var armed by remember { mutableStateOf(false) }
+    if (popOnActive) {
+        LaunchedEffect(active) {
+            // Komposisi pertama hanya menampilkan keadaan awal, tanpa animasi.
+            if (!armed) {
+                armed = true
+                return@LaunchedEffect
+            }
+            if (active) {
+                launch {
+                    burst.snapTo(0f)
+                    burst.animateTo(1f, tween(durationMillis = 520, easing = FastOutSlowInEasing))
+                }
+                launch {
+                    tilt.snapTo(-28f)
+                    tilt.animateTo(0f, spring(dampingRatio = 0.35f, stiffness = Spring.StiffnessLow))
+                }
+                pop.snapTo(0.5f)
+                pop.animateTo(1f, spring(dampingRatio = 0.32f, stiffness = Spring.StiffnessMedium))
+            } else {
+                burst.snapTo(0f)
+                tilt.snapTo(0f)
+                pop.animateTo(0.78f, tween(durationMillis = 90))
+                pop.animateTo(1f, spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMedium))
+            }
+        }
+    }
     val discAlpha by animateFloatAsState(
         targetValue = if (active) 0.34f else 0.18f,
         label = "glyphDisc",
@@ -713,6 +751,16 @@ internal fun CircleGlyph(
             .size(size)
             .clip(CircleShape)
             .background(LocalPlayerTint.current.copy(alpha = discAlpha))
+            .drawBehind {
+                val p = burst.value
+                if (p > 0f && p < 1f) {
+                    drawCircle(
+                        color = ringColor.copy(alpha = (1f - p) * 0.55f),
+                        radius = this.size.minDimension / 2f * p,
+                        style = Stroke(width = 2.dp.toPx() * (1f - p) + 0.5f),
+                    )
+                }
+            }
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -731,7 +779,13 @@ internal fun CircleGlyph(
                 imageVector = glyph,
                 contentDescription = contentDescription,
                 tint = LocalPlayerTint.current,
-                modifier = Modifier.size(19.dp),
+                modifier = Modifier
+                    .size(19.dp)
+                    .graphicsLayer {
+                        scaleX = pop.value
+                        scaleY = pop.value
+                        rotationZ = tilt.value
+                    },
             )
         }
     }
