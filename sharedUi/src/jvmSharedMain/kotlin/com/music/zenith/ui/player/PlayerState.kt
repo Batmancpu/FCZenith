@@ -558,12 +558,29 @@ internal fun rememberArtworkDissolve(
             // audio-nya memudar, bukan lebih cepat atau lebih lambat.
             mixingNow && skipFadeNow > 0L -> skipFadeNow.toInt().coerceIn(400, 6_000)
             // Mix/crossfade otomatis: transisi cover sepanjang lama mix-nya.
-            mixingNow && mixFadeNow > 0L -> mixFadeNow.toInt().coerceIn(400, 12_000)
+            mixingNow && mixFadeNow > 0L -> mixFadeNow.toInt().coerceIn(400, 60_000)
             mixingNow -> MIX_DISSOLVE_MS
             dissolve.frame != null -> FRAME_DISSOLVE_MS
             dissolve.light -> LIGHT_DISSOLVE_MS
             dissolve.fluid -> FLUID_DISSOLVE_MS
             else -> SKIP_DISSOLVE_MS
+        }
+        // Automix sungguhan: transisi cover mengikuti progres blend yang sebenarnya,
+        // jadi mulai bersama teks "Mixing" dan selesai tepat saat mix selesai,
+        // berapa pun lamanya.
+        if (mixingNow && skipFadeNow <= 0L && dissolve.frame == null &&
+            PlayerSettings.smartMixView.value != null
+        ) {
+            kotlinx.coroutines.flow.combine(
+                PlayerSettings.smartMixProgress,
+                snapshotFlow { mixingNow },
+            ) { p, m -> p to m }.first { (p, m) ->
+                dissolve.progress = p.coerceIn(0f, 1f)
+                p >= 0.999f || !m
+            }
+            dissolve.progress = 1f
+            dissolve.finish()
+            return@LaunchedEffect
         }
         val easing = if (dissolve.fluid && dissolve.frame == null) FLUID_EASING else ARTWORK_FLOW_EASING
         animate(0f, 1f, animationSpec = tween(duration, easing = easing)) { value, _ ->
