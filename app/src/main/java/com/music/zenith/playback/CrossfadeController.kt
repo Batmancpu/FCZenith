@@ -1745,6 +1745,8 @@ class CrossfadeController(
         into.volume = 0f
         into.playWhenReady = true
         fadeStartedAt = SystemClock.elapsedRealtime()
+        phaseLogNext = 0
+        phaseLogCount = 0
         nudgeUntil = 0L
         lockCount = 0
         outClock.reset()
@@ -1914,6 +1916,7 @@ class CrossfadeController(
             headroomFor(mixRise(outgoingAt), outgoingLevel(elapsed / wallSpan + tracks.outgoingLeadMs() / span.toFloat(), wallSpan)),
         )
         if (render.phaseLock) holdPhase(out, player, progress)
+        logPhase(out, player, progress)
 
         // The midpoint, or sooner if the outgoing track is about to run out
         // from under it: until the handoff its queue still runs on past the
@@ -3527,6 +3530,38 @@ class CrossfadeController(
         nudgeUntil = now + (abs(median) / (base * abs(factor - 1f)) * 1000).roundToLong().coerceIn(1L, MAX_NUDGE_MS)
     }
 
+    // ---- Phase log ----------------------------------------------------------
+    // Hanya mengukur, tidak mengoreksi: seberapa jauh dua beat sebenarnya bergeser di
+    // lagu nyata, di awal, tengah, dan akhir overlap. Filter Logcat: ZenithCrossfade.
+
+    private val phaseLogSamples = DoubleArray(PHASE_LOG_SAMPLES)
+    private var phaseLogCount = 0
+    private var phaseLogNext = 0
+
+    private fun logPhase(out: ExoPlayer, into: ExoPlayer, progress: Float) {
+        if (phaseLogNext >= PHASE_LOG_CHECKPOINTS.size) return
+        if (progress < PHASE_LOG_CHECKPOINTS[phaseLogNext]) return
+        if (!out.isPlaying || !into.isPlaying) return
+        val error = phaseError(out, into)
+        if (error.isNaN()) {
+            Log.d(TAG, "phase: tidak ada grid beat yang bisa dibandingkan, log dihentikan")
+            phaseLogNext = PHASE_LOG_CHECKPOINTS.size
+            return
+        }
+        phaseLogSamples[phaseLogCount++] = error
+        if (phaseLogCount < PHASE_LOG_SAMPLES) return
+        phaseLogCount = 0
+        phaseLogSamples.sort()
+        val median = phaseLogSamples[PHASE_LOG_SAMPLES / 2]
+        Log.d(
+            TAG,
+            "phase p=${"%.2f".format(Locale.ROOT, progress)}: " +
+                "${"%+.1f".format(Locale.ROOT, median * 1000)}ms " +
+                "(+ = track masuk mendahului, - = tertinggal) rate=${"%.4f".format(Locale.ROOT, mediaRatio)}",
+        )
+        phaseLogNext++
+    }
+
     private fun incomingBaseSpeed(): Float = (AppSettings.playbackSpeed.value * incomingPlaybackRate).toFloat()
 
     /**
@@ -3942,6 +3977,8 @@ class CrossfadeController(
 
         /** Phase readings per decision; the median of these is what gets corrected. */
         const val LOCK_SAMPLES = 5
+        const val PHASE_LOG_SAMPLES = 5
+        val PHASE_LOG_CHECKPOINTS = floatArrayOf(0.05f, 0.5f, 0.9f)
 
         /** Under this the two beats are together as far as anyone can hear. */
         const val LOCK_DEADBAND_SECONDS = 0.008
