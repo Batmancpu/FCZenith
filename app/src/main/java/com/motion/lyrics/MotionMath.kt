@@ -29,6 +29,7 @@ internal object MotionTuning {
     const val HoldMinMs = 450f
     const val HoldRangeMs = 700f
     const val GlowSpanChars = 5f
+    const val SweepFeatherEm = 0.5f
     const val GlowRadiusEm = 0.75f
     const val ParticleCount = 3
     const val ParticleSpeed = 0.55f

@@ -286,15 +286,27 @@ private fun DrawScope.drawMotion(
             scale(s, s, pivot)
         }) {
             drawText(g, color = inactive, topLeft = tl)
-            val frac = dist.coerceIn(0f, 1f)
-            if (frac >= 1f) {
+            val feather = (rt.fontPx * MotionTuning.SweepFeatherEm).coerceAtLeast(1f)
+            val rtl = lay.rtl[i]
+            // Posisi kepala karaoke di ruang lokal huruf (0..w); bisa di luar rentang
+            // sehingga pudarannya menjalar mulus melewati huruf-huruf di sekitarnya.
+            val hx = if (rtl) w - dist * w else dist * w
+            val front = feather * 0.6f
+            val back = feather * 0.4f
+            val reached = if (rtl) hx - front < w else hx + front > 0f
+            val settled = if (rtl) hx + back <= 0f else hx - back >= w
+            if (settled) {
                 drawText(g, color = active, topLeft = tl, shadow = shadow)
-            } else if (frac > 0f) {
-                val cl = if (lay.rtl[i]) r - frac * w else l
-                val cr = if (lay.rtl[i]) r else l + frac * w
-                clipRect(cl, lay.top[i] - 60f, cr, lay.bottom[i] + 60f) {
-                    drawText(g, color = active, topLeft = tl, shadow = shadow)
-                }
+            } else if (reached) {
+                val x0 = if (rtl) hx + back else hx - back
+                val x1 = if (rtl) hx - front else hx + front
+                val sweepBrush = Brush.horizontalGradient(
+                    0f to active,
+                    0.45f to active.copy(alpha = active.alpha * 0.6f),
+                    1f to active.copy(alpha = 0f),
+                    startX = x0, endX = x1
+                )
+                drawText(g, brush = sweepBrush, topLeft = tl, shadow = shadow)
             }
         }
         if (sw > 0.01f) {
