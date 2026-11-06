@@ -3543,11 +3543,11 @@ class CrossfadeController(
         if (phaseLogNext >= PHASE_LOG_CHECKPOINTS.size) return
         if (progress < PHASE_LOG_CHECKPOINTS[phaseLogNext]) return
         if (!out.isPlaying || !into.isPlaying) return
-        val error = phaseError(out, into)
+        val error = phaseRaw(out, into)
         if (error.isNaN()) {
             TrackLog.d(
                 TAG,
-                "phase: tidak ada grid beat yang bisa dibandingkan, log dihentikan",
+                "phase: salah satu track tidak punya grid beat, log dihentikan ${phaseFacts(out, into)}",
                 about = into.currentMediaItem?.mediaId,
             )
             phaseLogNext = PHASE_LOG_CHECKPOINTS.size
@@ -3558,14 +3558,47 @@ class CrossfadeController(
         phaseLogCount = 0
         phaseLogSamples.sort()
         val median = phaseLogSamples[PHASE_LOG_SAMPLES / 2]
+        val offsetBeats = if (phaseLogPeriod > 0.0) median / mediaRatio / phaseLogPeriod else 0.0
         TrackLog.d(
             TAG,
             "phase p=${"%.2f".format(Locale.ROOT, progress)}: " +
                 "${"%+.1f".format(Locale.ROOT, median * 1000)}ms " +
-                "(+ = track masuk mendahului, - = tertinggal) rate=${"%.4f".format(Locale.ROOT, mediaRatio)}",
+                "(${"%+.2f".format(Locale.ROOT, offsetBeats)} beat, beat=${"%.0f".format(Locale.ROOT, phaseLogPeriod * 1000)}ms; " +
+                "+ = track masuk mendahului, - = tertinggal) rate=${"%.4f".format(Locale.ROOT, mediaRatio)}" +
+                if (phaseLogNext == 0) " ${phaseFacts(out, into)}" else "",
             about = into.currentMediaItem?.mediaId,
         )
         phaseLogNext++
+    }
+
+    private var phaseLogPeriod = 0.0
+
+    /**
+     * Seperti [phaseError], tapi tanpa batas LOCK_MAX_BEATS: yang dicatat adalah selisih
+     * sebenarnya, sebesar apa pun. NaN hanya bila salah satu track memang tanpa grid.
+     */
+    private fun phaseRaw(out: ExoPlayer, into: ExoPlayer): Double {
+        if (!beatAt(outgoingAnalysis, positionMs(out) / 1000.0)) return Double.NaN
+        val outSince = beatScratch[0]
+        val outBeat = beatScratch[1]
+        if (!beatAt(incomingAnalysis, positionMs(into) / 1000.0)) return Double.NaN
+        val rate = mediaRatio
+        val period = minOf(outBeat, beatScratch[1] / rate)
+        var diff = (beatScratch[0] / rate - outSince) % period
+        if (diff > period / 2) diff -= period else if (diff < -period / 2) diff += period
+        phaseLogPeriod = period
+        return diff * rate
+    }
+
+    /** Data grid kedua track dan posisi pemutarnya, untuk membaca log fase. */
+    private fun phaseFacts(out: ExoPlayer, into: ExoPlayer): String {
+        fun side(name: String, a: TrackAnalysis): String =
+            "$name[bpm=${"%.2f".format(Locale.ROOT, a.bpm)} conf=${"%.2f".format(Locale.ROOT, a.beatConfidence)} " +
+                "beat=${"%.3f".format(Locale.ROOT, a.beatInterval)}s downbeats=${a.downbeats.size} " +
+                "head=${a.headBeats != null} tail=${a.tailBeats != null}]"
+        return side("out", outgoingAnalysis) + " " + side("in", incomingAnalysis) +
+            " outPos=${positionMs(out)}ms inPos=${positionMs(into)}ms cue=${incomingCueTimeMs}ms " +
+            "mediaRatio=${"%.4f".format(Locale.ROOT, mediaRatio)}"
     }
 
     private fun incomingBaseSpeed(): Float = (AppSettings.playbackSpeed.value * incomingPlaybackRate).toFloat()
