@@ -972,7 +972,6 @@ private fun SweptLyricLine(
                 modifier = Modifier
                     .graphicsLayer { alpha = glowAlpha }
                     .blur(glowRadius, BlurredEdgeTreatment.Unbounded)
-                    .then(room)
                     // Each letter is masked to its own brightness with DstIn,
                     // which needs a layer of its own to erase into — against the
                     // backdrop it would take the artwork with it.
@@ -992,7 +991,14 @@ private fun SweptLyricLine(
                             peak = WORD_RISE.toPx(),
                             growth = growth,
                         )
-                    },
+                    }
+                    // Di luar layer Offscreen dan draw lambda, sama seperti
+                    // riseAgainst(room): layer topeng DstIn jadi mencakup
+                    // ruang halo, dan koordinat glowGrown (yang sudah memakai
+                    // inset) cocok dengan posisi teks. Sebelumnya layer hanya
+                    // seukuran kotak teks sehingga huruf yang membesar di sisi
+                    // baris terpotong.
+                    .then(room),
             )
         }
         Text(
