@@ -268,25 +268,13 @@ internal class ArtworkDissolve(first: PlayerArtwork) {
      * Transisi ringan (crossfade lembut tanpa sapuan/cair) untuk next/prev saat
      * "efek penuh hanya saat mix" aktif dan tidak ada mix/crossfade berjalan.
      */
-    internal var calm = false
-
-    /** Transisi ringan (crossfade lembut) untuk cover biasa; frame canvas memakai blur-zoom polos. */
-    internal val light: Boolean get() = calm && frame == null
-
-    /** Frame layar penuh (canvas hero/Spotify) boleh memakai efek cair/geser. */
-    internal var fullFxAllowed = false
-
-    /** Frame layar penuh ikut efek cair/geser alih-alih blur + zoom polos. */
-    internal val fullFx: Boolean get() = fullFxAllowed && !calm
-
-    /** Shader sendiri untuk frame layar penuh, terpisah dari layer sleeve. */
-    internal val shaderFull by lazy(LazyThreadSafetyMode.NONE) { FluidArtworkShader() }
+    internal var light = false
 
     /**
      * Efek cair (shader AGSL) menggantikan sapuan geser. Hanya dibaca per frame
      * selama transisi berjalan (progress sudah memicunya), jadi properti biasa.
      */
-    internal val fluid: Boolean get() = fluidWanted && !calm
+    internal val fluid: Boolean get() = fluidWanted && !light
 
     /** Benih pola noise transisi ini; beda tiap lagu supaya morph tidak identik. */
     internal var seed = 0f
@@ -486,7 +474,6 @@ internal fun rememberArtworkDissolve(
     val dissolve = remember { ArtworkDissolve(art) }
     // Properti biasa, ditulis di komposisi sebelum retarget memulai transisi.
     dissolve.fluidWanted = coverFluid && fluidArtworkSupported
-    dissolve.fullFxAllowed = !reduceAnimation && coverSlide
     // Dilakukan saat komposisi, sebelum sleeve membacanya: frame pertama cover
     // baru harus sudah punya cover lama di atasnya, kalau tidak frame itu
     // adalah cut-nya.
@@ -495,7 +482,7 @@ internal fun rememberArtworkDissolve(
     remember(art) {
         dissolve.punch = if (mixing) 0.35f else 1f
         // Next/prev biasa: transisi ringan. Mix/crossfade: efek penuh pilihan user.
-        dissolve.calm = coverMixOnly && !mixing
+        dissolve.light = coverMixOnly && !mixing && dissolve.frame == null
         // Spotify Canvas layar penuh sudah menahan frame terakhirnya sendiri
         // (fullFrame) dan memudarkannya ke layar lagu baru. Sleeve tidak boleh
         // ikut menyapu thumbnail lagu lama di bawahnya, kalau tidak thumbnail
@@ -559,18 +546,18 @@ internal fun rememberArtworkDissolve(
         androidx.compose.runtime.withFrameNanos { }
         // Dinilai ulang saat animasi mulai: flag mix/crossfade bisa menyala sesaat
         // setelah cover berganti, dan cover baru sudah termuat di titik ini.
-        dissolve.calm = mixOnlyNow && !mixingNow
+        dissolve.light = mixOnlyNow && !mixingNow && dissolve.frame == null
         val duration = when {
             // Crossfade next/prev: cover lama melebur ke cover baru selama
             // audio-nya memudar, bukan lebih cepat atau lebih lambat.
             mixingNow && skipFadeNow > 0L -> skipFadeNow.toInt().coerceIn(400, 6_000)
             mixingNow -> MIX_DISSOLVE_MS
-            dissolve.frame != null && dissolve.calm -> FRAME_DISSOLVE_MS
+            dissolve.frame != null -> FRAME_DISSOLVE_MS
             dissolve.light -> LIGHT_DISSOLVE_MS
             dissolve.fluid -> FLUID_DISSOLVE_MS
             else -> SKIP_DISSOLVE_MS
         }
-        val easing = if (dissolve.fluid) FLUID_EASING else ARTWORK_FLOW_EASING
+        val easing = if (dissolve.fluid && dissolve.frame == null) FLUID_EASING else ARTWORK_FLOW_EASING
         animate(0f, 1f, animationSpec = tween(duration, easing = easing)) { value, _ ->
             dissolve.progress = value
         }
