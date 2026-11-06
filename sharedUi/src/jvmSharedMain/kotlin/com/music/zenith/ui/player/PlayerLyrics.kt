@@ -2767,7 +2767,7 @@ private fun PanelVoice(
     )
     val motionLine = LocalMotionLyricLine.current
     val liquidFlow by PlayerSettings.liquidFlow.collectAsStateWithLifecycle()
-    if (motionLine != null && rise && !liquidFlow && line.isWordSynced && line.timingSource == null) {
+    if (motionLine != null && rise && liquidFlow && line.isWordSynced && line.timingSource == null) {
         // Efek Motion: huruf naik, membesar, dan bloom mengikuti kepala karaoke.
         val motionTail by animateFloatAsState(
             targetValue = if (sung) 1f else UNSUNG_ALPHA,

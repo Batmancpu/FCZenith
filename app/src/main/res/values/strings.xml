@@ -1151,7 +1151,7 @@
 
     <string name="liquid_flow">LiquidFlow</string>
 
-    <string name="liquid_flow_subtitle">Smooth word sweep. Turns the Motion lyric effect off, and off turns Motion back on</string>
+    <string name="liquid_flow_subtitle">Smooth word sweep with the Motion lyric effect. Off uses the default lyric effect</string>
 
     <string name="advanced_options">Advanced &amp; experimental options</string>
 

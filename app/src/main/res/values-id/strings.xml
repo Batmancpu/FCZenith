@@ -821,7 +821,7 @@
 
     <string name="liquid_flow">LiquidFlow</string>
 
-    <string name="liquid_flow_subtitle">Sapuan kata yang halus. Saat nyala, efek Motion mati; saat mati, efek Motion aktif</string>
+    <string name="liquid_flow_subtitle">Sapuan kata yang halus dengan efek Motion. Saat mati, memakai efek lirik bawaan</string>
 
     <string name="brand_account">Akun merek</string>
 
