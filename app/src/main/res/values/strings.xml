@@ -1149,6 +1149,10 @@
 
     <string name="blur_unfocused_lyrics_subtitle">Keeps the spotlight on the current line</string>
 
+    <string name="liquid_flow">LiquidFlow</string>
+
+    <string name="liquid_flow_subtitle">Smooth word sweep. Turns the Motion lyric effect off, and off turns Motion back on</string>
+
     <string name="advanced_options">Advanced &amp; experimental options</string>
 
     <string name="lyrics_debug_logs">Lyrics debug logs</string>

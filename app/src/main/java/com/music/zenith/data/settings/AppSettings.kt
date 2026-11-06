@@ -551,6 +551,12 @@ object AppSettings {
     /** Blurs unfocused lyric lines, keeping the active line sharp. */
     val lyricsBlur = MutableStateFlow(true)
 
+    /**
+     * Efek lirik LiquidFlow (sapuan kata). Nyala: efek Motion mati. Mati: efek
+     * Motion dipakai. Tidak dipengaruhi oleh Reduce animation.
+     */
+    val liquidFlow = MutableStateFlow(false)
+
     /** Positive values delay synced lyrics; negative values bring them forward. */
     val lyricsOffsetMs = MutableStateFlow(0)
 
@@ -1076,6 +1082,7 @@ object AppSettings {
             .putBoolean(KEY_PROGRESSIVE_BLUR, false)
             .putBoolean(KEY_LEGACY_MESH_GRADIENT, false)
             .putBoolean(KEY_LYRICS_BLUR, !lowRam)
+            .putBoolean(KEY_LIQUID_FLOW, lowRam)
             .putBoolean(KEY_ANIMATED_CANVAS, !lowRam)
             .apply()
     }
@@ -1167,6 +1174,7 @@ object AppSettings {
         liquidGlass.value = prefs.getBoolean(KEY_LIQUID_GLASS, false)
         progressiveBlur.value = prefs.getBoolean(KEY_PROGRESSIVE_BLUR, false)
         lyricsBlur.value = prefs.getBoolean(KEY_LYRICS_BLUR, true)
+        liquidFlow.value = prefs.getBoolean(KEY_LIQUID_FLOW, false)
         lyricsOffsetMs.value = prefs.getInt(KEY_LYRICS_OFFSET_MS, 0)
             .coerceIn(MIN_LYRICS_OFFSET_MS, MAX_LYRICS_OFFSET_MS)
         translationLanguage.value = prefs.getString(KEY_TRANSLATION_LANGUAGE, "").orEmpty()
@@ -1661,6 +1669,11 @@ object AppSettings {
     fun setLyricsBlur(value: Boolean) {
         lyricsBlur.value = value
         prefs.edit().putBoolean(KEY_LYRICS_BLUR, value).apply()
+    }
+
+    fun setLiquidFlow(value: Boolean) {
+        liquidFlow.value = value
+        prefs.edit().putBoolean(KEY_LIQUID_FLOW, value).apply()
     }
 
     fun setLyricsOffsetMs(value: Int) {
@@ -2439,6 +2452,7 @@ object AppSettings {
     private const val KEY_LIQUID_GLASS = "liquid_glass"
     private const val KEY_PROGRESSIVE_BLUR = "progressive_blur"
     private const val KEY_LYRICS_BLUR = "lyrics_blur"
+    private const val KEY_LIQUID_FLOW = "liquid_flow"
     private const val KEY_LYRICS_OFFSET_MS = "lyrics_offset_ms"
     private const val KEY_TRANSLATION_LANGUAGE = "translation_language"
     private const val KEY_ANIMATED_CANVAS = "animated_canvas"

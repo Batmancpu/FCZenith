@@ -259,6 +259,7 @@ fun SettingsScreen(
     val progressiveBlur by AppSettings.progressiveBlur.collectAsStateWithLifecycle()
     val liquidGlassSupported = isGlassSupported()
     val lyricsBlur by AppSettings.lyricsBlur.collectAsStateWithLifecycle()
+    val liquidFlow by AppSettings.liquidFlow.collectAsStateWithLifecycle()
     val animatedCanvas by AppSettings.animatedCanvas.collectAsStateWithLifecycle()
     val canvasOverCellular by AppSettings.canvasOverCellular.collectAsStateWithLifecycle()
     val signatureApiEnabled by AppSettings.signatureApiEnabled.collectAsStateWithLifecycle()
@@ -1189,6 +1190,21 @@ fun SettingsScreen(
                             )
                         },
                         onClick = { AppSettings.setLyricsBlur(!lyricsBlur) },
+                    )
+                }
+                val liquidFlowTitle = stringResource(R.string.liquid_flow)
+                row(liquidFlowTitle, "lyrics", "liquidflow", "effect") {
+                    SettingsRow(
+                        icon = SfIcons.Waves,
+                        title = liquidFlowTitle,
+                        subtitle = stringResource(R.string.liquid_flow_subtitle),
+                        trailing = {
+                            IosSwitch(
+                                checked = liquidFlow,
+                                onCheckedChange = AppSettings::setLiquidFlow,
+                            )
+                        },
+                        onClick = { AppSettings.setLiquidFlow(!liquidFlow) },
                     )
                 }
                 val lyricsSourcesTitle = stringResource(R.string.lyrics_sources)

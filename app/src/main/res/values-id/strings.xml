@@ -819,6 +819,10 @@
 
     <string name="blur_unfocused_lyrics_subtitle">Menjaga fokus pada baris saat ini</string>
 
+    <string name="liquid_flow">LiquidFlow</string>
+
+    <string name="liquid_flow_subtitle">Sapuan kata yang halus. Saat nyala, efek Motion mati; saat mati, efek Motion aktif</string>
+
     <string name="brand_account">Akun merek</string>
 
     <string name="card_plays_format">%1$s diputar</string>
