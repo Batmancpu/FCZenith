@@ -10,6 +10,7 @@ import androidx.media3.common.Timeline
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import com.music.zenith.data.listentogether.ListenTogether
+import com.music.zenith.data.TrackLog
 import com.music.zenith.data.settings.AppSettings
 import com.music.zenith.data.settings.MixBlend
 import com.music.zenith.data.settings.MixDeck
@@ -3544,7 +3545,11 @@ class CrossfadeController(
         if (!out.isPlaying || !into.isPlaying) return
         val error = phaseError(out, into)
         if (error.isNaN()) {
-            Log.d(TAG, "phase: tidak ada grid beat yang bisa dibandingkan, log dihentikan")
+            TrackLog.d(
+                TAG,
+                "phase: tidak ada grid beat yang bisa dibandingkan, log dihentikan",
+                about = into.currentMediaItem?.mediaId,
+            )
             phaseLogNext = PHASE_LOG_CHECKPOINTS.size
             return
         }
@@ -3553,11 +3558,12 @@ class CrossfadeController(
         phaseLogCount = 0
         phaseLogSamples.sort()
         val median = phaseLogSamples[PHASE_LOG_SAMPLES / 2]
-        Log.d(
+        TrackLog.d(
             TAG,
             "phase p=${"%.2f".format(Locale.ROOT, progress)}: " +
                 "${"%+.1f".format(Locale.ROOT, median * 1000)}ms " +
                 "(+ = track masuk mendahului, - = tertinggal) rate=${"%.4f".format(Locale.ROOT, mediaRatio)}",
+            about = into.currentMediaItem?.mediaId,
         )
         phaseLogNext++
     }
