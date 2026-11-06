@@ -1527,6 +1527,7 @@ fun NowPlayingScreen(
     // never fires again. Keyed on the cover there is nothing to reset: the
     // bitmap really is still loaded, so the state stays true.
     val art = rememberPlayerArtwork(remoteArt)
+    PrefetchNeighbourArtwork(queue, queueIndex)
     // clipShowing: lagu yang sedang tampil punya clip animasi yang benar-benar
     // terlihat (bukan sedang dipadamkan oleh mix). Kalau begitu dan lagu diganti
     // manual (next/prev), tidak ada dissolve lewat thumbnail: langsung ke cover

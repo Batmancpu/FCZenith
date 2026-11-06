@@ -185,6 +185,35 @@ internal class PlayerArtwork(val url: String?, private val context: PlatformCont
     }
 }
 
+/**
+ * Memuat cover lagu di sekitar yang sedang diputar ke memory cache, dengan
+ * request yang sama seperti [PlayerArtwork.request], supaya saat lagu berganti
+ * cover barunya sudah ada dan tidak ada jeda kosong atau pop-in.
+ */
+@Composable
+internal fun PrefetchNeighbourArtwork(queue: List<Song>, queueIndex: Int) {
+    val context = LocalPlatformContext.current
+    val urls = remember(queue, queueIndex) {
+        listOf(queueIndex + 1, queueIndex - 1, queueIndex + 2)
+            .mapNotNull { index -> queue.getOrNull(index)?.thumbnailUrl.artworkAt(ART_PX) }
+            .distinct()
+    }
+    LaunchedEffect(urls) {
+        // Beri cover lagu yang sedang tampil jalan lebih dulu.
+        delay(400L)
+        val loader = coil3.SingletonImageLoader.get(context)
+        urls.forEach { url ->
+            loader.enqueue(
+                ImageRequest.Builder(context)
+                    .data(url)
+                    .size(ART_PX)
+                    .crossfade(false)
+                    .build(),
+            )
+        }
+    }
+}
+
 @Composable
 internal fun rememberPlayerArtwork(remoteArt: String?): PlayerArtwork {
     val context = LocalPlatformContext.current
