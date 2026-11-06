@@ -1588,6 +1588,9 @@ fun NowPlayingScreen(
             withTimeoutOrNull(2_000L) {
                 snapshotFlow { artNow.loaded || canvasRenderedNow.value }.first { it }
             }
+            // Mix/crossfade dinilai ulang di sini: flag-nya bisa menyala sesaat setelah lagu berganti.
+            dissolve.calm = PlayerSettings.coverMixOnlyEffects.value &&
+                !(PlayerSettings.smartMixInProgress.value || PlayerSettings.crossfadeRunning.value)
         }
     }
     val skipNext: () -> Unit = {
@@ -2764,18 +2767,48 @@ fun NowPlayingScreen(
                         .graphicsLayer {
                             val p = dissolve.fullProgress
                             val active = dissolve.fullFrame != null && p < 1f
+                            // Efek penuh (cair/geser) berlaku juga untuk frame canvas; tanpa itu frame
+                            // memudar dengan zoom + blur polos.
+                            val fx = active && dissolve.fullFx
+                            val fluidFx = fx && dissolve.fluid
+                            val slideFx = fx && !fluidFx
+                            val move = dissolve.direction * dissolve.punch
                             // Tetap utuh di seperempat awal, supaya cover baru yang
                             // masuk di atasnya tidak meninggalkan celah di antara keduanya.
-                            alpha = if (active) {
-                                1f - smootherStep(((p - 0.25f) / 0.75f).coerceIn(0f, 1f))
-                            } else {
+                            alpha = if (!active) {
                                 0f
+                            } else if (fluidFx) {
+                                1f
+                            } else if (slideFx) {
+                                1f - smootherStep(((p - 0.62f) / 0.38f).coerceIn(0f, 1f))
+                            } else {
+                                1f - smootherStep(((p - 0.25f) / 0.75f).coerceIn(0f, 1f))
                             }
-                            val zoom = if (active) 1f + 0.09f * p else 1f
+                            translationX = if (slideFx) -move * size.width * 0.30f * p else 0f
+                            val zoom = when {
+                                fluidFx -> 1f + 0.035f * dissolve.punch * smootherStep(p)
+                                slideFx -> 1f - 0.08f * dissolve.punch * p
+                                active -> 1f + 0.09f * p
+                                else -> 1f
+                            }
                             scaleX = zoom
                             scaleY = zoom
-                            renderEffect = if (active && renderEffectBlurSupported) {
-                                val radius = 30f * smootherStep((p * 1.4f).coerceIn(0f, 1f))
+                            renderEffect = if (fluidFx) {
+                                dissolve.shaderFull.effect(
+                                    incoming = false,
+                                    progress = p,
+                                    direction = dissolve.direction,
+                                    punch = dissolve.punch,
+                                    seed = dissolve.seed,
+                                    width = size.width,
+                                    height = size.height,
+                                )
+                            } else if (active && renderEffectBlurSupported) {
+                                val radius = if (slideFx) {
+                                    12f * dissolve.punch * 4f * p * (1f - p)
+                                } else {
+                                    30f * smootherStep((p * 1.4f).coerceIn(0f, 1f))
+                                }
                                 if (radius > 0.5f) BlurEffect(radius, radius, TileMode.Clamp) else null
                             } else {
                                 null
@@ -2792,6 +2825,39 @@ fun NowPlayingScreen(
                                     drawCropped(grabbed)
                                 }
                                 drawContent()
+                                if (dissolve.fullFx && !dissolve.fluid) {
+                                    // Sapuan geser di atas frame dan kaca dek: sama seperti cover biasa.
+                                    val p = dissolve.fullProgress
+                                    val feather = size.width * 0.75f
+                                    val travel = size.width + feather
+                                    val forward = dissolve.direction >= 0f
+                                    val start = if (forward) size.width - travel * p else -feather + travel * p
+                                    drawRect(
+                                        brush = Brush.horizontalGradient(
+                                            colorStops = Array(FADE_CURVE_STOPS + 1) { i ->
+                                                val t = i / FADE_CURVE_STOPS.toFloat()
+                                                val keep = if (forward) 1f - smootherStep(t) else smootherStep(t)
+                                                t to Color.Black.copy(alpha = keep)
+                                            },
+                                            startX = start,
+                                            endX = start + feather,
+                                        ),
+                                        blendMode = BlendMode.DstIn,
+                                    )
+                                    val glint = 4f * p * (1f - p) * 0.35f * dissolve.punch
+                                    if (glint > 0.01f) {
+                                        val mid = start + feather * 0.5f
+                                        val half = feather * 0.28f
+                                        drawRect(
+                                            brush = Brush.horizontalGradient(
+                                                colors = listOf(Color.Transparent, Color.White.copy(alpha = glint), Color.Transparent),
+                                                startX = mid - half,
+                                                endX = mid + half,
+                                            ),
+                                            blendMode = BlendMode.Plus,
+                                        )
+                                    }
+                                }
                             }
                         },
                 ) {
@@ -3861,17 +3927,17 @@ fun NowPlayingScreen(
                                         // Setelah frame canvas: cover baru muncul dari
                                         // blur + sedikit zoom ke tajam, tanpa geser.
                                         val framed = dissolve.frame != null
-                                        val fluid = dissolve.fluid && dissolve.outgoing != null && !framed
+                                        val fluid = dissolve.fluid && dissolve.outgoing != null
                                         val settle = if (dissolve.light) {
                                             1f + 0.02f * ease
                                         } else if (fluid) {
                                             1f + 0.045f * dissolve.punch * ease
                                         } else {
-                                            1f + (if (framed) 0.07f else 0.12f) * dissolve.punch * ease
+                                            1f + (if (framed && dissolve.calm) 0.07f else 0.12f) * dissolve.punch * ease
                                         }
                                         scaleX = settle
                                         scaleY = settle
-                                        translationX = if (framed || fluid || dissolve.light) {
+                                        translationX = if ((framed && dissolve.calm) || fluid || dissolve.light) {
                                             0f
                                         } else {
                                             dissolve.direction * dissolve.punch * size.width * 0.05f * ease
@@ -3886,7 +3952,7 @@ fun NowPlayingScreen(
                                                 width = size.width,
                                                 height = size.height,
                                             )
-                                        } else if (framed && renderEffectBlurSupported && ease > 0.01f) {
+                                        } else if (framed && dissolve.calm && renderEffectBlurSupported && ease > 0.01f) {
                                             val radius = 24f * dissolve.punch * ease
                                             BlurEffect(radius, radius, TileMode.Clamp)
                                         } else {
@@ -3946,8 +4012,8 @@ fun NowPlayingScreen(
                                         // pindah, lalu memudar (blur + zoom). Tanpa frame:
                                         // sapuan geser, kini dengan ekor memudar halus.
                                         alpha = when {
-                                            framed && sweeping -> 1f - t
-                                            framed -> 1f
+                                            framed && dissolve.calm && sweeping -> 1f - t
+                                            framed && !sweeping -> 1f
                                             sweeping && dissolve.fluid -> 1f
                                             sweeping && dissolve.light -> 1f - smootherStep(t)
                                             sweeping -> 1f - smootherStep(((t - 0.62f) / 0.38f).coerceIn(0f, 1f))
@@ -3958,9 +4024,9 @@ fun NowPlayingScreen(
                                         // kiri, previous ke kanan), mengecil sedikit dan
                                         // miring seperti kartu yang dilepas.
                                         val move = dissolve.direction * dissolve.punch
-                                        translationX = if (sweeping && !framed && !dissolve.fluid && !dissolve.light) -move * size.width * 0.30f * t else 0f
+                                        translationX = if (sweeping && !(framed && dissolve.calm) && !dissolve.fluid && !dissolve.light) -move * size.width * 0.30f * t else 0f
                                         val shrink = when {
-                                            sweeping && framed -> 1f + 0.09f * dissolve.punch * t
+                                            sweeping && framed && dissolve.calm -> 1f + 0.09f * dissolve.punch * t
                                             sweeping && dissolve.fluid -> 1f + 0.035f * dissolve.punch * smootherStep(t)
                                             sweeping && dissolve.light -> 1f - 0.02f * t
                                             sweeping -> 1f - 0.08f * dissolve.punch * t
@@ -3968,8 +4034,8 @@ fun NowPlayingScreen(
                                         }
                                         scaleX = shrink
                                         scaleY = shrink
-                                        rotationY = if (sweeping && !framed && !dissolve.fluid && !dissolve.light) move * 9f * t else 0f
-                                        renderEffect = if (sweeping && !framed && dissolve.fluid) {
+                                        rotationY = if (sweeping && !(framed && dissolve.calm) && !dissolve.fluid && !dissolve.light) move * 9f * t else 0f
+                                        renderEffect = if (sweeping && dissolve.fluid) {
                                             dissolve.shaderOut.effect(
                                                 incoming = false,
                                                 progress = t,
@@ -3980,7 +4046,7 @@ fun NowPlayingScreen(
                                                 height = size.height,
                                             )
                                         } else if (sweeping && !dissolve.light && renderEffectBlurSupported) {
-                                            val radius = if (framed) {
+                                            val radius = if (framed && dissolve.calm) {
                                                 30f * dissolve.punch * smootherStep((t * 1.4f).coerceIn(0f, 1f))
                                             } else {
                                                 12f * dissolve.punch * 4f * t * (1f - t)
@@ -4008,9 +4074,11 @@ fun NowPlayingScreen(
                                             } else {
                                                 drawCropped(grabbed)
                                             }
-                                            return@drawWithContent
+                                            // Blur-zoom polos tidak memakai sapuan; frame yang kena efek penuh lanjut ke sapuan di bawah.
+                                            if (dissolve.calm || dissolve.outgoing == null) return@drawWithContent
+                                        } else {
+                                            drawContent()
                                         }
-                                        drawContent()
                                         if (dissolve.outgoing == null) return@drawWithContent
                                         // Efek cair memakai mask shader, bukan sapuan + kilau.
                                         if (dissolve.fluid || dissolve.light) return@drawWithContent
