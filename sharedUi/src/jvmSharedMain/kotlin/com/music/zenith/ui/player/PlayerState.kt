@@ -494,8 +494,11 @@ internal fun rememberArtworkDissolve(
         // lagu 1 muncul di lagu 2 alih-alih gambar terakhir canvas.
         dissolve.retarget(
             art,
+            // Saat mix mulai, cover sudah menuju lagu tujuan padahal clip canvas
+            // masih tampil di komposisi sebelumnya; itu tetap harus bertransisi,
+            // bukan dipotong seperti ganti lagu manual.
             enabled = !reduceAnimation && coverSlide && dissolve.fullFrame == null &&
-                (dissolve.frame != null || !dissolve.lastClipShowing),
+                (dissolve.frame != null || mixing || !dissolve.lastClipShowing),
             queueIndex = queueIndex,
             holdOld = (reduceAnimation || !coverSlide) && dissolve.fullFrame == null &&
                 !dissolve.lastClipShowing,
