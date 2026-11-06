@@ -483,6 +483,52 @@ private fun incomingStartPoint(analysis: TrackAnalysis): Double =
     listOfNotNull(analysis.audibleStartTime, analysis.pickupTime, analysis.firstBeat)
         .firstOrNull { it.isFinite() && it >= 0 } ?: 0.0
 
+/**
+ * Track yang masuk dibaca dari kepalanya, bukan dari ekornya. [TrackAnalysis.bpm] mengikuti
+ * grid ekor (untuk keluar), padahal rate peregangan track berikutnya harus dari tempo bagian
+ * yang benar-benar diputar saat overlap: kepalanya. Tanpa grid kepala yang layak, apa adanya.
+ */
+private fun TrackAnalysis.asIncoming(): TrackAnalysis {
+    val head = headBeats ?: return this
+    if (head.beats.size < 8 || head.bpm < MIN_BPM || head.bpm > MAX_BPM) return this
+    if (abs(head.bpm - bpm) < 1e-6) return this
+    return copy(bpm = head.bpm, beatInterval = 60.0 / head.bpm, firstBeat = head.beats.first())
+}
+
+/** Grid kepala track yang masuk, kalau model mengukurnya dan cukup dipercaya. */
+private fun incomingHeadGrid(next: TrackAnalysis): BeatSide? =
+    next.headBeats?.takeIf { it.beats.size >= 8 && next.beatConfidence.orZero() >= MIN_DJ_CONFIDENCE }
+
+/**
+ * Menarik titik masuk [cue] ke downbeat (atau beat) terdekat milik track yang masuk, dalam
+ * setengah beat. Titik mulai transisi sudah di downbeat track keluar, jadi inilah yang
+ * membuat dua kick benar-benar jatuh bersamaan.
+ */
+private fun snapToIncomingGrid(next: TrackAnalysis, cue: Double, beatSeconds: Double): Double {
+    val head = incomingHeadGrid(next) ?: return cue
+    if (beatSeconds <= 0) return cue
+    val half = beatSeconds * 0.5
+    nearestValue(head.downbeats, cue, half)?.let { return it }
+    return nearestValue(head.beats, cue, half) ?: cue
+}
+
+/**
+ * Titik masuk phrase mix: downbeat pertama track yang masuk pada atau sesudah bunyi
+ * pertamanya (maksimal dua bar), bukan bunyi pertamanya itu sendiri, yang bisa jatuh di
+ * mana saja terhadap beat-nya. Tanpa grid kepala, tetap [audibleStart].
+ */
+private fun incomingGridEntry(next: TrackAnalysis, audibleStart: Double, beatSeconds: Double): Double {
+    val head = incomingHeadGrid(next) ?: return audibleStart
+    if (beatSeconds <= 0) return audibleStart
+    val from = audibleStart - beatSeconds * 0.25
+    head.downbeats.firstOrNull { it >= from }
+        ?.takeIf { it - audibleStart <= 2 * BEATS_PER_BAR * beatSeconds }
+        ?.let { return it }
+    return head.beats.firstOrNull { it >= from }
+        ?.takeIf { it - audibleStart <= BEATS_PER_BAR * beatSeconds }
+        ?: audibleStart
+}
+
 // ---------------------------------------------------------------------------
 // Apple-style Automix: fixed-length phrase mixes (8 or 16 bars)
 // ---------------------------------------------------------------------------
@@ -584,7 +630,7 @@ private fun phraseBarPlan(
     // start. The drop point is carried for the renderer's handoff marker but does not gate the cue:
     // a 16-bar mix must not require an intro as long as itself, which backing the cue off from the
     // drop would.
-    val finalIncomingCueTime = audibleStart
+    val finalIncomingCueTime = incomingGridEntry(nextAnalysis, audibleStart, incomingBeatSeconds)
     val incomingHandoffTime =
         if (nextLength > 0) {
             min(incomingDropTime, nextLength - MIN_INCOMING_CLEARANCE_SECONDS).coerceAtLeast(finalIncomingCueTime)
@@ -1422,7 +1468,7 @@ fun planTransition(
 ): TransitionPlan {
     val plan = planTransitionInner(
         analysis = analysis,
-        nextAnalysis = nextAnalysis,
+        nextAnalysis = nextAnalysis.asIncoming(),
         currentTrack = currentTrack,
         nextTrack = nextTrack,
         currentTime = currentTime,
@@ -1789,8 +1835,11 @@ private fun mixPlan(
             preferEarlier = true,
             minimum = earliestTransitionStart,
         )
-        finalIncomingCueTime =
-            max(0.0, incomingHandoffTime - (mixEnd - transitionStart) * incomingPlaybackRate)
+        finalIncomingCueTime = snapToIncomingGrid(
+            nextAnalysis,
+            max(0.0, incomingHandoffTime - (mixEnd - transitionStart) * incomingPlaybackRate),
+            if (alignedIncomingBpm > 0) 60.0 / alignedIncomingBpm else beatSeconds,
+        )
     } else {
         val clamped = clamp(overlap, min(handoffSeconds, maximumOverlap), maximumOverlap)
         val actualOverlap = if (traits != null) wholeBars(clamped, beatSeconds, maximumOverlap) else clamped
