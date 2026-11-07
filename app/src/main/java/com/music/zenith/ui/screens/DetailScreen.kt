@@ -2465,14 +2465,19 @@ private fun SectionCard(
         )
         return
     }
+    // Sama seperti kartu di Home: ketuk memulai penerbangan cover ke halaman
+    // album/single, lalu membuka halamannya.
+    val coverToken = remember { Any() }
+    val openWithCover = rememberCoverFlightTap(item.browseId, coverToken, onClick)
     Column(
         modifier = modifier
-            .longPressMenuClickable(onClick = onClick, onLongClick = onLongPress),
+            .longPressMenuClickable(onClick = openWithCover, onLongClick = onLongPress),
     ) {
         AsyncImage(
             model = item.thumbnailUrl.artworkAt(CARD_ART_PX),
             contentDescription = null,
             modifier = Modifier
+                .coverFlightSource(coverToken, item.thumbnailUrl.artworkAt(CARD_ART_PX), 10.dp)
                 .fillMaxWidth()
                 .aspectRatio(1f)
                 .clip(RoundedCornerShape(10.dp))
