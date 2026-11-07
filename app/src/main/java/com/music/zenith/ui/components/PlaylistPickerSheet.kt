@@ -653,16 +653,32 @@ internal fun RenamePlaylistForm(
     onBack: () -> Unit,
     onRename: (String) -> Unit,
     modifier: Modifier = Modifier,
+    /** Ganti cover dari galeri; Uri null = hapus cover kustom. Null menyembunyikan bagian cover. */
+    onChangeCover: ((Uri?) -> Unit)? = null,
 ) {
     var name by remember { mutableStateOf(playlist.title) }
+    var cover by remember { mutableStateOf<Uri?>(null) }
+    var coverRemoved by remember { mutableStateOf(false) }
+    var nameFocused by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
+    val pickCover = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { picked ->
+        if (picked != null) {
+            cover = picked
+            coverRemoved = false
+        }
+    }
 
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
+    val changed = cover != null || coverRemoved || name != playlist.title
     val submit: () -> Unit = {
-        if (name.isNotBlank()) {
+        if (name.isNotBlank() && changed) {
             focusManager.clearFocus()
+            val picked = cover
+            if (onChangeCover != null) {
+                if (picked != null) onChangeCover(picked) else if (coverRemoved) onChangeCover(null)
+            }
             onRename(name)
         }
     }
@@ -672,7 +688,8 @@ internal fun RenamePlaylistForm(
     Column(
         modifier
             .fillMaxWidth()
-            .imePadding(),
+            .imePadding()
+            .verticalScroll(rememberScrollState()),
     ) {
         Row(
             modifier = Modifier
@@ -696,12 +713,111 @@ internal fun RenamePlaylistForm(
         }
         HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outline)
 
+        // Cover: pratinjau langsung, ketuk untuk memilih dari galeri.
+        if (onChangeCover != null) {
+            val shown: Any? = when {
+                cover != null -> cover
+                coverRemoved -> null
+                else -> playlist.thumbnailUrl
+            }
+            // Hanya cover kustom (dari galeri) yang bisa dihapus.
+            val removable = cover != null ||
+                (!coverRemoved && playlist.thumbnailUrl?.startsWith("file:") == true)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 20.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(128.dp)
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .clickable {
+                            focusManager.clearFocus()
+                            pickCover.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                            )
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (shown != null) {
+                        AsyncImage(
+                            model = shown,
+                            contentDescription = stringResource(R.string.playlist_cover_change),
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(8.dp)
+                                .size(30.dp)
+                                .clip(CircleShape)
+                                .background(Color.Black.copy(alpha = 0.55f)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                Icons.Rounded.Edit,
+                                contentDescription = stringResource(R.string.playlist_cover_change),
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp),
+                            )
+                        }
+                    } else {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                Icons.Rounded.AddPhotoAlternate,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(34.dp),
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                text = stringResource(R.string.playlist_cover_add),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    if (removable) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(8.dp)
+                                .size(30.dp)
+                                .clip(CircleShape)
+                                .background(Color.Black.copy(alpha = 0.55f))
+                                .clickable {
+                                    if (cover != null) cover = null else coverRemoved = true
+                                },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                Icons.Rounded.Close,
+                                contentDescription = stringResource(R.string.playlist_cover_remove),
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 22.dp, vertical = 16.dp)
-                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(11.dp))
-                .padding(horizontal = 12.dp, vertical = 12.dp),
+                .padding(horizontal = 22.dp, vertical = 20.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .border(
+                    1.5.dp,
+                    if (nameFocused) MaterialTheme.colorScheme.primary else Color.Transparent,
+                    RoundedCornerShape(14.dp),
+                )
+                .padding(horizontal = 14.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             BasicTextField(
@@ -716,17 +832,39 @@ internal fun RenamePlaylistForm(
                 keyboardActions = KeyboardActions(onDone = { submit() }),
                 modifier = Modifier
                     .weight(1f)
-                    .focusRequester(focusRequester),
+                    .focusRequester(focusRequester)
+                    .onFocusChanged { nameFocused = it.isFocused },
             )
+            if (name.isNotEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .clickable { name = "" },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Rounded.Close,
+                        contentDescription = stringResource(R.string.clear_name),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
         }
         Button(
             onClick = submit,
-            enabled = name.isNotBlank() && name != playlist.title,
+            enabled = name.isNotBlank() && changed,
+            shape = RoundedCornerShape(26.dp),
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 22.dp),
+                .padding(horizontal = 22.dp)
+                .height(52.dp),
         ) {
-            Text(stringResource(R.string.save_name))
+            Text(
+                text = stringResource(R.string.save_name),
+                style = MaterialTheme.typography.titleMedium,
+            )
         }
         Spacer(Modifier.height(28.dp))
     }

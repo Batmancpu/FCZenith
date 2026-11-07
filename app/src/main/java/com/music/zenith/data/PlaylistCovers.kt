@@ -35,6 +35,12 @@ object PlaylistCovers {
 
     fun get(context: Context, id: String): String? = lookup(context)(id)
 
+    /** Menghapus cover kustom; kartu kembali ke thumbnail bawaan setelah Library dimuat ulang. */
+    fun remove(context: Context, id: String) {
+        val k = key(id)
+        dir(context).listFiles { f -> f.name.startsWith(k + SEP) }?.forEach { it.delete() }
+    }
+
     /** Memotong jadi persegi, mengecilkan, menyimpan. Mengembalikan alamat file, atau null jika gagal. */
     suspend fun save(context: Context, id: String, source: Uri): String? = withContext(Dispatchers.IO) {
         runCatching {

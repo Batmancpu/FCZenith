@@ -5408,6 +5408,9 @@ private fun ZenithApp(
                         viewModel.retitleDetail(p.browseId, name.trim())
                     }
                 },
+                onChangeCover = playlist?.let { p ->
+                    { uri: android.net.Uri? -> viewModel.setPlaylistCover(p, uri) }
+                },
                 onReorder = playlist?.let { p ->
                     {
                         browseActions = null

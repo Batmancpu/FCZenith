@@ -150,6 +150,8 @@ fun BrowseActionsMenu(
      */
     onRenameInSheet: (() -> Unit)? = null,
     startRenaming: Boolean = false,
+    /** Ganti cover dari galeri (null = hapus cover kustom). Null menyembunyikan bagian cover di form Rename. */
+    onChangeCover: ((android.net.Uri?) -> Unit)? = null,
 ) {
     var renaming by remember { mutableStateOf(startRenaming) }
     var confirmingDelete by remember { mutableStateOf(false) }
@@ -161,6 +163,7 @@ fun BrowseActionsMenu(
             playlist = playlist,
             onBack = { renaming = false },
             onRename = onRename,
+            onChangeCover = onChangeCover,
             modifier = modifier,
         )
         return

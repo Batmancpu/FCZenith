@@ -1329,6 +1329,35 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
+     * Mengganti cover playlist dengan gambar dari galeri, atau menghapusnya
+     * ([cover] null). Dinyatakan di semua tempat playlist digambar: picker,
+     * kartu Library, dan halamannya sendiri.
+     */
+    fun setPlaylistCover(playlist: UserPlaylist, cover: android.net.Uri?) {
+        viewModelScope.launch {
+            val app = getApplication<Application>()
+            val url = if (cover != null) {
+                com.music.zenith.data.PlaylistCovers.save(app, playlist.playlistId, cover)
+                    ?: return@launch
+            } else {
+                com.music.zenith.data.PlaylistCovers.remove(app, playlist.playlistId)
+                null
+            }
+            _playlists.value = _playlists.value.map {
+                if (it.playlistId == playlist.playlistId) it.copy(thumbnailUrl = url) else it
+            }
+            editPlaylistShelf { items ->
+                items.map { if (it.browseId == playlist.browseId) it.copy(thumbnailUrl = url) else it }
+            }
+            _detailStack.value = _detailStack.value.map {
+                if (it.browseId == playlist.browseId) it.copy(thumbnailUrl = url) else it
+            }
+            // Tanpa cover kustom, thumbnail aslinya baru kembali dari feed.
+            if (cover == null) libraryStale = true
+        }
+    }
+
+    /**
      * The playlist's entries as they stand on YouTube, for the reorder page —
      * see [YtMusicRepository.playlistEntries] for why not the open page's list.
      */
