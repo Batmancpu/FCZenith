@@ -41,11 +41,15 @@ private val INFO_BODY_MAX_HEIGHT = 360.dp
  * "reduce dynamic blur".
  */
 @Composable
-internal fun SongInfoDialog(song: Song, onDismiss: () -> Unit) {
+internal fun SongInfoDialog(
+    song: Song,
+    backdrop: com.music.zenith.ui.components.backdrop.Backdrop? = null,
+    onDismiss: () -> Unit,
+) {
     // Window Dialog tidak bisa melihat haze/halaman di belakangnya, dan
     // LocalAppBackdrop merekam halaman utama (bukan player yang sedang terbuka).
     // Pakai backdrop menu yang membukanya; di luar menu tetap backdrop app.
-    val menuBackdrop = LocalMenuBackdrop.current ?: LocalAppBackdrop.current
+    val menuBackdrop = backdrop ?: LocalMenuBackdrop.current ?: LocalAppBackdrop.current
     CompositionLocalProvider(LocalAppBackdrop provides menuBackdrop) {
         SongInfoDialogContent(song, onDismiss)
     }
@@ -67,6 +71,7 @@ private fun SongInfoDialogContent(song: Song, onDismiss: () -> Unit) {
         Column(
             Modifier
                 .width(ALERT_WIDTH)
+                .jellyPopIn()
                 .clip(RoundedCornerShape(ALERT_CORNER))
                 .alertGlass(RoundedCornerShape(ALERT_CORNER)),
         ) {

@@ -180,6 +180,11 @@ fun SongActionsMenu(
      * as before — present when the id is there, absent when it never was.
      */
     resolvingLinks: Boolean = false,
+    /**
+     * Membuka Song Info di luar menu. Bila diisi, pemanggil menutup menu
+     * lalu menampilkan popup-nya sendiri; bila null, popup tampil di sini.
+     */
+    onShowSongInfo: ((Song) -> Unit)? = null,
 ) {
     var showingSongInfo by remember(song.videoId) { mutableStateOf(false) }
     var pickingSleepTimer by remember { mutableStateOf(false) }
@@ -369,7 +374,8 @@ fun SongActionsMenu(
             ) { onOpenArtist(id) }
         }
         ActionRow(SfIcons.Info, stringResource(R.string.song_info), accent = palette.accent) {
-            showingSongInfo = true
+            val openInfo = onShowSongInfo
+            if (openInfo != null) openInfo(song) else showingSongInfo = true
         }
 
         // The player's own: about the track playing right now rather than
@@ -415,9 +421,13 @@ fun SongActionsMenu(
             // The player's menu has the sleep timer, and swaps its rows for
             // the picker in place.
             if (pickingSleepTimer) {
-                SleepTimerPicker(palette = palette, onBack = { pickingSleepTimer = false })
+                Column(Modifier.fillMaxWidth().jellyPopIn()) {
+                    SleepTimerPicker(palette = palette, onBack = { pickingSleepTimer = false })
+                }
             } else if (pickingSpeed) {
-                PlaybackSpeedPage(palette = palette, onBack = { pickingSpeed = false })
+                Column(Modifier.fillMaxWidth().jellyPopIn()) {
+                    PlaybackSpeedPage(palette = palette, onBack = { pickingSpeed = false })
+                }
             } else {
                 rows()
             }

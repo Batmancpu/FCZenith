@@ -692,6 +692,11 @@ private fun ZenithApp(
     var showSpotifyLogin by remember { mutableStateOf(false) }
     var discordDialog by remember { mutableStateOf<DiscordDialog?>(null) }
     var songActions by remember { mutableStateOf<Song?>(null) }
+    // Song Info hidup di luar menu supaya menu bisa menutup di belakangnya.
+    var songInfoTarget by remember { mutableStateOf<Song?>(null) }
+    var songInfoBackdrop by remember {
+        mutableStateOf<com.music.zenith.ui.components.backdrop.Backdrop?>(null)
+    }
     var showLyricsOffset by remember { mutableStateOf(false) }
     /**
      * Whether the track menu that is up was opened from the player.
@@ -4425,7 +4430,8 @@ private fun ZenithApp(
         Isolated {
             val pageMenuUp =
                 (songActions != null && songMenuOrigin == null && !(menuFromPlayer && playerRaised)) ||
-                    (browseActions != null && browseMenuOrigin == null && !browseRenameInSheet)
+                    (browseActions != null && browseMenuOrigin == null && !browseRenameInSheet) ||
+                    songInfoTarget != null
             LaunchedEffect(pageMenuUp, reduceDynamicBlur) {
                 if (pageMenuUp && !reduceDynamicBlur && isGlassSupported()) {
                     pageBackdrop.capture()
@@ -4711,6 +4717,16 @@ private fun ZenithApp(
                 // looked up as the menu opens — see `needsLinks` above.
                 resolvingLinks = if (fromPlayer) linksLoading else needsLinks && menuLinksLoading,
                 showSleepTimer = fromPlayer,
+                // Song Info: menu langsung menutup, popup-nya tampil sendiri.
+                onShowSongInfo = { info ->
+                    songInfoBackdrop = if (menuFromPlayer && playerRaised && songMenuOrigin == null) {
+                        if (playerLiveCanvas) livePlayerBackdrop else playerBackdrop
+                    } else {
+                        pageBackdrop
+                    }
+                    songInfoTarget = info
+                    songActions = null
+                },
                 // Offered for every playing track with a YouTube upload
                 // behind it, not only for one an upgrade visibly swapped:
                 // a source ranked above YouTube can be playing its own
@@ -4867,7 +4883,8 @@ private fun ZenithApp(
                     .onSuccess { addSongsSuggestions = it }
                     .onFailure { addSongsSuggestions = emptyList() }
             }
-            val playerMenuUp = (songActions != null && songMenuOrigin == null && menuFromPlayer) || addSongsOpen
+            val playerMenuUp = (songActions != null && songMenuOrigin == null && menuFromPlayer) ||
+                addSongsOpen || songInfoTarget != null
             LaunchedEffect(playerMenuUp, reduceDynamicBlur) {
                 if (!playerMenuUp || reduceDynamicBlur) {
                     delay(SNAPSHOT_RELEASE_DELAY_MS)
@@ -5045,6 +5062,13 @@ private fun ZenithApp(
                     songMenuAnchor = null
                     menuFromHistory = false
                 }
+            }
+        }
+
+        // ---- Song Info ----
+        songInfoTarget?.let { info ->
+            com.music.zenith.ui.components.SongInfoDialog(info, backdrop = songInfoBackdrop) {
+                songInfoTarget = null
             }
         }
 
