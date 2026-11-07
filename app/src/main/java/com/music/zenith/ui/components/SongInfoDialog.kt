@@ -36,8 +36,9 @@ private val INFO_BODY_MAX_HEIGHT = 360.dp
  * Kept in a window [Dialog] because it opens from the song actions menu, which
  * can sit inside the player's own window; an in-tree overlay would be drawn
  * underneath it. A
- * separate window can't sample the app's haze, so the card takes the plain
- * surface the other alerts fall back to under "reduce dynamic blur".
+ * separate window can't sample the app's haze, so the card is [alertGlass]
+ * instead, which samples the app backdrop, and is the plain surface only under
+ * "reduce dynamic blur".
  */
 @Composable
 internal fun SongInfoDialog(song: Song, onDismiss: () -> Unit) {
@@ -48,12 +49,15 @@ internal fun SongInfoDialog(song: Song, onDismiss: () -> Unit) {
     }
     val onSurface = MaterialTheme.colorScheme.onSurface
 
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+    ) {
         Column(
             Modifier
                 .width(ALERT_WIDTH)
                 .clip(RoundedCornerShape(ALERT_CORNER))
-                .background(MaterialTheme.colorScheme.surface),
+                .alertGlass(RoundedCornerShape(ALERT_CORNER)),
         ) {
             Column(
                 Modifier

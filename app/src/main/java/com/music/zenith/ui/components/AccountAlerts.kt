@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -885,12 +886,13 @@ private fun ChoiceRow(
 @OptIn(ExperimentalHazeMaterialsApi::class)
 @Composable
 internal fun AlertScaffold(
-    hazeState: HazeState,
+    /** Null for an alert with no [HazeState] to hand; it is then always [alertGlass]. */
+    hazeState: HazeState?,
     onDismiss: () -> Unit,
     /**
      * False for an alert in a window of its own, where [hazeState] has nothing
-     * to blur — Haze reads only its own window. The card is then the plain
-     * surface the reduced-blur setting uses; see [InfoAlert]'s `inOwnWindow`.
+     * to blur — Haze reads only its own window. The card is then [alertGlass],
+     * which samples the app backdrop instead; see [InfoAlert]'s `inOwnWindow`.
      */
     frosted: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
@@ -914,10 +916,10 @@ internal fun AlertScaffold(
                 .width(ALERT_WIDTH)
                 .clip(shape)
                 .then(
-                    if (reduceDynamicBlur || !frosted) {
-                        Modifier.background(MaterialTheme.colorScheme.surface)
-                    } else {
-                        Modifier.optimizedHazeEffect(
+                    when {
+                        reduceDynamicBlur -> Modifier.background(MaterialTheme.colorScheme.surface)
+                        !frosted || hazeState == null -> Modifier.alertGlass(shape)
+                        else -> Modifier.optimizedHazeEffect(
                             state = hazeState,
                             style = HazeMaterials.regular(MaterialTheme.colorScheme.surface),
                         )
@@ -930,5 +932,87 @@ internal fun AlertScaffold(
                 ),
             content = content,
         )
+    }
+}
+
+private const val ALERT_GLASS_TINT = 0.6f
+
+/**
+ * The card of an alert drawn in a window of its own: [liquidGlass] sampling the
+ * app backdrop, under the theme's surface at [ALERT_GLASS_TINT] so the text on
+ * it stays readable. Haze cannot do this job — it reads only its own window.
+ * Plain surface where glass is unsupported; [liquidGlass] itself falls back to
+ * a solid fill under "reduce dynamic blur".
+ */
+@Composable
+internal fun Modifier.alertGlass(shape: RoundedCornerShape): Modifier {
+    val surface = MaterialTheme.colorScheme.surface
+    return if (isGlassSupported()) {
+        liquidGlass(shape = shape, surfaceTint = surface.copy(alpha = ALERT_GLASS_TINT))
+    } else {
+        background(surface, shape)
+    }
+}
+
+/**
+ * An alert in a window of its own, for a caller with no [HazeState] to blur
+ * against — a settings page, or a dialog that must sit above another window.
+ * Same scrim and card as every other alert here; [content] is the card's rows.
+ */
+@Composable
+internal fun GlassAlertDialog(
+    onDismiss: () -> Unit,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+    ) {
+        val window = (LocalView.current.parent as? DialogWindowProvider)?.window
+        // The scaffold draws its own flat scrim; the platform's would double it.
+        SideEffect { window?.setDimAmount(0f) }
+        // Without this the keyboard sits over the actions of an alert with a field.
+        Box(Modifier.imePadding()) {
+            AlertScaffold(hazeState = null, onDismiss = onDismiss, frosted = false, content = content)
+        }
+    }
+}
+
+/** [ConfirmationAlert] in a window of its own: a title, a message, a confirm and a dismiss. */
+@Composable
+internal fun GlassConfirmDialog(
+    title: String,
+    message: String,
+    confirmLabel: String,
+    dismissLabel: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+    destructive: Boolean = false,
+) {
+    GlassAlertDialog(onDismiss = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 19.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge.copy(fontSize = 17.sp, fontWeight = FontWeight.W600),
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                text = message,
+                modifier = Modifier.padding(top = 4.dp),
+                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp, lineHeight = 17.sp),
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center,
+            )
+        }
+        AlertRule()
+        AlertAction(label = confirmLabel, emphasised = true, destructive = destructive, onClick = onConfirm)
+        AlertRule()
+        AlertAction(label = dismissLabel, emphasised = false, onClick = onDismiss)
     }
 }

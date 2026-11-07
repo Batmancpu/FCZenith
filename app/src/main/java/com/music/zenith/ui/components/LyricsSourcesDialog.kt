@@ -208,34 +208,47 @@ fun LyricsSourcesDialog(
 
     if (showPaxSenixKeyDialog) {
         var input by remember(paxSenixApiKey) { mutableStateOf(paxSenixApiKey) }
-        AlertDialog(
-            onDismissRequest = { showPaxSenixKeyDialog = false },
-            title = { Text(stringResource(R.string.paxsenix_api_key)) },
-            text = {
-                OutlinedTextField(
+        GlassAlertDialog(onDismiss = { showPaxSenixKeyDialog = false }) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 19.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    text = stringResource(R.string.paxsenix_api_key),
+                    modifier = Modifier.padding(bottom = 14.dp),
+                    style = MaterialTheme.typography.bodyLarge.copy(fontSize = 17.sp, fontWeight = FontWeight.W600),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.Center,
+                )
+                PillTextField(
                     value = input,
                     onValueChange = { input = it },
-                    singleLine = true,
-                    visualTransformation = PasswordVisualTransformation(),
+                    placeholder = stringResource(R.string.paxsenix_api_key),
+                    isPassword = true,
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Password,
                         imeAction = ImeAction.Done,
                     ),
-                    modifier = Modifier.fillMaxWidth(),
                 )
-            },
-            confirmButton = {
-                TextButton(onClick = {
+            }
+            AlertRule()
+            AlertAction(
+                label = stringResource(R.string.save),
+                emphasised = true,
+                onClick = {
                     AppSettings.setPaxSenixApiKey(input)
                     showPaxSenixKeyDialog = false
-                }) { Text(stringResource(R.string.save)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showPaxSenixKeyDialog = false }) {
-                    Text(stringResource(R.string.cancel))
-                }
-            },
-        )
+                },
+            )
+            AlertRule()
+            AlertAction(
+                label = stringResource(R.string.cancel),
+                emphasised = false,
+                onClick = { showPaxSenixKeyDialog = false },
+            )
+        }
     }
 }
 

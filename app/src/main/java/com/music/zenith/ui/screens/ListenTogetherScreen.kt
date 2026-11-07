@@ -47,6 +47,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import com.music.zenith.ui.components.GlassConfirmDialog
 import com.music.zenith.ui.components.IosSwitch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -274,68 +275,39 @@ fun ListenTogetherScreen(
 
     pendingServerSwitchInvite?.let { (codeToJoin, serverToSet) ->
         val isSwitchToOfficial = serverToSet.isBlank()
-        AlertDialog(
-            onDismissRequest = {
+        GlassConfirmDialog(
+            title = stringResource(
+                if (isSwitchToOfficial) {
+                    R.string.listen_together_official_server_dialog_title
+                } else {
+                    R.string.listen_together_custom_server_dialog_title
+                },
+            ),
+            message = if (isSwitchToOfficial) {
+                stringResource(R.string.listen_together_official_server_dialog_message, codeToJoin)
+            } else {
+                stringResource(
+                    R.string.listen_together_custom_server_dialog_message,
+                    serverToSet,
+                    codeToJoin,
+                )
+            },
+            confirmLabel = stringResource(R.string.listen_together_custom_server_switch_and_join),
+            dismissLabel = stringResource(R.string.cancel),
+            onConfirm = {
+                val toJoin = codeToJoin
+                val toSet = serverToSet
+                pendingServerSwitchInvite = null
+                // Same next step as any other invite: the confirm
+                // sheet, not an immediate join. This dialog is only
+                // consent to talk to a different server at all.
+                openPartyPreview(toJoin, toSet.ifBlank { null })
+                onInviteHandled()
+            },
+            onDismiss = {
                 pendingServerSwitchInvite = null
                 onInviteHandled()
             },
-            title = {
-                Text(
-                    stringResource(
-                        if (isSwitchToOfficial) {
-                            R.string.listen_together_official_server_dialog_title
-                        } else {
-                            R.string.listen_together_custom_server_dialog_title
-                        }
-                    ),
-                    style = MaterialTheme.typography.titleLarge,
-                )
-            },
-            text = {
-                Text(
-                    if (isSwitchToOfficial) {
-                        stringResource(R.string.listen_together_official_server_dialog_message, codeToJoin)
-                    } else {
-                        stringResource(
-                            R.string.listen_together_custom_server_dialog_message,
-                            serverToSet,
-                            codeToJoin,
-                        )
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        val toJoin = codeToJoin
-                        val toSet = serverToSet
-                        pendingServerSwitchInvite = null
-                        // Same next step as any other invite: the confirm
-                        // sheet, not an immediate join. This dialog is only
-                        // consent to talk to a different server at all.
-                        openPartyPreview(toJoin, toSet.ifBlank { null })
-                        onInviteHandled()
-                    },
-                ) {
-                    Text(
-                        stringResource(R.string.listen_together_custom_server_switch_and_join),
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        pendingServerSwitchInvite = null
-                        onInviteHandled()
-                    },
-                ) {
-                    Text(stringResource(R.string.cancel))
-                }
-            },
-            containerColor = MaterialTheme.colorScheme.surface,
         )
     }
 

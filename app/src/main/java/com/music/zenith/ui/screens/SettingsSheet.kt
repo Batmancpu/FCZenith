@@ -144,6 +144,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.SingletonImageLoader
 import coil3.compose.AsyncImage
+import com.music.zenith.ui.components.GlassConfirmDialog
 import com.music.zenith.ui.components.GlassSegmentedControl
 import com.music.zenith.ui.components.LiquidThemeSelector
 import com.music.zenith.ui.components.PillSegmentedControl
@@ -1919,53 +1920,35 @@ fun SettingsScreen(
     }
 
     if (showPerformanceWarning) {
-        AlertDialog(
-            onDismissRequest = { showPerformanceWarning = false },
-            title = { Text(stringResource(R.string.high_performance_before_enabling)) },
-            text = { Text(stringResource(R.string.high_performance_battery_warning)) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showPerformanceWarning = false
-                        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                            data = Uri.fromParts("package", context.packageName, null)
-                        }
-                        val settingsIntent = intent.takeIf {
-                            it.resolveActivity(context.packageManager) != null
-                        } ?: Intent(Settings.ACTION_SETTINGS)
-                        batterySettingsLauncher.launch(settingsIntent)
-                    },
-                ) {
-                    Text(stringResource(R.string.open_battery_settings))
+        IosConfirmDialog(
+            title = stringResource(R.string.high_performance_before_enabling),
+            message = stringResource(R.string.high_performance_battery_warning),
+            confirmText = stringResource(R.string.open_battery_settings),
+            dismissText = stringResource(R.string.cancel),
+            onDismiss = { showPerformanceWarning = false },
+            onConfirm = {
+                showPerformanceWarning = false
+                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.fromParts("package", context.packageName, null)
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { showPerformanceWarning = false }) {
-                    Text(stringResource(R.string.cancel))
-                }
+                val settingsIntent = intent.takeIf {
+                    it.resolveActivity(context.packageManager) != null
+                } ?: Intent(Settings.ACTION_SETTINGS)
+                batterySettingsLauncher.launch(settingsIntent)
             },
         )
     }
 
     if (showPerformanceConfirmation) {
-        AlertDialog(
-            onDismissRequest = { showPerformanceConfirmation = false },
-            title = { Text(stringResource(R.string.enable_high_performance_title)) },
-            text = { Text(stringResource(R.string.enable_high_performance_confirmation)) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showPerformanceConfirmation = false
-                        AppSettings.setHighPerformanceMode(true)
-                    },
-                ) {
-                    Text(stringResource(R.string.enable))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showPerformanceConfirmation = false }) {
-                    Text(stringResource(R.string.not_yet))
-                }
+        IosConfirmDialog(
+            title = stringResource(R.string.enable_high_performance_title),
+            message = stringResource(R.string.enable_high_performance_confirmation),
+            confirmText = stringResource(R.string.enable),
+            dismissText = stringResource(R.string.not_yet),
+            onDismiss = { showPerformanceConfirmation = false },
+            onConfirm = {
+                showPerformanceConfirmation = false
+                AppSettings.setHighPerformanceMode(true)
             },
         )
     }
@@ -2929,58 +2912,15 @@ private fun IosConfirmDialog(
     onDismiss: () -> Unit,
     destructive: Boolean = false,
 ) {
-    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
-        androidx.compose.material3.Surface(
-            shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant,
-        ) {
-            Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 22.dp, end = 22.dp, top = 22.dp),
-                )
-                Text(
-                    text = message,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 22.dp, end = 22.dp, top = 8.dp, bottom = 20.dp),
-                )
-                HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outline)
-                Row(Modifier.fillMaxWidth().height(52.dp)) {
-                    TextButton(
-                        onClick = onDismiss,
-                        shape = androidx.compose.foundation.shape.RoundedCornerShape(0.dp),
-                        modifier = Modifier.weight(1f).height(52.dp),
-                    ) {
-                        Text(text = dismissText, color = MaterialTheme.colorScheme.onSurface)
-                    }
-                    androidx.compose.material3.VerticalDivider(
-                        thickness = 0.5.dp,
-                        color = MaterialTheme.colorScheme.outline,
-                    )
-                    TextButton(
-                        onClick = onConfirm,
-                        shape = androidx.compose.foundation.shape.RoundedCornerShape(0.dp),
-                        modifier = Modifier.weight(1f).height(52.dp),
-                    ) {
-                        Text(
-                            text = confirmText,
-                            fontWeight = FontWeight.SemiBold,
-                            color = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                }
-            }
-        }
-    }
+    GlassConfirmDialog(
+        title = title,
+        message = message,
+        confirmLabel = confirmText,
+        dismissLabel = dismissText,
+        onConfirm = onConfirm,
+        onDismiss = onDismiss,
+        destructive = destructive,
+    )
 }
 
 /** The main page's list of categories: a glyph and a name each, and a chevron into it. */

@@ -49,10 +49,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.TextButton
+import com.music.zenith.ui.components.AlertAction
+import com.music.zenith.ui.components.AlertRule
+import com.music.zenith.ui.components.GlassAlertDialog
+import com.music.zenith.ui.components.PillTextField
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -148,116 +150,105 @@ private fun EditProfileDialog(account: Account?, onDismiss: () -> Unit) {
     }
     val preview: String? = photoPath.takeIf { it.isNotEmpty() }?.let { "file://$it" } ?: account?.thumbnailUrl
 
-    AlertDialog(
-        onDismissRequest = {
+    GlassAlertDialog(
+        onDismiss = {
             discardUnsavedPhoto()
             onDismiss()
         },
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(28.dp),
-        title = {
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 19.dp),
+        ) {
             Text(
                 text = stringResource(R.string.edit_profile),
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 modifier = Modifier.fillMaxWidth(),
             )
-        },
-        text = {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                Box(
-                    modifier = Modifier
-                        .size(96.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.outline)
-                        .clickable(onClick = pickPhoto),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    if (preview != null) {
-                        AsyncImage(
-                            model = preview,
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    } else {
-                        Icon(
-                            SfIcons.Person,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-                Spacer(Modifier.height(4.dp))
-                TextButton(onClick = pickPhoto, enabled = !busy) {
-                    Text(
-                        text = stringResource(R.string.profile_change_photo),
-                        fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
+            Spacer(Modifier.height(14.dp))
+            Box(
+                modifier = Modifier
+                    .size(96.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.outline)
+                    .clickable(onClick = pickPhoto),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (preview != null) {
+                    AsyncImage(
+                        model = preview,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    Icon(
+                        SfIcons.Person,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Spacer(Modifier.height(4.dp))
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it.take(PROFILE_NAME_MAX) },
-                    singleLine = true,
-                    label = { Text(stringResource(R.string.profile_display_name)) },
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
-                    colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = androidx.compose.ui.graphics.Color.Transparent,
-                        unfocusedBorderColor = androidx.compose.ui.graphics.Color.Transparent,
-                        disabledBorderColor = androidx.compose.ui.graphics.Color.Transparent,
-                        focusedContainerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f),
-                        unfocusedContainerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f),
-                    ),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(Modifier.height(10.dp))
-                Text(
-                    text = stringResource(R.string.profile_local_only_note),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-                )
-                if (hasOverride) {
-                    Spacer(Modifier.height(6.dp))
-                    TextButton(
-                        onClick = {
-                            discardUnsavedPhoto()
-                            AppSettings.clearProfileOverride()
-                            onDismiss()
-                        },
-                    ) {
-                        Text(
-                            text = stringResource(R.string.profile_reset),
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                    }
-                }
             }
-        },
-        confirmButton = {
-            TextButton(
-                enabled = !busy && name.isNotBlank(),
-                onClick = {
-                    AppSettings.setProfileOverride(owner, name.trim(), photoPath)
-                    onDismiss()
-                },
-            ) {
+            Spacer(Modifier.height(4.dp))
+            TextButton(onClick = pickPhoto, enabled = !busy) {
                 Text(
-                    text = stringResource(R.string.save),
-                    fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                    text = stringResource(R.string.profile_change_photo),
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
                 )
             }
-        },
-        dismissButton = {
-            TextButton(
+            Spacer(Modifier.height(4.dp))
+            PillTextField(
+                value = name,
+                onValueChange = { name = it.take(PROFILE_NAME_MAX) },
+                placeholder = stringResource(R.string.profile_display_name),
+            )
+            Spacer(Modifier.height(10.dp))
+            Text(
+                text = stringResource(R.string.profile_local_only_note),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+            )
+        }
+        AlertRule()
+        AlertAction(
+            label = stringResource(R.string.save),
+            emphasised = true,
+            enabled = !busy && name.isNotBlank(),
+            onClick = {
+                AppSettings.setProfileOverride(owner, name.trim(), photoPath)
+                onDismiss()
+            },
+        )
+        if (hasOverride) {
+            AlertRule()
+            AlertAction(
+                label = stringResource(R.string.profile_reset),
+                emphasised = false,
+                destructive = true,
                 onClick = {
                     discardUnsavedPhoto()
+                    AppSettings.clearProfileOverride()
                     onDismiss()
                 },
-            ) { Text(stringResource(R.string.cancel)) }
-        },
-    )
+            )
+        }
+        AlertRule()
+        AlertAction(
+            label = stringResource(R.string.cancel),
+            emphasised = false,
+            onClick = {
+                discardUnsavedPhoto()
+                onDismiss()
+            },
+        )
+    }
 }
 
 @Composable
