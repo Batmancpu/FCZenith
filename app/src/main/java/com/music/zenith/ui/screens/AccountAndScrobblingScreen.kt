@@ -153,7 +153,15 @@ private fun EditProfileDialog(account: Account?, onDismiss: () -> Unit) {
             discardUnsavedPhoto()
             onDismiss()
         },
-        title = { Text(stringResource(R.string.edit_profile)) },
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(28.dp),
+        title = {
+            Text(
+                text = stringResource(R.string.edit_profile),
+                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
         text = {
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
                 Box(
@@ -179,30 +187,51 @@ private fun EditProfileDialog(account: Account?, onDismiss: () -> Unit) {
                         )
                     }
                 }
+                Spacer(Modifier.height(4.dp))
                 TextButton(onClick = pickPhoto, enabled = !busy) {
-                    Text(stringResource(R.string.profile_change_photo))
+                    Text(
+                        text = stringResource(R.string.profile_change_photo),
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
+                    )
                 }
+                Spacer(Modifier.height(4.dp))
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it.take(PROFILE_NAME_MAX) },
                     singleLine = true,
                     label = { Text(stringResource(R.string.profile_display_name)) },
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
+                    colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = androidx.compose.ui.graphics.Color.Transparent,
+                        unfocusedBorderColor = androidx.compose.ui.graphics.Color.Transparent,
+                        disabledBorderColor = androidx.compose.ui.graphics.Color.Transparent,
+                        focusedContainerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f),
+                        unfocusedContainerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f),
+                    ),
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(10.dp))
                 Text(
                     text = stringResource(R.string.profile_local_only_note),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
                 )
                 if (hasOverride) {
+                    Spacer(Modifier.height(6.dp))
                     TextButton(
                         onClick = {
                             discardUnsavedPhoto()
                             AppSettings.clearProfileOverride()
                             onDismiss()
                         },
-                    ) { Text(stringResource(R.string.profile_reset)) }
+                    ) {
+                        Text(
+                            text = stringResource(R.string.profile_reset),
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
                 }
             }
         },
@@ -213,7 +242,12 @@ private fun EditProfileDialog(account: Account?, onDismiss: () -> Unit) {
                     AppSettings.setProfileOverride(owner, name.trim(), photoPath)
                     onDismiss()
                 },
-            ) { Text(stringResource(R.string.save)) }
+            ) {
+                Text(
+                    text = stringResource(R.string.save),
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                )
+            }
         },
         dismissButton = {
             TextButton(
