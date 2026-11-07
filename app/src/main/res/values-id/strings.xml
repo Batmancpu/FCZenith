@@ -440,6 +440,7 @@
     <string name="playlist_privacy_unlisted_hint">Siapa pun yang punya tautannya</string>
     <string name="playlist_privacy_public_hint">Siapa pun bisa menemukannya</string>
     <string name="add_songs_to_playlist">Tambah Lagu ke Playlist</string>
+    <string name="playlist_add_songs">Tambah lagu</string>
     <string name="presence">Presence</string>
     <string name="preview">Pratinjau</string>
     <string name="prioritize_syllable_lyrics">Prioritaskan lirik per suku kata</string>

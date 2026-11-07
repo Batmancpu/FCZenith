@@ -706,6 +706,7 @@
     <string name="playlist_privacy_unlisted_hint">Anyone with the link</string>
     <string name="playlist_privacy_public_hint">Anyone can find it</string>
     <string name="add_songs_to_playlist">Add Songs to Playlist</string>
+    <string name="playlist_add_songs">Add songs</string>
     <string name="presence">Presence</string>
     <string name="preview">Preview</string>
     <string name="prioritize_syllable_lyrics">Prioritize syllable lyrics</string>

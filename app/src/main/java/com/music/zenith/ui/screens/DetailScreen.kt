@@ -404,6 +404,8 @@ fun DetailScreen(
      * [ArtworkPalette] so it reads as this page rather than a sheet over it.
      */
     reorder: (@Composable (ArtworkPalette) -> Unit)? = null,
+    /** Membuka popup tambah lagu. Hanya diberikan untuk playlist milik akun; null menyembunyikan tombolnya. */
+    onAddSongs: (() -> Unit)? = null,
 ) {
     val rawSongs = (page.songs as? UiState.Success)?.data.orEmpty()
     // A folder keeps its own sort — the one its top bar menu sets — rather
@@ -663,6 +665,7 @@ fun DetailScreen(
                         onArtistClick = onArtistClick.takeIf { folder == null },
                         onToggleLibrary = onToggleLibrary,
                         onDownloadAll = folder?.onDownload?.let { download -> { download(songs) } },
+                        onAddSongs = onAddSongs,
                     )
                 }
             }
@@ -998,6 +1001,8 @@ private fun ReleaseHeader(
     onToggleLibrary: (() -> Unit)?,
     /** The Cached songs folder's: saves every track on it to Downloads. Null hides it. */
     onDownloadAll: (() -> Unit)? = null,
+    /** Tombol "Add songs" di bawah baris aksi; juga tampil saat playlist masih kosong. */
+    onAddSongs: (() -> Unit)? = null,
     /** Tinggi hero full-bleed, hanya dipakai halaman Liked Music. */
     heroHeight: Dp = sleeveSize * 1.2f,
 ) {
@@ -1253,6 +1258,24 @@ private fun ReleaseHeader(
                     )
                 }
             }
+        }
+
+        // Di luar blok "songs.isNotEmpty()" di atas: playlist yang baru dibuat
+        // masih kosong, dan baris Shuffle/Play belum ada, tapi tombol ini harus.
+        if (onAddSongs != null) {
+            Spacer(Modifier.height(if (songs.isEmpty()) 18.dp else 10.dp))
+            ActionPill(
+                icon = ZenithIcons.Plus,
+                label = stringResource(R.string.playlist_add_songs),
+                onClick = onAddSongs,
+                filled = songs.isEmpty(),
+                size = RELEASE_SIDE_BUTTON,
+                modifier = Modifier
+                    .flightReveal(290, afterFlight = page.covers.isNotEmpty())
+                    .widthIn(max = RELEASE_ACTIONS_MAX_WIDTH)
+                    .fillMaxWidth()
+                    .padding(horizontal = HEADER_GUTTER),
+            )
         }
     }
 }

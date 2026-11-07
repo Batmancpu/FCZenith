@@ -993,6 +993,8 @@ private fun ZenithApp(
     val pinnedToOriginal by OriginalVersion.pinned.collectAsStateWithLifecycle()
     val qualityUpgradesInFlight by NerdStats.racingLossless.collectAsStateWithLifecycle()
     val playlists by viewModel.playlists.collectAsStateWithLifecycle()
+    // Playlist mana yang terkonfirmasi dibuat akun ini; menentukan tombol Add songs.
+    val ownedPlaylistPages by viewModel.playlistOwned.collectAsStateWithLifecycle()
     val playlistsLoading by viewModel.playlistsLoading.collectAsStateWithLifecycle()
 
     // The Downloads page is a snapshot of the folder, taken when it was opened.
@@ -3321,6 +3323,7 @@ private fun ZenithApp(
                             }
                             // This page's songs being rearranged, drawn in place of its list.
                             val reordering = reorderTarget?.takeIf { it.browseId == page.browseId }
+                            LaunchedEffect(page.browseId) { viewModel.resolvePlaylistOwnership(page.browseId) }
                             DetailScreen(
                                 page = page,
                                 currentSong = player.song,
@@ -3371,6 +3374,22 @@ private fun ZenithApp(
                                     viewModel.openDetail(id, name, "Artist", null, BrowseType.ARTIST)
                                 },
                                 onAddSuggested = { song -> viewModel.addSuggestedSong(page.browseId, song) },
+                                onAddSongs = if (signedIn &&
+                                    page.type == BrowseType.PLAYLIST &&
+                                    ownedPlaylistPages[page.browseId] == true
+                                ) {
+                                    {
+                                        addSongsPlaylist = playlists.firstOrNull { it.browseId == page.browseId }
+                                            ?: UserPlaylist(
+                                                playlistId = page.browseId.removePrefix("VL"),
+                                                title = page.title,
+                                                subtitle = "",
+                                                thumbnailUrl = page.thumbnailUrl,
+                                            )
+                                    }
+                                } else {
+                                    null
+                                },
                                 // Saving is an account action, so it isn't offered to a
                                 // guest at all — same as the like and add-to-playlist rows
                                 // in the track menu.
