@@ -3,10 +3,11 @@ package com.music.zenith.ui.components
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -45,8 +46,10 @@ fun QueueActionNoticeHost(
             if (reduceAnimation) {
                 EnterTransition.None togetherWith ExitTransition.None
             } else {
-                (fadeIn() + slideInVertically { height -> height / 2 }) togetherWith
-                    fadeOut()
+                // Fade saja, tanpa geser. Ukuran tidak dianimasikan supaya
+                // muncul/hilang tidak terlihat memuai atau menyusut.
+                (fadeIn(tween(200)) togetherWith fadeOut(tween(200)))
+                    .using(SizeTransform(clip = false) { _, _ -> snap() })
             }
         },
         contentKey = { it?.id },
