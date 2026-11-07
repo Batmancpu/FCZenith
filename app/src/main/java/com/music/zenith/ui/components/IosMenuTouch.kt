@@ -53,8 +53,9 @@ import kotlinx.coroutines.launch
 
 /**
  * Sentuhan di dalam panel menu, seperti menu iOS: satu indikator (pil) meluncur
- * ke baris yang sedang disentuh jari, jari boleh digeser antar baris lalu
- * dilepas untuk memilih, dan seluruh panel bergoyang seperti jelly mengikuti
+ * ke baris yang sedang disentuh jari, jari boleh digeser antar baris untuk
+ * bermain dengan jelly (dilepas setelah menyeret tidak menekan baris mana pun;
+ * hanya ketukan yang memilih), dan seluruh panel bergoyang seperti jelly mengikuti
  * tarikan jari lalu memantul kembali saat dilepas.
  *
  * Baris mendaftar sebagai [Target] lewat [iosMenuTouchTarget]; panelnya memasang
@@ -76,8 +77,8 @@ internal class IosMenuTouch(private val scope: CoroutineScope) {
 
     private var host: LayoutCoordinates? = null
     private var hovered: Target? = null
-    private var startTarget: Target? = null
-    private var leftStart = false
+    // Jari sudah bergeser lebih jauh dari touch slop: ini seretan (bermain jelly), bukan ketukan.
+    private var dragged = false
     private var scrolled = false
     private var anchorTarget: Target? = null
     private var anchorTop = 0f
@@ -117,9 +118,8 @@ internal class IosMenuTouch(private val scope: CoroutineScope) {
         down = pos
         downWindow = toWindow(pos)
         scrolled = false
-        leftStart = false
+        dragged = false
         val t = targetAt(pos)
-        startTarget = t
         anchorTarget = t ?: targets.firstOrNull()
         anchorTop = anchorTarget?.local()?.top ?: 0f
         select(t, animate = false)
@@ -130,7 +130,7 @@ internal class IosMenuTouch(private val scope: CoroutineScope) {
         val anchor = anchorTarget?.local()
         if (anchor != null && abs(anchor.top - anchorTop) > 2f) scrolled = true
         val t = if (scrolled) null else targetAt(pos)
-        if (t !== startTarget && (pos - down).getDistance() > slop) leftStart = true
+        if ((pos - down).getDistance() > slop) dragged = true
         if (t !== hovered) select(t, animate = true)
         // Menu yang digulir tetap bergoyang mengikuti jari, hanya lebih lembut,
         // supaya menu panjang tidak terasa mati saat ditarik.
@@ -177,12 +177,18 @@ internal class IosMenuTouch(private val scope: CoroutineScope) {
         scope.launch { jellyScaleY.animateTo(sy, follow) }
     }
 
-    /** Jari lepas: indikator memudar, panel memantul kembali. Mengembalikan baris yang harus dipilih. */
-    fun finish(released: Boolean): Target? {
-        val t = hovered
-        val fire = if (released && !scrolled && t != null && (t !== startTarget || leftStart)) t else null
+    /**
+     * Jari lepas: indikator memudar, panel memantul kembali.
+     *
+     * Mengembalikan true bila gerakan tadi seretan untuk bermain jelly, bukan ketukan:
+     * lepasnya di baris mana pun tidak boleh menekan baris itu, jadi pemanggil
+     * mengonsumsi event lepasnya. Ketukan murni dikembalikan false dan ditangani
+     * klik biasa pada barisnya. Saat daftar menu sedang digulir juga false: event
+     * lepasnya dibiarkan utuh supaya fling gulir tetap jalan (klik sudah batal sendiri).
+     */
+    fun finish(): Boolean {
+        val swallow = dragged && !scrolled
         hovered = null
-        startTarget = null
         anchorTarget = null
         scope.launch { indicatorAlpha.animateTo(0f, tween(160)) }
         if (!reduceMotion) {
@@ -192,7 +198,7 @@ internal class IosMenuTouch(private val scope: CoroutineScope) {
             scope.launch { jellyScaleX.animateTo(1f, wobble) }
             scope.launch { jellyScaleY.animateTo(1f, wobble) }
         }
-        return fire
+        return swallow
     }
 }
 
@@ -243,11 +249,9 @@ internal fun Modifier.iosMenuTouchHost(touch: IosMenuTouch, color: Color): Modif
                 if (!change.pressed) break
                 touch.move(change.position, slop, dead, maxShift)
             }
-            val fire = touch.finish(released != null)
-            if (fire != null) {
-                released?.consume()
-                fire.onClick?.invoke()
-            }
+            // Seretan untuk bermain jelly tidak pernah menekan baris tempat jari berhenti.
+            val swallow = touch.finish()
+            if (swallow) released?.consume()
         }
     }
 
