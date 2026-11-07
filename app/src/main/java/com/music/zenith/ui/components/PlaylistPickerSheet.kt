@@ -15,6 +15,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -741,7 +744,14 @@ internal fun RenamePlaylistForm(
         }
     }
 
-    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+    // Tombol simpan ikut digulirkan ke area yang terlihat saat keyboard naik,
+    // sehingga kolom nama (tepat di atasnya) tidak tertutup keyboard.
+    val saveBring = remember { BringIntoViewRequester() }
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+        delay(400)
+        saveBring.bringIntoView()
+    }
 
     val changed = cover != null || coverRemoved || name != playlist.title
     val submit: () -> Unit = {
@@ -929,6 +939,7 @@ internal fun RenamePlaylistForm(
             enabled = name.isNotBlank() && changed,
             shape = RoundedCornerShape(26.dp),
             modifier = Modifier
+                .bringIntoViewRequester(saveBring)
                 .fillMaxWidth()
                 .padding(horizontal = 22.dp)
                 .height(52.dp),

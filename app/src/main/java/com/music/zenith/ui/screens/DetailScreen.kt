@@ -1184,7 +1184,7 @@ private fun ReleaseHeader(
                 horizontalArrangement = Arrangement.spacedBy(RELEASE_ACTION_GAP),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (page.browseId.startsWith("local:")) {
+                if (page.browseId.startsWith("local:") || library == null) {
                     // Already on this device — a folder, a download, a local
                     // playlist — so there is no library to add it to, and a
                     // greyed-out plus would only promise one. Apple Music's
@@ -1245,16 +1245,6 @@ private fun ReleaseHeader(
                         onClick = { onToggleLibrary?.invoke() },
                         haptic = if (library.saved) Haptic.ToggleOff else Haptic.ToggleOn,
                         size = RELEASE_SIDE_BUTTON,
-                    )
-                } else {
-                    // Shown but greyed out for a guest, rather than leaving a
-                    // hole beside Play.
-                    CircleIconButton(
-                        icon = ZenithIcons.Plus,
-                        contentDescription = stringResource(R.string.add_to_library),
-                        onClick = {},
-                        size = RELEASE_SIDE_BUTTON,
-                        enabled = false,
                     )
                 }
             }
