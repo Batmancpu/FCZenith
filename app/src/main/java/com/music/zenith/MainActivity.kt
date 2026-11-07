@@ -4889,7 +4889,7 @@ private fun ZenithApp(
                     .onFailure { addSongsSuggestions = emptyList() }
             }
             val playerMenuUp = (songActions != null && songMenuOrigin == null && menuFromPlayer) ||
-                addSongsOpen || songInfoTarget != null
+                addSongsOpen || songInfoTarget != null || addonLeftOutOfDownload != null
             LaunchedEffect(playerMenuUp, reduceDynamicBlur) {
                 if (!playerMenuUp || reduceDynamicBlur) {
                     delay(SNAPSHOT_RELEASE_DELAY_MS)
@@ -6170,6 +6170,20 @@ private fun ZenithApp(
         }
 
         addonLeftOutOfDownload?.let { (addon, why) ->
+            // Dibuka dari player: kacanya harus melihat player, bukan halaman
+            // utama di bawahnya yang tertutup player.
+            val appBackdrop = LocalAppBackdrop.current
+            val alertBackdrop = if (playerRaised && !reduceDynamicBlur) {
+                if (playerLiveCanvas) livePlayerBackdrop else playerBackdrop
+            } else {
+                appBackdrop
+            }
+            LaunchedEffect(Unit) {
+                if (playerRaised && !reduceDynamicBlur && !playerLiveCanvas && !playerBackdrop.hasStill) {
+                    playerBackdrop.capture()
+                }
+            }
+            CompositionLocalProvider(LocalAppBackdrop provides alertBackdrop) {
             InfoAlert(
                 hazeState = hazeState,
                 title = stringResource(R.string.download_addon_left_out_title, addon),
@@ -6185,6 +6199,7 @@ private fun ZenithApp(
                 // here, the alert opened behind whichever it was.
                 inOwnWindow = playerRaised || songActions != null || browseActions != null,
             )
+            }
         }
 
     }

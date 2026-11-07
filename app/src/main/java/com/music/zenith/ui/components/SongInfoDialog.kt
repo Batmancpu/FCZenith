@@ -1,6 +1,8 @@
 package com.music.zenith.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -68,6 +70,26 @@ private fun SongInfoDialogContent(song: Song, onDismiss: () -> Unit) {
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
+        // Window layar penuh, bukan seukuran kartu: kalau window menyusut
+        // mengikuti kartu, posisi kartu di window-nya 0,0 dan kaca mengambil
+        // gambar latar dari pojok kiri atas, bukan dari tempat kartu berada.
+        Box(
+            Modifier
+                .fillMaxSize()
+                .clickable(
+                    indication = null,
+                    interactionSource = remember { MutableInteractionSource() },
+                    onClick = onDismiss,
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+        Box(
+            Modifier.clickable(
+                indication = null,
+                interactionSource = remember { MutableInteractionSource() },
+                onClick = {},
+            ),
+        ) {
         Column(
             Modifier
                 .width(ALERT_WIDTH)
@@ -145,6 +167,8 @@ private fun SongInfoDialogContent(song: Song, onDismiss: () -> Unit) {
                 AlertRule()
             }
             AlertAction(label = stringResource(R.string.done), emphasised = true, onClick = onDismiss)
+        }
+        }
         }
     }
 }
