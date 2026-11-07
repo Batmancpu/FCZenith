@@ -17,4 +17,107 @@
             </gradient>
         </aapt:attr>
     </path>
+    <!-- Kedalaman kaca: tepi sedikit lebih gelap, tengah terang. -->
+    <path android:pathData="M0,0h1024v1024h-1024z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:centerX="512"
+                android:centerY="512"
+                android:gradientRadius="760"
+                android:type="radial">
+                <item android:color="#00707090" android:offset="0.0" />
+                <item android:color="#00707090" android:offset="0.6" />
+                <item android:color="#33707090" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- Pendar dingin di sudut kanan bawah (bias cahaya). -->
+    <path android:pathData="M0,0h1024v1024h-1024z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:centerX="900"
+                android:centerY="990"
+                android:gradientRadius="460"
+                android:type="radial">
+                <item android:color="#4DA9B0D6" android:offset="0.0" />
+                <item android:color="#00A9B0D6" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- Panel kaca: tepi terang di atas, memudar ke dingin di bawah. -->
+    <path
+        android:pathData="M390,190L634,190C750,190 834,274 834,390L834,634C834,750 750,834 634,834L390,834C274,834 190,750 190,634L190,390C190,274 274,190 390,190Z"
+        android:strokeWidth="5">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="512"
+                android:startY="190"
+                android:endX="512"
+                android:endY="834"
+                android:type="linear">
+                <item android:color="#80FFFFFF" android:offset="0.0" />
+                <item android:color="#1AFFFFFF" android:offset="0.5" />
+                <item android:color="#1AB5B9D8" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:startX="512"
+                android:startY="190"
+                android:endX="512"
+                android:endY="834"
+                android:type="linear">
+                <item android:color="#FFFFFFFF" android:offset="0.0" />
+                <item android:color="#33FFFFFF" android:offset="0.5" />
+                <item android:color="#4DA9B0D6" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- Pantulan diagonal lembut. -->
+    <path android:pathData="M690,0H830L380,1024H240Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="434.3"
+                android:startY="467.7"
+                android:endX="635.7"
+                android:endY="556.3"
+                android:type="linear">
+                <item android:color="#00FFFFFF" android:offset="0.0" />
+                <item android:color="#8CFFFFFF" android:offset="0.5" />
+                <item android:color="#00FFFFFF" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- Kilau di sudut kiri atas. -->
+    <path android:pathData="M0,0H760C610,150 330,230 0,470Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="200"
+                android:startY="0"
+                android:endX="320"
+                android:endY="470"
+                android:type="linear">
+                <item android:color="#CCFFFFFF" android:offset="0.0" />
+                <item android:color="#00FFFFFF" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- Bayangan kontak lembut di bawah huruf Z. -->
+    <group
+        android:pivotX="512"
+        android:pivotY="740"
+        android:scaleY="0.32">
+        <path android:pathData="M212,740a300,300 0 1,0 600,0a300,300 0 1,0 -600,0Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:centerX="512"
+                    android:centerY="740"
+                    android:gradientRadius="300"
+                    android:type="radial">
+                    <item android:color="#3315151F" android:offset="0.0" />
+                    <item android:color="#0015151F" android:offset="1.0" />
+                </gradient>
+            </aapt:attr>
+        </path>
+    </group>
 </vector>
