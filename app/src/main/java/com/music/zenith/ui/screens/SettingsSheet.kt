@@ -463,7 +463,7 @@ fun SettingsScreen(
                 modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 4.dp),
             )
 
-            SearchableSettingsGroup(search) {
+            SearchableSettingsGroup(search, header = stringResource(R.string.settings_header_account)) {
                 val accountTitle = stringResource(R.string.account_integrations)
                 // What the row opens is the scrobbling screen, so the services it
                 // signs into are worth typing at this field even though none of
@@ -2859,7 +2859,7 @@ fun settingsChoiceBarTitle(choice: SettingsChoiceKind): String = stringResource(
 /** The main page's list of categories: a glyph and a name each, and a chevron into it. */
 @Composable
 private fun SettingsCategoryList(onOpen: (SettingsCategory) -> Unit) {
-    SettingsGroup {
+    SettingsGroup(header = stringResource(R.string.settings_header_general)) {
         SettingsCategory.entries.forEachIndexed { index, category ->
             if (index > 0) RowDivider()
             SettingsRow(

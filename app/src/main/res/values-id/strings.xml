@@ -191,6 +191,8 @@
     <string name="switch_to_grid_view">Beralih ke tampilan grid</string>
     <string name="switch_to_list_view">Beralih ke tampilan daftar</string>
     <string name="audio_quality">Kualitas audio</string>
+    <string name="settings_header_account">Akun</string>
+    <string name="settings_header_general">Umum</string>
     <string name="playback">Pemutaran</string>
     <string name="appearance">Tampilan</string>
     <string name="storage">Penyimpanan</string>

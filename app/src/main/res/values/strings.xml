@@ -248,6 +248,8 @@
     <string name="switch_to_grid_view">Switch to grid view</string>
     <string name="switch_to_list_view">Switch to list view</string>
     <string name="audio_quality">Audio quality</string>
+    <string name="settings_header_account">Account</string>
+    <string name="settings_header_general">General</string>
     <string name="playback">Playback</string>
     <string name="appearance">Appearance</string>
     <string name="storage">Storage</string>
