@@ -63,6 +63,7 @@ import com.music.zenith.data.model.LikeStatus
 import com.music.zenith.data.model.ROW_ART_PX
 import com.music.zenith.data.model.Song
 import com.music.zenith.data.model.artworkAt
+import com.music.zenith.data.settings.AppSettings
 import com.music.zenith.data.webdav.WebDavUploads
 import com.music.zenith.download.DownloadState
 import com.music.zenith.download.Downloads
@@ -182,6 +183,7 @@ fun SongActionsMenu(
 ) {
     var showingSongInfo by remember(song.videoId) { mutableStateOf(false) }
     var pickingSleepTimer by remember { mutableStateOf(false) }
+    var pickingSpeed by remember { mutableStateOf(false) }
     // A menu has no pages to swap, so Song Info opens as a dialog.
     if (showingSongInfo) SongInfoDialog(song) { showingSongInfo = false }
     // Neutral rather than the sleeve's colours: the panel floats over the page
@@ -376,6 +378,14 @@ fun SongActionsMenu(
             if (startsGroup()) IosMenuSeparator()
             if (showSleepTimer) {
                 ActionRow(
+                    icon = SfIcons.Performance,
+                    label = stringResource(R.string.playback_speed_tempo),
+                    value = speedTempoStatus(),
+                    accent = palette.accent,
+                ) { pickingSpeed = true }
+            }
+            if (showSleepTimer) {
+                ActionRow(
                     icon = SfIcons.SleepTimer,
                     label = stringResource(R.string.sleep_timer),
                     value = sleepTimerStatus(),
@@ -406,6 +416,8 @@ fun SongActionsMenu(
             // the picker in place.
             if (pickingSleepTimer) {
                 SleepTimerPicker(palette = palette, onBack = { pickingSleepTimer = false })
+            } else if (pickingSpeed) {
+                PlaybackSpeedPage(palette = palette, onBack = { pickingSpeed = false })
             } else {
                 rows()
             }
@@ -781,6 +793,143 @@ private fun StepButton(
             style = MaterialTheme.typography.titleLarge,
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = if (enabled) 0.85f else 0.25f),
         )
+    }
+}
+
+private const val SPEED_PAGE_MIN = 0.5f
+private const val SPEED_PAGE_MAX = 2.0f
+private const val SPEED_PAGE_STEP = 0.05f
+// (2.0 - 0.5) / 0.05 = 30 interval, jadi 29 titik di antara kedua ujung.
+private const val SPEED_PAGE_STOPS = 29
+
+/** "1.25×", atau "1.25× · 0.90×" bila keduanya diubah; null saat normal. */
+@Composable
+private fun speedTempoStatus(): String? {
+    val speed by AppSettings.playbackRate.collectAsStateWithLifecycle()
+    val tempo by AppSettings.playbackTempo.collectAsStateWithLifecycle()
+    if (speed == 1f && tempo == 1f) return null
+    val parts = ArrayList<String>(2)
+    if (speed != 1f) parts.add(speedFactorLabel(speed))
+    if (tempo != 1f) parts.add(speedFactorLabel(tempo))
+    return parts.joinToString(" · ")
+}
+
+private fun speedFactorLabel(value: Float): String =
+    String.format(Locale.getDefault(), "%.2f×", value)
+
+private fun snapSpeedFactor(value: Float): Float =
+    Math.round(value.coerceIn(SPEED_PAGE_MIN, SPEED_PAGE_MAX) / SPEED_PAGE_STEP) * SPEED_PAGE_STEP
+
+/**
+ * Speed dan Tempo, dua slider kaca (IosSlider) di satu halaman menu: Speed
+ * menggeser laju dan pitch bersama, Tempo hanya lajunya. Sama seperti halaman
+ * sleep timer, halaman ini mengganti baris menu di tempat.
+ */
+@Composable
+private fun PlaybackSpeedPage(palette: ArtworkPalette, onBack: () -> Unit) {
+    val speed by AppSettings.playbackRate.collectAsStateWithLifecycle()
+    val tempo by AppSettings.playbackTempo.collectAsStateWithLifecycle()
+    val normal = speed == 1f && tempo == 1f
+
+    Column(Modifier.fillMaxWidth()) {
+        SleepTimerHeader(
+            title = stringResource(R.string.playback_speed_tempo),
+            subtitle = stringResource(R.string.playback_speed_tempo_hint),
+            onBack = onBack,
+        )
+        HorizontalDivider(thickness = 0.5.dp, color = palette.divider)
+
+        SpeedFactorSlider(
+            title = stringResource(R.string.playback_speed),
+            hint = stringResource(R.string.playback_speed_hint),
+            value = speed,
+            onValueChange = AppSettings::setPlaybackRate,
+        )
+        SpeedFactorSlider(
+            title = stringResource(R.string.playback_tempo),
+            hint = stringResource(R.string.playback_tempo_hint),
+            value = tempo,
+            onValueChange = AppSettings::setPlaybackTempo,
+        )
+        Spacer(Modifier.height(16.dp))
+        HorizontalDivider(thickness = 0.5.dp, color = palette.divider)
+        ActionRow(
+            icon = SfIcons.Revert,
+            label = stringResource(R.string.playback_reset),
+            accent = palette.accent,
+            enabled = !normal,
+        ) { AppSettings.resetPlaybackSpeedAndTempo() }
+    }
+}
+
+/** Judul + nilai besar di atas slider kaca, dengan − dan + untuk satu langkah. */
+@Composable
+private fun SpeedFactorSlider(
+    title: String,
+    hint: String,
+    value: Float,
+    onValueChange: (Float) -> Unit,
+) {
+    val colors = iosMenuColors()
+    val foreground = MaterialTheme.colorScheme.onBackground
+    Column(Modifier.fillMaxWidth().padding(top = 18.dp)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 22.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontSize = 17.sp,
+                        lineHeight = 21.sp,
+                        letterSpacing = (-0.3).sp,
+                        fontWeight = FontWeight.SemiBold,
+                    ),
+                    color = colors.label,
+                )
+                Text(
+                    text = hint,
+                    fontSize = 13.sp,
+                    lineHeight = 16.sp,
+                    color = colors.secondaryLabel,
+                )
+            }
+            Text(
+                text = speedFactorLabel(value),
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                color = foreground,
+            )
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            StepButton(
+                label = "−",
+                contentDescription = stringResource(R.string.less),
+                enabled = value > SPEED_PAGE_MIN + 0.001f,
+            ) { onValueChange(snapSpeedFactor(value - SPEED_PAGE_STEP)) }
+            IosSlider(
+                value = value,
+                onValueChange = { onValueChange(snapSpeedFactor(it)) },
+                valueRange = SPEED_PAGE_MIN..SPEED_PAGE_MAX,
+                steps = SPEED_PAGE_STOPS,
+                activeColor = foreground.copy(alpha = 0.92f),
+                inactiveColor = foreground.copy(alpha = 0.26f),
+                modifier = Modifier.weight(1f),
+            )
+            StepButton(
+                label = "+",
+                contentDescription = stringResource(R.string.more),
+                enabled = value < SPEED_PAGE_MAX - 0.001f,
+            ) { onValueChange(snapSpeedFactor(value + SPEED_PAGE_STEP)) }
+        }
     }
 }
 

@@ -858,6 +858,13 @@
 
     <string name="convert_to_audio">Konversi ke audio</string>
     <string name="convert_to_video">Ubah ke video</string>
+    <string name="playback_speed_tempo">Kecepatan &amp; tempo</string>
+    <string name="playback_speed_tempo_hint">Atur seberapa cepat lagu diputar</string>
+    <string name="playback_speed">Kecepatan</string>
+    <string name="playback_speed_hint">Lebih cepat atau lambat, pitch ikut berubah</string>
+    <string name="playback_tempo">Tempo</string>
+    <string name="playback_tempo_hint">Lebih cepat atau lambat, pitch tetap</string>
+    <string name="playback_reset">Kembalikan ke normal</string>
 
     <string name="converting_to_audio">Mengonversi ke audio…</string>
 

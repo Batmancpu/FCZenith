@@ -456,7 +456,17 @@ object AppSettings {
      */
     val equalizerPreset = MutableStateFlow(EqualizerPreset.FLAT)
 
+    /**
+     * Laju efektif yang dibaca mesin pemutar (= [playbackRate] x [playbackTempo]).
+     * Jangan diubah langsung dari UI: pakai [setPlaybackRate] / [setPlaybackTempo].
+     */
     val playbackSpeed = MutableStateFlow(1.0f)
+
+    /** Speed: laju DAN pitch berubah bersama (seperti piringan hitam). 1.0 = normal. */
+    val playbackRate = MutableStateFlow(1.0f)
+
+    /** Tempo: hanya laju yang berubah, pitch tetap. 1.0 = normal. */
+    val playbackTempo = MutableStateFlow(1.0f)
     val themeMode = MutableStateFlow(ThemeMode.DARK)
     val appFont = MutableStateFlow(AppFont.DEFAULT)
     val accentColor = MutableStateFlow(AccentColor.RED)
@@ -1144,7 +1154,15 @@ object AppSettings {
         equalizerBalance.value = prefs.getFloat(KEY_EQ_BALANCE, 0f).coerceIn(-1f, 1f)
         equalizerBands.value = readEqualizerBands()
         equalizerPreset.value = EqualizerPreset.matching(equalizerBands.value)
-        playbackSpeed.value = prefs.getFloat(KEY_SPEED, 1.0f)
+        // KEY_SPEED lama adalah laju tanpa pitch (= tempo): dipindah jadi tempo
+        // bila kunci tempo baru belum pernah ditulis.
+        playbackRate.value = prefs.getFloat(KEY_PLAYBACK_RATE, 1.0f)
+        playbackTempo.value = if (prefs.contains(KEY_PLAYBACK_TEMPO)) {
+            prefs.getFloat(KEY_PLAYBACK_TEMPO, 1.0f)
+        } else {
+            prefs.getFloat(KEY_SPEED, 1.0f)
+        }
+        playbackSpeed.value = effectivePlaybackSpeed()
         themeMode.value = runCatching {
             ThemeMode.valueOf(prefs.getString(KEY_THEME, null) ?: "DARK")
         }.getOrDefault(ThemeMode.DARK)
@@ -1532,6 +1550,32 @@ object AppSettings {
     fun setPlaybackSpeed(value: Float) {
         playbackSpeed.value = value
         prefs.edit().putFloat(KEY_SPEED, value).apply()
+    }
+
+    /** Dibulatkan agar 0.8 x 1.25 tepat 1.0 dan pengecekan "bukan 1x" tidak salah. */
+    private fun effectivePlaybackSpeed(): Float =
+        Math.round(playbackRate.value * playbackTempo.value * 1000f) / 1000f
+
+    fun setPlaybackRate(value: Float) {
+        playbackRate.value = value
+        prefs.edit().putFloat(KEY_PLAYBACK_RATE, value).apply()
+        setPlaybackSpeed(effectivePlaybackSpeed())
+    }
+
+    fun setPlaybackTempo(value: Float) {
+        playbackTempo.value = value
+        prefs.edit().putFloat(KEY_PLAYBACK_TEMPO, value).apply()
+        setPlaybackSpeed(effectivePlaybackSpeed())
+    }
+
+    fun resetPlaybackSpeedAndTempo() {
+        playbackRate.value = 1.0f
+        playbackTempo.value = 1.0f
+        prefs.edit()
+            .putFloat(KEY_PLAYBACK_RATE, 1.0f)
+            .putFloat(KEY_PLAYBACK_TEMPO, 1.0f)
+            .apply()
+        setPlaybackSpeed(1.0f)
     }
 
     fun setShowNerdStats(value: Boolean) {
@@ -2468,6 +2512,8 @@ object AppSettings {
     private const val KEY_PROGRESSIVE_BLUR = "progressive_blur"
     private const val KEY_LYRICS_BLUR = "lyrics_blur"
     private const val KEY_LIQUID_FLOW = "liquid_flow_motion"
+    private const val KEY_PLAYBACK_RATE = "playback_rate"
+    private const val KEY_PLAYBACK_TEMPO = "playback_tempo"
     private const val KEY_LYRICS_OFFSET_MS = "lyrics_offset_ms"
     private const val KEY_TRANSLATION_LANGUAGE = "translation_language"
     private const val KEY_ANIMATED_CANVAS = "animated_canvas"

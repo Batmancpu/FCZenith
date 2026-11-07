@@ -32,6 +32,7 @@ import androidx.media3.common.Timeline
 import androidx.core.net.toUri
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.audio.AudioProcessor
+import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.audio.SonicAudioProcessor
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.decoder.ffmpeg.FfmpegAudioRenderer
@@ -6674,6 +6675,16 @@ class PlaybackService : MediaLibraryService() {
     }
 
     /**
+     * Pitch dari slider Speed. Laju efektif (Speed x Tempo) tetap lewat
+     * setPlaybackSpeed; di sini hanya pitch yang diganti, lajunya dipertahankan.
+     */
+    private fun applyPitch(player: ExoPlayer, pitch: Float) {
+        val current = player.playbackParameters
+        if (current.pitch == pitch) return
+        player.playbackParameters = PlaybackParameters(current.speed, pitch)
+    }
+
+    /**
      * Push current settings onto a player. Called for both: whichever one is
      * idle right now is the one the next transition will start a song on, so it
      * cannot be left on stale settings.
@@ -6681,6 +6692,7 @@ class PlaybackService : MediaLibraryService() {
     private fun applySettings(player: ExoPlayer) {
         player.skipSilenceEnabled = AppSettings.skipSilence.value
         player.setPlaybackSpeed(AppSettings.playbackSpeed.value)
+        applyPitch(player, AppSettings.playbackRate.value)
         // Restore persisted shuffle and repeat states on startup. Assign both
         // values: Android can destroy and recreate the service while retaining
         // this process, so QueueShuffle's process-wide object may still hold
@@ -7074,6 +7086,12 @@ class PlaybackService : MediaLibraryService() {
             AppSettings.playbackSpeed.collect { speed ->
                 if (crossfade?.isTransitioning() == true) return@collect
                 crossfade?.applyPlaybackSpeed(speed) ?: eachPlayer { it.setPlaybackSpeed(speed) }
+            }
+        }
+        scope.launch {
+            // Pitch tidak ikut stretch crossfade, jadi boleh diterapkan kapan saja.
+            AppSettings.playbackRate.collect { pitch ->
+                eachPlayer { applyPitch(it, pitch) }
             }
         }
         scope.launch {
