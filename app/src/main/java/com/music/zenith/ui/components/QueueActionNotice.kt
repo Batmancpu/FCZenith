@@ -54,22 +54,31 @@ fun QueueActionNoticeHost(
         modifier = modifier.fillMaxWidth(),
     ) { current ->
         if (current != null) {
-            Surface(
-                color = Color(0xFF282828),
-                contentColor = Color.White,
-                shape = RoundedCornerShape(5.dp),
-                shadowElevation = 4.dp,
+            // Kapsul kecil di tengah, bukan kotak selebar layar.
+            androidx.compose.foundation.layout.Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .padding(bottom = 8.dp)
-                    .semantics { liveRegion = LiveRegionMode.Polite },
+                    .padding(horizontal = 32.dp)
+                    .padding(bottom = 10.dp),
+                contentAlignment = androidx.compose.ui.Alignment.Center,
             ) {
-                Text(
-                    text = current.message,
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
-                )
+                Surface(
+                    color = Color(0xEB2C2C2E),
+                    contentColor = Color.White,
+                    shape = androidx.compose.foundation.shape.CircleShape,
+                    shadowElevation = 12.dp,
+                    border = androidx.compose.foundation.BorderStroke(0.5.dp, Color.White.copy(alpha = 0.12f)),
+                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                ) {
+                    Text(
+                        text = current.message,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        maxLines = 2,
+                        modifier = Modifier.padding(horizontal = 22.dp, vertical = 12.dp),
+                    )
+                }
             }
         }
     }
