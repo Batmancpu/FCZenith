@@ -16,7 +16,7 @@ internal object MotionTuning {
     const val SwellTailCharsPerSec = 5f
     const val BloomFollowSec = 0.18f
     const val RiseDistanceEm = 0.14f
-    const val SwellScale = 0.17f
+    const val SwellScale = 0.06f
     const val BloomStrength = 1.6f
     const val BloomRadiusEm = 0.45f
     const val BloomLagChars = 1.2f
@@ -29,7 +29,7 @@ internal object MotionTuning {
     const val HoldMinMs = 450f
     const val HoldRangeMs = 700f
     const val GlowSpanChars = 5f
-    const val SweepFeatherEm = 0.5f
+    const val SweepFeatherEm = 0.18f
     const val GlowRadiusEm = 0.40f
     // Glow tidak boleh lebih lebar dari area bleed agar tepinya tidak terpotong.
     const val GlowMaxBleedShare = 0.8f

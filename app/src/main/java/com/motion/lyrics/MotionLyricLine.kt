@@ -308,7 +308,7 @@ private fun DrawScope.drawMotion(
                 val x1 = if (rtl) hx - front else hx + front
                 val sweepBrush = Brush.horizontalGradient(
                     0f to active,
-                    0.45f to active.copy(alpha = active.alpha * 0.6f),
+                    0.72f to active,
                     1f to active.copy(alpha = 0f),
                     startX = x0, endX = x1
                 )
