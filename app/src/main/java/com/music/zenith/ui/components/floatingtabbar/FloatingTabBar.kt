@@ -899,7 +899,8 @@ private fun SharedTransitionScope.ExpandedTabs(
     pill.reduceMotion = reduceAnimation
     // The lens samples the recorded page, and "reduce dynamic blur" stops that
     // recording. There the flat pill carries the whole motion on its own.
-    val glassPill = isGlassSupported() && !reduceDynamicBlur
+    val glassPill = isGlassSupported() && !reduceDynamicBlur &&
+        com.music.zenith.ui.components.LocalLiquidGlassEnabled.current
     val barGlass = rememberLayerBackdrop()
     val tabRow = rememberLayerBackdrop()
 

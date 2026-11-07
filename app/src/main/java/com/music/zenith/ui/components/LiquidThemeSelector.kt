@@ -165,7 +165,7 @@ fun LiquidSegmentedControl(
 
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
     val reduceAnimation by AppSettings.reduceAnimation.collectAsStateWithLifecycle()
-    val glassOn = isGlassSupported() && !reduceDynamicBlur
+    val glassOn = isGlassSupported() && !reduceDynamicBlur && LocalLiquidGlassEnabled.current
 
     val light = MaterialTheme.colorScheme.surface.luminance() > 0.5f
     val labelColor = glassContentColor()
@@ -626,7 +626,7 @@ fun LiquidScrollSegmentedControl(
     val scroll = rememberScrollState()
     val placed = remember { booleanArrayOf(false) }
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
-    val glassOn = isGlassSupported() && !reduceDynamicBlur
+    val glassOn = isGlassSupported() && !reduceDynamicBlur && LocalLiquidGlassEnabled.current
     val light = MaterialTheme.colorScheme.surface.luminance() > 0.5f
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val natural = minSegmentWidth * count + SELECTOR_INSET * 2

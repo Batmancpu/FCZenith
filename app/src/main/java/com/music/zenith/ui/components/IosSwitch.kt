@@ -96,7 +96,7 @@ fun IosSwitch(
     val currentChecked by rememberUpdatedState(checked)
     val currentOnChange by rememberUpdatedState(onCheckedChange)
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
-    val glassOk = isGlassSupported() && !reduceDynamicBlur
+    val glassOk = isGlassSupported() && !reduceDynamicBlur && LocalLiquidGlassEnabled.current
 
     val accent = if (dark) Color(0xFF30D158) else Color(0xFF34C759)
     val trackOff = if (dark) Color(0xFF787880).copy(alpha = 0.36f) else Color(0xFF787878).copy(alpha = 0.2f)

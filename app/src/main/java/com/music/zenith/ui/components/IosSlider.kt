@@ -74,7 +74,7 @@ fun IosSlider(
     val active = activeColor ?: MaterialTheme.colorScheme.primary
     val inactive = inactiveColor ?: Color(0xFF8E8E93).copy(alpha = if (dark) 0.36f else 0.24f)
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
-    val glassOk = isGlassSupported() && !reduceDynamicBlur
+    val glassOk = isGlassSupported() && !reduceDynamicBlur && LocalLiquidGlassEnabled.current
 
     val rangeStart = valueRange.start
     val rangeEnd = valueRange.endInclusive

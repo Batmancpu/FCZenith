@@ -51,7 +51,7 @@ internal fun LiquidGlassThumb(
     restColor: Color = Color.White,
 ) {
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
-    if (!isGlassSupported() || reduceDynamicBlur) {
+    if (!isGlassSupported() || reduceDynamicBlur || !LocalLiquidGlassEnabled.current) {
         RestingThumb(modifier)
         return
     }
