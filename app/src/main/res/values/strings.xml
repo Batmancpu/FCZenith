@@ -381,8 +381,8 @@
     <string name="cover_fluid_animation">Fluid cover effect</string>
     <string name="cover_fluid_animation_subtitle">The cover melts and morphs organically into the new song</string>
     <string name="cover_fluid_animation_locked">Turn on cover change animation first</string>
-    <string name="cover_mix_only_animation">Full effect in mix</string>
-    <string name="cover_mix_only_animation_subtitle">Next/previous uses a light transition; the fluid or slide effect turns on automatically while Automix or crossfade is running</string>
+    <string name="cover_mix_only_animation">Animate only during mix</string>
+    <string name="cover_mix_only_animation_subtitle">Cover animation plays only at the end of a song, during Automix or crossfade</string>
     <string name="cover_style_off">Off</string>
     <string name="cover_style_slide">Slide</string>
     <string name="cover_style_fluid">Fluid</string>
