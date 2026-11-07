@@ -46,7 +46,7 @@ fun QueueActionNoticeHost(
                 EnterTransition.None togetherWith ExitTransition.None
             } else {
                 (fadeIn() + slideInVertically { height -> height / 2 }) togetherWith
-                    (fadeOut() + slideOutVertically { height -> height / 2 })
+                    fadeOut()
             }
         },
         contentKey = { it?.id },
