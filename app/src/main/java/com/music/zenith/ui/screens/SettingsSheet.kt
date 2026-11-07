@@ -1760,76 +1760,58 @@ fun SettingsScreen(
     }
 
     if (confirmClearCanvasCache) {
-        AlertDialog(
-            onDismissRequest = { confirmClearCanvasCache = false },
-            title = { Text(stringResource(R.string.clear_canvas_cache_title)) },
-            text = { Text(stringResource(R.string.clear_canvas_cache_warning)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirmClearCanvasCache = false
-                    backupScope.launch {
-                        withContext(Dispatchers.IO) { CanvasCache.clear() }
-                        Toast.makeText(
-                            context,
-                            context.getString(R.string.canvas_cache_cleared),
-                            Toast.LENGTH_SHORT,
-                        ).show()
-                    }
-                }) {
-                    Text(stringResource(R.string.clear))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmClearCanvasCache = false }) {
-                    Text(stringResource(R.string.cancel))
+        IosConfirmDialog(
+            title = stringResource(R.string.clear_canvas_cache_title),
+            message = stringResource(R.string.clear_canvas_cache_warning),
+            confirmText = stringResource(R.string.clear),
+            dismissText = stringResource(R.string.cancel),
+            destructive = true,
+            onDismiss = { confirmClearCanvasCache = false },
+            onConfirm = {
+                confirmClearCanvasCache = false
+                backupScope.launch {
+                    withContext(Dispatchers.IO) { CanvasCache.clear() }
+                    Toast.makeText(
+                        context,
+                        context.getString(R.string.canvas_cache_cleared),
+                        Toast.LENGTH_SHORT,
+                    ).show()
                 }
             },
         )
     }
 
     if (confirmClearImageCache) {
-        AlertDialog(
-            onDismissRequest = { confirmClearImageCache = false },
-            title = { Text(stringResource(R.string.clear_image_cache_title)) },
-            text = { Text(stringResource(R.string.clear_image_cache_warning)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirmClearImageCache = false
-                    val loader = SingletonImageLoader.get(context)
-                    loader.memoryCache?.clear()
-                    loader.diskCache?.clear()
-                    Toast.makeText(context, context.getString(R.string.image_cache_cleared), Toast.LENGTH_SHORT).show()
-                }) {
-                    Text(stringResource(R.string.clear))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmClearImageCache = false }) {
-                    Text(stringResource(R.string.cancel))
-                }
+        IosConfirmDialog(
+            title = stringResource(R.string.clear_image_cache_title),
+            message = stringResource(R.string.clear_image_cache_warning),
+            confirmText = stringResource(R.string.clear),
+            dismissText = stringResource(R.string.cancel),
+            destructive = true,
+            onDismiss = { confirmClearImageCache = false },
+            onConfirm = {
+                confirmClearImageCache = false
+                val loader = SingletonImageLoader.get(context)
+                loader.memoryCache?.clear()
+                loader.diskCache?.clear()
+                Toast.makeText(context, context.getString(R.string.image_cache_cleared), Toast.LENGTH_SHORT).show()
             },
         )
     }
 
     // Everything in the Cached songs folder goes with it, so say so first.
     if (confirmClearSongCache) {
-        AlertDialog(
-            onDismissRequest = { confirmClearSongCache = false },
-            title = { Text(stringResource(R.string.clear_song_cache_title)) },
-            text = { Text(stringResource(R.string.clear_song_cache_warning)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirmClearSongCache = false
-                    AudioCache.clear {
-                        Toast.makeText(context, context.getString(R.string.song_cache_cleared), Toast.LENGTH_SHORT).show()
-                    }
-                }) {
-                    Text(stringResource(R.string.clear))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmClearSongCache = false }) {
-                    Text(stringResource(R.string.cancel))
+        IosConfirmDialog(
+            title = stringResource(R.string.clear_song_cache_title),
+            message = stringResource(R.string.clear_song_cache_warning),
+            confirmText = stringResource(R.string.clear),
+            dismissText = stringResource(R.string.cancel),
+            destructive = true,
+            onDismiss = { confirmClearSongCache = false },
+            onConfirm = {
+                confirmClearSongCache = false
+                AudioCache.clear {
+                    Toast.makeText(context, context.getString(R.string.song_cache_cleared), Toast.LENGTH_SHORT).show()
                 }
             },
         )
@@ -1839,24 +1821,15 @@ fun SettingsScreen(
     // thing being confirmed is that this device's own history is about to be
     // thrown away, and that is true whichever file gets picked.
     if (confirmImport) {
-        AlertDialog(
-            onDismissRequest = { confirmImport = false },
-            title = { Text(stringResource(R.string.import_backup_title)) },
-            text = {
-                Text(stringResource(R.string.import_backup_warning))
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirmImport = false
-                    importPicker.launch(arrayOf("application/json", "text/plain", "*/*"))
-                }) {
-                    Text(stringResource(R.string.choose_file))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmImport = false }) {
-                    Text(stringResource(R.string.cancel))
-                }
+        IosConfirmDialog(
+            title = stringResource(R.string.import_backup_title),
+            message = stringResource(R.string.import_backup_warning),
+            confirmText = stringResource(R.string.choose_file),
+            dismissText = stringResource(R.string.cancel),
+            onDismiss = { confirmImport = false },
+            onConfirm = {
+                confirmImport = false
+                importPicker.launch(arrayOf("application/json", "text/plain", "*/*"))
             },
         )
     }
@@ -2855,6 +2828,71 @@ fun settingsChoiceBarTitle(choice: SettingsChoiceKind): String = stringResource(
         else -> choice.title
     },
 )
+
+/** Dialog konfirmasi bergaya iOS: judul dan pesan di tengah, dua tombol sejajar dengan pemisah. */
+@Composable
+private fun IosConfirmDialog(
+    title: String,
+    message: String,
+    confirmText: String,
+    dismissText: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+    destructive: Boolean = false,
+) {
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        androidx.compose.material3.Surface(
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant,
+        ) {
+            Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 22.dp, end = 22.dp, top = 22.dp),
+                )
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 22.dp, end = 22.dp, top = 8.dp, bottom = 20.dp),
+                )
+                HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outline)
+                Row(Modifier.fillMaxWidth().height(52.dp)) {
+                    TextButton(
+                        onClick = onDismiss,
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(0.dp),
+                        modifier = Modifier.weight(1f).height(52.dp),
+                    ) {
+                        Text(text = dismissText, color = MaterialTheme.colorScheme.onSurface)
+                    }
+                    androidx.compose.material3.VerticalDivider(
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outline,
+                    )
+                    TextButton(
+                        onClick = onConfirm,
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(0.dp),
+                        modifier = Modifier.weight(1f).height(52.dp),
+                    ) {
+                        Text(
+                            text = confirmText,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
 
 /** The main page's list of categories: a glyph and a name each, and a chevron into it. */
 @Composable
