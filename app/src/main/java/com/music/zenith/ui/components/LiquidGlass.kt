@@ -45,6 +45,14 @@ val LocalLiquidGlassEnabled = staticCompositionLocalOf { false }
 val LocalAppBackdrop = staticCompositionLocalOf<Backdrop> { error("No AppBackdrop provided") }
 
 /**
+ * Backdrop yang dipakai panel menu yang sedang terbuka (still player, atau still
+ * halaman). Null di luar menu. Dialog di window sendiri yang dibuka dari isi menu,
+ * seperti Song Info, memakainya supaya blur-nya mengambil latar yang sama dengan
+ * menu itu, bukan [LocalAppBackdrop] yang merekam halaman utama di bawah player.
+ */
+internal val LocalMenuBackdrop = compositionLocalOf<Backdrop?> { null }
+
+/**
  * Where a [liquidGlass] surface composed under it also records the glass it
  * draws — the sampled, blurred and tinted backdrop, without its rim or shadow —
  * so a lens above it can refract that surface rather than the page behind it.

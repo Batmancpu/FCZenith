@@ -42,6 +42,17 @@ private val INFO_BODY_MAX_HEIGHT = 360.dp
  */
 @Composable
 internal fun SongInfoDialog(song: Song, onDismiss: () -> Unit) {
+    // Window Dialog tidak bisa melihat haze/halaman di belakangnya, dan
+    // LocalAppBackdrop merekam halaman utama (bukan player yang sedang terbuka).
+    // Pakai backdrop menu yang membukanya; di luar menu tetap backdrop app.
+    val menuBackdrop = LocalMenuBackdrop.current ?: LocalAppBackdrop.current
+    CompositionLocalProvider(LocalAppBackdrop provides menuBackdrop) {
+        SongInfoDialogContent(song, onDismiss)
+    }
+}
+
+@Composable
+private fun SongInfoDialogContent(song: Song, onDismiss: () -> Unit) {
     var retry by remember(song.videoId) { mutableIntStateOf(0) }
     val info by produceState<SongInfo?>(null, song, retry) {
         value = null

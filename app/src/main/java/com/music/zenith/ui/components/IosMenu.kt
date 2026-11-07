@@ -542,7 +542,9 @@ fun <T : Any> IosMenuPopover(
                         .padding(vertical = 8.dp),
                 ) {
                     IosMenuScrollEnvironment(touch) {
-                        content(menuItem)
+                        CompositionLocalProvider(LocalMenuBackdrop provides backdrop) {
+                            content(menuItem)
+                        }
                     }
                 }
             }
