@@ -97,6 +97,8 @@ internal class MotionRuntime {
                     smoothstep(sw / MotionTuning.SwellAttackFraction) *
                     smoothstep((1f - sw) / MotionTuning.SwellReleaseFraction)
             }
+            // Baris belum mulai: head diam di huruf pertama, jangan swell/partikel dulu.
+            if (pos < words.first().startMs) swellTarget = 0f
             if (snap) {
                 rise[l] = riseTarget; riseVel[l] = 0f
                 swell[l] = swellTarget; swellVel[l] = 0f
