@@ -1107,6 +1107,11 @@
     <string name="equalizer_focused_footer">Drag left for a warmer sound and right for a brighter one; down scoops the middle, up brings it forward. Focused works on narrower stretches, so it changes less around what it moves.</string>
 
     <string name="equalizer_preset">Preset</string>
+    <string name="bar_title_account">Akun</string>
+    <string name="bar_title_advanced">Lanjutan</string>
+    <string name="bar_title_automix">Automix</string>
+    <string name="bar_title_bit_perfect">Bit-perfect</string>
+    <string name="bar_title_mobile_data">Data seluler</string>
 
     <string name="equalizer_bands">Bands</string>
 

@@ -3906,9 +3906,11 @@ private fun ZenithApp(
                     floatingTitle = if (detail == null && selectedMoodGenre == null) {
                         when (route) {
                             AppRoute.Settings -> stringResource(R.string.settings)
-                            is AppRoute.SettingsSection -> stringResource(route.category.title)
-                            is AppRoute.SettingsChoice -> stringResource(route.choice.title)
-                            AppRoute.AccountScrobbling -> stringResource(R.string.account_integrations)
+                            is AppRoute.SettingsSection ->
+                                com.music.zenith.ui.screens.settingsCategoryBarTitle(route.category)
+                            is AppRoute.SettingsChoice ->
+                                com.music.zenith.ui.screens.settingsChoiceBarTitle(route.choice)
+                            AppRoute.AccountScrobbling -> stringResource(R.string.bar_title_account)
                             AppRoute.Discord -> stringResource(R.string.discord)
                             AppRoute.Equalizer -> stringResource(R.string.equalizer)
                             AppRoute.EqualizerPresets -> stringResource(R.string.equalizer_preset)

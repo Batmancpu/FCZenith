@@ -290,6 +290,11 @@
     <string name="equalizer_broad_footer">Drag left for a warmer sound and right for a brighter one; down scoops the middle, up brings it forward. Broad moves wide stretches of the spectrum at once.</string>
     <string name="equalizer_focused_footer">Drag left for a warmer sound and right for a brighter one; down scoops the middle, up brings it forward. Focused works on narrower stretches, so it changes less around what it moves.</string>
     <string name="equalizer_preset">Preset</string>
+    <string name="bar_title_account">Account</string>
+    <string name="bar_title_advanced">Advanced</string>
+    <string name="bar_title_automix">Automix</string>
+    <string name="bar_title_bit_perfect">Bit-perfect</string>
+    <string name="bar_title_mobile_data">Mobile data</string>
     <string name="equalizer_bands">Bands</string>
     <string name="equalizer_bands_footer">Moving a band leaves the preset behind and the curve becomes your own.</string>
     <string name="equalizer_reset">Reset all bands</string>

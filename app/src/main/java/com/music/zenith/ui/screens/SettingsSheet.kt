@@ -2828,6 +2828,25 @@ enum class SettingsChoiceKind(@param:StringRes val title: Int) {
     COVER_ANIMATION(R.string.cover_slide_animation),
 }
 
+/** Judul pendek untuk pil melayang di bar atas; judul asli tetap dipakai di daftar. */
+@Composable
+fun settingsCategoryBarTitle(category: SettingsCategory): String = stringResource(
+    when (category) {
+        SettingsCategory.ADVANCED -> R.string.bar_title_advanced
+        else -> category.title
+    },
+)
+
+@Composable
+fun settingsChoiceBarTitle(choice: SettingsChoiceKind): String = stringResource(
+    when (choice) {
+        SettingsChoiceKind.AUTOMIX_PERFORMANCE -> R.string.bar_title_automix
+        SettingsChoiceKind.BIT_PERFECT -> R.string.bar_title_bit_perfect
+        SettingsChoiceKind.AUDIO_QUALITY_CELLULAR -> R.string.bar_title_mobile_data
+        else -> choice.title
+    },
+)
+
 /** The main page's list of categories: a glyph and a name each, and a chevron into it. */
 @Composable
 private fun SettingsCategoryList(onOpen: (SettingsCategory) -> Unit) {
