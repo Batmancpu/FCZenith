@@ -699,6 +699,13 @@
     <string name="pause_countdown">%1$s until playback pauses</string>
     <string name="play_to_preview">Play something to fill in the preview.</string>
     <string name="playlist_name">Playlist name</string>
+    <string name="playlist_cover_add">Add cover</string>
+    <string name="playlist_cover_change">Change cover</string>
+    <string name="playlist_cover_remove">Remove cover</string>
+    <string name="playlist_privacy_private_hint">Only you</string>
+    <string name="playlist_privacy_unlisted_hint">Anyone with the link</string>
+    <string name="playlist_privacy_public_hint">Anyone can find it</string>
+    <string name="add_songs_to_playlist">Add Songs to Playlist</string>
     <string name="presence">Presence</string>
     <string name="preview">Preview</string>
     <string name="prioritize_syllable_lyrics">Prioritize syllable lyrics</string>

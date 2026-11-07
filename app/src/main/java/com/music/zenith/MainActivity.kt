@@ -754,6 +754,8 @@ private fun ZenithApp(
     // The picker opened from the Library tab, where there is no track and
     // creating the playlist is the whole errand.
     var creatingPlaylist by remember { mutableStateOf(false) }
+    // Playlist yang baru dibuat dan sedang diisi lewat popup "tambah lagu".
+    var addSongsPlaylist by remember { mutableStateOf<UserPlaylist?>(null) }
     // The same two, over the device's own playlists — for a track that is a
     // file on it, and for "New playlist" on Local Music's Playlists tab.
     var offlinePlaylistTarget by remember { mutableStateOf<Song?>(null) }
@@ -5063,8 +5065,21 @@ private fun ZenithApp(
                         }
                     }
                 },
-                onCreate = { title, privacy ->
-                    viewModel.createPlaylist(title, privacy, target)
+                onCreate = { title, privacy, cover ->
+                    viewModel.createPlaylist(title, privacy, target, cover) { created ->
+                        // Dibuat dari tab Library (bukan dari menu lagu): masuk ke
+                        // halaman playlist-nya dan langsung buka popup tambah lagu.
+                        if (target == null) {
+                            viewModel.openDetail(
+                                created.browseId,
+                                created.title,
+                                created.subtitle,
+                                created.thumbnailUrl,
+                                BrowseType.PLAYLIST,
+                            )
+                            addSongsPlaylist = created
+                        }
+                    }
                 },
             )
         }
@@ -5116,12 +5131,69 @@ private fun ZenithApp(
                         )
                     }
                 },
-                onCreate = { title, _ ->
+                onCreate = { title, _, _ ->
                     OfflinePlaylists.create(title, listOfNotNull(target))
                     if (target != null) showQueueNotice(context.getString(R.string.song_added_to_playlist))
                 },
             )
         }
+
+        // ---- Tambah lagu ke playlist yang baru dibuat ----
+        // Popup yang sama dengan "Add Songs to Queue" di player, tapi hasil
+        // ketukannya masuk ke playlist. Query/hasil dipakai bersama tab Search,
+        // jadi dibersihkan saat dibuka dan ditutup.
+        val plAddTypeahead by viewModel.typeaheadResults.collectAsStateWithLifecycle()
+        var plAddSuggestions by remember { mutableStateOf<List<Song>?>(null) }
+        var plAddPrevFilter by remember { mutableStateOf<SearchFilter?>(null) }
+        val plAddOpen = addSongsPlaylist != null
+        val closeAddSongs: () -> Unit = {
+            if (addSongsPlaylist != null) {
+                addSongsPlaylist = null
+                viewModel.onQueryChange("")
+                plAddPrevFilter?.let { viewModel.onFilterChange(it) }
+                plAddPrevFilter = null
+            }
+        }
+        LaunchedEffect(plAddOpen) {
+            if (!plAddOpen) return@LaunchedEffect
+            viewModel.onQueryChange("")
+            plAddPrevFilter = filter
+            viewModel.onFilterChange(SearchFilter.ALL)
+            plAddSuggestions = null
+            val seed = player.song
+            if (seed == null) {
+                plAddSuggestions = emptyList()
+                return@LaunchedEffect
+            }
+            loadAutoplayTracks(existing = player.queue, seedSong = seed, limit = 8)
+                .onSuccess { plAddSuggestions = it }
+                .onFailure { plAddSuggestions = emptyList() }
+        }
+        AddSongsDialog(
+            open = plAddOpen,
+            title = stringResource(R.string.add_songs_to_playlist),
+            query = query,
+            onQueryChange = viewModel::onQueryChange,
+            onSubmit = viewModel::submitSearch,
+            results = results,
+            typeahead = plAddTypeahead,
+            suggestions = plAddSuggestions,
+            filter = filter,
+            onFilterChange = viewModel::onFilterChange,
+            onLiveSearch = viewModel::searchQuiet,
+            backdrop = null,
+            hazeState = hazeState,
+            onAdd = { song ->
+                addSongsPlaylist?.let { pl ->
+                    viewModel.addToPlaylists(listOf(pl), song) { added, alreadyThere, failed ->
+                        if (added == 0 && alreadyThere == 0 && failed > 0) {
+                            showQueueNotice(context.getString(R.string.failed))
+                        }
+                    }
+                }
+            },
+            onDismiss = closeAddSongs,
+        )
 
         if (showSpotifyImportDialog) {
             BackHandler { showSpotifyImportDialog = false }

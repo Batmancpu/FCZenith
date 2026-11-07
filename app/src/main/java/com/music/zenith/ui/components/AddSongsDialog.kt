@@ -73,6 +73,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import dev.chrisbanes.haze.HazeState
 import com.music.zenith.data.model.ROW_ART_PX
 import com.music.zenith.data.model.SearchResult
 import com.music.zenith.data.model.Song
@@ -114,6 +115,10 @@ fun AddSongsDialog(
     onFilterChange: (SearchFilter) -> Unit,
     onLiveSearch: () -> Unit,
     onDismiss: () -> Unit,
+    /** Judul popup; null = "Add Songs to Queue". */
+    title: String? = null,
+    /** Dipakai di luar player, saat tidak ada [backdrop] untuk blur. */
+    hazeState: HazeState? = null,
 ) {
     val reduceMotion by AppSettings.reduceAnimation.collectAsStateWithLifecycle()
     // Back: kalau keyboard sedang tampil, hanya keyboard yang ditutup, popup tetap.
@@ -200,14 +205,14 @@ fun AddSongsDialog(
                     .fillMaxHeight(0.66f)
                     // Ketukan di panel tidak boleh jatuh ke scrim di bawahnya.
                     .pointerInput(Unit) {}
-                    .iosMenuPanel(translucent = true, backdrop = backdrop),
+                    .iosMenuPanel(translucent = true, backdrop = backdrop, hazeState = hazeState),
             ) {
                 Row(
                     Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = stringResource(SharedRes.string.add_songs_to_queue),
+                        text = title ?: stringResource(SharedRes.string.add_songs_to_queue),
                         color = colors.label,
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,

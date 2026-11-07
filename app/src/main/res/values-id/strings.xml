@@ -433,6 +433,13 @@
     <string name="pause_countdown">%1$s hingga pemutaran dijeda</string>
     <string name="play_to_preview">Putar sesuatu untuk mengisi pratinjau.</string>
     <string name="playlist_name">Nama playlist</string>
+    <string name="playlist_cover_add">Tambah cover</string>
+    <string name="playlist_cover_change">Ganti cover</string>
+    <string name="playlist_cover_remove">Hapus cover</string>
+    <string name="playlist_privacy_private_hint">Hanya kamu</string>
+    <string name="playlist_privacy_unlisted_hint">Siapa pun yang punya tautannya</string>
+    <string name="playlist_privacy_public_hint">Siapa pun bisa menemukannya</string>
+    <string name="add_songs_to_playlist">Tambah Lagu ke Playlist</string>
     <string name="presence">Presence</string>
     <string name="preview">Pratinjau</string>
     <string name="prioritize_syllable_lyrics">Prioritaskan lirik per suku kata</string>

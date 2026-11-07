@@ -951,7 +951,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val identity = listenerKey()
         _playlistsLoading.value = true
         viewModelScope.launch {
-            YtMusicRepository.userPlaylists().onSuccess { if (identity == listenerKey()) _playlists.value = it }
+            YtMusicRepository.userPlaylists().onSuccess { list ->
+                if (identity == listenerKey()) {
+                    val cover = com.music.zenith.data.PlaylistCovers.lookup(getApplication<Application>())
+                    _playlists.value = list.map { p ->
+                        cover(p.playlistId)?.let { p.copy(thumbnailUrl = it) } ?: p
+                    }
+                }
+            }
             if (identity == listenerKey()) _playlistsLoading.value = false
         }
     }
@@ -1072,7 +1079,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      * track's menu — one request, so it can't half-succeed into an empty
      * playlist the user has to add to again.
      */
-    fun createPlaylist(title: String, privacy: PlaylistPrivacy, song: Song? = null) {
+    fun createPlaylist(
+        title: String,
+        privacy: PlaylistPrivacy,
+        song: Song? = null,
+        cover: android.net.Uri? = null,
+        onCreated: ((UserPlaylist) -> Unit)? = null,
+    ) {
         if (!requireSignIn()) return
         val name = title.trim().ifBlank { text(R.string.new_playlist) }
         viewModelScope.launch {
@@ -1088,6 +1101,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     // after someone holds it.
                     setPlaylistOwned("VL$playlistId", true)
                     libraryStale = true
+                    val coverUrl = cover?.let {
+                        com.music.zenith.data.PlaylistCovers.save(getApplication<Application>(), playlistId, it)
+                    }
                     val created = UserPlaylist(
                         playlistId = playlistId,
                         title = name,
@@ -1096,7 +1112,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                         // unseeded playlist gets a card of just its name rather
                         // than a guess at what the feed will call it.
                         subtitle = if (song != null) "1 song" else "",
-                        thumbnailUrl = song?.thumbnailUrl,
+                        thumbnailUrl = coverUrl ?: song?.thumbnailUrl,
                     )
                     // Drawn from what was just sent rather than waited for: the
                     // library feed does not have this playlist yet, and the
@@ -1116,6 +1132,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                             ),
                         ) + items.filterNot { it.browseId == created.browseId }
                     }
+                    onCreated?.invoke(created)
                 },
                 onFailure = {},
             )
@@ -2044,7 +2061,29 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             },
             onFailure = { UiState.Error(it.friendly()) },
         )
-        if (identity == listenerKey()) _library.value = next
+        if (identity == listenerKey()) _library.value = withPlaylistCovers(next)
+    }
+
+    /** Memasang cover galeri di kartu playlist pada shelf Playlists. */
+    private fun withPlaylistCovers(state: UiState<LibraryPage>): UiState<LibraryPage> {
+        val page = (state as? UiState.Success)?.data ?: return state
+        val cover = com.music.zenith.data.PlaylistCovers.lookup(getApplication<Application>())
+        return UiState.Success(
+            page.copy(
+                shelves = page.shelves.map { shelf ->
+                    if (shelf.title != YtMusicRepository.PLAYLISTS_SHELF) {
+                        shelf
+                    } else {
+                        shelf.copy(
+                            items = shelf.items.map { item ->
+                                val c = item.browseId?.let(cover)
+                                if (c != null) item.copy(thumbnailUrl = c) else item
+                            },
+                        )
+                    }
+                },
+            ),
+        )
     }
 
     /**
@@ -2978,7 +3017,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     it.copy(
                         songs = state,
                         sections = sections,
-                        thumbnailUrl = artwork ?: it.thumbnailUrl,
+                        thumbnailUrl = com.music.zenith.data.PlaylistCovers.get(getApplication<Application>(), browseId)
+                            ?: artwork ?: it.thumbnailUrl,
                         title = name ?: it.title,
                         subtitle = credit ?: it.subtitle,
                         suggestedSongs = suggested,

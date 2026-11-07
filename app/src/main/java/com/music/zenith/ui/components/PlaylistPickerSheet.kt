@@ -19,6 +19,20 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.rounded.AddPhotoAlternate
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -107,7 +121,7 @@ fun PlaylistPickerSheet(
     playlists: List<UserPlaylist>,
     loading: Boolean,
     onAdd: (List<UserPlaylist>) -> Unit,
-    onCreate: (String, PlaylistPrivacy) -> Unit,
+    onCreate: (String, PlaylistPrivacy, Uri?) -> Unit,
     onDismiss: () -> Unit,
     song: Song? = null,
     startCreating: Boolean = false,
@@ -159,7 +173,7 @@ fun PlaylistPickerSheet(
                     // the form, so that bar closes it instead.
                     onBack = if (startCreating) null else ({ creating = false }),
                     onClose = { closeAfter {} },
-                    onCreate = { name, privacy -> closeAfter { onCreate(name, privacy) } },
+                    onCreate = { name, privacy, cover -> closeAfter { onCreate(name, privacy, cover) } },
                     offline = offline,
                 )
             } else {
@@ -339,13 +353,18 @@ private fun PlaylistRow(playlist: UserPlaylist, selected: Boolean, onClick: () -
 private fun NewPlaylistForm(
     onBack: (() -> Unit)?,
     onClose: () -> Unit,
-    onCreate: (String, PlaylistPrivacy) -> Unit,
+    onCreate: (String, PlaylistPrivacy, Uri?) -> Unit,
     offline: Boolean,
 ) {
     var name by remember { mutableStateOf("") }
     var privacy by remember { mutableStateOf(PlaylistPrivacy.PRIVATE) }
+    var cover by remember { mutableStateOf<Uri?>(null) }
+    var nameFocused by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
+    val pickCover = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { picked ->
+        if (picked != null) cover = picked
+    }
 
     // The form exists to be typed into; opening it with the keyboard already
     // up saves the tap that would otherwise always follow.
@@ -354,11 +373,16 @@ private fun NewPlaylistForm(
     val submit: () -> Unit = {
         if (name.isNotBlank()) {
             focusManager.clearFocus()
-            onCreate(name, privacy)
+            onCreate(name, privacy, if (offline) null else cover)
         }
     }
 
-    Column(Modifier.fillMaxWidth()) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .imePadding()
+            .verticalScroll(rememberScrollState()),
+    ) {
         SheetTopBar(
             leadingIcon = if (onBack != null) SfIcons.ArrowBack else SfIcons.Close,
             leadingDescription = stringResource(if (onBack != null) R.string.back else R.string.close),
@@ -388,12 +412,100 @@ private fun NewPlaylistForm(
         )
         HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outline)
 
+        // Cover dari galeri, dengan pratinjaunya langsung di kotak ini.
+        if (!offline) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 24.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(176.dp)
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .clickable {
+                            focusManager.clearFocus()
+                            pickCover.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                            )
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    val picked = cover
+                    if (picked != null) {
+                        AsyncImage(
+                            model = picked,
+                            contentDescription = stringResource(R.string.playlist_cover_change),
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(10.dp)
+                                .size(34.dp)
+                                .clip(CircleShape)
+                                .background(Color.Black.copy(alpha = 0.55f)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                Icons.Rounded.Edit,
+                                contentDescription = stringResource(R.string.playlist_cover_change),
+                                tint = Color.White,
+                                modifier = Modifier.size(18.dp),
+                            )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(10.dp)
+                                .size(34.dp)
+                                .clip(CircleShape)
+                                .background(Color.Black.copy(alpha = 0.55f))
+                                .clickable { cover = null },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                Icons.Rounded.Close,
+                                contentDescription = stringResource(R.string.playlist_cover_remove),
+                                tint = Color.White,
+                                modifier = Modifier.size(18.dp),
+                            )
+                        }
+                    } else {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                Icons.Rounded.AddPhotoAlternate,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(40.dp),
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                text = stringResource(R.string.playlist_cover_add),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 22.dp, vertical = 16.dp)
-                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(11.dp))
-                .padding(horizontal = 12.dp, vertical = 12.dp),
+                .padding(horizontal = 22.dp, vertical = 22.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .border(
+                    1.5.dp,
+                    if (nameFocused) MaterialTheme.colorScheme.primary else Color.Transparent,
+                    RoundedCornerShape(14.dp),
+                )
+                .padding(horizontal = 14.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(Modifier.weight(1f)) {
@@ -416,7 +528,8 @@ private fun NewPlaylistForm(
                     keyboardActions = KeyboardActions(onDone = { submit() }),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .focusRequester(focusRequester),
+                        .focusRequester(focusRequester)
+                        .onFocusChanged { nameFocused = it.isFocused },
                 )
             }
             if (name.isNotEmpty()) {
@@ -440,23 +553,91 @@ private fun NewPlaylistForm(
         // A playlist on the device is seen by whoever holds the device.
         if (!offline) {
             SheetHeading(stringResource(R.string.who_can_see_it).uppercase(Locale.getDefault()))
-            Row(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 22.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 PlaylistPrivacy.entries.forEach { option ->
-                    PrivacyPill(
-                        icon = option.icon,
-                        label = option.label,
+                    PrivacyOptionRow(
+                        option = option,
                         selected = option == privacy,
-                        onClick = { privacy = option },
+                        onClick = {
+                            focusManager.clearFocus()
+                            privacy = option
+                        },
                     )
                 }
             }
         }
 
+        Button(
+            onClick = submit,
+            enabled = name.isNotBlank(),
+            shape = RoundedCornerShape(26.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 22.dp, vertical = 22.dp)
+                .height(52.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.create_playlist),
+                style = MaterialTheme.typography.titleMedium,
+            )
+        }
+        Spacer(Modifier.navigationBarsPadding())
+    }
+}
+
+private val PlaylistPrivacy.hint: Int
+    get() = when (this) {
+        PlaylistPrivacy.PRIVATE -> R.string.playlist_privacy_private_hint
+        PlaylistPrivacy.UNLISTED -> R.string.playlist_privacy_unlisted_hint
+        PlaylistPrivacy.PUBLIC -> R.string.playlist_privacy_public_hint
+    }
+
+/** Satu baris penuh per pilihan: label tidak lagi terpotong ("Publi / c") di layar sempit. */
+@Composable
+private fun PrivacyOptionRow(option: PlaylistPrivacy, selected: Boolean, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(14.dp)
+    val primary = MaterialTheme.colorScheme.primary
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(if (selected) primary.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant)
+            .border(1.5.dp, if (selected) primary else Color.Transparent, shape)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = option.icon,
+            contentDescription = null,
+            tint = if (selected) primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(22.dp),
+        )
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = option.label,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onBackground,
+            )
+            Text(
+                text = stringResource(option.hint),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Icon(
+            imageVector = if (selected) Icons.Rounded.CheckCircle else Icons.Rounded.RadioButtonUnchecked,
+            contentDescription = null,
+            tint = if (selected) primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(22.dp),
+        )
     }
 }
 
