@@ -288,7 +288,25 @@ fun LiquidSegmentedControl(
                             )
                         }
                     } else {
-                        Modifier
+                        // Tanpa glass: pill digambar DI BAWAH label (bukan di atasnya),
+                        // jadi label tetap terlihat saat pill ditarik.
+                        Modifier.drawBehind {
+                            val r = liquidPillRect(
+                                size = size,
+                                slotPx = slotPx,
+                                insetPx = SELECTOR_INSET.toPx(),
+                                position = position.value,
+                                velocity = position.velocity,
+                                press = pressProgress.value,
+                                isLtr = isLtr,
+                            )
+                            drawRoundRect(
+                                color = if (light) Color.White else FALLBACK_DARK_PILL,
+                                topLeft = r.topLeft,
+                                size = r.size,
+                                cornerRadius = CornerRadius(r.height / 2f),
+                            )
+                        }
                     },
                 )
                 .padding(SELECTOR_INSET),
@@ -373,16 +391,8 @@ fun LiquidSegmentedControl(
                 },
             )
         } else {
+            // Pill fallback sudah digambar di lapisan track (di bawah label).
             pillBase
-                .graphicsLayer {
-                    val pop = 1f + 0.05f * pressProgress.value
-                    scaleX = pop
-                    scaleY = pop
-                }
-                .background(
-                    if (light) Color.White else FALLBACK_DARK_PILL,
-                    shape,
-                )
         }
         // 3) Tepi kaca: rim ambient, bayangan luar, inner shadow tipis, border putih transparan.
         //    Digambar sebelum pill supaya pill yang ditarik tampil di atas rim.
@@ -554,7 +564,7 @@ fun LiquidSegmentedControl(
                 // Dengan glass, salinan label di lensa sudah lengkap; lapisan ini hanya
                 // menangani klik dan semantik (tidak digambar). Tanpa glass tetap tampil.
                 .graphicsLayer {
-                    alpha = if (glassOn) 0f else (1f - energy() * 4f).coerceIn(0f, 1f)
+                    alpha = 0f
                 },
         ) {
             modes.forEachIndexed { index, mode ->
