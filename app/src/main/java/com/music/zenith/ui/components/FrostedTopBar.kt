@@ -68,6 +68,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.max
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.launch
@@ -441,18 +442,19 @@ private fun ArtworkPageTitle(
     Box(
         modifier = modifier
             .graphicsLayer { alpha = alphaProvider() }
-            .height(TOP_CONTROL_SIZE)
+            .height(40.dp)
             .then(artworkPageSurface(shape = CircleShape, hazeState = hazeState)),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             text = text,
             style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Medium,
             color = contentColor,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 16.dp),
+            modifier = Modifier.padding(horizontal = 14.dp),
         )
     }
 }
