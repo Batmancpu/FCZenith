@@ -19,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
@@ -54,7 +55,17 @@ fun QueueActionNoticeHost(
         },
         contentKey = { it?.id },
         label = "queueActionNotice",
-        modifier = modifier.fillMaxWidth(),
+        // Tinggi layout selalu 0: kapsul digambar tepat di atas bar tanpa
+        // memakai ruang. Sebelumnya Column bar ikut membesar/mengecil saat
+        // notifikasi muncul/hilang, sehingga bar dan konten terdorong naik-turun.
+        modifier = modifier
+            .fillMaxWidth()
+            .layout { measurable, constraints ->
+                val placeable = measurable.measure(constraints)
+                layout(placeable.width, 0) {
+                    placeable.place(0, -placeable.height)
+                }
+            },
     ) { current ->
         if (current != null) {
             // Kapsul kecil di tengah, bukan kotak selebar layar.
