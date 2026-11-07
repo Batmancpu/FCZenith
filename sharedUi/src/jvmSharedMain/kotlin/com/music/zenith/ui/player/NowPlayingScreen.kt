@@ -4140,6 +4140,9 @@ fun NowPlayingScreen(
                             }
                         }
 
+                        // Ketuk dua kali pada cover = Like, dengan efek bintang.
+                        val doubleTapLike = rememberDoubleTapLikeState()
+
                         // The card's slot: where the sleeve sits as a card, whether or
                         // not it is being drawn as one. Holds the stats line and takes
                         // the gestures, both of which belong to the card's place even
@@ -4186,7 +4189,19 @@ fun NowPlayingScreen(
                                             closeLyrics()
                                         }
                                     } else {
-                                        Modifier
+                                        Modifier.doubleTapToLike(
+                                            state = doubleTapLike,
+                                            enabled = signedIn || song.localUri != null,
+                                        ) {
+                                            // Hanya menyukai: ketuk dua kali pada lagu yang
+                                            // sudah disukai tidak membatalkannya.
+                                            if (likeStatus != LikeStatus.LIKE) {
+                                                haptics.play(Haptic.ToggleOn)
+                                                onToggleLike()
+                                            } else {
+                                                haptics.play(Haptic.Tap)
+                                            }
+                                        }
                                     },
                                 ),
                             contentAlignment = Alignment.Center,
@@ -4208,6 +4223,11 @@ fun NowPlayingScreen(
                                         },
                                 )
                             }
+                            DoubleTapLikeBurst(
+                                state = doubleTapLike,
+                                reduceMotion = lyricsTranslation.reduceMotion,
+                                modifier = Modifier.matchParentSize(),
+                            )
                         }
 
                         // The music video, across the player's whole width — the
