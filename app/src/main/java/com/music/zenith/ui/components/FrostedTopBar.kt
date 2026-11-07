@@ -168,6 +168,13 @@ fun FrostedTopBar(
     /** Source sampled by floating top-bar surfaces when liquid glass is off. */
     backButtonHazeState: HazeState? = null,
     trailingTitle: String? = null,
+    /**
+     * Judul melayang (pil kaca) tepat di kanan tombol back. Hanya tampil pada
+     * halaman dengan tombol back; panjang teks otomatis dipendekkan.
+     */
+    floatingTitle: String? = null,
+    // Lambda agar perubahan alpha per frame scroll tidak merekomposisi pemanggil.
+    floatingTitleAlpha: () -> Float = { 1f },
     onBack: (() -> Unit)? = null,
     refreshing: Boolean = false,
     // A lambda, not a value: the drag changes every frame, and reading it in
@@ -320,6 +327,21 @@ fun FrostedTopBar(
                     }
                 }
             }
+            // Judul halaman melayang di kanan tombol back dan memudar halus
+            // mengikuti scroll halaman.
+            if (onBack != null && useFloatingChrome && floatingTitle != null) {
+                ArtworkPageTitle(
+                    text = shortBarTitle(floatingTitle),
+                    hazeState = backButtonHazeState,
+                    alphaProvider = floatingTitleAlpha,
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .padding(
+                            start = BAR_GUTTER + TOP_CONTROL_SIZE + ACCESSORY_GAP,
+                            end = BAR_GUTTER + 100.dp,
+                        ),
+                )
+            }
             // No wordmark at the leading end: the root tabs carry it above
             // their large heading instead (LargePageTitle in :sharedUi).
             // The accessory takes everything from the leading gutter up to the
@@ -388,6 +410,49 @@ private fun ArtworkPageBackButton(
             SfIcons.ArrowBack,
             contentDescription = stringResource(R.string.back),
             tint = contentColor,
+        )
+    }
+}
+
+/** Memendekkan judul panjang di batas kata, mis. "Account & integrations" -> "Account…". */
+private fun shortBarTitle(title: String, max: Int = 16): String {
+    val t = title.trim()
+    if (t.length <= max) return t
+    val head = t.take(max - 1)
+    val byWord = head.substringBeforeLast(' ', head).trimEnd(' ', ',', '&', '-')
+    return (if (byWord.length >= 6) byWord else head.trimEnd()) + "…"
+}
+
+/** Pil kaca berisi judul halaman, material sama dengan tombol back. */
+@Composable
+private fun ArtworkPageTitle(
+    text: String,
+    hazeState: HazeState?,
+    alphaProvider: () -> Float,
+    modifier: Modifier = Modifier,
+) {
+    val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
+    val useLiquidGlass = LocalLiquidGlassEnabled.current && isGlassSupported()
+    val contentColor = if (useLiquidGlass && !reduceDynamicBlur) {
+        glassContentColor()
+    } else {
+        MaterialTheme.colorScheme.onSurface
+    }
+    Box(
+        modifier = modifier
+            .graphicsLayer { alpha = alphaProvider() }
+            .height(TOP_CONTROL_SIZE)
+            .then(artworkPageSurface(shape = CircleShape, hazeState = hazeState)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = contentColor,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 16.dp),
         )
     }
 }

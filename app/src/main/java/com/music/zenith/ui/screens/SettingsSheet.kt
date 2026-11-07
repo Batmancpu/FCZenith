@@ -2451,14 +2451,12 @@ private inline fun SearchableSettingsGroup(
  * The large heading a Settings page leads with, under the bar's own small one —
  * the main page's "Settings", and every page opened from it.
  */
+@Suppress("UNUSED_PARAMETER")
 @Composable
 internal fun SettingsPageTitle(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.displayLarge,
-        color = MaterialTheme.colorScheme.onBackground,
-        modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 14.dp),
-    )
+    // Judul besar dipindah ke pil melayang di bar atas (FrostedTopBar.floatingTitle),
+    // jadi di sini hanya tersisa jarak kecil agar isi halaman tidak menempel.
+    Spacer(Modifier.height(4.dp))
 }
 
 /**

@@ -1314,6 +1314,29 @@ private fun ZenithApp(
         pageKeysSeen.removeAll(gone.toSet())
     }
     val detailTitleDrop = with(LocalDensity.current) { DETAIL_TITLE_DROP.toPx() }
+
+    // Jarak scroll halaman yang sedang tampil. Dibaca hanya di dalam lambda
+    // (graphicsLayer bar) supaya tidak merekomposisi layar tiap frame scroll.
+    val pageScroll = remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
+    val pageScrollByKey = remember { mutableMapOf<String, Float>() }
+    val pageScrollHolder = remember { object { var key: String = "" } }
+    val pageTitleFadePx = with(LocalDensity.current) { 64.dp.toPx() }
+    val pageScrollConnection = remember {
+        object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
+            override fun onPostScroll(
+                consumed: androidx.compose.ui.geometry.Offset,
+                available: androidx.compose.ui.geometry.Offset,
+                source: androidx.compose.ui.input.nestedscroll.NestedScrollSource,
+            ): androidx.compose.ui.geometry.Offset {
+                if (consumed.y != 0f) {
+                    val next = (pageScroll.floatValue - consumed.y).coerceAtLeast(0f)
+                    pageScroll.floatValue = next
+                    pageScrollByKey[pageScrollHolder.key] = next
+                }
+                return androidx.compose.ui.geometry.Offset.Zero
+            }
+        }
+    }
     val detailScrolled by remember(detailListState, detailTitleDrop) {
         derivedStateOf {
             detailListState.firstVisibleItemIndex > 0 ||
@@ -2929,6 +2952,7 @@ private fun ZenithApp(
                         }
                     },
                     modifier = Modifier
+                        .nestedScroll(pageScrollConnection)
                         .then(
                             if (glassActive) {
                                 Modifier
@@ -2953,6 +2977,10 @@ private fun ZenithApp(
                     // redraw itself as its own replacement — which then fades
                     // out from under the identical copy fading in behind it.
                     val key = destination.key
+                    LaunchedEffect(key) {
+                        pageScrollHolder.key = key
+                        pageScroll.floatValue = pageScrollByKey[key] ?: 0f
+                    }
                     val pageRoute = (destination as? AppDestination.Route)?.entry?.route
                     val live = (destination as? AppDestination.Release)?.let { release ->
                         detailStack.lastOrNull()?.takeIf { it.browseId == release.browseId }
@@ -3873,6 +3901,25 @@ private fun ZenithApp(
                     artworkPageChrome = true,
                     backButtonHazeState = hazeState,
                     trailingTitle = if (detail != null && detailActiveShelf != null) detail.title else null,
+                    // Judul halaman Settings dan turunannya pindah ke pil
+                    // melayang di kanan tombol back, memudar saat di-scroll.
+                    floatingTitle = if (detail == null && selectedMoodGenre == null) {
+                        when (route) {
+                            AppRoute.Settings -> stringResource(R.string.settings)
+                            is AppRoute.SettingsSection -> stringResource(route.category.title)
+                            is AppRoute.SettingsChoice -> stringResource(route.choice.title)
+                            AppRoute.AccountScrobbling -> stringResource(R.string.account_integrations)
+                            AppRoute.Discord -> stringResource(R.string.discord)
+                            AppRoute.Equalizer -> stringResource(R.string.equalizer)
+                            AppRoute.EqualizerPresets -> stringResource(R.string.equalizer_preset)
+                            AppRoute.ListenTogether -> stringResource(R.string.listen_together)
+                            AppRoute.Sources -> stringResource(R.string.source)
+                            else -> null
+                        }
+                    } else null,
+                    floatingTitleAlpha = {
+                        (1f - pageScroll.floatValue / pageTitleFadePx).coerceIn(0f, 1f)
+                    },
                     actionsHidden = showAccountSelector && !accountSelectorLeaving,
                     // Search has no large in-list header to hand the title back to —
                     // the field takes that space — so its bar title is always up.
