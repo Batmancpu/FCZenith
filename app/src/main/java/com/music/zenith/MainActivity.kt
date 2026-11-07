@@ -3832,6 +3832,16 @@ private fun ZenithApp(
                     ?.let { detailListStates.getOrPut(it.browseId) { LazyListState() } }
                 val homeHeadingVisible = route == null && detail == null && selectedTab == TAB_HOME
                 val headerListState = artistListState ?: homeListState.takeIf { homeHeadingVisible }
+                // Header (foto profil + pill) turun/naik antara posisi Home dan tab lain
+                // dengan spring sedikit membal, bukan loncat saat tab berpindah.
+                val homeHeaderBlend = animateFloatAsState(
+                    targetValue = if (homeHeadingVisible) 1f else 0f,
+                    animationSpec = androidx.compose.animation.core.spring(
+                        dampingRatio = 0.5f,
+                        stiffness = 260f,
+                    ),
+                    label = "homeHeaderBlend",
+                )
                 val fadeStart = if (artistListState != null) TOP_FADE_START else 0f
                 val fadeRamp = if (artistListState != null) TOP_FADE_RAMP else 1f
                 val topFadeAlpha by remember(headerListState, fadeStart, fadeRamp) {
@@ -3948,14 +3958,15 @@ private fun ZenithApp(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .graphicsLayer {
-                            if (homeHeadingVisible) {
+                            val blend = homeHeaderBlend.value
+                            if (blend != 0f) {
                                 val rest = (18.dp + homeLogoHalf).toPx()
                                 val scrolledPx = if (homeListState.firstVisibleItemIndex > 0) {
                                     rest
                                 } else {
                                     homeListState.firstVisibleItemScrollOffset.toFloat()
                                 }
-                                translationY = (rest - scrolledPx).coerceAtLeast(0f)
+                                translationY = blend * (rest - scrolledPx).coerceAtLeast(0f)
                             }
                         },
                     // Only on the Search tab itself, not on anything pushed over it.
