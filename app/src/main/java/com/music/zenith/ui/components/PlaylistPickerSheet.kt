@@ -33,6 +33,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -188,21 +189,33 @@ fun PlaylistPickerSheet(
                     },
                     confirmEnabled = selected.isNotEmpty(),
                     onConfirm = { closeAfter { onAdd(playlists.filter { it.playlistId in selected }) } },
+                    title = {
+                        Text(
+                            text = stringResource(
+                                if (song != null) R.string.add_to_playlist else R.string.your_playlists,
+                            ),
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.onBackground,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(start = 8.dp),
+                        )
+                    },
                 )
+                // Lagu yang sedang ditambahkan, sebagai kartu.
                 if (song != null) {
-                    SheetTrackHeader(song)
-                    HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outline)
+                    SheetTrackHeader(
+                        song,
+                        modifier = Modifier
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)),
+                    )
                 }
-                SheetHeading(
-                    stringResource(if (song != null) R.string.add_to_playlist else R.string.your_playlists)
-                        .uppercase(Locale.getDefault()),
-                )
 
-                ActionRow(
-                    icon = ZenithIcons.Plus,
-                    label = stringResource(R.string.new_playlist),
-                    onClick = { creating = true },
-                )
+                NewPlaylistRow(onClick = { creating = true })
 
                 when {
                     // Only while there is nothing to show: re-fetching under a
@@ -228,14 +241,9 @@ fun PlaylistPickerSheet(
                     )
 
                     else -> {
-                        HorizontalDivider(
-                            modifier = Modifier.padding(vertical = 6.dp),
-                            thickness = 0.5.dp,
-                            color = MaterialTheme.colorScheme.outline,
-                        )
                         LazyColumn(
                             modifier = Modifier.weight(1f),
-                            contentPadding = WindowInsets.navigationBars.asPaddingValues(),
+                            contentPadding = PaddingValues(top = 4.dp, bottom = 8.dp),
                         ) {
                             items(playlists, key = { it.playlistId }) { playlist ->
                                 val ticked = playlist.playlistId in selected
@@ -248,6 +256,27 @@ fun PlaylistPickerSheet(
                                 )
                             }
                         }
+                        // Tombol di bawah: dekat jempol, muncul begitu ada yang dipilih.
+                        if (selected.isNotEmpty()) {
+                            Button(
+                                onClick = { closeAfter { onAdd(playlists.filter { it.playlistId in selected }) } },
+                                shape = RoundedCornerShape(26.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 22.dp, vertical = 12.dp)
+                                    .height(52.dp),
+                            ) {
+                                Text(
+                                    text = pluralStringResource(
+                                        R.plurals.add_to_playlists_count,
+                                        selected.size,
+                                        selected.size,
+                                    ),
+                                    style = MaterialTheme.typography.titleMedium,
+                                )
+                            }
+                        }
+                        Spacer(Modifier.navigationBarsPadding())
                     }
                 }
             }
@@ -298,29 +327,72 @@ private fun SheetTopBar(
     }
 }
 
+/** "New playlist": tile plus sebesar thumbnail playlist, sejajar dengan daftar di bawahnya. */
 @Composable
-private fun PlaylistRow(playlist: UserPlaylist, selected: Boolean, onClick: () -> Unit) {
+private fun NewPlaylistRow(onClick: () -> Unit) {
+    val primary = MaterialTheme.colorScheme.primary
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 2.dp)
+            .clip(RoundedCornerShape(16.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 22.dp, vertical = 8.dp),
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(52.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(primary.copy(alpha = 0.14f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = ZenithIcons.Plus,
+                contentDescription = null,
+                tint = primary,
+                modifier = Modifier.size(26.dp),
+            )
+        }
+        Spacer(Modifier.width(14.dp))
+        Text(
+            text = stringResource(R.string.new_playlist),
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onBackground,
+        )
+    }
+}
+
+/** Baris playlist: seluruh baris ter-highlight saat dipilih, bukan hanya lingkarannya. */
+@Composable
+private fun PlaylistRow(playlist: UserPlaylist, selected: Boolean, onClick: () -> Unit) {
+    val primary = MaterialTheme.colorScheme.primary
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 2.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(if (selected) primary.copy(alpha = 0.12f) else Color.Transparent)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         AsyncImage(
             model = playlist.thumbnailUrl.artworkAt(ROW_ART_PX),
             contentDescription = null,
             modifier = Modifier
-                .size(44.dp)
-                .clip(RoundedCornerShape(7.dp))
-                .thumbnailBorder(RoundedCornerShape(7.dp))
+                .size(52.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .thumbnailBorder(RoundedCornerShape(10.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant),
         )
-        Spacer(Modifier.width(16.dp))
+        Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
             Text(
                 text = playlist.title,
                 style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onBackground,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -339,8 +411,8 @@ private fun PlaylistRow(playlist: UserPlaylist, selected: Boolean, onClick: () -
         Icon(
             imageVector = if (selected) Icons.Rounded.CheckCircle else Icons.Rounded.RadioButtonUnchecked,
             contentDescription = null,
-            tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(24.dp),
+            tint = if (selected) primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(26.dp),
         )
     }
 }
