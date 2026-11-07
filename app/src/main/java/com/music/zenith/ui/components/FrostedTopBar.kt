@@ -432,29 +432,22 @@ private fun ArtworkPageTitle(
     alphaProvider: () -> Float,
     modifier: Modifier = Modifier,
 ) {
-    val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
-    val useLiquidGlass = LocalLiquidGlassEnabled.current && isGlassSupported()
-    val contentColor = if (useLiquidGlass && !reduceDynamicBlur) {
-        glassContentColor()
-    } else {
-        MaterialTheme.colorScheme.onSurface
-    }
+    // Teks saja (tanpa pill/permukaan kaca), seperti judul navbar Apple Music.
     Box(
         modifier = modifier
             .graphicsLayer { alpha = alphaProvider() }
-            .height(40.dp)
-            .then(artworkPageSurface(shape = CircleShape, hazeState = hazeState)),
-        contentAlignment = Alignment.Center,
+            .height(40.dp),
+        contentAlignment = Alignment.CenterStart,
     ) {
         Text(
             text = text,
             style = MaterialTheme.typography.titleMedium,
-            fontSize = 15.sp,
-            fontWeight = FontWeight.Medium,
-            color = contentColor,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 14.dp),
+            modifier = Modifier.padding(horizontal = 4.dp),
         )
     }
 }
