@@ -2398,7 +2398,12 @@ private fun ZenithApp(
             if (!songs.all { Downloads.servableFromCache(it.videoId) }) {
                 SourceRegistry.addonsLeftOutOfDownloads()
                     .firstOrNull { (config, why) -> explainedDownloadExclusions.add("${config.id}:$why") }
-                    ?.let { (config, why) -> addonLeftOutOfDownload = config.displayName to why }
+                    ?.let { (config, why) ->
+                        addonLeftOutOfDownload = config.displayName to why
+                        // Menu ditutup: popup ini window sendiri yang blur-nya
+                        // hanya melihat player/halaman, menu di belakangnya terlewat.
+                        songActions = null
+                    }
             }
         }
         // Recorded for everything that was asked for, not just what still has to
