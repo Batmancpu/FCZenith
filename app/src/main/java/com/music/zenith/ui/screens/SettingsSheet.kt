@@ -350,6 +350,23 @@ fun SettingsScreen(
     var confirmImport by remember { mutableStateOf(false) }
     var confirmClearSongCache by remember { mutableStateOf(false) }
     var confirmClearCanvasCache by remember { mutableStateOf(false) }
+    // Batas baru yang lebih kecil dari isi cache ditahan dulu (belum disimpan) sampai user setuju.
+    var pendingSongLimitBytes by remember { mutableStateOf<Long?>(null) }
+    var pendingCanvasLimitBytes by remember { mutableStateOf<Long?>(null) }
+    var confirmSongShrink by remember { mutableStateOf(false) }
+    var confirmCanvasShrink by remember { mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(pendingSongLimitBytes) {
+        if (pendingSongLimitBytes != null) {
+            delay(600)
+            confirmSongShrink = true
+        }
+    }
+    androidx.compose.runtime.LaunchedEffect(pendingCanvasLimitBytes) {
+        if (pendingCanvasLimitBytes != null) {
+            delay(600)
+            confirmCanvasShrink = true
+        }
+    }
     var confirmClearImageCache by remember { mutableStateOf(false) }
     var showPerformanceWarning by remember { mutableStateOf(false) }
     var showPerformanceConfirmation by remember { mutableStateOf(false) }
@@ -1322,10 +1339,18 @@ fun SettingsScreen(
                             stringResource(R.string.song_cache_large_subtitle, cacheLimitLabel)
                         else -> stringResource(R.string.song_cache_limit_subtitle)
                     },
-                    value = cacheLimitLabel,
-                    sliderValue = cacheLimitMb.toFloat(),
+                    value = pendingSongLimitBytes?.let { formatCacheSize((it / (1024 * 1024)).toInt()) }
+                        ?: cacheLimitLabel,
+                    sliderValue = (pendingSongLimitBytes?.let { (it / (1024 * 1024)).toInt() }
+                        ?: cacheLimitMb).toFloat(),
                     onSliderValue = {
-                        AppSettings.setAudioCacheLimitBytes(it.roundToInt().toLong() * 1024 * 1024)
+                        val bytes = it.roundToInt().toLong() * 1024 * 1024
+                        if (bytes < AudioCache.usedBytes()) {
+                            pendingSongLimitBytes = bytes
+                        } else {
+                            pendingSongLimitBytes = null
+                            AppSettings.setAudioCacheLimitBytes(bytes)
+                        }
                     },
                     valueRange = (AppSettings.DEFAULT_CACHE_LIMIT_BYTES / (1024 * 1024)).toFloat()..
                         CACHE_UNLIMITED_STOP_MB.toFloat(),
@@ -1371,10 +1396,19 @@ fun SettingsScreen(
                     icon = SfIcons.Animation,
                     title = canvasCacheLimitTitle,
                     subtitle = stringResource(R.string.canvas_cache_limit_subtitle),
-                    value = formatCacheSize(canvasLimitMb),
-                    sliderValue = canvasLimitMb.toFloat(),
+                    value = formatCacheSize(
+                        pendingCanvasLimitBytes?.let { (it / (1024 * 1024)).toInt() } ?: canvasLimitMb,
+                    ),
+                    sliderValue = (pendingCanvasLimitBytes?.let { (it / (1024 * 1024)).toInt() }
+                        ?: canvasLimitMb).toFloat(),
                     onSliderValue = {
-                        AppSettings.setCanvasCacheLimitBytes(it.roundToInt().toLong() * 1024 * 1024)
+                        val bytes = it.roundToInt().toLong() * 1024 * 1024
+                        if (bytes < CanvasCache.usedBytes()) {
+                            pendingCanvasLimitBytes = bytes
+                        } else {
+                            pendingCanvasLimitBytes = null
+                            AppSettings.setCanvasCacheLimitBytes(bytes)
+                        }
                     },
                     valueRange = canvasLimitMinMb.toFloat()..canvasLimitMaxMb.toFloat(),
                     // 128 MB per stop: 128 MB, 256 MB ... 5 GB.
@@ -1755,6 +1789,56 @@ fun SettingsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 24.dp, bottom = 8.dp),
+            )
+        }
+    }
+
+    if (confirmSongShrink) {
+        pendingSongLimitBytes?.let { pending ->
+            IosConfirmDialog(
+                title = stringResource(R.string.cache_shrink_title),
+                message = stringResource(
+                    R.string.cache_shrink_warning,
+                    formatStoredBytes(AudioCache.usedBytes()),
+                    formatCacheSize((pending / (1024 * 1024)).toInt()),
+                ),
+                confirmText = stringResource(R.string.cache_shrink_confirm),
+                dismissText = stringResource(R.string.cancel),
+                destructive = true,
+                onDismiss = {
+                    confirmSongShrink = false
+                    pendingSongLimitBytes = null
+                },
+                onConfirm = {
+                    confirmSongShrink = false
+                    pendingSongLimitBytes = null
+                    AppSettings.setAudioCacheLimitBytes(pending)
+                },
+            )
+        }
+    }
+
+    if (confirmCanvasShrink) {
+        pendingCanvasLimitBytes?.let { pending ->
+            IosConfirmDialog(
+                title = stringResource(R.string.cache_shrink_title),
+                message = stringResource(
+                    R.string.cache_shrink_warning,
+                    formatStoredBytes(CanvasCache.usedBytes()),
+                    formatCacheSize((pending / (1024 * 1024)).toInt()),
+                ),
+                confirmText = stringResource(R.string.cache_shrink_confirm),
+                dismissText = stringResource(R.string.cancel),
+                destructive = true,
+                onDismiss = {
+                    confirmCanvasShrink = false
+                    pendingCanvasLimitBytes = null
+                },
+                onConfirm = {
+                    confirmCanvasShrink = false
+                    pendingCanvasLimitBytes = null
+                    AppSettings.setCanvasCacheLimitBytes(pending)
+                },
             )
         }
     }

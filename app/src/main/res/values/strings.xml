@@ -418,6 +418,9 @@
     <string name="synced_lyrics_subtitle">Lights up the words on the player as they’re sung</string>
     <string name="lyrics_sources">Lyrics sources</string>
     <string name="song_cache_limit">Song cache limit</string>
+    <string name="cache_shrink_title">Lower the cache limit?</string>
+    <string name="cache_shrink_warning">%1$s is currently stored. Lowering the limit to %2$s will delete the oldest cached files to fit.</string>
+    <string name="cache_shrink_confirm">Lower</string>
     <string name="clear_song_cache">Clear song cache</string>
     <string name="song_cache_usage">Song cache usage</string>
     <string name="cache_usage_songs">%1$s stored · %2$d songs</string>
