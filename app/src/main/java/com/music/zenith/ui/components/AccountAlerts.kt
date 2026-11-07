@@ -914,6 +914,7 @@ internal fun AlertScaffold(
         Column(
             modifier = Modifier
                 .width(ALERT_WIDTH)
+                .jellyPopIn()
                 .clip(shape)
                 .then(
                     when {

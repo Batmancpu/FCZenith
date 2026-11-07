@@ -80,6 +80,7 @@ internal fun AudioPopupCard(
         Column(
             modifier = Modifier
                 .width(POPUP_WIDTH)
+                .jellyPopIn()
                 .clip(POPUP_CARD_SHAPE)
                 .then(
                     // The ⋯ menu's frost — see [PlayerDrawer], whose drawers
