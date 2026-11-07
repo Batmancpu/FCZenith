@@ -296,6 +296,7 @@ fun SearchScreen(
                             typeaheadResults = typeaheadResults,
                             onSongClick = { song -> onTopResultPlay(song) },
                             onSongLongPress = onTypeaheadLongPress,
+                            onSongSwipe = onSongSwipe,
                             onBrowseClick = { item ->
                                 onBrowseClick(item)
                             },
@@ -690,6 +691,7 @@ private fun LazyListScope.searchTypeaheadDropdown(
     typeaheadResults: List<SearchResult>,
     onSongClick: (Song) -> Unit,
     onSongLongPress: ((Song) -> Unit)?,
+    onSongSwipe: ((Song) -> Unit)? = null,
     onBrowseClick: (BrowseItem) -> Unit,
     currentSong: Song?,
     isPlaying: Boolean,
@@ -717,6 +719,7 @@ private fun LazyListScope.searchTypeaheadDropdown(
                 song = result.song,
                 onClick = { onSongClick(result.song) },
                 onLongPress = onSongLongPress?.let { { it(result.song) } },
+                onSwipeToQueue = onSongSwipe?.let { { it(result.song) } },
                 isCurrent = isCurrentRow(result.song),
                 isPlaying = isPlaying && isCurrentRow(result.song),
             )
@@ -729,6 +732,7 @@ private fun LazyListScope.searchTypeaheadDropdown(
                 song = result.song,
                 onClick = { onSongClick(result.song) },
                 onLongPress = onSongLongPress?.let { { it(result.song) } },
+                onSwipeToQueue = onSongSwipe?.let { { it(result.song) } },
                 isCurrent = isCurrentRow(result.song),
                 isPlaying = isPlaying && isCurrentRow(result.song),
             )
@@ -745,12 +749,19 @@ private fun TypeaheadSongRow(
     song: Song,
     onClick: () -> Unit,
     onLongPress: (() -> Unit)? = null,
+    onSwipeToQueue: (() -> Unit)? = null,
     isCurrent: Boolean = false,
     isPlaying: Boolean = false,
 ) {
+    SwipeToQueueBox(
+        onSwipeToQueue = onSwipeToQueue,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            // Opak agar latar swipe tidak tembus saat baris digeser.
+            .then(if (onSwipeToQueue != null) Modifier.background(MaterialTheme.colorScheme.background) else Modifier)
             .longPressMenuClickable(
                 onClick = onClick,
                 onLongClick = onLongPress,
@@ -791,6 +802,7 @@ private fun TypeaheadSongRow(
                 overflow = TextOverflow.Ellipsis,
             )
         }
+    }
     }
 }
 
