@@ -250,15 +250,21 @@ private fun DrawScope.drawMotion(
     // Lapisan glow: gradien radial lembut, digambar SEBELUM teks dan tanpa clip,
     // alpha kontinu (tanpa ambang) sehingga tidak berkedip dan tepinya memudar penuh.
     val glowR = rt.fontPx * MotionTuning.GlowRadiusEm
+    // Batas atas radius: tidak melewati area bleed (kecil dari X dan Y), jadi
+    // pada kata yang ditahan lama glow tidak membesar sampai terpotong.
+    val glowMaxR = minOf(MotionTuning.BleedXDp, MotionTuning.BleedYDp).dp.toPx() *
+        MotionTuning.GlowMaxBleedShare
     for (i in 0 until lay.count) {
         if (i >= rt.rise.size) break
         val sw0 = rt.swell[i]
+        // swell dijepit ke 0..1 supaya durasi panjang tidak melipatgandakan glow.
+        val swc = sw0.coerceIn(0f, 1f)
         val prox0 = 1f - smoothstep(abs(rt.head - lay.charIndex[i] - 1f) / MotionTuning.GlowSpanChars)
-        val a = (rt.bloomA[0] * prox0 * (0.35f + 0.65f * sw0) * 0.5f).coerceIn(0f, 1f)
+        val a = (rt.bloomA[0] * prox0 * (0.35f + 0.65f * swc) * MotionTuning.GlowAlphaScale).coerceIn(0f, 1f)
         if (a < 0.004f) continue
         val cx = (lay.left[i] + lay.right[i]) / 2f
         val cy = (lay.top[i] + lay.bottom[i]) / 2f + (1f - rt.rise[i]) * riseDist
-        val rad = glowR * (1f + 0.5f * sw0)
+        val rad = minOf(glowR * (1f + 0.15f * swc), glowMaxR)
         drawCircle(
             brush = Brush.radialGradient(
                 0f to active.copy(alpha = a),

@@ -30,7 +30,10 @@ internal object MotionTuning {
     const val HoldRangeMs = 700f
     const val GlowSpanChars = 5f
     const val SweepFeatherEm = 0.5f
-    const val GlowRadiusEm = 0.75f
+    const val GlowRadiusEm = 0.40f
+    // Glow tidak boleh lebih lebar dari area bleed agar tepinya tidak terpotong.
+    const val GlowMaxBleedShare = 0.8f
+    const val GlowAlphaScale = 0.30f
     const val ParticleCount = 3
     const val ParticleSpeed = 0.55f
     const val ParticleRiseEm = 1.0f
