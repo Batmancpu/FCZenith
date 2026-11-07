@@ -5467,6 +5467,10 @@ private fun ZenithApp(
             browseActions?.takeIf { browseRenameInSheet }?.let { target ->
                 ModalBottomSheet(
                     onDismissRequest = { browseActions = null },
+                    // Langsung tinggi penuh. Setengah terbuka, sheet berhenti di
+                    // tengah layar dan bagian bawahnya (kolom nama + Save) berada
+                    // di balik keyboard, tidak terjangkau oleh scroll form.
+                    sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
                     containerColor = MaterialTheme.colorScheme.background,
                 ) {
                     browseMenuBody(target)

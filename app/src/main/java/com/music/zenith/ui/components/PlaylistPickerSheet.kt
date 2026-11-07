@@ -15,6 +15,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.ime
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.platform.LocalDensity
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import kotlinx.coroutines.delay
@@ -747,11 +753,32 @@ internal fun RenamePlaylistForm(
     // Tombol simpan ikut digulirkan ke area yang terlihat saat keyboard naik,
     // sehingga kolom nama (tepat di atasnya) tidak tertutup keyboard.
     val saveBring = remember { BringIntoViewRequester() }
+    val density = LocalDensity.current
+    val imeInsets = WindowInsets.ime
+    var imeUp by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
-        delay(400)
-        saveBring.bringIntoView()
+        // Pengaman: tidak memakai delay tetap. Tinggi keyboard dipantau, dan
+        // setiap kali berubah (animasi naik/turun, ganti keyboard, gesture
+        // insets) scroll dibatalkan lalu diulang. Tombol Save baru
+        // digulirkan ke area terlihat setelah tinggi keyboard benar-benar
+        // berhenti berubah, sehingga kolom nama di atasnya ikut terlihat.
+        snapshotFlow { imeInsets.getBottom(density) }
+            .distinctUntilChanged()
+            .collectLatest { bottom ->
+                imeUp = bottom > 0
+                if (bottom > 0) {
+                    delay(120)
+                    saveBring.bringIntoView()
+                }
+            }
     }
+    // Pratinjau cover mengecil saat keyboard naik supaya kolom nama dan Save
+    // selalu muat di area sisa, juga di layar pendek.
+    val coverSize by animateDpAsState(
+        targetValue = if (imeUp) 80.dp else 128.dp,
+        label = "renameCoverSize",
+    )
 
     val changed = cover != null || coverRemoved || name != playlist.title
     val submit: () -> Unit = {
@@ -813,7 +840,7 @@ internal fun RenamePlaylistForm(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(128.dp)
+                        .size(coverSize)
                         .clip(RoundedCornerShape(18.dp))
                         .background(MaterialTheme.colorScheme.surfaceVariant)
                         .clickable {
