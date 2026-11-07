@@ -59,6 +59,7 @@ import com.music.zenith.ui.components.MenuFrostDark
 import com.music.zenith.ui.components.liveMenuFrost
 import com.music.zenith.ui.utils.containSheetGestures
 import dev.chrisbanes.haze.HazeState
+import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
 internal val DRAWER_SHAPE = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp)
@@ -85,6 +86,9 @@ internal val SCRIM_COLOR = Color.Black.copy(alpha = 0.5f)
  * and little enough that a flick reads as one.
  */
 private const val DISMISS_DRAG_FRACTION = 0.25f
+
+/** How long the drawer takes to leave, and so how long [PlayerDrawer] waits before telling its caller. */
+private const val DRAWER_EXIT_MS = 180
 
 /**
  * The bottom-edge drawer shell every player sheet in this package puts up —
@@ -128,6 +132,24 @@ fun PlayerDrawer(
     var shown by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { shown = true }
 
+    // Closing is played before it is reported: the caller removes the drawer
+    // from the tree the moment [onDismiss] runs, which cut the exit short.
+    var closing by remember { mutableStateOf(false) }
+    val closeFade by animateFloatAsState(
+        targetValue = if (closing) 0f else 1f,
+        animationSpec = tween(DRAWER_EXIT_MS),
+        label = "playerDrawerScrim",
+    )
+    LaunchedEffect(closing) {
+        if (closing) {
+            shown = false
+            delay(DRAWER_EXIT_MS.toLong())
+            onDismiss()
+        }
+    }
+    val close: () -> Unit = { closing = true }
+    PlayerBackHandler(enabled = !closing) { close() }
+
     // The drawer's rows scroll, and that scroll takes the finger before the
     // drag detector below ever sees it. So a pull down past the top of the
     // list moves the drawer itself — the way a sheet with a list in it
@@ -140,7 +162,7 @@ fun PlayerDrawer(
     // answers to its own drag alone, because a scroll leftover means something
     // else there and must not be read as a pull.
     val dismissOnRelease: () -> Unit = {
-        if (height > 0 && drag > height * DISMISS_DRAG_FRACTION) onDismiss() else drag = 0f
+        if (height > 0 && drag > height * DISMISS_DRAG_FRACTION) close() else drag = 0f
     }
     val drawerScroll = remember {
         object : NestedScrollConnection {
@@ -182,18 +204,18 @@ fun PlayerDrawer(
         modifier = modifier
             .fillMaxSize()
             .containSheetGestures()
-            .background(SCRIM_COLOR.copy(alpha = SCRIM_COLOR.alpha * scrimAlpha))
+            .background(SCRIM_COLOR.copy(alpha = SCRIM_COLOR.alpha * scrimAlpha * closeFade))
             .clickable(
                 indication = null,
                 interactionSource = remember { MutableInteractionSource() },
-                onClick = onDismiss,
+                onClick = close,
             ),
         contentAlignment = Alignment.BottomCenter,
     ) {
         AnimatedVisibility(
             visible = shown,
             enter = slideInVertically(tween(260, easing = FastOutSlowInEasing)) { it },
-            exit = slideOutVertically(tween(180)) { it },
+            exit = slideOutVertically(tween(DRAWER_EXIT_MS)) { it },
         ) {
         Column(
             modifier = Modifier
