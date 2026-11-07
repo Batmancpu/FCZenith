@@ -465,8 +465,8 @@ fun <T : Any> IosMenuPopover(
                 if (reduceMotion) {
                     tween(durationMillis = 120, easing = LinearEasing)
                 } else {
-                    // Under-damped: overshoots a little and wobbles back, the jelly pop.
-                    spring(dampingRatio = 0.58f, stiffness = 420f)
+                    // Hampir critically damped: overshoot tipis, hanya sedikit kenyal.
+                    spring(dampingRatio = 0.78f, stiffness = 520f)
                 },
             )
         } else {
@@ -574,8 +574,8 @@ fun <T : Any> IosMenuPopover(
             if (!reduceMotion) {
                 transformOrigin = TransformOrigin(1f, if (hangsDown) 0f else 1f)
                 val scale = lerp(0.3f, 1f, p)
-                // X dan Y berlawanan fase saat overshoot: meregang seperti jelly.
-                val wobble = (p - 1f) * p * p * 0.45f
+                // Regangan X/Y berlawanan dibuat tipis supaya tidak terasa bergoyang.
+                val wobble = (p - 1f) * p * p * 0.12f
                 scaleX = scale - wobble
                 scaleY = scale + wobble
                 applyIosMenuJelly(touch, scale, 1f, if (hangsDown) 0f else 1f)

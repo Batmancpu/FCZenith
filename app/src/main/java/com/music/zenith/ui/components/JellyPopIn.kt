@@ -25,14 +25,14 @@ internal fun Modifier.jellyPopIn(): Modifier {
         if (reduce) {
             progress.snapTo(1f)
         } else {
-            progress.animateTo(1f, spring(dampingRatio = 0.55f, stiffness = 380f))
+            progress.animateTo(1f, spring(dampingRatio = 0.8f, stiffness = 500f))
         }
     }
     return graphicsLayer {
         val p = progress.value
         alpha = (p * 3f).coerceIn(0f, 1f)
-        val scale = 0.8f + 0.2f * p
-        val wobble = (p - 1f) * p * p * 0.45f
+        val scale = 0.92f + 0.08f * p
+        val wobble = (p - 1f) * p * p * 0.12f
         scaleX = scale - wobble
         scaleY = scale + wobble
     }
