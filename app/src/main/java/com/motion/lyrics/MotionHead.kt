@@ -30,7 +30,10 @@ internal fun computeHead(words: List<MotionWord>, pos: Long, out: HeadOut) {
     val effEnd = max(w.endMs - share.toLong(), w.startMs + 1)
 
     if (pos < effEnd) {
-        val frac = (pos - w.startMs).toFloat() / (effEnd - w.startMs).toFloat()
+        // Head sampai ke huruf terakhir sedikit sebelum kata berakhir, jadi huruf
+        // terakhir (mis. "e" di "sure") sudah terang penuh saat vokal masih ditahan.
+        val frac = (pos - w.startMs).toFloat() /
+            ((effEnd - w.startMs).toFloat() * MotionTuning.WordReachFraction)
         out.head = w.charStart + (w.charEnd - w.charStart) * frac.coerceIn(0f, 1f)
         out.sung = 1f
         return

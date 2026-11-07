@@ -33,6 +33,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.ResolvedTextDirection
+import androidx.compose.ui.text.style.TextMotion
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.isSpecified
@@ -54,6 +55,7 @@ internal class MotionRuntime {
     var swell = FloatArray(0); var swellVel = FloatArray(0)
     val bloomA = FloatArray(1); val bloomV = FloatArray(1)
     var head = 0f
+    var words: List<MotionWord> = emptyList()
     var maxSwell = 0f
     var timeSec = 0f
     var headX = 0f; var headY = 0f; var headRtl = false
@@ -66,6 +68,7 @@ internal class MotionRuntime {
 
     fun step(lay: MotionLayout, words: List<MotionWord>, pos: Long, dt: Float, snapIn: Boolean) {
         var snap = snapIn
+        this.words = words
         val n = lay.count
         if (rise.size != n) {
             rise = FloatArray(n); riseVel = FloatArray(n)
@@ -143,7 +146,13 @@ fun MotionLyricLine(
     val measurer = rememberTextMeasurer()
     val density = LocalDensity.current
     val motionStyle = remember(style) {
-        style.copy(fontFeatureSettings = MotionTuning.NoLigatures, color = Color.Unspecified)
+        style.copy(
+            fontFeatureSettings = MotionTuning.NoLigatures,
+            color = Color.Unspecified,
+            // Teks beranimasi (naik + membesar): matikan hinting & snap piksel
+            // supaya huruf tidak bergetar saat di-scale/translate tiap frame.
+            textMotion = TextMotion.Animated
+        )
     }
     val rt = remember(text, words, motionStyle) { MotionRuntime() }
     // Bloom kini digambar langsung per huruf (tanpa RenderEffect) agar tidak ada ghosting.
@@ -289,6 +298,10 @@ private fun DrawScope.drawMotion(
         val tl = Offset(l, lay.glyphY[i])
         val dist = rt.head - lay.charIndex[i]
         val shadow: Shadow? = null
+        // Kata sudah selesai dinyanyikan: huruf terakhirnya wajib menyala penuh.
+        val wIdx = lay.wordIndex[i]
+        val wordDone = wIdx >= 0 && wIdx < rt.words.size &&
+            rt.head >= rt.words[wIdx].charEnd - 0.001f
         withTransform({
             translate(0f, dy)
             scale(s, s, pivot)
@@ -303,7 +316,7 @@ private fun DrawScope.drawMotion(
             val back = feather * 0.4f
             val reached = if (rtl) hx - front < w else hx + front > 0f
             val settled = if (rtl) hx + back <= 0f else hx - back >= w
-            if (settled) {
+            if (settled || wordDone) {
                 drawText(g, color = active, topLeft = tl, shadow = shadow)
             } else if (reached) {
                 val x0 = if (rtl) hx + back else hx - back
