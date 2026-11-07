@@ -541,6 +541,13 @@ object AppSettings {
     val liquidGlass = MutableStateFlow(false)
 
     /**
+     * Menurunkan Liquid Glass menjadi frosted glass: tetap blur + tint + rim,
+     * tetapi tanpa lensa refraksi, chromatic aberration, dan shadow. Jauh lebih
+     * ringan di HP spek rendah. Hanya berlaku saat [liquidGlass] aktif.
+     */
+    val frostedGlass = MutableStateFlow(false)
+
+    /**
      * Blurs what scrolls under the status bar and the top controls, easing out
      * just below them, instead of fading it to the page colour. A Liquid Glass
      * option, honoured only while [liquidGlass] is on. Off by default: it costs
@@ -1080,6 +1087,7 @@ object AppSettings {
             .putBoolean(KEY_REDUCE_ANIMATION, lowRam)
             .putBoolean(KEY_REDUCE_BLUR, lowRam)
             .putBoolean(KEY_PROGRESSIVE_BLUR, false)
+            .putBoolean(KEY_FROSTED_GLASS, lowRam)
             .putBoolean(KEY_LEGACY_MESH_GRADIENT, false)
             .putBoolean(KEY_LYRICS_BLUR, !lowRam)
             .putBoolean(KEY_LIQUID_FLOW, !lowRam)
@@ -1172,6 +1180,7 @@ object AppSettings {
         smartVersionAlignment.value = prefs.getBoolean(KEY_SMART_VERSION_ALIGNMENT, true)
         reduceDynamicBlur.value = prefs.getBoolean(KEY_REDUCE_BLUR, false)
         liquidGlass.value = prefs.getBoolean(KEY_LIQUID_GLASS, false)
+        frostedGlass.value = prefs.getBoolean(KEY_FROSTED_GLASS, false)
         progressiveBlur.value = prefs.getBoolean(KEY_PROGRESSIVE_BLUR, false)
         lyricsBlur.value = prefs.getBoolean(KEY_LYRICS_BLUR, true)
         liquidFlow.value = prefs.getBoolean(KEY_LIQUID_FLOW, true)
@@ -1639,6 +1648,11 @@ object AppSettings {
     fun setLiquidGlass(value: Boolean) {
         liquidGlass.value = value
         prefs.edit().putBoolean(KEY_LIQUID_GLASS, value).apply()
+    }
+
+    fun setFrostedGlass(value: Boolean) {
+        frostedGlass.value = value
+        prefs.edit().putBoolean(KEY_FROSTED_GLASS, value).apply()
     }
 
     fun setProgressiveBlur(value: Boolean) {
@@ -2450,6 +2464,7 @@ object AppSettings {
     private const val KEY_SMART_VERSION_ALIGNMENT = "smart_version_alignment"
     private const val KEY_REDUCE_BLUR = "reduce_dynamic_blur"
     private const val KEY_LIQUID_GLASS = "liquid_glass"
+    private const val KEY_FROSTED_GLASS = "frosted_glass"
     private const val KEY_PROGRESSIVE_BLUR = "progressive_blur"
     private const val KEY_LYRICS_BLUR = "lyrics_blur"
     private const val KEY_LIQUID_FLOW = "liquid_flow_motion"

@@ -206,6 +206,7 @@ fun Modifier.liquidGlass(
 ): Modifier {
     if (!isGlassSupported()) return this
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
+    val frosted by AppSettings.frostedGlass.collectAsStateWithLifecycle()
     if (reduceDynamicBlur) {
         return background(MaterialTheme.colorScheme.surface, shape)
             .border(GLASS_EDGE_WIDTH, GLASS_EDGE_COLOR, shape)
@@ -227,9 +228,10 @@ fun Modifier.liquidGlass(
         backdrop = backdrop,
         shape = { shape },
         effects = {
-            colorControls(saturation = 1f + 0.5f * VIBRANCY)
-            blur(blurPx)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            // Frosted: hanya saturasi ringan + blur, tanpa lensa (bagian terberat di GPU).
+            colorControls(saturation = if (frosted) 1.15f else 1f + 0.5f * VIBRANCY)
+            blur(if (frosted) blurPx * 1.4f else blurPx)
+            if (!frosted && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 lens(
                     refractionHeight = lensHeightPx,
                     refractionAmount = lensAmountPx,
@@ -239,7 +241,7 @@ fun Modifier.liquidGlass(
             }
         },
         highlight = { Highlight.Default },
-        shadow = { Shadow.Default },
+        shadow = { if (frosted) null else Shadow.Default },
         onDrawSurface = {
             drawRect(color = surfaceTintColor, size = size)
         },

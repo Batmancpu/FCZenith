@@ -256,6 +256,7 @@ fun SettingsScreen(
     val coverFluidAnimation by AppSettings.coverFluidAnimation.collectAsStateWithLifecycle()
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
     val liquidGlass by AppSettings.liquidGlass.collectAsStateWithLifecycle()
+    val frostedGlass by AppSettings.frostedGlass.collectAsStateWithLifecycle()
     val progressiveBlur by AppSettings.progressiveBlur.collectAsStateWithLifecycle()
     val liquidGlassSupported = isGlassSupported()
     val lyricsBlur by AppSettings.lyricsBlur.collectAsStateWithLifecycle()
@@ -1017,6 +1018,14 @@ fun SettingsScreen(
             // its own. Its own switch because it costs frames of its own. Reduce
             // dynamic blur turns it off.
             if (liquidGlass && liquidGlassSupported) {
+                val frostedGlassTitle = stringResource(R.string.frosted_glass)
+                row(frostedGlassTitle, "frosted", "glass", "lite", "light", "performance", divided = false) {
+                    SettingsSubRow(
+                        title = frostedGlassTitle,
+                        checked = frostedGlass,
+                        onCheckedChange = AppSettings::setFrostedGlass,
+                    )
+                }
                 val progressiveBlurTitle = stringResource(R.string.progressive_blur)
                 row(progressiveBlurTitle, "blur", "status bar", "top", divided = false) {
                     SettingsSubRow(
