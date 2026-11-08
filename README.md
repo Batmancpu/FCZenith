@@ -95,14 +95,18 @@
 
 </div>
 
-Zeuxxi is my personal fork of [BitChord](https://github.com/kushagrasinghx/BitChord), reshaped into an Android-only build with its own identity and release pipeline.
+Zeuxxi is my personal fork of [BitChord](https://github.com/kushagrasinghx/BitChord), rebuilt as an Android-only app with an Apple Music–inspired look. The full list is in the [release notes](RELEASE_NOTES.md); the highlights:
 
-- **Own identity** — new "Z" launcher icon and in-app logo, package `com.zeux.zenith`, credit line "Made by Zeuxxi" in the About screen.
-- **Android only** — the project is trimmed to the `shared`, `sharedUi` and `app` modules, and the APK ships for `arm64-v8a` only.
-- **Side-by-side dev build** — a `dev` flavor (`com.zeux.zenith.dev`) installs next to the `prod` app instead of overwriting it.
-- **Automated releases** — GitHub Actions (`build-apk.yml`) builds a signed release APK with ccache, retries flaky dependency downloads, and publishes `Zenith-<version>.apk` to Releases whenever a `v*` tag is pushed.
-- **In-app updater** — checks this repository's Releases for new versions.
-- **Optimized release build** — R8 minification and resource shrinking enabled for a faster UI.
+- **Own identity** — renamed to Zenith, new "Z" logo and launcher icons (Default + red Liquid Glass), package `com.zeux.zenith`, downloads saved to `Music/Zenith`.
+- **Android only** — TV, web, backend, desktop and Wear OS code removed; APK built for `arm64-v8a` only.
+- **Apple Music–style UI** — full color scheme, squircle shapes, 10 accent colors, Liquid Glass toggles, sliders, segmented controls and nav bar, plus a lighter Frosted Glass mode.
+- **Redesigned player** — mini player and big player share one morphing panel, with a flying cover, full-screen animated canvas and fluid cover transitions between songs.
+- **Redesigned Home & Library** — Top Picks cards, Made for You Mix, Most Played, Liked Music hero and Listen again rows.
+- **Smarter Automix** — closed-loop beat-phase correction, better tempo and cue detection, longer overlaps.
+- **New lyrics engine** — MOTION lyrics with the LiquidFlow effect.
+- **Queue & playlists** — Apple Music–style queue, Add Songs to Queue popup, redesigned playlist pages with gallery covers.
+- **Offline & speed** — disk caches for browse, lyrics and search, animated covers cached for offline, first-run presets with a low-RAM fallback.
+- **Automated releases** — GitHub Actions builds a signed APK and publishes it whenever a `v*` tag is pushed; the in-app updater checks this repository.
 
 ---
 
