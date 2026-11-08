@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
 <defs>
-<clipPath id="sq"><path d="M0,512C0,128 128,0 512,0C896,0 1024,128 1024,512C1024,896 896,1024 512,1024C128,1024 0,896 0,512Z"/></clipPath>
+<clipPath id="sq"><path d="M260,0H764C944,0 1024,80 1024,260V764C1024,944 944,1024 764,1024H260C80,1024 0,944 0,764V260C0,80 80,0 260,0Z"/></clipPath>
 <radialGradient id="bg1" gradientUnits="userSpaceOnUse" cx="512" cy="512" r="724"><stop offset="0" stop-color="#FCFBFD" stop-opacity="1"/><stop offset="0.55" stop-color="#F1F0F4" stop-opacity="1"/><stop offset="1" stop-color="#DFDFE8" stop-opacity="1"/></radialGradient>
 <radialGradient id="bg2" gradientUnits="userSpaceOnUse" cx="512" cy="512" r="760"><stop offset="0" stop-color="#707090" stop-opacity="0.0"/><stop offset="0.6" stop-color="#707090" stop-opacity="0.0"/><stop offset="1" stop-color="#707090" stop-opacity="0.2"/></radialGradient>
 <radialGradient id="bg3" gradientUnits="userSpaceOnUse" cx="900" cy="990" r="460"><stop offset="0" stop-color="#A9B0D6" stop-opacity="0.302"/><stop offset="1" stop-color="#A9B0D6" stop-opacity="0.0"/></radialGradient>

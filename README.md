@@ -2,7 +2,7 @@
 
 <br/>
 
-<img src=".github/assets/icon.svg" alt="Zenith icon" width="140" height="140" />
+<img src=".github/assets/zenith-icon.svg" alt="Zenith icon" width="140" height="140" />
 
 <h1>Zenith</h1>
 
@@ -97,7 +97,7 @@ Past versions and their changes are listed in [Releases](https://github.com/reza
 
 </details>
 
-<details>
+<details open>
 <summary><b>Look and feel</b></summary>
 
 - Apple Music style with squircle shapes and a choice of accent colors.
@@ -107,7 +107,7 @@ Past versions and their changes are listed in [Releases](https://github.com/reza
 
 </details>
 
-<details>
+<details open>
 <summary><b>Lyrics</b></summary>
 
 - Word-synced lyrics with the MOTION engine and the LiquidFlow effect.
@@ -116,7 +116,7 @@ Past versions and their changes are listed in [Releases](https://github.com/reza
 
 </details>
 
-<details>
+<details open>
 <summary><b>Accounts and connections</b></summary>
 
 - Sign in with Google for personalized content.
@@ -127,7 +127,7 @@ Past versions and their changes are listed in [Releases](https://github.com/reza
 
 </details>
 
-<details>
+<details open>
 <summary><b>Controls</b></summary>
 
 - Separate audio quality for Wi-Fi and mobile data.
@@ -140,17 +140,7 @@ Past versions and their changes are listed in [Releases](https://github.com/reza
 
 ## What's different from BitChord
 
-Zenith is my personal fork of [BitChord](https://github.com/kushagrasinghx/BitChord).
-
-| | BitChord | Zenith |
-| --- | :---: | :---: |
-| Platforms | Several | Android only |
-| Interface | Material | Apple Music–style |
-| Player | Separate mini and full | One morphing panel |
-| Lyrics | Word-synced | New MOTION engine |
-| Automix | Beat-matched | Closed-loop beat correction |
-| Accent colors | Fixed | 10 to choose from |
-| Releases | Manual | Signed, built by GitHub Actions |
+Zenith is my personal fork of [BitChord](https://github.com/kushagrasinghx/BitChord), rebuilt as an Android-only app with its own identity, interface and release pipeline.
 
 ---
 
@@ -162,7 +152,7 @@ Zenith is built on top of [BitChord](https://github.com/kushagrasinghx/BitChord)
 
 ## Disclaimer
 
-<details>
+<details open>
 <summary><b>Legal notice</b></summary>
 
 Zenith is an independent third-party audio player. It is **not** associated with Google LLC, YouTube Music, Deezer, Telegram, or any of their parent companies.
