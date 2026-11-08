@@ -37,6 +37,18 @@ The full changelog is in [RELEASE_NOTES.md](RELEASE_NOTES.md).
 
 ---
 
+## Screenshots
+
+<div align="center">
+<img src=".github/assets/screenshots/screenshot-1.jpg" alt="Zenith screenshot 1" width="32%" />
+<img src=".github/assets/screenshots/screenshot-2.jpg" alt="Zenith screenshot 2" width="32%" />
+<img src=".github/assets/screenshots/screenshot-3.jpg" alt="Zenith screenshot 3" width="32%" />
+<img src=".github/assets/screenshots/screenshot-4.jpg" alt="Zenith screenshot 4" width="32%" />
+<img src=".github/assets/screenshots/screenshot-5.jpg" alt="Zenith screenshot 5" width="32%" />
+</div>
+
+---
+
 ## Features
 
 ### Playback
