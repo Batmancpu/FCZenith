@@ -3,27 +3,33 @@
 <br/>
 <br/>
 
-<img src="Logo.png" alt="Zenith app icon" width="200" />
+<img src="app/src/main/assets/Logo.svg" alt="Zenith app icon" width="200" />
 
 # Zenith
 
-### Aesthetic YouTube Music Client
+### Aesthetic YouTube Music Client — Zeuxxi Edition
 
 <br/>
 
-[![Latest release](https://img.shields.io/github/v/release/kushagrasinghx/BitChord?style=for-the-badge&labelColor=0d1117)](https://github.com/kushagrasinghx/BitChord/releases)
-[![License](https://img.shields.io/github/license/kushagrasinghx/BitChord?style=for-the-badge&labelColor=0d1117)](https://github.com/kushagrasinghx/BitChord/blob/main/LICENSE)
-[![Downloads](https://img.shields.io/github/downloads/kushagrasinghx/BitChord/total?style=for-the-badge&labelColor=0d1117)](https://github.com/kushagrasinghx/BitChord/releases)
-[![Listening now](https://api.bitchord.kushagrasingh.in/api/stats/live/badge.svg)](https://api.bitchord.kushagrasingh.in/api/stats/live)
+[
+
+![Latest release](https://img.shields.io/github/v/release/USERNAME/Zeuxxi?style=for-the-badge&labelColor=0d1117)
+
+](https://github.com/USERNAME/Zeuxxi/releases)
+[
+
+![License](https://img.shields.io/github/license/USERNAME/Zeuxxi?style=for-the-badge&labelColor=0d1117)
+
+](LICENSE)
+[
+
+![Downloads](https://img.shields.io/github/downloads/USERNAME/Zeuxxi/total?style=for-the-badge&labelColor=0d1117)
+
+](https://github.com/USERNAME/Zeuxxi/releases)
 
 <br/>
 
-[**Download**](#download) · [**Features**](#features) · [**Contributing**](#contributing) · [**Support**](#support) · [**Disclaimer**](#disclaimer)
-
-<br/>
-
-<a href="https://fmhy.net/mobile#youtube-music" target="_blank" rel="noopener noreferrer"><img src="https://cdn.jsdelivr.net/gh/JMcrafter26/badges@main/src/assets/available/fmhy/cozy.svg" alt="Featured on FMHY" height="55"/></a>
-<a href="https://trendshift.io/repositories/177639?utm_source=repository-badge&amp;utm_medium=badge&amp;utm_campaign=badge-repository-177639" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/repositories/177639" alt="kushagrasinghx%2FZenith | Trendshift" width="250" height="55"/></a>
+[**Download**](#download) · [**Features**](#features) · [**What's different**](#whats-different) · [**Credits**](#credits) · [**Disclaimer**](#disclaimer)
 
 </div>
 
@@ -33,8 +39,6 @@
 ---
 
 <div align="center">
-
-<img src="Banner.png" alt="Zenith banner" width="100%" />
 
 <h1><a id="features"></a>Features</h1>
 
@@ -87,12 +91,28 @@
 
 <div align="center">
 
+<h1><a id="whats-different"></a>What's different from BitChord</h1>
+
+</div>
+
+Zeuxxi is my personal fork of [BitChord](https://github.com/kushagrasinghx/BitChord), reshaped into an Android-only build with its own identity and release pipeline.
+
+- **Own identity** — new "Z" launcher icon and in-app logo, package `com.zeux.zenith`, credit line "Made by Zeuxxi" in the About screen.
+- **Android only** — the project is trimmed to the `shared`, `sharedUi` and `app` modules, and the APK ships for `arm64-v8a` only.
+- **Side-by-side dev build** — a `dev` flavor (`com.zeux.zenith.dev`) installs next to the `prod` app instead of overwriting it.
+- **Automated releases** — GitHub Actions (`build-apk.yml`) builds a signed release APK with ccache, retries flaky dependency downloads, and publishes `Zenith-<version>.apk` to Releases whenever a `v*` tag is pushed.
+- **In-app updater** — checks this repository's Releases for new versions.
+- **Optimized release build** — R8 minification and resource shrinking enabled for a faster UI.
+
+---
+
+<div align="center">
+
 <h1><a id="download"></a>Download</h1>
 
-<a href="https://github.com/kushagrasinghx/BitChord/releases" target="_blank" rel="noopener noreferrer"><img src="https://cdn.jsdelivr.net/gh/JMcrafter26/badges@main/src/assets/supported/android/cozy.svg" alt="Download for Android" height="55"/></a>
+<a href="https://github.com/USERNAME/Zeuxxi/releases" target="_blank" rel="noopener noreferrer"><img src="https://cdn.jsdelivr.net/gh/JMcrafter26/badges@main/src/assets/supported/android/cozy.svg" alt="Download for Android" height="55"/></a>
 
-Grab the latest signed APK from the [Releases](https://github.com/kushagrasinghx/BitChord/releases) page. Sideloading requires enabling "Install unknown apps" for whichever app you download it with.
-
+Grab the latest signed APK from the [Releases](https://github.com/USERNAME/Zeuxxi/releases) page. Sideloading requires enabling "Install unknown apps" for whichever app you download it with.
 
 </div>
 
@@ -100,33 +120,13 @@ Grab the latest signed APK from the [Releases](https://github.com/kushagrasinghx
 
 <div align="center">
 
-<h1><a id="contributing"></a>Contributing</h1>
+<h1><a id="credits"></a>Credits</h1>
 
-We welcome contributions to Zenith! Please review our [Contributing Guide](CONTRIBUTING.md) and [Code of Conduct](CODE_OF_CONDUCT.md) before submitting a Pull Request.
+Zenith is built on top of [BitChord](https://github.com/kushagrasinghx/BitChord) by [kushagrasinghx](https://github.com/kushagrasinghx) and its contributors. Huge thanks for the original work.
+
+Lyrics providers, Bit-perfect USB reference and the lyrics animation are credited in [Features](#features).
 
 [**Contributing Guide**](CONTRIBUTING.md) · [**Code of Conduct**](CODE_OF_CONDUCT.md) · [**Maintainers**](MAINTAINERS.md) · [**Additional Docs**](ADDITIONAL.md)
-
-### Thanks to all contributors ❤
-
-<a href="https://github.com/kushagrasinghx/BitChord/graphs/contributors">
-  <img src="https://raw.githubusercontent.com/kushagrasinghx/BitChord/contributors/contributors.svg" />
-</a>
-
-</div>
-
----
-
-<div align="center">
-
-<h1><a id="support"></a>Support</h1>
-
-Zenith is free and always will be — if it's earned a spot in your rotation, you can chip in here:
-
-<a href="https://ko-fi.com/kushagrasinghx" target="_blank" rel="noopener noreferrer"><img src="https://cdn.jsdelivr.net/gh/JMcrafter26/badges@main/src/assets/donate/kofi-singular-alt/cozy.svg" alt="Support me on Ko-fi" height="55"/></a>
-<a href="https://paypal.me/kuxhagrasingh" target="_blank" rel="noopener noreferrer"><img src="https://cdn.jsdelivr.net/gh/JMcrafter26/badges@main/src/assets/donate/paypal-plural/cozy.svg" alt="Support us on PayPal" height="55"/></a>
-
-<br/>
-<img src="upi_support.jpg" alt="UPI Support" width="250" />
 
 </div>
 
