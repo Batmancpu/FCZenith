@@ -2,106 +2,106 @@
 
 <br/>
 
-<img src=".github/assets/logo.svg" alt="Logo Zenith" width="128" height="128" />
+<img src=".github/assets/icon.svg" alt="Zenith icon" width="160" height="160" />
 
 <h1>Zenith</h1>
 
-<p><b>Pemutar YouTube Music untuk Android dengan tampilan ala Apple Music</b><br/>Edisi Zeuxxi</p>
+<p><b>An Apple Music–style YouTube Music player for Android</b><br/>Zeuxxi Edition</p>
 
 <p>
-<a href="https://github.com/rezapranata089-bit/Zenith/releases"><img src="https://img.shields.io/github/v/release/rezapranata089-bit/Zenith?style=flat-square&amp;labelColor=0d1117&amp;color=ff4d6d" alt="Rilis terbaru" /></a>
-<a href="https://github.com/rezapranata089-bit/Zenith/releases"><img src="https://img.shields.io/github/downloads/rezapranata089-bit/Zenith/total?style=flat-square&amp;labelColor=0d1117&amp;color=ff4d6d" alt="Unduhan" /></a>
-<a href="LICENSE"><img src="https://img.shields.io/github/license/rezapranata089-bit/Zenith?style=flat-square&amp;labelColor=0d1117&amp;color=ff4d6d" alt="Lisensi" /></a>
+<a href="https://github.com/rezapranata089-bit/Zenith/releases"><img src="https://img.shields.io/github/v/release/rezapranata089-bit/Zenith?style=flat-square&amp;labelColor=0d1117&amp;color=ff4d6d" alt="Latest release" /></a>
+<a href="https://github.com/rezapranata089-bit/Zenith/releases"><img src="https://img.shields.io/github/downloads/rezapranata089-bit/Zenith/total?style=flat-square&amp;labelColor=0d1117&amp;color=ff4d6d" alt="Downloads" /></a>
+<a href="LICENSE"><img src="https://img.shields.io/github/license/rezapranata089-bit/Zenith?style=flat-square&amp;labelColor=0d1117&amp;color=ff4d6d" alt="License" /></a>
 </p>
 
 <p>
 <a href="#download">Download</a> ·
-<a href="#fitur">Fitur</a> ·
-<a href="#bedanya-dengan-bitchord">Bedanya dengan BitChord</a> ·
-<a href="#kredit">Kredit</a> ·
+<a href="#features">Features</a> ·
+<a href="#whats-different-from-bitchord">What's different</a> ·
+<a href="#credits">Credits</a> ·
 <a href="#disclaimer">Disclaimer</a>
 </p>
 
 </div>
 
 > [!IMPORTANT]
-> Zenith tidak berafiliasi, tidak didukung, dan tidak terhubung dengan YouTube maupun Google. Gunakan dengan bijak.
+> Zenith is not affiliated with, endorsed by, or connected to YouTube or Google in any way. Use it at your own discretion.
 
 ---
 
 ## Download
 
-Ambil APK terbaru di halaman [Releases](https://github.com/rezapranata089-bit/Zenith/releases). Aplikasi ini hanya untuk Android (arm64). Saat memasang dari file, aktifkan izin "Install unknown apps" untuk aplikasi yang kamu pakai membuka APK.
+Grab the latest APK from the [Releases](https://github.com/rezapranata089-bit/Zenith/releases) page. Zenith is Android only (arm64). When installing from a file, allow "Install unknown apps" for the app you open the APK with.
 
-Catatan perubahan lengkap ada di [RELEASE_NOTES.md](RELEASE_NOTES.md).
-
----
-
-## Fitur
-
-### Pemutaran
-- Cari, jelajahi, dan putar apa saja dari YouTube Music.
-- Audio Hi-Res lossless (FLAC/ALAC) dari sumber modul, YouTube Music sebagai cadangan.
-- Gapless dengan crossfade asli, atur 0–12 detik.
-- Automix (Beta): transisi ala DJ dengan beat-matching dan tempo-stretching.
-- Unduh lagu untuk offline, lengkap dengan metadata.
-- Pustaka musik lokal, pemutaran latar belakang lewat media session.
-- Output USB bit-perfect ke USB DAC pada sample rate dan bit depth aslinya. Terima kasih kepada [Mornye](https://github.com/mornyeapp/Mornye) untuk referensinya.
-
-### Tampilan
-- Gaya Apple Music: squircle, aksen warna pilihan, kaca cair (Liquid Glass) dan mode Frosted Glass yang lebih ringan.
-- Mini player dan big player menyatu dalam satu panel, cover terbang saat berpindah halaman.
-- Animated album canvas di layar pemutar.
-- Tema dinamis dari warna cover album.
-
-### Lirik
-- Lirik sinkron per kata dengan mesin MOTION dan efek LiquidFlow.
-- Animasi lirik ala Apple Music, kredit ke [binimum](https://github.com/binimum/am-lyrics).
-- Penyedia lirik: [lrc.red](https://lrc.red), [BiniLyrics](https://github.com/binimum), [BetterLyrics](https://github.com/better-lyrics/better-lyrics), [PaxSenix](https://lyrics.paxsenix.org), [LyricsPlus](https://github.com/ibratabian17/YouLyPlus), [SimpMusic](https://github.com/maxrave-dev/SimpMusic), [Unison](https://unison.boidu.dev), [Megalobiz](https://www.megalobiz.com), [KuGou](https://www.kugou.com), [LRCLIB](https://lrclib.net), [Musixmatch](https://www.musixmatch.com), dan [Genius](https://genius.com).
-
-### Akun dan koneksi
-- Masuk dengan akun Google untuk konten personal.
-- Integrasi Spotify untuk playlist dan Liked Songs.
-- Discord Rich Presence dan scrobbling ke Last.fm serta ListenBrainz.
-- Listen Together untuk mendengarkan bareng.
-- Sumber musik modular yang bisa ditambah, diedit, dan dicek.
-
-### Kontrol
-- Kualitas audio terpisah untuk Wi-Fi dan data seluler.
-- Kecepatan putar 0,5×–2,0×, skip silence, sleep timer, dan equalizer sistem.
-- Stats for nerds: codec, bit depth, dan sample rate di layar pemutar.
+The full changelog is in [RELEASE_NOTES.md](RELEASE_NOTES.md).
 
 ---
 
-## Bedanya dengan BitChord
+## Features
 
-Zenith adalah fork pribadiku dari [BitChord](https://github.com/kushagrasinghx/BitChord). Yang berubah:
+### Playback
+- Search, browse and play anything on YouTube Music.
+- Hi-Res lossless audio (FLAC/ALAC) from a configured module source, with YouTube Music as fallback.
+- Gapless playback with true crossfade, adjustable from 0 to 12 seconds.
+- Automix (Beta): DJ-style transitions with beat-matching and tempo-stretching.
+- Offline downloads with embedded metadata.
+- Local music library and background playback through a proper media session.
+- Bit-perfect USB output to a USB DAC at each track's own sample rate and bit depth. Thanks to [Mornye](https://github.com/mornyeapp/Mornye) for the reference.
 
-- **Identitas sendiri**: nama Zenith, logo Z baru, package `com.zeux.zenith`, unduhan masuk ke `Music/Zenith`.
-- **Android saja**: kode TV, web, backend, desktop, dan Wear OS dibuang, APK hanya untuk arm64-v8a.
-- **Tampilan ala Apple Music**: skema warna baru, 10 pilihan warna aksen, toggle, slider, dan segmented control berbahan kaca.
-- **Pemutar baru**: satu panel yang berubah bentuk dari mini ke penuh, canvas layar penuh, transisi cover antar lagu.
-- **Home dan Library baru**: kartu Top Picks, Made for You Mix, Most Played, hero Liked Music.
-- **Automix lebih presisi**: koreksi fase beat, deteksi tempo dan cue yang lebih baik.
-- **Cache dan kecepatan**: cache disk untuk browse, lirik, dan pencarian, preset awal dengan cadangan untuk HP RAM kecil.
-- **Rilis otomatis**: GitHub Actions membuat APK bertanda tangan setiap tag `v*` di-push, dan updater di dalam app mengecek repo ini.
+### Look and feel
+- Apple Music style: squircle shapes, a choice of accent colors, Liquid Glass and a lighter Frosted Glass mode.
+- Mini player and big player share one morphing panel, and covers fly between screens.
+- Animated album canvas on the player screen.
+- Dynamic theme taken from the album artwork.
+
+### Lyrics
+- Word-synced lyrics with the MOTION engine and the LiquidFlow effect.
+- Apple Music–style lyrics animation, credit to [binimum](https://github.com/binimum/am-lyrics).
+- Lyrics providers: [lrc.red](https://lrc.red), [BiniLyrics](https://github.com/binimum), [BetterLyrics](https://github.com/better-lyrics/better-lyrics), [PaxSenix](https://lyrics.paxsenix.org), [LyricsPlus](https://github.com/ibratabian17/YouLyPlus), [SimpMusic](https://github.com/maxrave-dev/SimpMusic), [Unison](https://unison.boidu.dev), [Megalobiz](https://www.megalobiz.com), [KuGou](https://www.kugou.com), [LRCLIB](https://lrclib.net), [Musixmatch](https://www.musixmatch.com) and [Genius](https://genius.com).
+
+### Accounts and connections
+- Sign in with Google for personalized content.
+- Spotify integration for your playlists and Liked Songs.
+- Discord Rich Presence, plus scrobbling to Last.fm and ListenBrainz.
+- Listen Together for listening in sync with friends.
+- Pluggable module sources you can add, edit and test.
+
+### Controls
+- Separate audio quality for Wi-Fi and mobile data.
+- Playback speed from 0.5× to 2.0×, skip silence, sleep timer and system equalizer.
+- Stats for nerds: codec, bit depth and sample rate on the player screen.
 
 ---
 
-## Kredit
+## What's different from BitChord
 
-Zenith dibangun di atas [BitChord](https://github.com/kushagrasinghx/BitChord) karya [kushagrasinghx](https://github.com/kushagrasinghx) dan para kontributornya. Terima kasih untuk fondasinya.
+Zenith is my personal fork of [BitChord](https://github.com/kushagrasinghx/BitChord). What changed:
+
+- **Own identity**: renamed to Zenith, new Z icon, package `com.zeux.zenith`, downloads saved to `Music/Zenith`.
+- **Android only**: TV, web, backend, desktop and Wear OS code removed, APK built for arm64-v8a only.
+- **Apple Music–style UI**: new color scheme, 10 accent colors, glass toggles, sliders and segmented controls.
+- **New player**: one panel that morphs from mini to full, full-screen canvas, cover transitions between songs.
+- **New Home and Library**: Top Picks cards, Made for You Mix, Most Played, Liked Music hero.
+- **More precise Automix**: beat-phase correction, better tempo and cue detection.
+- **Caching and speed**: disk cache for browse, lyrics and search, first-run presets with a fallback for low-RAM phones.
+- **Automated releases**: GitHub Actions builds a signed APK whenever a `v*` tag is pushed, and the in-app updater checks this repository.
+
+---
+
+## Credits
+
+Zenith is built on top of [BitChord](https://github.com/kushagrasinghx/BitChord) by [kushagrasinghx](https://github.com/kushagrasinghx) and its contributors. Thank you for the foundation.
 
 ---
 
 ## Disclaimer
 
-Zenith adalah pemutar audio pihak ketiga yang independen. Aplikasi ini **tidak** terkait dengan Google LLC, YouTube Music, Deezer, Telegram, atau perusahaan induk mereka.
+Zenith is an independent third-party audio player. It is **not** associated with Google LLC, YouTube Music, Deezer, Telegram, or any of their parent companies.
 
-- **Tidak menyimpan media**: Zenith tidak meng-host atau mengunggah musik berhak cipta. Aplikasi hanya menjadi antarmuka untuk membaca penyimpanan lokal atau memutar dari API publik atau API yang sudah kamu login.
-- **Penggunaan wajar**: dibuat untuk keperluan pribadi, riset, dan edukasi. Kamu bertanggung jawab memastikan pemakaianmu sesuai hukum hak cipta setempat dan Ketentuan Layanan YouTube.
-- **Tanpa jaminan**: tidak ada jaminan fitur akan terus berjalan bila platform pihak ketiga mengubah aturannya.
+- **No media hosting**: Zenith does not host or upload copyrighted music. It only acts as an interface to local storage or to public and user-authenticated APIs.
+- **Fair use**: made for personal, research and educational purposes. You are responsible for following your local copyright laws and the YouTube Terms of Service.
+- **No guarantees**: features may stop working if third-party platforms change their rules.
 
-## Lisensi
+## License
 
-Proyek ini berlisensi **GNU GPL v3.0**. Lihat berkas [LICENSE](LICENSE). Siapa pun yang mendistribusikan salinannya wajib menyertakan kode sumber dengan lisensi yang sama.
+This project is licensed under the **GNU GPL v3.0**. See the [LICENSE](LICENSE) file. Anyone distributing copies must provide the source code under the same license.
