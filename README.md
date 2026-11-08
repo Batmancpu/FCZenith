@@ -15,15 +15,16 @@
 <img src="https://img.shields.io/badge/Android-8.0%2B-ff4d6d?style=flat-square&amp;labelColor=0d1117" alt="Android 8.0+" />
 </p>
 
+<a href="https://github.com/rezapranata089-bit/Zenith/releases/latest"><img src="https://img.shields.io/badge/Download%20the%20latest%20APK-ff4d6d?style=for-the-badge&amp;logo=android&amp;logoColor=white" alt="Download the latest APK" /></a>
+
 <p>
 <a href="#screenshots">Screenshots</a> ·
+<a href="#highlights">Highlights</a> ·
 <a href="#download">Download</a> ·
 <a href="#features">Features</a> ·
 <a href="#whats-different-from-bitchord">What's different</a> ·
 <a href="#credits">Credits</a>
 </p>
-
-<a href="https://github.com/rezapranata089-bit/Zenith/releases/latest"><img src="https://img.shields.io/badge/Download%20the%20latest%20APK-ff4d6d?style=for-the-badge&amp;logo=android&amp;logoColor=white" alt="Download the latest APK" /></a>
 
 </div>
 
@@ -35,12 +36,34 @@
 ## Screenshots
 
 <div align="center">
-<img src=".github/assets/screenshots/screenshot-1.jpg" alt="Zenith screenshot 1" width="32%" />
-<img src=".github/assets/screenshots/screenshot-2.jpg" alt="Zenith screenshot 2" width="32%" />
-<img src=".github/assets/screenshots/screenshot-3.jpg" alt="Zenith screenshot 3" width="32%" />
-<img src=".github/assets/screenshots/screenshot-4.jpg" alt="Zenith screenshot 4" width="32%" />
-<img src=".github/assets/screenshots/screenshot-5.jpg" alt="Zenith screenshot 5" width="32%" />
+<table>
+  <tr>
+    <td align="center" width="33%"><img src=".github/assets/screenshots/screenshot-1.jpg" alt="Home" width="100%" /><br/><sub><b>Home</b></sub></td>
+    <td align="center" width="33%"><img src=".github/assets/screenshots/screenshot-2.jpg" alt="Explore" width="100%" /><br/><sub><b>Explore</b></sub></td>
+    <td align="center" width="33%"><img src=".github/assets/screenshots/screenshot-3.jpg" alt="Library" width="100%" /><br/><sub><b>Library</b></sub></td>
+  </tr>
+  <tr>
+    <td align="center" width="33%"><img src=".github/assets/screenshots/screenshot-4.jpg" alt="Liked Music" width="100%" /><br/><sub><b>Liked Music</b></sub></td>
+    <td align="center" width="33%"><img src=".github/assets/screenshots/screenshot-5.jpg" alt="Player" width="100%" /><br/><sub><b>Player</b></sub></td>
+    <td align="center" width="33%"></td>
+  </tr>
+</table>
 </div>
+
+---
+
+## Highlights
+
+| Area | What you get |
+| --- | --- |
+| **Player** | Mini and big player move as one panel, with covers that fly between screens and a full-screen animated canvas. |
+| **Home and Library** | Top Picks, Made for You Mix, Most Played, and a Liked Music hero in the style of Apple Music. |
+| **Lyrics** | Word-by-word highlighting with a new engine and the LiquidFlow effect. |
+| **Automix** | Beat-matched transitions with better tempo and cue detection. |
+| **Look** | Liquid Glass controls, a lighter Frosted Glass mode, and 10 accent colors. |
+| **Queue** | Apple Music–style queue with an Add Songs popup and live search. |
+| **Offline** | Downloads, animated covers and browse data stay available without a connection. |
+| **Speed** | Disk caching and sensible first-run defaults for quicker loading. |
 
 ---
 
@@ -50,7 +73,13 @@
 2. Download the APK file.
 3. Open it and allow "Install unknown apps" if Android asks.
 
-Zenith is Android only (arm64) and checks for new versions by itself. Past versions and their changes are listed in [Releases](https://github.com/rezapranata089-bit/Zenith/releases).
+| | |
+| --- | --- |
+| **Android** | 8.0 or newer |
+| **Architecture** | arm64 |
+| **Updates** | Checked inside the app |
+
+Past versions and their changes are listed in [Releases](https://github.com/rezapranata089-bit/Zenith/releases).
 
 ---
 
@@ -113,18 +142,15 @@ Zenith is Android only (arm64) and checks for new versions by itself. Past versi
 
 Zenith is my personal fork of [BitChord](https://github.com/kushagrasinghx/BitChord).
 
-<details>
-<summary><b>See what changed</b></summary>
-
-- New identity: renamed to Zenith with its own icon.
-- Android only: other platforms removed, to keep the app focused and the build fast.
-- Apple Music–style interface across Home, Library, the player and Settings.
-- A redesigned player with fluid cover transitions and a full-screen canvas.
-- More precise Automix and a new lyrics engine.
-- Faster loading through disk caching and sensible first-run defaults.
-- Signed releases built automatically with GitHub Actions.
-
-</details>
+| | BitChord | Zenith |
+| --- | :---: | :---: |
+| Platforms | Several | Android only |
+| Interface | Material | Apple Music–style |
+| Player | Separate mini and full | One morphing panel |
+| Lyrics | Word-synced | New MOTION engine |
+| Automix | Beat-matched | Closed-loop beat correction |
+| Accent colors | Fixed | 10 to choose from |
+| Releases | Manual | Signed, built by GitHub Actions |
 
 ---
 
