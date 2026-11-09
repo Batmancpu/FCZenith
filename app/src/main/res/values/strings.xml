@@ -302,6 +302,8 @@
     <string name="home_layout_description">Drag a row by its handle to move it. Untick a row to hide it from Home.</string>
     <string name="home_layout_empty">Home is still loading. Open this again once the rows have appeared.</string>
     <string name="home_row_top_picks">Top Picks for You</string>
+    <string name="still_video_covers">Cover instead of video</string>
+    <string name="still_video_covers_subtitle">Never plays the video in the player. Songs with no audio version show their cover</string>
     <string name="square_video_covers">Square video covers</string>
     <string name="square_video_covers_subtitle">Shows every music video as a square, in lists, cards and the player</string>
     <string name="equalizer">Equalizer</string>

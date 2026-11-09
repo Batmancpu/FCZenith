@@ -119,7 +119,9 @@ class AndroidPlayerHost(context: Context) : PlayerHost {
     @Composable
     override fun CanvasVideo(spec: CanvasVideoSpec, modifier: Modifier) = AndroidCanvasVideo(spec, modifier)
 
-    override val musicVideoSupported: Boolean get() = true
+    // Dimatikan oleh setelan "Sampul, bukan video": pemutar lalu menampilkan cover
+    // diam, dan tidak ada permukaan video yang dibuat untuk lagu bertipe video.
+    override val musicVideoSupported: Boolean get() = !AppSettings.stillVideoCovers.value
 
     @Composable
     override fun MusicVideo(videoId: String, fit: Boolean, onRenderedChanged: (Boolean) -> Unit, modifier: Modifier) =

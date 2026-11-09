@@ -609,6 +609,9 @@ object AppSettings {
     /** Shows every music video as a square, see [VideoThumbnails]. */
     val squareVideoCovers = MutableStateFlow(false)
 
+    /** Never plays the music video in the player: a video track shows its cover instead. */
+    val stillVideoCovers = MutableStateFlow(false)
+
     /** The listener's own order and hidden rows on Home. Empty keeps the built-in order. */
     val homeLayout = MutableStateFlow(HomeLayout())
 
@@ -1274,6 +1277,7 @@ object AppSettings {
         hideHomeMoods.value = prefs.getBoolean(KEY_HIDE_HOME_MOODS, false)
         squareVideoCovers.value = prefs.getBoolean(KEY_SQUARE_VIDEO_COVERS, false)
         VideoThumbnails.square = squareVideoCovers.value
+        stillVideoCovers.value = prefs.getBoolean(KEY_STILL_VIDEO_COVERS, false)
         homeLayout.value = HomeLayout.decode(prefs.getString(KEY_HOME_LAYOUT, null))
         reduceDynamicBlur.value = prefs.getBoolean(KEY_REDUCE_BLUR, false)
         liquidGlass.value = prefs.getBoolean(KEY_LIQUID_GLASS, false)
@@ -1796,6 +1800,11 @@ object AppSettings {
         squareVideoCovers.value = value
         VideoThumbnails.square = value
         prefs.edit().putBoolean(KEY_SQUARE_VIDEO_COVERS, value).apply()
+    }
+
+    fun setStillVideoCovers(value: Boolean) {
+        stillVideoCovers.value = value
+        prefs.edit().putBoolean(KEY_STILL_VIDEO_COVERS, value).apply()
     }
 
     fun setHomeLayout(value: HomeLayout) {
@@ -2659,6 +2668,7 @@ object AppSettings {
     private const val KEY_HIDE_HOME_TOP_PICKS = "hide_home_top_picks"
     private const val KEY_HIDE_HOME_MOODS = "hide_home_moods"
     private const val KEY_SQUARE_VIDEO_COVERS = "square_video_covers"
+    private const val KEY_STILL_VIDEO_COVERS = "still_video_covers"
     private const val KEY_HOME_LAYOUT = "home_layout"
     private const val KEY_REDUCE_BLUR = "reduce_dynamic_blur"
     private const val KEY_LIQUID_GLASS = "liquid_glass"

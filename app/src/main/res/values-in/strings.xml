@@ -1128,6 +1128,8 @@
     <string name="home_layout_description">Seret baris lewat gagangnya untuk memindahkan. Hapus centang untuk menyembunyikannya dari Beranda.</string>
     <string name="home_layout_empty">Beranda masih dimuat. Buka lagi setelah barisnya muncul.</string>
     <string name="home_row_top_picks">Pilihan Teratas untuk Anda</string>
+    <string name="still_video_covers">Sampul, bukan video</string>
+    <string name="still_video_covers_subtitle">Video tidak diputar di pemutar. Lagu tanpa versi audio hanya menampilkan sampulnya</string>
     <string name="square_video_covers">Sampul video persegi</string>
     <string name="square_video_covers_subtitle">Menampilkan semua music video berbentuk persegi, di daftar, kartu, dan pemutar</string>
 

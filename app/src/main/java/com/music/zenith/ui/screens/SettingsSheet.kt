@@ -312,6 +312,7 @@ fun SettingsScreen(
     val autoMusicOnly by AppSettings.autoMusicOnly.collectAsStateWithLifecycle()
     val hideHomeVideos by AppSettings.hideHomeVideos.collectAsStateWithLifecycle()
     val squareVideoCovers by AppSettings.squareVideoCovers.collectAsStateWithLifecycle()
+    val stillVideoCovers by AppSettings.stillVideoCovers.collectAsStateWithLifecycle()
     val filterNonMusicAudio by AppSettings.filterNonMusicAudio.collectAsStateWithLifecycle()
     val localMusicFolderUri by AppSettings.localMusicFolderUri.collectAsStateWithLifecycle()
     val highPerformanceMode by AppSettings.highPerformanceMode.collectAsStateWithLifecycle()
@@ -1025,6 +1026,21 @@ fun SettingsScreen(
                         )
                     },
                     onClick = { AppSettings.setSquareVideoCovers(!squareVideoCovers) },
+                )
+            }
+            val stillVideoCoversTitle = stringResource(R.string.still_video_covers)
+            row(stillVideoCoversTitle, "video", "cover", "thumbnail", "artwork", "player", "still") {
+                SettingsRow(
+                    icon = SfIcons.Video,
+                    title = stillVideoCoversTitle,
+                    subtitle = stringResource(R.string.still_video_covers_subtitle),
+                    trailing = {
+                        IosSwitch(
+                            checked = stillVideoCovers,
+                            onCheckedChange = AppSettings::setStillVideoCovers,
+                        )
+                    },
+                    onClick = { AppSettings.setStillVideoCovers(!stillVideoCovers) },
                 )
             }
         }

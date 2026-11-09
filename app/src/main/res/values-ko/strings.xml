@@ -290,6 +290,8 @@
     <string name="home_layout_description">손잡이를 끌어 줄을 옮겨요. 체크를 해제하면 홈에서 숨겨져요.</string>
     <string name="home_layout_empty">홈을 아직 불러오는 중이에요. 줄이 나타난 뒤 다시 열어 주세요.</string>
     <string name="home_row_top_picks">나를 위한 추천 선곡</string>
+    <string name="still_video_covers">비디오 대신 커버</string>
+    <string name="still_video_covers_subtitle">플레이어에서 비디오를 재생하지 않아요. 오디오 버전이 없는 곡은 커버만 표시해요</string>
     <string name="square_video_covers">정사각형 비디오 커버</string>
     <string name="square_video_covers_subtitle">목록, 카드, 플레이어에서 모든 뮤직비디오를 정사각형으로 표시해요</string>
     <string name="equalizer">이퀄라이저</string>
