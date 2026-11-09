@@ -295,6 +295,8 @@ fun FloatingTabBar(
     chromeDownPush: (() -> Float)? = null,
     /** Goyangan jelly pill accessory inline; tab dan Search terdorong olehnya. */
     jellyPush: JellyPush? = null,
+    /** true = tab terakhir (Search) dipisah jadi lingkaran sendiri hanya saat bar inline. */
+    inlineSplitLast: Boolean = false,
     tabBarContentModifier: @Composable () -> Modifier = DefaultTabBarContentModifier,
     inlineAccessory: (@Composable SharedTransitionScope.(Modifier, AnimatedVisibilityScope) -> Unit)? = null,
     expandedAccessory: (@Composable SharedTransitionScope.(Modifier, AnimatedVisibilityScope) -> Unit)? = null,
@@ -305,7 +307,9 @@ fun FloatingTabBar(
     contentKey: Any? = null,
     content: FloatingTabBarScope.() -> Unit
 ) {
-    val scope = remember(contentKey) { FloatingTabBarScopeImpl().apply { content() } }
+    val scope = remember(contentKey, inlineSplitLast) {
+        FloatingTabBarScopeImpl(inlineSplitLast).apply { content() }
+    }
 
     val isAccessoryShared = inlineAccessory != null && expandedAccessory != null
 
@@ -622,7 +626,7 @@ private fun SharedTransitionScope.InlineBar(
     neighbourPull: () -> Float = { 0f }
 ) {
     val inlineTab = scope.getInlineTab(selectedTabKey)
-    val standaloneTab = scope.standaloneTab
+    val standaloneTab = scope.inlineStandaloneTab
     val hasInlineTab = inlineTab != null
     // Tab menyingkir ke sisi awalnya, Search ke sisi akhirnya.
     val startSign = if (LocalLayoutDirection.current == LayoutDirection.Rtl) 1f else -1f
@@ -1407,14 +1411,36 @@ private fun Modifier.animateEnterExitTab(
     }
 }
 
-private class FloatingTabBarScopeImpl : FloatingTabBarScope {
+private class FloatingTabBarScopeImpl(
+    private val inlineSplitLast: Boolean = false,
+) : FloatingTabBarScope {
     val tabs = mutableStateListOf<FloatingTabBarTab>()
     var standaloneTab: FloatingTabBarTab? by mutableStateOf(null)
         private set
     private var inlineTab: FloatingTabBarTab? = null
 
+    /**
+     * Standalone tab untuk bentuk inline. Jika tidak ada standalone asli,
+     * tab terakhir dipisah jadi lingkaran (ikon saja) saat [inlineSplitLast] aktif.
+     * Bentuk expanded tetap memakai [standaloneTab] (satu pil).
+     */
+    val inlineStandaloneTab: FloatingTabBarTab?
+        get() = standaloneTab ?: if (inlineSplitLast && tabs.size > 1) {
+            tabs.last().let { t ->
+                FloatingTabBarTab(
+                    key = t.key,
+                    title = {},
+                    icon = t.icon,
+                    onClick = t.onClick,
+                    indication = t.indication
+                )
+            }
+        } else {
+            null
+        }
+
     fun getInlineTab(selectedTabKey: Any?): FloatingTabBarTab? {
-        return if (selectedTabKey != standaloneTab?.key) {
+        return if (selectedTabKey != inlineStandaloneTab?.key) {
             val selectedTab = tabs.find { it.key == selectedTabKey }
             if (selectedTab != null) {
                 inlineTab = selectedTab

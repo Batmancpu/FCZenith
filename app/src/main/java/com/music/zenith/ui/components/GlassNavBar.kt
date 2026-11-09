@@ -170,6 +170,7 @@ val haptics = rememberHaptics()
         chromeSidePush = chromeSidePush,
         chromeDownPush = chromeDownPush,
         jellyPush = jellyPush,
+        inlineSplitLast = !searchSeparate,
         modifier = modifier
             .windowInsetsPadding(floatingBarInsets)
             .padding(horizontal = NAV_BAR_GUTTER)
