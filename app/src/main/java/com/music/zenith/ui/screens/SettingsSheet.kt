@@ -1860,15 +1860,71 @@ fun SettingsScreen(
         // The version line is the page's colophon, not a setting: it belongs to
         // the whole list, so it goes when the list is narrowed to a few rows.
         if (section == null && searchQuery.isBlank()) {
-            Text(
-                text = "Zenith $version\nMade by Zeuxxi",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 24.dp, bottom = 8.dp),
-            )
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    text = "Zenith $version",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Row(
+                    modifier = Modifier.padding(top = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "Made with ",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Icon(
+                        imageVector = SfIcons.Heart,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(11.dp),
+                    )
+                    Text(
+                        text = " by Zeuxxi",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Column(
+                    modifier = Modifier
+                        .padding(top = 16.dp)
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f)),
+                ) {
+                    FooterLinkRow(
+                        icon = SfIcons.Person,
+                        title = "Developer",
+                        subtitle = "github.com/rezapranata089-bit",
+                        onClick = { context.openLink("https://github.com/rezapranata089-bit") },
+                    )
+                    HorizontalDivider(
+                        modifier = Modifier.padding(start = 52.dp),
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                    )
+                    FooterLinkRow(
+                        icon = SfIcons.Star,
+                        title = "Star Zenith on GitHub",
+                        subtitle = "Source code · rezapranata089-bit/Zenith",
+                        onClick = { context.openLink("https://github.com/rezapranata089-bit/Zenith") },
+                    )
+                }
+                Text(
+                    text = "Enjoying Zenith? A star on GitHub means a lot.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 12.dp),
+                )
+            }
         }
     }
 
@@ -2149,6 +2205,64 @@ fun SettingsScreen(
         )
     }
 
+}
+
+/** Opens [url] in the browser; shows the address instead when nothing can open it. */
+private fun Context.openLink(url: String) {
+    runCatching {
+        startActivity(
+            Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    }.onFailure {
+        Toast.makeText(this, url, Toast.LENGTH_SHORT).show()
+    }
+}
+
+/** One tappable link in the settings footer card. */
+@Composable
+private fun FooterLinkRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(22.dp),
+        )
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Icon(
+            imageVector = SfIcons.ChevronRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(14.dp),
+        )
+    }
 }
 
 /** "3 months of listening" — the unit a backup is actually measured in. */
