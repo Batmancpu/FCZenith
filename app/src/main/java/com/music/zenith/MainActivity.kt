@@ -561,7 +561,7 @@ private fun ZenithApp(
     // What folds [GlassNavBar] between its expanded and inline shapes. Held here
     // rather than inside the bar because the page's scroll is what drives it,
     // and the page is a sibling of the bar rather than a child.
-    val navBarScroll = rememberFloatingTabBarScrollConnection()
+    val navBarScroll = rememberFloatingTabBarScrollConnection(expandOnlyAtTop = true)
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     // Explore loads the first time it's shown, not at launch beside Home.
     LaunchedEffect(selectedTab) {
@@ -1242,6 +1242,11 @@ private fun ZenithApp(
         TAB_EXPLORE -> if (selectedMoodGenre == null) exploreListState else moodGenreListState
         TAB_LIBRARY -> libraryListState
         else -> searchListState
+    }
+    // The collapsed bar stays collapsed while scrolling up, and opens only at the top.
+    LaunchedEffect(currentListState) {
+        androidx.compose.runtime.snapshotFlow { currentListState.canScrollBackward }
+            .collect { canScrollBack -> if (!canScrollBack) navBarScroll.expand() }
     }
 
     // Pull-to-refresh: the drag lives with the feed, but the indicator is the

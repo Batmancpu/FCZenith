@@ -387,7 +387,8 @@ private val LiquidBounds = androidx.compose.animation.BoundsTransform { _, _ ->
 class FloatingTabBarScrollConnection(
     initialIsInline: Boolean = false,
     private val scrollThresholdPx: Float,
-    private val inlineBehavior: FloatingTabBarInlineBehavior = FloatingTabBarInlineBehavior.OnScrollDown
+    private val inlineBehavior: FloatingTabBarInlineBehavior = FloatingTabBarInlineBehavior.OnScrollDown,
+    private val expandOnlyAtTop: Boolean = false
 ) : NestedScrollConnection {
     var isInline by mutableStateOf(initialIsInline)
         private set
@@ -427,7 +428,7 @@ class FloatingTabBarScrollConnection(
                     // Scrolling down enough - transition to inline mode
                     isInline = true
                     accumulatedScroll = 0f // Reset after state change
-                } else if (accumulatedScroll >= scrollThresholdPx && isInline) {
+                } else if (accumulatedScroll >= scrollThresholdPx && isInline && !expandOnlyAtTop) {
                     // Scrolling up enough - transition to expanded mode
                     isInline = false
                     accumulatedScroll = 0f // Reset after state change
@@ -454,6 +455,18 @@ class FloatingTabBarScrollConnection(
 
         return Offset.Zero // Don't consume the scroll, let it pass through
     }
+
+    override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+        // Scrolling up with nothing left to scroll: the page has reached its top.
+        if (expandOnlyAtTop &&
+            inlineBehavior == FloatingTabBarInlineBehavior.OnScrollDown &&
+            isInline &&
+            available.y > 0f
+        ) {
+            expand()
+        }
+        return Offset.Zero
+    }
 }
 
 /**
@@ -468,11 +481,12 @@ class FloatingTabBarScrollConnection(
 fun rememberFloatingTabBarScrollConnection(
     initialIsInline: Boolean = false,
     scrollThreshold: Dp = 50.dp,
-    inlineBehavior: FloatingTabBarInlineBehavior = FloatingTabBarInlineBehavior.OnScrollDown
+    inlineBehavior: FloatingTabBarInlineBehavior = FloatingTabBarInlineBehavior.OnScrollDown,
+    expandOnlyAtTop: Boolean = false
 ): FloatingTabBarScrollConnection = with(LocalDensity.current) {
     val scrollThresholdPx = scrollThreshold.toPx()
-    remember(scrollThresholdPx, inlineBehavior, initialIsInline) {
-        FloatingTabBarScrollConnection(initialIsInline, scrollThresholdPx, inlineBehavior)
+    remember(scrollThresholdPx, inlineBehavior, initialIsInline, expandOnlyAtTop) {
+        FloatingTabBarScrollConnection(initialIsInline, scrollThresholdPx, inlineBehavior, expandOnlyAtTop)
     }
 }
 
