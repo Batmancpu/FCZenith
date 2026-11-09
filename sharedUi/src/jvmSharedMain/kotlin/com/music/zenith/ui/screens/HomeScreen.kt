@@ -103,6 +103,7 @@ import com.music.zenith.ui.components.rememberCoverTap
 import com.music.zenith.ui.components.feedMoreSkeleton
 import com.music.zenith.ui.components.feedSkeleton
 import com.music.zenith.ui.components.recentlyPlayedSkeleton
+import com.music.zenith.ui.components.ShelfSkeleton
 import com.music.zenith.ui.components.heroCardWidth
 import com.music.zenith.ui.components.thumbnailBorder
 import com.music.zenith.ui.components.trackColumnWidth
@@ -165,6 +166,48 @@ private fun List<HomeShelf>.withOtherModelBelowListenAgain(): List<HomeShelf> {
         ?: (again + 2 until size).firstOrNull { !this[it].isCardRow() }
         ?: return this
     return toMutableList().also { it.add(again + 1, it.removeAt(from)) }
+}
+
+/** How many placeholder rows a custom layout shows while the feed loads. */
+private const val HOME_SKELETON_SLOTS = 4
+
+/**
+ * Loading placeholders in the order the listener arranged Home: Top Picks,
+ * Recents and every shelf each get a skeleton in their own slot. Hidden rows
+ * are not passed in; Top Picks, Find Your Mood and Recents only get one when
+ * they are actually going to be drawn.
+ */
+private fun androidx.compose.foundation.lazy.LazyListScope.homeLayoutSkeleton(
+    slots: List<String>,
+    withTopPicks: Boolean,
+    withMoods: Boolean,
+    withRecents: Boolean,
+) {
+    val recentsKey = homeShelfKey(RECENTS_TITLE)
+    var shown = 0
+    for (key in slots) {
+        if (shown >= HOME_SKELETON_SLOTS) break
+        val position = shown
+        when {
+            key == HOME_SLOT_TOP_PICKS -> if (withTopPicks) {
+                topPicksSkeleton()
+                shown++
+            }
+            key == recentsKey -> if (withRecents) {
+                recentlyPlayedSkeleton()
+                shown++
+            }
+            key == HOME_SLOT_MOODS -> if (withMoods) {
+                item(key = "skeleton:slot:$key") { ShelfSkeleton(index = position) }
+                shown++
+            }
+            else -> {
+                item(key = "skeleton:slot:$key") { ShelfSkeleton(index = position) }
+                shown++
+            }
+        }
+    }
+    if (shown == 0) feedSkeleton(firstIsHero = false)
 }
 
 private fun List<ShelfItem>.playingItemMatcher(song: Song?): (ShelfItem) -> Boolean {
@@ -240,12 +283,16 @@ fun HomeScreen(
     // A custom layout places Top Picks itself, among the other rows, once the feed
     // is in. Until then it only goes above the feed when the layout puts it first;
     // anywhere else it waits for its slot rather than jump there later.
+    // A custom layout draws Top Picks (and its skeleton) in its own slot; only an
+    // error page keeps it above the message when the layout puts it first.
     val topPicksAboveFeed = if (homeLayout.isCustom) {
-        state !is UiState.Success &&
+        state is UiState.Error &&
             homeLayout.slots.firstOrNull { !it.hidden }?.key == HOME_SLOT_TOP_PICKS
     } else {
         true
     }
+    // Held from the first frame, so the row's slot never opens up after the feed is drawn.
+    val topPicksWaiting = topPicks == null && (topPicksLoading || state is UiState.Loading)
     CompositionLocalProvider(
         LocalArtworkMotion provides (artworkMotion && feedReady),
         LocalArtworkImages provides feedReady,
@@ -298,12 +345,21 @@ fun HomeScreen(
                             onLongPress = onTopPickLongPress,
                         )
                     }
-                    topPicks == null && topPicksLoading -> topPicksSkeleton()
+                    topPicksWaiting -> topPicksSkeleton()
                 }
             }
             when (state) {
                 is UiState.Loading -> {
-                    if (recentlyPlayedLoading) {
+                    if (homeLayout.isCustom) {
+                        // Placeholders in the listener's own order, so what loads
+                        // lands where its skeleton already stood.
+                        homeLayoutSkeleton(
+                            slots = homeLayout.slots.filterNot { it.hidden }.map { it.key },
+                            withTopPicks = onTopPickClick != null,
+                            withMoods = onMoodClick != null,
+                            withRecents = recentlyPlayedLoading,
+                        )
+                    } else if (recentlyPlayedLoading) {
                         recentlyPlayedSkeleton()
                         // Recents owns the leading layout while its request is
                         // pending, so the feed behind it starts with ordinary
@@ -319,12 +375,8 @@ fun HomeScreen(
                 is UiState.Success -> {
                     // The Apple-style release row now leads Explore; keep it out of Home.
                     val editorialIndex = if (onTopPickClick != null) editorialShelfIndex(state.data) else null
-                    if (recentlyPlayedLoading) {
-                        recentlyPlayedSkeleton()
-                    }
-                    // The loading skeleton already owns the hero slot. Until
-                    // Recently Played lands, every real shelf must retain its
-                    // compact-card layout instead of briefly becoming a hero.
+                    // Recents' skeleton is drawn inside the list, in the slot Recents
+                    // will take, rather than stacked above rows that then swap places.
                     itemsIndexedShelves(
                         shelves = if (editorialIndex != null) {
                             state.data.filterIndexed { index, _ -> index != editorialIndex }
@@ -337,10 +389,11 @@ fun HomeScreen(
                         onItemLongPress = onItemLongPress,
                         currentSong = currentSong,
                         isPlaying = isPlaying,
-                        firstIsHero = leadHero && !recentlyPlayedLoading,
+                        firstIsHero = leadHero,
+                        recentsPending = recentlyPlayedLoading,
                         onPlaySongs = onPlaySongs,
                         homeLayout = homeLayout,
-                        topPicksPending = onTopPickClick != null && topPicks == null && topPicksLoading,
+                        topPicksPending = onTopPickClick != null && topPicksWaiting,
                         topPicksItem = if (onTopPickClick != null && !topPicks.isNullOrEmpty()) {
                             {
                                 TopPicksShelf(
@@ -440,13 +493,28 @@ private fun androidx.compose.foundation.lazy.LazyListScope.itemsIndexedShelves(
     topPicksItem: (@Composable () -> Unit)? = null,
     /** The row is still being built: a custom [homeLayout] holds its slot with a skeleton. */
     topPicksPending: Boolean = false,
+    /** Recents is still loading: a skeleton holds the slot it will land in. */
+    recentsPending: Boolean = false,
 ) {
-    val ordered = shelves.withListenAgainFirst().withQuickPicksInListenAgainSlot().withOtherModelBelowListenAgain()
+    // Recents swaps places with Listen again once it arrives, so its slot is
+    // reserved from the start and the rows beneath are already where they will stay.
+    val withRecentsSlot = if (
+        recentsPending && shelves.none { it.title.trim().equals(RECENTS_TITLE, ignoreCase = true) }
+    ) {
+        listOf(HomeShelf(title = RECENTS_TITLE, items = emptyList())) + shelves
+    } else {
+        shelves
+    }
+    val ordered = withRecentsSlot.withListenAgainFirst().withQuickPicksInListenAgainSlot().withOtherModelBelowListenAgain()
     // Find Your Mood sits right after Recents, so it never follows another
     // row of cards directly. Without Recents (a guest) it goes after the second shelf.
     val moodAt = (ordered.indexOfFirst { it.title.trim().equals(RECENTS_TITLE, ignoreCase = true) }
         .takeIf { it >= 0 } ?: 1) + 1
     fun shelfItem(index: Int, shelf: HomeShelf) {
+        if (recentsPending && shelf.items.isEmpty() && shelf.title == RECENTS_TITLE) {
+            recentlyPlayedSkeleton()
+            return
+        }
         item(key = shelf.title + index) {
             val openItem: (ShelfItem) -> Unit = { item -> onItemClick(item, shelf.title) }
             val isListenAgain = LISTEN_AGAIN_TITLES.any { shelf.title.trim().equals(it, ignoreCase = true) }

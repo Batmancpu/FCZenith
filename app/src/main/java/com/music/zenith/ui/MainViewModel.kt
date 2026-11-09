@@ -1871,7 +1871,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         _homePendingShelves.value = 1 + YtMusicRepository.HOME_SUPPLEMENT_BROWSE_IDS.size
         if (!AppSettings.hideHomeTopPicks.value) loadTopPicks(identity, rebuild = false)
         viewModelScope.launch {
-            launch {
+            val coreFeed = launch {
                 try {
                     YtMusicRepository.home()
                         .onSuccess { feed ->
@@ -1889,12 +1889,18 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
             if (_signedIn.value && !AppSettings.hideHomeRecents.value) loadHomeRecents(identity, generation)
-            YtMusicRepository.HOME_SUPPLEMENT_BROWSE_IDS.forEach { browseId ->
-                launch {
+            // Fetched together but published one after another in list order, and
+            // only once the core feed is in, so the rows never swap places with
+            // whichever request happened to answer first.
+            val supplements = YtMusicRepository.HOME_SUPPLEMENT_BROWSE_IDS.map { browseId ->
+                async { runCatching { YtMusicRepository.homeSupplement(browseId).getOrNull() }.getOrNull() }
+            }
+            launch {
+                coreFeed.join()
+                supplements.forEach { request ->
                     try {
-                        YtMusicRepository.homeSupplement(browseId).onSuccess { shelves ->
-                            if (isCurrentHomeLoad(identity, generation)) publishHomeShelves(shelves)
-                        }
+                        val shelves = request.await()
+                        if (shelves != null && isCurrentHomeLoad(identity, generation)) publishHomeShelves(shelves)
                     } finally {
                         homeShelfRequestSettled(identity, generation)
                     }
@@ -2051,16 +2057,23 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         // Top Picks keeps to its hour; a pull refreshes the feed, not the
         // picks, unless the hour has already turned over.
         if (!AppSettings.hideHomeTopPicks.value && topPicksJob?.isActive != true) loadTopPicks(identity, rebuild = false)
-        YtMusicRepository.home().onSuccess { feed ->
+        val feedResult = YtMusicRepository.home()
+        val recentShelf = recent?.await()?.getOrNull()
+        feedResult.onSuccess { feed ->
             if (identity != listenerKey()) return@onSuccess
             homeContinuation = feed.continuation
             homeSeenTitles.clear()
             val shelves = feed.shelves.withoutRepeatsOf(emptyList())
                 .filter { homeSeenTitles.add(it.title.lowercase(Locale.ROOT)) }
-            if (shelves.isNotEmpty()) _home.value = UiState.Success(shelves)
-        }
-        recent?.await()?.onSuccess { shelf ->
-            if (identity == listenerKey()) shelf?.let { publishHomeShelves(listOf(it), prepend = true) }
+            if (shelves.isNotEmpty()) {
+                // Recents goes in with the feed in one update. Applied a moment
+                // later it swapped places with Listen again and shoved every row.
+                val replacing = recentShelf?.let { setOf(it.title.lowercase(Locale.ROOT)) }.orEmpty()
+                homeSeenTitles.addAll(replacing)
+                _home.value = UiState.Success(
+                    listOfNotNull(recentShelf) + shelves.filterNot { it.title.lowercase(Locale.ROOT) in replacing },
+                )
+            }
         }
     }
 
