@@ -1065,16 +1065,15 @@ private fun SharedTransitionScope.ExpandedTabs(
                 modifier = Modifier
                     .shadow(
                         shape = shapes.tabBarShape,
-                        elevation = elevations.expandedElevation
+                        elevation = elevations.expandedElevation,
+                        clip = false
                     )
                     .background(
                         color = colors.backgroundColor,
                         shape = shapes.tabBarShape
                     )
-                    .clip(shapes.tabBarShape)
                     .then(tabBarContentModifier())
                     .padding(contentPadding)
-                    .animateContentSize()
             ) {
                 if (showPill && (!glassPill || pill.isFlat || pill.blurMix > 0f)) {
                     FlatSelectionPill(
@@ -1084,10 +1083,7 @@ private fun SharedTransitionScope.ExpandedTabs(
                             .matchParentSize()
                             .pillPlacement(
                                 center = { pillCenterInRow(pill.position) },
-                                size = {
-                                    if (glassPill) pill.flatSize(restSize, liftedSize)
-                                    else pill.liveSize(restSize, liftedSize)
-                                },
+                                size = { pill.liveSize(restSize, liftedSize) },
                             ),
                     )
                 }
@@ -1095,6 +1091,7 @@ private fun SharedTransitionScope.ExpandedTabs(
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(sizes.tabSpacing),
                     modifier = Modifier
+                        .animateContentSize()
                         .fillMaxWidth()
                         .onSizeChanged { rowSize = it }
                         .layerBackdrop(tabRow)
