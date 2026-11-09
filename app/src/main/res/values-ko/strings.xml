@@ -1206,4 +1206,19 @@
     <string name="no_audio_version">이 동영상의 오디오 버전을 찾지 못했어요</string>
     <string name="no_video_version">이 노래의 동영상 버전을 찾지 못했어요</string>
     <string name="version_switch_in_party">함께 듣기 중인 모든 사람이 같은 버전을 들어요</string>
+    <string name="accent_color">강조 색상</string>
+    <string name="accent_color_footer">탭 바, 버튼, 슬라이더, 선택 항목의 강조 색상을 설정합니다. 하트와 Replay 배지는 빨간색으로 유지됩니다.</string>
+    <string name="accent_red">빨강</string>
+    <string name="accent_orange">주황</string>
+    <string name="accent_yellow">노랑</string>
+    <string name="accent_green">초록</string>
+    <string name="accent_teal">청록</string>
+    <string name="accent_blue">파랑</string>
+    <string name="accent_indigo">남색</string>
+    <string name="accent_purple">보라</string>
+    <string name="accent_pink">분홍</string>
+    <string name="accent_gray">회색</string>
+    <string name="pipeline_pcm_data_rate">PCM 데이터 전송률</string>
+    <string name="spotify_import_language_preference">언어 선호도</string>
+    <string name="spotify_import_language_hint">예: 펀자브어, 마라티어, 한국어…</string>
 </resources>
