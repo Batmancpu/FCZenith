@@ -1,13 +1,14 @@
 name: FC Zenith — upstream sync and Music release
 
 on:
+  push:
+    branches: [main]
   schedule:
-    - cron: '17 * * * *'
+    - cron: '47 * * * *'
   workflow_dispatch:
 
 permissions:
   contents: write
-  actions: write
 
 concurrency:
   group: fczenith-main-sync-release
@@ -34,19 +35,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-      - name: Disable inherited Zenith-only workflows
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          for workflow in build-apk.yml cleanup-artifacts.yml; do
-            if gh api --method PUT "repos/$GITHUB_REPOSITORY/actions/workflows/$workflow/disable" >/dev/null 2>&1; then
-              echo "Disabled inherited workflow: $workflow"
-            else
-              echo "No active inherited workflow to disable: $workflow"
-            fi
-          done
 
       - name: Fetch the latest published stable upstream release
         id: upstream
