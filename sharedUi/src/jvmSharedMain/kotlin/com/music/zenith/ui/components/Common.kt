@@ -433,8 +433,10 @@ fun SwipeToQueueBox(
     // *commits* past 45% of the width — so without this the label is a promise
     // the finger can't check. One light tick at the crossing is the whole point:
     // let go now and it queues.
-    LaunchedEffect(swipeState, boxWidth) {
-        if (boxWidth <= 0f) return@LaunchedEffect
+    // Only a row being dragged watches its offset; idle rows run no collector.
+    val dragging = swipeState.dismissDirection != SwipeToDismissBoxValue.Settled
+    LaunchedEffect(swipeState, boxWidth, dragging) {
+        if (!dragging || boxWidth <= 0f) return@LaunchedEffect
         val armAt = boxWidth * 0.45f
         var armed = false
         snapshotFlow { try { swipeState.requireOffset() } catch (e: Exception) { 0f } }
@@ -532,7 +534,7 @@ private fun SongRowContent(
         targetValue = if (isCurrent && !searchPlayingStyle) activeTint else MaterialTheme.colorScheme.onBackground,
         label = "song row title",
     )
-    val activeBackground by animateColorAsState(
+    val activeBackground = animateColorAsState(
         targetValue = if ((isCurrent && !searchPlayingStyle) || selected) activeTint.copy(alpha = 0.14f) else Color.Transparent,
         label = "song row background",
     )
@@ -544,7 +546,11 @@ private fun SongRowContent(
         modifier = modifier
             .fillMaxWidth()
             .alpha(if (unavailable) 0.45f else 1f)
-            .background(activeBackground)
+            // Read in draw only, so the fade redraws the row instead of recomposing it.
+            .drawWithContent {
+                drawRect(activeBackground.value)
+                drawContent()
+            }
             .longPressMenuClickable(
                 onClick = onClick,
                 onLongClick = onLongPress,
