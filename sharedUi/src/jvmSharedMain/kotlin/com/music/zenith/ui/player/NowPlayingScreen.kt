@@ -654,6 +654,25 @@ private class DockFrame {
  */
 private class LandscapeDockPose(val left: Float, val top: Float, val scale: Float)
 
+/**
+ * Isi panel lirik lagu yang sedang tampil. Hanya ditulis dari SideEffect saat
+ * [trackId] masih sama dengan lagu yang diputar, jadi saat lagu berganti ia
+ * masih memegang lirik lagu lama sampai panel selesai memudar.
+ */
+private class LyricsHold(var trackId: String) {
+    var lines: List<LyricLine> = emptyList()
+    var subLines: List<LyricLine>? = null
+    var looking: Boolean = true
+}
+
+/** Salinan [LyricsHold] yang dipakai panel selama memudar keluar. */
+private class LyricsExit(
+    val trackId: String,
+    val lines: List<LyricLine>,
+    val subLines: List<LyricLine>?,
+    val looking: Boolean,
+)
+
 /** The placeholder tile's corners — one shape, not a new one every frame it moves. */
 private val TileShape = RoundedCornerShape(8.dp)
 
@@ -1173,6 +1192,8 @@ fun NowPlayingScreen(
     // buka/tutup biasa dari layar utama tidak berubah sama sekali.
     var leavingQueue by remember { mutableStateOf(false) }
     var leavingLyrics by remember { mutableStateOf(false) }
+    val lyricsHold = remember { LyricsHold(song.videoId) }
+    var lyricsExit by remember { mutableStateOf<LyricsExit?>(null) }
     val paneSwap = remember { mutableFloatStateOf(1f) }
     var paneSwapTick by remember { mutableIntStateOf(0) }
     LaunchedEffect(paneSwapTick) {
@@ -1184,6 +1205,7 @@ fun NowPlayingScreen(
         ) { value, _ -> paneSwap.floatValue = value }
         leavingQueue = false
         leavingLyrics = false
+        lyricsExit = null
     }
     // Shared with Spotify's title placement below. The deck and credits must
     // read one clock: the weighted region changes size as this value moves, so
@@ -1284,12 +1306,41 @@ fun NowPlayingScreen(
         haptics = haptics,
         onCard = { lyricsShare = it },
     )
-    // Nothing here resets [lyricsOpen] on a track change, deliberately. The
-    // panel is a place, not a property of the track: someone reading along who
-    // skips — or who simply lets the queue run on — means to carry on reading,
-    // so the words change underneath them and the panel stays. Closing it
-    // dropped them back onto the artwork every few minutes with no gesture of
-    // their own behind it.
+    // Ganti lagu saat panel lirik terbuka mengembalikan pemain ke Now Playing:
+    // cover, judul, dan artis lagu baru tampil lebih dulu, sedangkan lirik
+    // dimuat di belakang layar oleh loadLyrics (yang sudah membatalkan job dan
+    // mengabaikan hasil lagu lama lewat generation, serta memakai cache disk).
+    // Dipicu oleh videoId, jadi next, previous, queue, playlist, otomatis, dan
+    // Auto Mix semuanya lewat jalur yang sama. Panel memudar lewat crossfade
+    // [paneSwap] milik Queue <-> Lirik dengan isi lagu lama ditahan, supaya
+    // tidak sempat berkedip menjadi skeleton lagu baru.
+    SideEffect {
+        if (lyricsHold.trackId == song.videoId) {
+            if (!lyrics.isNullOrEmpty()) lyricsHold.lines = lyrics
+            lyricsHold.subLines = lyricsTranslation.subLines
+            lyricsHold.looking = !lyricsUnavailable
+        }
+    }
+    LaunchedEffect(song.videoId) {
+        val previousId = lyricsHold.trackId
+        if (previousId == song.videoId) return@LaunchedEffect
+        // Layout landscape menaruh lirik di samping pemain, jadi tidak ada
+        // layar yang perlu dikembalikan.
+        if (lyricsOpen && !landscapePlayerAvailable(windowWidth, windowHeight)) {
+            lyricsExit = LyricsExit(
+                previousId, lyricsHold.lines, lyricsHold.subLines, lyricsHold.looking,
+            )
+            paneSwap.floatValue = 0f
+            leavingLyrics = true
+            leavingQueue = false
+            paneSwapTick++
+            closeLyrics()
+        }
+        lyricsHold.trackId = song.videoId
+        lyricsHold.lines = emptyList()
+        lyricsHold.subLines = null
+        lyricsHold.looking = true
+    }
     // A brief, non-modal confirmation that the three-dot menu now contains a
     // way back to the original YouTube rendition. The control keeps its usual
     // action — opening the menu — so the cue teaches rather than surprises.
@@ -4600,12 +4651,27 @@ fun NowPlayingScreen(
                                             }
                                         },
                                 ) { particleProgress ->
+                                    // Selama memudar keluar (atau satu frame saat lagu baru
+                                    // tiba), panel memegang isi lagu lama, bukan skeleton baru.
+                                    val lyricsLeaving = lyricsExit?.takeIf { !lyricsOpen }
+                                        ?: lyricsHold
+                                            .takeIf {
+                                                lyricsOpen && lyricsExit == null &&
+                                                    it.trackId != song.videoId
+                                            }
+                                            ?.let {
+                                                LyricsExit(it.trackId, it.lines, it.subLines, it.looking)
+                                            }
                                     LyricsPanel(
-                                        lines = lyrics.orEmpty(),
-                                        subLines = lyricsTranslation.subLines,
-                                        trackKey = song.videoId,
+                                        lines = lyricsLeaving?.lines ?: lyrics.orEmpty(),
+                                        subLines = if (lyricsLeaving != null) {
+                                            lyricsLeaving.subLines
+                                        } else {
+                                            lyricsTranslation.subLines
+                                        },
+                                        trackKey = lyricsLeaving?.trackId ?: song.videoId,
                                         playhead = lyricsPlayhead,
-                                        looking = !lyricsUnavailable,
+                                        looking = lyricsLeaving?.looking ?: !lyricsUnavailable,
                                         isPlaying = isPlaying && position.advancing,
                                         active = lyricsPanelVisible,
                                         onSeekToLine = seekToLyric,
