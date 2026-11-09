@@ -875,8 +875,15 @@ private val ELASTIC_PULL_RANGE = 600.dp
 /** iOS's UIScrollView rubber-band coefficient. */
 private const val ELASTIC_PULL_RUBBER = 0.6f
 
-/** How long a release waits for the refresh to actually start before letting go. */
-private const val ELASTIC_PULL_START_GRACE_MS = 1200L
+/** How long a release waits for the refresh to actually start before assuming it already ended. */
+private const val ELASTIC_PULL_START_GRACE_MS = 600L
+
+/**
+ * The least time the page stays held once a refresh fires. A feed that answers
+ * from cache finishes in a few milliseconds; without this the page would drop
+ * back before the loading animation had been seen.
+ */
+private const val ELASTIC_PULL_MIN_HOLD_MS = 900L
 
 /**
  * State of the elastic pull-to-refresh: the whole page follows the finger with
@@ -900,6 +907,10 @@ class ElasticRefreshState internal constructor(private val scope: CoroutineScope
     var holding by mutableStateOf(false)
         private set
 
+    /** True while a finger is pulling the page (as opposed to it settling on its own). */
+    var pulling by mutableStateOf(false)
+        private set
+
     internal var thresholdPx = 0f
         private set
     private var holdPx = 0f
@@ -907,6 +918,8 @@ class ElasticRefreshState internal constructor(private val scope: CoroutineScope
     private var rawDrag = 0f
     private var dragging = false
     private var started = false
+    private var finishing = false
+    private var holdStartNs = 0L
     private var anim: Job? = null
 
     internal fun configure(thresholdPx: Float, holdPx: Float, rangePx: Float) {
@@ -930,6 +943,7 @@ class ElasticRefreshState internal constructor(private val scope: CoroutineScope
             anim = null
             rawDrag = unresist(offset)
             dragging = true
+            pulling = true
         }
         val next = (rawDrag + delta).coerceAtLeast(0f)
         val used = next - rawDrag
@@ -947,6 +961,7 @@ class ElasticRefreshState internal constructor(private val scope: CoroutineScope
     internal fun release(refreshingNow: Boolean, onRefresh: () -> Unit): Boolean {
         if (!dragging) return false
         dragging = false
+        pulling = false
         rawDrag = 0f
         if (offset <= 0f) {
             armed = false
@@ -956,7 +971,9 @@ class ElasticRefreshState internal constructor(private val scope: CoroutineScope
         armed = false
         if (fire) {
             holding = true
+            finishing = false
             started = refreshingNow
+            holdStartNs = System.nanoTime()
             settleTo(holdPx)
             onRefresh()
             scope.launch {
@@ -980,15 +997,24 @@ class ElasticRefreshState internal constructor(private val scope: CoroutineScope
     /** The page is back on screen: drop anything a previous visit left half-done. */
     internal fun onAttach() {
         dragging = false
+        pulling = false
         rawDrag = 0f
         armed = false
         if (!holding && offset > 0f) settleTo(0f)
     }
 
     private fun finish() {
-        holding = false
-        started = false
-        if (!dragging) settleTo(0f)
+        if (finishing) return
+        finishing = true
+        scope.launch {
+            val elapsedMs = (System.nanoTime() - holdStartNs) / 1_000_000L
+            val remaining = ELASTIC_PULL_MIN_HOLD_MS - elapsedMs
+            if (remaining > 0L) delay(remaining)
+            holding = false
+            started = false
+            finishing = false
+            if (!dragging) settleTo(0f)
+        }
     }
 
     private fun settleTo(target: Float) {
@@ -1087,9 +1113,11 @@ fun PullToRefresh(
 }
 
 /**
- * A thin arc in the gap the pull opens: it fills with the drag, then turns
- * while the refresh runs. It lives in the page, so it goes where the page goes.
- * Composed only while the page is displaced, so nothing animates at rest.
+ * Three stacked rings in the gap the pull opens, with a short label under
+ * them. The rings fill one after another with the drag, then turn at their own
+ * speeds and directions while the refresh runs. It lives in the page, so it
+ * goes where the page goes. Composed only while the page is displaced, so
+ * nothing animates at rest.
  */
 @Composable
 private fun ElasticRefreshHint(state: ElasticRefreshState, topInset: Dp) {
@@ -1100,26 +1128,83 @@ private fun ElasticRefreshHint(state: ElasticRefreshState, topInset: Dp) {
     val angle by spin.animateFloat(
         initialValue = 0f,
         targetValue = 360f,
-        animationSpec = infiniteRepeatable(tween(900, easing = LinearEasing)),
+        animationSpec = infiniteRepeatable(tween(1400, easing = LinearEasing)),
         label = "elasticRefreshAngle",
     )
-    Canvas(Modifier.fillMaxSize()) {
-        val pushed = state.offset
-        val progress = (pushed / state.thresholdPx.coerceAtLeast(1f)).coerceIn(0f, 1f)
-        val alpha = (progress * 1.6f).coerceAtMost(1f) * 0.7f
-        val radius = 7.dp.toPx()
-        val cx = size.width / 2f
-        val cy = topInset.toPx() + pushed / 2f
-        val holding = state.holding
-        drawArc(
-            color = color.copy(alpha = alpha),
-            startAngle = if (holding) -90f + angle else -90f + progress * 120f,
-            sweepAngle = if (holding) 270f else (300f * progress).coerceAtLeast(10f),
-            useCenter = false,
-            topLeft = Offset(cx - radius, cy - radius),
-            size = Size(radius * 2f, radius * 2f),
-            style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round),
-        )
+    val blend by animateFloatAsState(
+        targetValue = if (state.holding) 1f else 0f,
+        animationSpec = tween(280),
+        label = "elasticRefreshBlend",
+    )
+    // 0 = pull, 1 = release, 2 = refreshing. Kept through the spring-back so the
+    // label does not flip back to "pull" while the page is going home.
+    var mode by remember { mutableStateOf(0) }
+    val target = when {
+        state.holding -> 2
+        state.pulling && state.armed -> 1
+        state.pulling -> 0
+        else -> -1
+    }
+    LaunchedEffect(target) { if (target >= 0) mode = target }
+    val label = stringResource(
+        when (mode) {
+            2 -> Res.string.pull_refreshing
+            1 -> Res.string.pull_release
+            else -> Res.string.pull_to_refresh
+        },
+    )
+    val density = LocalDensity.current
+    val insetPx = with(density) { topInset.toPx() }
+    val halfPx = with(density) { 21.dp.toPx() }
+    val fadeStartPx = with(density) { 18.dp.toPx() }
+    val fadeSpanPx = with(density) { 36.dp.toPx() }
+    Box(Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .graphicsLayer {
+                    translationY = insetPx + state.offset / 2f - halfPx
+                    alpha = ((state.offset - fadeStartPx) / fadeSpanPx).coerceIn(0f, 1f)
+                },
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Canvas(Modifier.size(24.dp)) {
+                val pushed = state.offset
+                val progress = (pushed / state.thresholdPx.coerceAtLeast(1f)).coerceIn(0f, 1f)
+                val center = Offset(size.width / 2f, size.height / 2f)
+                val stroke = Stroke(width = 1.6.dp.toPx(), cap = StrokeCap.Round)
+                for (i in 0 until 3) {
+                    val radius = (10.5f - 3.5f * i).dp.toPx()
+                    // Outer ring first, each one a beat behind the last.
+                    val fill = (progress * 1.5f - i * 0.25f).coerceIn(0f, 1f)
+                    val pullSweep = 30f + 270f * fill
+                    val holdSweep = 250f - 40f * i
+                    val sweep = pullSweep + (holdSweep - pullSweep) * blend
+                    val dir = if (i == 1) -1f else 1f
+                    val pullRot = -90f + dir * pushed * 0.25f * (1f + i * 0.4f)
+                    val speed = when (i) {
+                        0 -> 1f
+                        1 -> -2f
+                        else -> 3f
+                    }
+                    drawArc(
+                        color = color.copy(alpha = 0.35f + 0.25f * i),
+                        startAngle = pullRot + angle * speed * blend,
+                        sweepAngle = sweep,
+                        useCenter = false,
+                        topLeft = Offset(center.x - radius, center.y - radius),
+                        size = Size(radius * 2f, radius * 2f),
+                        style = stroke,
+                    )
+                }
+            }
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = color,
+            )
+        }
     }
 }
 
