@@ -312,19 +312,20 @@ fun FloatingTabBar(
     // Saat mengecil, bar ditarik sedikit ke atas seolah terseret halaman, lalu
     // mengendap ke bentuk inline dengan pegas. Dibaca di graphicsLayer saja.
     val pull = remember { androidx.compose.animation.core.Animatable(0f) }
-    val pullPx = with(LocalDensity.current) { 22.dp.toPx() }
-    val firstRun = remember { booleanArrayOf(true) }
+    val pullPx = with(LocalDensity.current) { 28.dp.toPx() }
+    // Bentuk yang ditampilkan menyusul scrollConnection: mini player ditarik dulu,
+    // baru saat dilepas bentuknya berganti dan memantul masuk ke pil tengah.
+    var shownInline by remember { mutableStateOf(scrollConnection.isInline) }
     LaunchedEffect(scrollConnection.isInline) {
-        if (firstRun[0]) {
-            firstRun[0] = false
-            return@LaunchedEffect
-        }
-        // Karet menegang, lalu dilepas: memantul lewat titik awal dan mengendap.
-        val amplitude = if (scrollConnection.isInline) 1f else 0.7f
+        val target = scrollConnection.isInline
+        if (target == shownInline) return@LaunchedEffect
+        val amplitude = if (target) 1f else 0.7f
         pull.animateTo(
             amplitude,
-            androidx.compose.animation.core.tween(170, easing = FastOutSlowInEasing),
+            androidx.compose.animation.core.tween(190, easing = FastOutSlowInEasing),
         )
+        // Dilepas: berganti bentuk, lalu memantul lewat titik awal dan mengendap.
+        shownInline = target
         pull.animateTo(
             0f,
             androidx.compose.animation.core.spring(dampingRatio = 0.42f, stiffness = 210f),
@@ -351,7 +352,7 @@ fun FloatingTabBar(
 
     SharedTransitionLayout(modifier = modifier) {
         AnimatedContent(
-            targetState = scrollConnection.isInline,
+            targetState = shownInline,
             transitionSpec = {
                 // The container's own size follows the same spring, so the bar
                 // grows and shrinks with the pieces inside it.
