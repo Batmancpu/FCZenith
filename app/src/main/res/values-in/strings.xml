@@ -20,7 +20,7 @@
     <string name="settings">Pengaturan</string>
     <string name="search">Cari</string>
     <string name="clear_search">Hapus pencarian</string>
-    <string name="library">Perpustakaan</string>
+    <string name="library">Pustaka</string>
     <string name="home">Beranda</string>
     <string name="play">Putar</string>
     <string name="explore">Jelajahi</string>
@@ -448,7 +448,7 @@
     <string name="queued">Dalam antrean</string>
     <string name="remove">Hapus</string>
     <string name="remove_from_liked">Hapus dari Musik yang Disukai</string>
-    <string name="liked_music">Musik yang Disukai</string>
+    <string name="liked_music">Disukai</string>
     <string name="remove_from_playlist">Hapus dari playlist ini</string>
     <string name="rename_playlist">Edit playlist</string>
     <string name="reorder_songs">Atur ulang urutan lagu</string>
