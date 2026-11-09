@@ -115,8 +115,8 @@ private val HOME_TITLE_LIFT = 28.dp
 private const val RECENTS_TITLE = "Recents"
 private const val RECENT_TRACKS_PER_COLUMN = 4
 
-private val LISTEN_AGAIN_TITLES = listOf("Listen again", "Nghe lại", "もう一度聴く", "Dengarkan lagi")
-private val QUICK_PICKS_TITLES = listOf("Quick picks", "Lựa chọn nhanh", "Chọn nhanh đài phát", "クイック ミックス", "Pilihan cepat")
+private val LISTEN_AGAIN_TITLES = listOf("Listen again", "Nghe lại", "もう一度聴く", "Dengarkan lagi", "Putar ulang", "다시 듣기")
+private val QUICK_PICKS_TITLES = listOf("Quick picks", "Lựa chọn nhanh", "Chọn nhanh đài phát", "クイック ミックス", "Pilihan cepat", "Pilihan singkat", "빠른 선곡", "빠른 선택")
 
 /**
  * Quick picks menempati slot Listen again (baris kartu persegi di depan),
