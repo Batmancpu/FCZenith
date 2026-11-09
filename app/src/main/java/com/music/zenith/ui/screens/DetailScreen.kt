@@ -1109,11 +1109,24 @@ private fun ReleaseHeader(
             canvas?.let { clip ->
                 val frameGrab = remember(clip) { CanvasFrameGrab() }
                 RegisterCoverFlightGrab(page.browseId, frameGrab)
+                // The clip eases in once it is actually drawing, instead of
+                // popping over the still the moment it is composed.
+                var clipShown by remember(clip) { mutableStateOf(false) }
+                val clipAlpha by animateFloatAsState(
+                    targetValue = if (clipShown) 1f else 0f,
+                    animationSpec = tween(400),
+                    label = "artistClipFade",
+                )
                 CanvasArtworkPlayer(
                     canvas = clip,
                     isPlaying = true,
-                    modifier = Modifier.matchParentSize(),
-                    onRenderedChanged = { if (it) coverFlightClipRendered(page.browseId) },
+                    modifier = Modifier
+                        .matchParentSize()
+                        .graphicsLayer { alpha = clipAlpha },
+                    onRenderedChanged = {
+                        clipShown = it
+                        if (it) coverFlightClipRendered(page.browseId)
+                    },
                     frameGrab = frameGrab,
                 )
             }
@@ -1570,17 +1583,7 @@ private fun PageBackground(
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
     val art = heroUrl ?: page.thumbnailUrl.artworkAt(HEADER_ART_PX)
 
-    // The photo on screen. A new one (Apple's hero replacing the YouTube
-    // thumbnail) is loaded first and swapped in with a crossfade, so the old
-    // photo never fades out onto an empty area while the new one is fetched.
-    val artContext = LocalPlatformContext.current
-    var shownArt by remember { mutableStateOf(art) }
-    LaunchedEffect(art) {
-        if (art == shownArt) return@LaunchedEffect
-        coil3.SingletonImageLoader.get(artContext)
-            .execute(ImageRequest.Builder(artContext).data(art).build())
-        shownArt = art
-    }
+
 
     // The photo waits for the page colour instead of showing over a black page
     // that then turns purple a moment later. A read that never finishes gives
@@ -1606,21 +1609,12 @@ private fun PageBackground(
                 // After the offset, so the flight lands on where the photo really is.
                 .coverFlightTarget(page.browseId, 0.dp, palette.wash),
         ) {
-            Crossfade(
-                targetState = shownArt,
-                animationSpec = tween(260),
-                label = "artistHeroSwap",
+            SwapArt(
+                url = art,
                 modifier = Modifier
                     .matchParentSize()
                     .background(palette.elevated),
-            ) { shown ->
-                AsyncImage(
-                    model = shown,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
+            )
 
             // Above the still art but below the scrim, so the scrim that
             // settles the header into the page still sits over it. Always
@@ -1629,11 +1623,24 @@ private fun PageBackground(
             canvas?.let { clip ->
                 val frameGrab = remember(clip) { CanvasFrameGrab() }
                 RegisterCoverFlightGrab(page.browseId, frameGrab)
+                // The clip eases in once it is actually drawing, instead of
+                // popping over the still the moment it is composed.
+                var clipShown by remember(clip) { mutableStateOf(false) }
+                val clipAlpha by animateFloatAsState(
+                    targetValue = if (clipShown) 1f else 0f,
+                    animationSpec = tween(400),
+                    label = "artistClipFade",
+                )
                 CanvasArtworkPlayer(
                     canvas = clip,
                     isPlaying = true,
-                    modifier = Modifier.matchParentSize(),
-                    onRenderedChanged = { if (it) coverFlightClipRendered(page.browseId) },
+                    modifier = Modifier
+                        .matchParentSize()
+                        .graphicsLayer { alpha = clipAlpha },
+                    onRenderedChanged = {
+                        clipShown = it
+                        if (it) coverFlightClipRendered(page.browseId)
+                    },
                     frameGrab = frameGrab,
                 )
             }
@@ -1643,10 +1650,8 @@ private fun PageBackground(
             // rather than a fade to a flat tint. The same request as the sharp
             // copy, so it is a memory-cache hit and lands on the same frame.
             if (softenFoot) {
-                Crossfade(
-                    targetState = shownArt,
-                    animationSpec = tween(260),
-                    label = "artistHeroSoftSwap",
+                SwapArt(
+                    url = art,
                     modifier = Modifier
                         .matchParentSize()
                         // Offscreen so the mask cuts the blurred result rather
@@ -1659,14 +1664,7 @@ private fun PageBackground(
                         // Rectangle keeps the edges clamped to the picture's own
                         // colour rather than fading to transparent at the foot.
                         .blur(SOFT_FOOT_BLUR, BlurredEdgeTreatment.Rectangle),
-                ) { shown ->
-                    AsyncImage(
-                        model = shown,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                }
+                )
             }
 
             // Ends on the page colour at full strength, so there is no edge
@@ -1714,6 +1712,45 @@ private val SOFT_FOOT_MASK = Brush.verticalGradient(
  * blurred photograph next to a flat colour is still two surfaces.
  */
 private val SOFT_FOOT_BLUR = 48.dp
+
+/**
+ * A photo that changes its picture without a cut. The new one is composed on
+ * top, invisible, through the same AsyncImage the old one uses; it fades in
+ * only once its pixels have actually arrived, then becomes the base. Loading
+ * it any other way misses the image cache and fades in an empty frame.
+ */
+@Composable
+private fun SwapArt(url: String?, modifier: Modifier = Modifier) {
+    var base by remember { mutableStateOf(url) }
+    var loaded by remember(url) { mutableStateOf(false) }
+    val fade = remember { androidx.compose.animation.core.Animatable(0f) }
+    LaunchedEffect(url, loaded) {
+        if (url != base && loaded) {
+            fade.animateTo(1f, tween(320))
+            base = url
+            fade.snapTo(0f)
+        }
+    }
+    Box(modifier) {
+        AsyncImage(
+            model = base,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize(),
+        )
+        if (url != base) {
+            AsyncImage(
+                model = url,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                onState = { if (it is AsyncImagePainter.State.Success) loaded = true },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { alpha = fade.value },
+            )
+        }
+    }
+}
 
 /**
  * Shuffle • Play • Star — the artist page's action row, as Apple Music lays
