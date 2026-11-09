@@ -2767,7 +2767,7 @@ private const val LIKED_MAX_COVERS = 9
 private const val LIKED_COVER_TTL_MS = 24L * 60 * 60 * 1000
 
 /** Naikkan angka ini untuk membuang pilihan cover lama yang tersimpan di perangkat. */
-private const val LIKED_COVER_CACHE_VERSION = 2
+private const val LIKED_COVER_CACHE_VERSION = 3
 
 /** Salinan ter-blur di kaki hero direkam ulang tiap sekian ms, bukan tiap frame. */
 private const val FOOT_REFRESH_MS = 300L
