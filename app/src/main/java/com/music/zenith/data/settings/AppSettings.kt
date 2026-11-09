@@ -79,12 +79,13 @@ enum class GlassClarity(
     val saturation: Float,
     val resolutionScale: Float,
     val lensScale: Float,
+    val chromatic: Boolean,
 ) {
     // Clear: tanpa blur, resolusi sampling tinggi (tidak buram saat di-upscale),
-    // tint nyaris nol, refraksi tepi sedikit lebih kuat.
-    CLEAR("Clear", 0.05f, 0f, 1.1f, 0.75f, 1.25f),
-    BALANCED("Balanced", 0.30f, 1f, 1.5f, 0.33f, 1f),
-    FROSTED("Frosted", 0.46f, 1.35f, 1.5f, 0.33f, 1f),
+    // tint nyaris nol, refraksi tepi halus tanpa efek pelangi.
+    CLEAR("Clear", 0.05f, 0f, 1.1f, 0.75f, 0.6f, false),
+    BALANCED("Balanced", 0.30f, 1f, 1.5f, 0.33f, 1f, true),
+    FROSTED("Frosted", 0.46f, 1.35f, 1.5f, 0.33f, 1f, true),
 }
 
 /**

@@ -246,7 +246,7 @@ fun Modifier.liquidGlass(
                     refractionHeight = lensHeightPx,
                     refractionAmount = lensAmountPx,
                     depthEffect = true,
-                    chromaticAberration = true,
+                    chromaticAberration = clarity.chromatic,
                 )
             }
         },
