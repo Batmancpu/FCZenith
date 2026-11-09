@@ -1075,6 +1075,7 @@ private fun SharedTransitionScope.ExpandedTabs(
                 if (showPill && (!glassPill || pill.isFlat)) {
                     FlatSelectionPill(
                         color = colors.indicatorColor,
+                        barGlass = barGlass,
                         modifier = Modifier
                             .matchParentSize()
                             .pillPlacement(

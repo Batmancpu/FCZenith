@@ -35,7 +35,12 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalDensity
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.music.zenith.data.settings.AppSettings
 import com.music.zenith.ui.components.LocalAppBackdrop
+import com.music.zenith.ui.components.isGlassSupported
+import com.music.zenith.ui.components.backdrop.effects.blur
 import com.music.zenith.ui.components.backdrop.Backdrop
 import com.music.zenith.ui.components.backdrop.backdrops.LayerBackdrop
 import com.music.zenith.ui.components.backdrop.drawBackdrop
@@ -500,9 +505,51 @@ internal fun Modifier.pillPlacement(center: () -> Offset, size: () -> Size): Mod
 internal fun FlatSelectionPill(
     color: Color,
     modifier: Modifier,
+    barGlass: LayerBackdrop? = null,
 ) {
     val shape = remember { RoundedCornerShape(percent = 50) }
-    Box(modifier.background(color, shape))
+    val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
+    if (reduceDynamicBlur || !isGlassSupported()) {
+        Box(modifier.background(color, shape))
+        return
+    }
+    val page = LocalAppBackdrop.current
+    val blurPx = with(LocalDensity.current) { INDICATOR_BLUR.toPx() }
+    val backdrop = remember(page, barGlass) { PageAndBarBackdrop(page, barGlass) }
+    // Frosted: halaman dan kaca bar di bawah indikator di-blur, lalu diberi
+    // warna fill indikator di atasnya. Tab digambar di atas pill ini, jadi
+    // ikon dan labelnya tetap tajam.
+    Box(
+        modifier.drawBackdrop(
+            backdrop = backdrop,
+            shape = { shape },
+            effects = { blur(blurPx) },
+            highlight = null,
+            shadow = null,
+            onDrawSurface = { drawRect(color = color, size = size) },
+        ),
+    )
+}
+
+/** Blur radius of the resting selection indicator. */
+private val INDICATOR_BLUR = 10.dp
+
+/** What the resting indicator blurs: the page, then the bar's own glass over it. */
+private class PageAndBarBackdrop(
+    private val page: Backdrop,
+    private val bar: Backdrop?,
+) : Backdrop {
+
+    override val isCoordinatesDependent: Boolean = true
+
+    override fun DrawScope.drawBackdrop(
+        density: Density,
+        coordinates: LayoutCoordinates?,
+        layerBlock: (GraphicsLayerScope.() -> Unit)?,
+    ) {
+        with(page) { drawBackdrop(density, coordinates, layerBlock) }
+        bar?.let { with(it) { drawBackdrop(density, coordinates, layerBlock) } }
+    }
 }
 
 /**
