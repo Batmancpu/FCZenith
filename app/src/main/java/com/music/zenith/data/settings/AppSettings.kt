@@ -15,6 +15,7 @@ import com.music.zenith.BuildConfig
 import com.music.zenith.auth.AuthStore
 import com.music.zenith.data.canvas.SpotifyToken
 import com.music.zenith.data.lyrics.LyricsSource
+import com.music.zenith.data.model.HomeLayout
 import com.music.zenith.data.sources.SourceKind
 import com.music.zenith.playback.EqLayout
 import com.music.zenith.playback.EqualizerPreset
@@ -559,6 +560,9 @@ object AppSettings {
 
     /** Shows every music video as a square, see [VideoThumbnails]. */
     val squareVideoCovers = MutableStateFlow(false)
+
+    /** The listener's own order and hidden rows on Home. Empty keeps the built-in order. */
+    val homeLayout = MutableStateFlow(HomeLayout())
 
     /** Drops haze blur (status bar, mini player, bottom fade, lyrics focus) for a solid-fill look. */
     val reduceDynamicBlur = MutableStateFlow(false)
@@ -1218,6 +1222,7 @@ object AppSettings {
         hideHomeMoods.value = prefs.getBoolean(KEY_HIDE_HOME_MOODS, false)
         squareVideoCovers.value = prefs.getBoolean(KEY_SQUARE_VIDEO_COVERS, false)
         VideoThumbnails.square = squareVideoCovers.value
+        homeLayout.value = HomeLayout.decode(prefs.getString(KEY_HOME_LAYOUT, null))
         reduceDynamicBlur.value = prefs.getBoolean(KEY_REDUCE_BLUR, false)
         liquidGlass.value = prefs.getBoolean(KEY_LIQUID_GLASS, false)
         frostedGlass.value = prefs.getBoolean(KEY_FROSTED_GLASS, false)
@@ -1727,6 +1732,11 @@ object AppSettings {
         squareVideoCovers.value = value
         VideoThumbnails.square = value
         prefs.edit().putBoolean(KEY_SQUARE_VIDEO_COVERS, value).apply()
+    }
+
+    fun setHomeLayout(value: HomeLayout) {
+        homeLayout.value = value
+        prefs.edit().putString(KEY_HOME_LAYOUT, value.encode()).apply()
     }
 
     fun setReduceDynamicBlur(value: Boolean) {
@@ -2559,6 +2569,7 @@ object AppSettings {
     private const val KEY_HIDE_HOME_TOP_PICKS = "hide_home_top_picks"
     private const val KEY_HIDE_HOME_MOODS = "hide_home_moods"
     private const val KEY_SQUARE_VIDEO_COVERS = "square_video_covers"
+    private const val KEY_HOME_LAYOUT = "home_layout"
     private const val KEY_REDUCE_BLUR = "reduce_dynamic_blur"
     private const val KEY_LIQUID_GLASS = "liquid_glass"
     private const val KEY_FROSTED_GLASS = "frosted_glass"

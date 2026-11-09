@@ -1,5 +1,9 @@
 package com.music.zenith.ui.screens
 
+import com.music.zenith.data.model.HOME_SLOT_MOODS
+import com.music.zenith.data.model.HOME_SLOT_TOP_PICKS
+import com.music.zenith.data.model.HomeLayout
+import com.music.zenith.data.model.homeShelfKey
 import com.music.zenith.ui.components.VideoThumbnails
 import com.music.zenith.ui.components.trackArtSize
 import com.music.zenith.ui.components.contextClick
@@ -227,9 +231,13 @@ fun HomeScreen(
     artworkMotion: Boolean = true,
     /** Memutar daftar lagu dari awal; dipakai tombol play di kartu playlist. */
     onPlaySongs: ((List<Song>) -> Unit)? = null,
+    /** The listener's own order and hidden rows. Empty keeps Home's built-in order. */
+    homeLayout: HomeLayout = HomeLayout(),
 ) {
     // Top Picks' pictures and motion wait for the feed — see LocalArtworkImages.
     val feedReady = state !is UiState.Loading
+    // A custom layout places Top Picks itself, among the other rows, once the feed is in.
+    val customHome = homeLayout.isCustom && state is UiState.Success
     CompositionLocalProvider(
         LocalArtworkMotion provides (artworkMotion && feedReady),
         LocalArtworkImages provides feedReady,
@@ -272,7 +280,7 @@ fun HomeScreen(
                     )
                 }
             }
-            if (onTopPickClick != null) {
+            if (onTopPickClick != null && !customHome) {
                 when {
                     !topPicks.isNullOrEmpty() -> item(key = "top-picks") {
                         TopPicksShelf(
@@ -323,6 +331,19 @@ fun HomeScreen(
                         isPlaying = isPlaying,
                         firstIsHero = leadHero && !recentlyPlayedLoading,
                         onPlaySongs = onPlaySongs,
+                        homeLayout = homeLayout,
+                        topPicksItem = if (onTopPickClick != null && !topPicks.isNullOrEmpty()) {
+                            {
+                                TopPicksShelf(
+                                    picks = topPicks,
+                                    listenerName = listenerName,
+                                    onClick = onTopPickClick,
+                                    onLongPress = onTopPickLongPress,
+                                )
+                            }
+                        } else {
+                            null
+                        },
                     )
                     if (loadingMore) feedMoreSkeleton()
                 }
@@ -367,16 +388,16 @@ private fun androidx.compose.foundation.lazy.LazyListScope.itemsIndexedShelves(
     onMoodClick: ((TopPickMood, String) -> Unit)? = null,
     onMoodsShowAll: () -> Unit = {},
     onPlaySongs: ((List<Song>) -> Unit)? = null,
+    homeLayout: HomeLayout = HomeLayout(),
+    /** The Top Picks row, when there is one to draw. Only placed by a custom [homeLayout]. */
+    topPicksItem: (@Composable () -> Unit)? = null,
 ) {
     val ordered = shelves.withListenAgainFirst().withQuickPicksInListenAgainSlot().withOtherModelBelowListenAgain()
     // Find Your Mood sits right after Recents, so it never follows another
     // row of cards directly. Without Recents (a guest) it goes after the second shelf.
     val moodAt = (ordered.indexOfFirst { it.title.trim().equals(RECENTS_TITLE, ignoreCase = true) }
         .takeIf { it >= 0 } ?: 1) + 1
-    ordered.forEachIndexed { index, shelf ->
-        if (index == moodAt && onMoodClick != null) {
-            item(key = "find-your-mood") { FindYourMoodShelf(onMoodClick, onMoodsShowAll) }
-        }
+    fun shelfItem(index: Int, shelf: HomeShelf) {
         item(key = shelf.title + index) {
             val openItem: (ShelfItem) -> Unit = { item -> onItemClick(item, shelf.title) }
             val isListenAgain = LISTEN_AGAIN_TITLES.any { shelf.title.trim().equals(it, ignoreCase = true) }
@@ -437,6 +458,36 @@ private fun androidx.compose.foundation.lazy.LazyListScope.itemsIndexedShelves(
                 )
             }
         }
+    }
+
+    if (homeLayout.isCustom) {
+        // The listener's own order: Top Picks, Find Your Mood and every shelf are
+        // slots on one list. What the layout has not seen yet goes last.
+        val entries = buildList<Pair<String, HomeShelf?>> {
+            if (topPicksItem != null) add(HOME_SLOT_TOP_PICKS to null)
+            if (onMoodClick != null) add(HOME_SLOT_MOODS to null)
+            ordered.forEach { add(homeShelfKey(it.title) to it) }
+        }
+        var shelfIndex = 0
+        homeLayout.arrange(entries) { it.first }.forEach { (key, shelf) ->
+            when {
+                shelf != null -> shelfItem(shelfIndex++, shelf)
+                key == HOME_SLOT_TOP_PICKS -> item(key = "top-picks") {
+                    if (topPicksItem != null) topPicksItem()
+                }
+                else -> item(key = "find-your-mood") {
+                    if (onMoodClick != null) FindYourMoodShelf(onMoodClick, onMoodsShowAll)
+                }
+            }
+        }
+        return
+    }
+
+    ordered.forEachIndexed { index, shelf ->
+        if (index == moodAt && onMoodClick != null) {
+            item(key = "find-your-mood") { FindYourMoodShelf(onMoodClick, onMoodsShowAll) }
+        }
+        shelfItem(index, shelf)
     }
     if (moodAt >= ordered.size && onMoodClick != null) {
         item(key = "find-your-mood") { FindYourMoodShelf(onMoodClick, onMoodsShowAll) }

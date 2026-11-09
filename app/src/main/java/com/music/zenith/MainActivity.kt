@@ -859,6 +859,7 @@ private fun ZenithApp(
     val hideHomeVideos by AppSettings.hideHomeVideos.collectAsStateWithLifecycle()
     val hideHomeTopPicks by AppSettings.hideHomeTopPicks.collectAsStateWithLifecycle()
     val hideHomeMoods by AppSettings.hideHomeMoods.collectAsStateWithLifecycle()
+    val homeLayout by AppSettings.homeLayout.collectAsStateWithLifecycle()
     // Only what Home draws: Top Picks and Explore keep reading the full feed.
     val visibleHomeState = remember(homeState, hideHomeVideos, hideHomeRecents) {
         val loaded = homeState as? UiState.Success
@@ -3528,6 +3529,7 @@ private fun ZenithApp(
                                 }.takeUnless { hideHomeTopPicks },
                                 onMoodClick = playMood.takeUnless { hideHomeMoods },
                                 onMoodsShowAll = { navigator.push(AppRoute.Moods) },
+                                homeLayout = homeLayout,
                                 onPlaySongs = { songs -> play(songs, 0) },
                                 artworkMotion = artworkMotion,
                                 onTopPickLongPress = { pick ->
