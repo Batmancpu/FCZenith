@@ -1454,9 +1454,11 @@ private fun ZenithApp(
             // to release the loading state and resume it immediately.
             if (audio == null || audio.videoId == song.videoId) {
                 TrackLog.w("Player", "audio switch found no distinct official song", song.videoId)
-                // The switch is always offered now, so say when there was nothing to switch to.
-                if (song.videoId !in missingVersions) missingVersions += song.videoId
-                if (stillCurrent) showQueueNotice(versionContext.getString(R.string.no_audio_version))
+                // Hanya dianggap "tidak ada versi audio" bila pencarian benar-benar selesai tanpa hasil;
+                // gagal jaringan tidak boleh mengunci tombol sebagai tidak tersedia.
+                val confirmedMissing = audio != null && YtMusicRepository.hasNoAudioVersion(song.videoId)
+                if (confirmedMissing && song.videoId !in missingVersions) missingVersions += song.videoId
+                if (stillCurrent && confirmedMissing) showQueueNotice(versionContext.getString(R.string.no_audio_version))
                 if (stillCurrent && resumeAfterResolution) c.play()
                 return
             }
@@ -1671,7 +1673,9 @@ private fun ZenithApp(
         val current = player.song ?: return@LaunchedEffect
         if (controller == null || partyState.inParty) return@LaunchedEffect
         if (!current.isVideo) return@LaunchedEffect
-        if (current.videoId == keepVideoId || current.videoId in missingVersions) return@LaunchedEffect
+        if (current.videoId == keepVideoId || current.videoId in missingVersions ||
+            YtMusicRepository.hasNoAudioVersion(current.videoId)
+        ) return@LaunchedEffect
         switchToMusicOnly(current, pauseWhileResolving = true)
     }
 
@@ -4802,7 +4806,8 @@ private fun ZenithApp(
                 upgradeQualityInProgress = fromPlayer && song.videoId in qualityUpgradesInFlight,
                 onToggleAudioVersion = onToggleVersion,
                 isAudioVersion = menuIsAudioVersion,
-                audioVersionMissing = song.videoId in missingVersions,
+                audioVersionMissing = song.videoId in missingVersions ||
+                    (song.isVideo && YtMusicRepository.hasNoAudioVersion(song.videoId)),
                 // Hidden outright when there's no real YouTube id behind
                 // this row to build a link from — SongActionsMenu already
                 // drops it for a local file via `isOffline`, this catches

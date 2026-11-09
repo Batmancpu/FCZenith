@@ -1427,7 +1427,7 @@
     <string name="song_info_unavailable">Tidak tersedia</string>
     <string name="song_info_error">Sebagian informasi tidak dapat dimuat.</string>
     <string name="song_info_retry">Coba lagi</string>
-    <string name="no_audio_version">No audio version found for this video</string>
+    <string name="no_audio_version">Video ini tidak punya versi audio</string>
     <string name="no_video_version">No video version found for this song</string>
     <string name="version_switch_in_party">Everyone in Listen Together hears the same version</string>
     <string name="opened_file">File yang dibuka</string>
