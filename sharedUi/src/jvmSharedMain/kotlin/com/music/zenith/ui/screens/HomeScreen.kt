@@ -515,7 +515,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.itemsIndexedShelves(
             recentlyPlayedSkeleton()
             return
         }
-        item(key = shelf.title + index) {
+        item(key = shelf.title + index, contentType = shelf.layout) {
             val openItem: (ShelfItem) -> Unit = { item -> onItemClick(item, shelf.title) }
             val isListenAgain = LISTEN_AGAIN_TITLES.any { shelf.title.trim().equals(it, ignoreCase = true) }
             val isQuickPicks = QUICK_PICKS_TITLES.any { shelf.title.trim().equals(it, ignoreCase = true) }
@@ -627,11 +627,12 @@ private fun RecentShelf(
         val isCurrentItem = shelf.items.playingItemMatcher(currentSong)
         BoxWithConstraints {
             val columnWidth = trackColumnWidth(maxWidth)
+            val recentColumns = remember(shelf.items) { shelf.items.chunked(RECENT_TRACKS_PER_COLUMN) }
             ShelfRow(
                 contentPadding = PaddingValues(horizontal = PAGE_GUTTER),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                items(shelf.items.chunked(RECENT_TRACKS_PER_COLUMN)) { column ->
+                items(recentColumns, contentType = { "recent-column" }) { column ->
                     Column(Modifier.width(columnWidth)) {
                         column.forEachIndexed { index, item ->
                             RecentTrackRow(
@@ -1105,7 +1106,7 @@ private fun HeroShelf(
                 contentPadding = PaddingValues(horizontal = PAGE_GUTTER),
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                itemsIndexed(shelf.items) { index, item ->
+                itemsIndexed(shelf.items, contentType = { _, _ -> "hero-card" }) { index, item ->
                     HeroCard(
                         item = item,
                         onClick = { onItemClick(item) },
@@ -1214,7 +1215,7 @@ internal fun Shelf(
             horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             leadingCard?.let { card -> item(key = "leading") { card() } }
-            itemsIndexed(shelf.items) { index, item ->
+            itemsIndexed(shelf.items, contentType = { _, _ -> "shelf-card" }) { index, item ->
                 Box(Modifier.shelfStagger(index)) {
                     if (shelf.layout == ShelfLayout.VIDEO) {
                         VideoShelfCard(

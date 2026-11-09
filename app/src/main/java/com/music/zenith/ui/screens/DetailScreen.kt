@@ -846,6 +846,7 @@ fun DetailScreen(
                     itemsIndexed(
                         items = matches,
                         key = { _, entry -> "${entry.index}_${entry.value.videoId}" },
+                        contentType = { _, _ -> "song-row" },
                     ) { position, entry ->
                         // The first rows arrive one after another; later ones, composed
                         // while scrolling, are already visible and draw as they are.
@@ -920,7 +921,7 @@ fun DetailScreen(
             }
 
             // Albums / Singles & EPs carousels (artist pages).
-            items(page.sections) { shelf ->
+            items(page.sections, contentType = { "section-shelf" }) { shelf ->
                 val canShowAll = shelf.items.size > ARTIST_ROW_MAX_ITEMS
                 val displayItems = remember(shelf.items) {
                     if (canShowAll) shelf.items.take(ARTIST_ROW_MAX_ITEMS) else shelf.items

@@ -582,8 +582,9 @@ private fun SongRowContent(
             }
         } else {
             Box(Modifier.trackArtSize(52.dp, song.isVideo)) {
+                val remoteArtwork = com.music.zenith.ui.player.rememberRemoteArtworkUrl(song)
                 AsyncImage(
-                    model = com.music.zenith.ui.player.rememberRemoteArtworkUrl(song)?.artworkAt(ROW_ART_PX),
+                    model = remember(remoteArtwork) { remoteArtwork?.artworkAt(ROW_ART_PX) },
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
@@ -608,10 +609,12 @@ private fun SongRowContent(
                 color = titleColor,
             )
             Spacer(Modifier.height(2.dp))
-            val subtitle = listOfNotNull(
-                song.artist.takeIf { it.isNotBlank() },
-                song.downloadFormat,
-            ).joinToString(" · ")
+            val subtitle = remember(song.artist, song.downloadFormat) {
+                listOfNotNull(
+                    song.artist.takeIf { it.isNotBlank() },
+                    song.downloadFormat,
+                ).joinToString(" · ")
+            }
             val quality = if (showSourceQuality) song.sourceQualityBadge() else null
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (quality != null) {
