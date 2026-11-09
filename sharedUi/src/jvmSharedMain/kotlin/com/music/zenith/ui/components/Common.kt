@@ -626,7 +626,8 @@ private fun QueueSwipeLabel(playNext: Boolean, swipeState: SwipeToDismissBoxStat
     ) {
         Box(
             modifier = Modifier
-                .size(34.dp)
+                .size(44.dp)
+                .padding(5.dp)
                 .graphicsLayer {
                     val s = 1f + 0.16f * pop
                     scaleX = s
