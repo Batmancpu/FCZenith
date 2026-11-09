@@ -1119,6 +1119,8 @@
     <string name="hide_home_recents_subtitle">Menghapus baris Recents dari Beranda. Riwayat Anda tidak berubah</string>
     <string name="hide_home_videos">Sembunyikan video di Beranda</string>
     <string name="hide_home_videos_subtitle">Baris yang hanya berisi video ikut hilang. Pencarian, artis, dan playlist tetap menampilkannya</string>
+    <string name="hide_home_branding">Sembunyikan branding Beranda</string>
+    <string name="hide_home_branding_subtitle">Hanya menampilkan judul Beranda, tanpa logo</string>
     <string name="hide_home_top_picks">Sembunyikan Pilihan Teratas</string>
     <string name="hide_home_top_picks_subtitle">Menghapus baris Pilihan Teratas untuk Anda dari Beranda</string>
     <string name="hide_home_moods">Sembunyikan Mood</string>

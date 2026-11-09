@@ -859,6 +859,7 @@ private fun ZenithApp(
 
     val homeState by viewModel.home.collectAsStateWithLifecycle()
     val hideHomeRecents by AppSettings.hideHomeRecents.collectAsStateWithLifecycle()
+    val hideHomeBranding by AppSettings.hideHomeBranding.collectAsStateWithLifecycle()
     val hideHomeVideos by AppSettings.hideHomeVideos.collectAsStateWithLifecycle()
     val hideHomeTopPicks by AppSettings.hideHomeTopPicks.collectAsStateWithLifecycle()
     val hideHomeMoods by AppSettings.hideHomeMoods.collectAsStateWithLifecycle()
@@ -3479,7 +3480,8 @@ private fun ZenithApp(
                                 listState = homeListState,
                                 currentSong = player.song,
                                 isPlaying = player.isPlaying,
-                                title = stringResource(R.string.listen_now),
+                                title = stringResource(if (hideHomeBranding) R.string.home else R.string.listen_now),
+                                hideBranding = hideHomeBranding,
                                 signedIn = signedIn,
                                 onSignIn = { webSession = WebSessionMode.SIGN_IN },
                                 onItemClick = { item, shelfTitle ->

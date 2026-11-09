@@ -310,6 +310,7 @@ fun SettingsScreen(
     val dontRepeatSuggestions by AppSettings.dontRepeatSuggestions.collectAsStateWithLifecycle()
     val smartVersionAlignment by AppSettings.smartVersionAlignment.collectAsStateWithLifecycle()
     val autoMusicOnly by AppSettings.autoMusicOnly.collectAsStateWithLifecycle()
+    val hideHomeBranding by AppSettings.hideHomeBranding.collectAsStateWithLifecycle()
     val hideHomeVideos by AppSettings.hideHomeVideos.collectAsStateWithLifecycle()
     val squareVideoCovers by AppSettings.squareVideoCovers.collectAsStateWithLifecycle()
     val stillVideoCovers by AppSettings.stillVideoCovers.collectAsStateWithLifecycle()
@@ -1002,6 +1003,21 @@ fun SettingsScreen(
                         )
                     },
                     onClick = { AppSettings.setHideHomeVideos(!hideHomeVideos) },
+                )
+            }
+            val hideHomeBrandingTitle = stringResource(R.string.hide_home_branding)
+            row(hideHomeBrandingTitle, "logo", "wordmark", "branding", "home", "title", "minimal") {
+                SettingsRow(
+                    icon = SfIcons.VisibilityOff,
+                    title = hideHomeBrandingTitle,
+                    subtitle = stringResource(R.string.hide_home_branding_subtitle),
+                    trailing = {
+                        IosSwitch(
+                            checked = hideHomeBranding,
+                            onCheckedChange = AppSettings::setHideHomeBranding,
+                        )
+                    },
+                    onClick = { AppSettings.setHideHomeBranding(!hideHomeBranding) },
                 )
             }
             val customizeHomeTitle = stringResource(R.string.customize_home)

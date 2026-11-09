@@ -277,6 +277,8 @@ fun HomeScreen(
     onPlaySongs: ((List<Song>) -> Unit)? = null,
     /** The listener's own order and hidden rows. Empty keeps Home's built-in order. */
     homeLayout: HomeLayout = HomeLayout(),
+    /** Swaps the logo and wordmark for a plain [title], without the mark. */
+    hideBranding: Boolean = false,
 ) {
     // Top Picks' pictures and motion wait for the feed — see LocalArtworkImages.
     val feedReady = state !is UiState.Loading
@@ -323,7 +325,7 @@ fun HomeScreen(
             },
         ) {
             if (title != null) {
-                item { HomeTitle(title) }
+                item { HomeTitle(title, hideBranding) }
             }
             if (!signedIn && onSignIn != null) {
                 item {
@@ -774,17 +776,27 @@ fun CompactTrackRow(
  * system font scale.
  */
 @Composable
-private fun HomeTitle(title: String, modifier: Modifier = Modifier) {
+private fun HomeTitle(title: String, hideBranding: Boolean, modifier: Modifier = Modifier) {
     val style = MaterialTheme.typography.displayLarge
     val logoHeight = with(LocalDensity.current) { (style.fontSize * LOGO_TO_FONT).toDp() }
     Column(modifier = modifier.padding(horizontal = PAGE_GUTTER, vertical = 8.dp)) {
-        Wordmark(
-            logoHeight = logoHeight,
-            fontSize = style.fontSize * MUSIC_TO_FONT,
-            color = MaterialTheme.colorScheme.onBackground,
-            gap = 2.dp,
-            modifier = Modifier.padding(bottom = 14.dp),
-        )
+        if (hideBranding) {
+            Text(
+                text = title,
+                style = style,
+                color = MaterialTheme.colorScheme.onBackground,
+                maxLines = 1,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
+        } else {
+            Wordmark(
+                logoHeight = logoHeight,
+                fontSize = style.fontSize * MUSIC_TO_FONT,
+                color = MaterialTheme.colorScheme.onBackground,
+                gap = 2.dp,
+                modifier = Modifier.padding(bottom = 14.dp),
+            )
+        }
         HorizontalDivider(
             thickness = 1.dp,
             color = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),

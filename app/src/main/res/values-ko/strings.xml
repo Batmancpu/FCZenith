@@ -281,6 +281,8 @@
     <string name="hide_home_recents_subtitle">홈에서 최근 재생 줄을 없애요. 기록은 그대로 남아요</string>
     <string name="hide_home_videos">홈에서 비디오 숨기기</string>
     <string name="hide_home_videos_subtitle">비디오로만 된 줄도 함께 사라져요. 검색, 아티스트, 플레이리스트에는 계속 표시돼요</string>
+    <string name="hide_home_branding">홈 브랜딩 숨기기</string>
+    <string name="hide_home_branding_subtitle">로고 없이 홈 제목만 표시해요</string>
     <string name="hide_home_top_picks">추천 선곡 숨기기</string>
     <string name="hide_home_top_picks_subtitle">홈에서 나를 위한 추천 선곡 줄을 없애요</string>
     <string name="hide_home_moods">무드 숨기기</string>

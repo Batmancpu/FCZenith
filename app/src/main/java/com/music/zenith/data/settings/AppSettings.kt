@@ -597,6 +597,9 @@ object AppSettings {
     /** Removes the Recents row from Home. */
     val hideHomeRecents = MutableStateFlow(false)
 
+    /** Replaces the Home logo and wordmark with a plain "Home" title. */
+    val hideHomeBranding = MutableStateFlow(false)
+
     /** Removes music videos from Home, plus any row left with nothing else in it. */
     val hideHomeVideos = MutableStateFlow(false)
 
@@ -1272,6 +1275,7 @@ object AppSettings {
         smartVersionAlignment.value = prefs.getBoolean(KEY_SMART_VERSION_ALIGNMENT, true)
         autoMusicOnly.value = prefs.getBoolean(KEY_AUTO_MUSIC_ONLY, false)
         hideHomeRecents.value = prefs.getBoolean(KEY_HIDE_HOME_RECENTS, false)
+        hideHomeBranding.value = prefs.getBoolean(KEY_HIDE_HOME_BRANDING, false)
         hideHomeVideos.value = prefs.getBoolean(KEY_HIDE_HOME_VIDEOS, false)
         hideHomeTopPicks.value = prefs.getBoolean(KEY_HIDE_HOME_TOP_PICKS, false)
         hideHomeMoods.value = prefs.getBoolean(KEY_HIDE_HOME_MOODS, false)
@@ -1779,6 +1783,11 @@ object AppSettings {
     fun setHideHomeRecents(value: Boolean) {
         hideHomeRecents.value = value
         prefs.edit().putBoolean(KEY_HIDE_HOME_RECENTS, value).apply()
+    }
+
+    fun setHideHomeBranding(value: Boolean) {
+        hideHomeBranding.value = value
+        prefs.edit().putBoolean(KEY_HIDE_HOME_BRANDING, value).apply()
     }
 
     fun setHideHomeVideos(value: Boolean) {
@@ -2664,6 +2673,7 @@ object AppSettings {
     private const val KEY_SMART_VERSION_ALIGNMENT = "smart_version_alignment"
     private const val KEY_AUTO_MUSIC_ONLY = "auto_music_only"
     private const val KEY_HIDE_HOME_RECENTS = "hide_home_recents"
+    private const val KEY_HIDE_HOME_BRANDING = "hide_home_branding"
     private const val KEY_HIDE_HOME_VIDEOS = "hide_home_videos"
     private const val KEY_HIDE_HOME_TOP_PICKS = "hide_home_top_picks"
     private const val KEY_HIDE_HOME_MOODS = "hide_home_moods"

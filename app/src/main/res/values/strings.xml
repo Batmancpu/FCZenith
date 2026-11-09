@@ -293,6 +293,8 @@
     <string name="hide_home_recents_subtitle">Removes the Recents row from Home. Your history stays as it is</string>
     <string name="hide_home_videos">Hide videos on Home</string>
     <string name="hide_home_videos_subtitle">Rows made only of videos go too. Search, artists and playlists still list them</string>
+    <string name="hide_home_branding">Hide Home branding</string>
+    <string name="hide_home_branding_subtitle">Shows only the Home title, without the logo</string>
     <string name="hide_home_top_picks">Hide Top Picks</string>
     <string name="hide_home_top_picks_subtitle">Removes the Top Picks for You row from Home</string>
     <string name="hide_home_moods">Hide Moods</string>
