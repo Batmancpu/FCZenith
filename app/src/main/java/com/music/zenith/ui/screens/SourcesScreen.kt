@@ -12,7 +12,15 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import com.music.zenith.playback.audio.LosslessOutput
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
+import com.music.zenith.data.sources.addon.AddonQualityOption
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -240,6 +248,13 @@ fun SourcesScreen(
                         awaitingOutput = if (config.enabled && config.awaitsLosslessOutput) losslessOutput else null,
                         onMetered = metered == true,
                         ceiling = ceiling,
+                        onPickQuality = { value ->
+                            // Off the stored config, not the one this row was
+                            // drawn from: a probe may have refreshed it since.
+                            SourceRegistry.config(config.id)?.let {
+                                SourceRegistry.update(it.copy(pickedQuality = value))
+                            }
+                        },
                         // Anything the user configured is theirs to edit or
                         // delete. JioSaavn and YouTube have no address to
                         // change, so a tap on them would open an empty editor.
@@ -755,6 +770,8 @@ private fun SourceRow(
     /** Which of the two ceilings [ceiling] is, so the row can name it. */
     onMetered: Boolean = false,
     ceiling: AudioQuality = AudioQuality.LOSSLESS,
+    /** Stores the listener's `quality` pick for an addon that offers a choice. */
+    onPickQuality: (String) -> Unit = {},
     /**
      * The drag grip, for a row whose position is the user's to set. Passed in
      * rather than drawn here because the gesture belongs to the list that knows
@@ -879,6 +896,16 @@ private fun SourceRow(
                     )
                 }
             }
+            // Read off the stored manifest, so it can be set while the addon
+            // is down or waiting on a lossless output. Only when the addon
+            // actually offers a choice (two or more renditions).
+            if (config.kind == SourceKind.ADDON && config.isComplete && config.qualityOptions.isNotEmpty()) {
+                AddonQualityStrip(
+                    options = config.qualityOptions,
+                    selected = config.activeQuality,
+                    onPick = onPickQuality,
+                )
+            }
         }
         Spacer(Modifier.width(8.dp))
         if (onToggle == null) {
@@ -899,6 +926,79 @@ private fun SourceRow(
         if (handle != null) {
             Spacer(Modifier.width(4.dp))
             handle()
+        }
+    }
+}
+
+/**
+ * An addon's own quality choices, laid out under its name as a row of pills.
+ *
+ * Every rendition the addon lists is visible at once and one tap picks it,
+ * where a single "current value" link would hide the list behind a dialog.
+ * The filled pill is the one in force; the row scrolls sideways for addons
+ * that list more than fit.
+ */
+@Composable
+private fun AddonQualityStrip(
+    options: List<AddonQualityOption>,
+    selected: AddonQualityOption?,
+    onPick: (String) -> Unit,
+) {
+    Column(modifier = Modifier.padding(top = 8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = SfIcons.Tune,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(13.dp),
+            )
+            Spacer(Modifier.width(4.dp))
+            Text(
+                text = stringResource(R.string.audio_quality),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
+        }
+        Row(
+            modifier = Modifier
+                .padding(top = 6.dp)
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            options.forEach { option ->
+                val isSelected = option.value == selected?.value
+                val container by animateColorAsState(
+                    targetValue = if (isSelected) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
+                    },
+                    label = "qualityPillContainer",
+                )
+                val content by animateColorAsState(
+                    targetValue = if (isSelected) {
+                        MaterialTheme.colorScheme.onPrimary
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
+                    label = "qualityPillContent",
+                )
+                Text(
+                    text = option.label,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = content,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(percent = 50))
+                        .background(container)
+                        .clickable(role = Role.RadioButton, onClickLabel = option.label) {
+                            if (!isSelected) onPick(option.value)
+                        }
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                )
+            }
         }
     }
 }
