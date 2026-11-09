@@ -85,7 +85,7 @@ data class GlassClarity(val level: Float) {
         }
 
     val tintAlpha: Float = mix(0.12f, 0.30f, 0.46f)
-    val blurScale: Float = mix(0.4f, 1f, 1.35f)
+    val blurScale: Float = mix(0.1f, 1f, 1.35f)
     val saturation: Float = mix(1.4f, 1.5f, 1.5f)
     val resolutionScale: Float = mix(0.75f, 0.33f, 0.33f)
     val lensScale: Float = mix(0.6f, 1f, 1f)
