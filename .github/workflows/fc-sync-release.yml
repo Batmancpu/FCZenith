@@ -243,7 +243,7 @@ jobs:
             "$APK"
 
           "$APKSIGNER" verify --verbose --print-certs "$SIGNED_APK" > /tmp/fc-signature.txt
-          FINGERPRINT="$(awk '/certificate SHA-256 digest:/ {value=\$NF; gsub(":", "", value); print tolower(value); exit}' /tmp/fc-signature.txt)"
+          FINGERPRINT="$(awk '/certificate SHA-256 digest:/ {value=$NF; gsub(":", "", value); print tolower(value); exit}' /tmp/fc-signature.txt)"
           if [[ ! "$FINGERPRINT" =~ ^[0-9a-f]{64}$ ]]; then
             echo "Could not read APK signing certificate SHA-256 fingerprint" >&2
             cat /tmp/fc-signature.txt
