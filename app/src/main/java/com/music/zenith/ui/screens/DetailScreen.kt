@@ -1569,11 +1569,26 @@ private fun PageBackground(
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
     val art = heroUrl ?: page.thumbnailUrl.artworkAt(HEADER_ART_PX)
 
+    // The photo waits for the page colour instead of showing over a black page
+    // that then turns purple a moment later. A read that never finishes gives
+    // up after 1.2 s so the photo is never held back for good.
+    var gaveUp by remember(art) { mutableStateOf(false) }
+    LaunchedEffect(art) {
+        delay(1_200)
+        gaveUp = true
+    }
+    val reveal by animateFloatAsState(
+        targetValue = if (palette.ready || gaveUp) 1f else 0f,
+        animationSpec = tween(260),
+        label = "artistHeroReveal",
+    )
+
     Box(modifier.clipToBounds()) {
         Box(
             Modifier
                 .fillMaxWidth()
                 .height(artHeight)
+                .graphicsLayer { alpha = reveal }
                 .offset { IntOffset(0, listState.headerTop(artHeight.toPx()).roundToInt()) }
                 // After the offset, so the flight lands on where the photo really is.
                 .coverFlightTarget(page.browseId, 0.dp, palette.wash),

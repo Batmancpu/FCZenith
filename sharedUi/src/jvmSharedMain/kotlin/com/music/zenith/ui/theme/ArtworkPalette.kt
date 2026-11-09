@@ -67,6 +67,12 @@ data class ArtworkPalette(
     val onBackground: Color,
     val onBackgroundVariant: Color,
     val divider: Color,
+    /**
+     * False while the artwork's colours are still being read. A surface that
+     * paints the artwork itself holds it back until this is true, so the
+     * picture and the page colour arrive on the same frame.
+     */
+    val ready: Boolean = true,
 )
 
 /**
@@ -139,6 +145,7 @@ fun rememberArtworkPalette(
             target.onBackgroundVariant, spec, label = "tintOnVariant",
         ).value,
         divider = animateColorAsState(target.divider, spec, label = "tintDivider").value,
+        ready = keyColors != null || decoded != null || imageUrl == null,
     )
 }
 
