@@ -378,13 +378,17 @@ internal class GlassPillMotion(
     private fun signOfTravel(span: Double): Double = if (abs(span) < 1e-6) 0.0 else sign(span)
 
     /**
-     * [liveSize] for the flat pill, which is drawn inside the bar's clip: its
-     * height never exceeds the resting height, so a lifted pill cannot be cut
-     * off at the top and bottom while the blur fades back in.
+     * [liveSize] for the flat pill, which is drawn inside the bar's clip: it
+     * never exceeds the resting width or height, so a lifted pill cannot be
+     * cut off at the top, bottom, or at the first and last tab while the blur
+     * fades back in.
      */
     fun flatSize(rest: Size, lifted: Size): Size {
         val s = liveSize(rest, lifted)
-        return Size(s.width, s.height.coerceAtMost(rest.height))
+        return Size(
+            s.width.coerceAtMost(rest.width),
+            s.height.coerceAtMost(rest.height),
+        )
     }
 
     /** The size the pill is drawn at this frame, between [rest] and [lifted]. */
