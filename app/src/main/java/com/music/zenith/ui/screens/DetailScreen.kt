@@ -1618,7 +1618,7 @@ private fun PageBackground(
                     model = shown,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.matchParentSize(),
+                    modifier = Modifier.fillMaxSize(),
                 )
             }
 
@@ -1664,7 +1664,7 @@ private fun PageBackground(
                         model = shown,
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier.matchParentSize(),
+                        modifier = Modifier.fillMaxSize(),
                     )
                 }
             }
