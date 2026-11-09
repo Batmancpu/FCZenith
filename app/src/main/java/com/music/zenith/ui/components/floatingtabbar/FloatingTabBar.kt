@@ -319,7 +319,8 @@ fun FloatingTabBar(
     LaunchedEffect(scrollConnection.isInline) {
         val target = scrollConnection.isInline
         if (target == shownInline) return@LaunchedEffect
-        val amplitude = if (target) 1f else 0.7f
+        // Mengecil: player penuh ditarik ke atas. Membesar: pil ditarik ke bawah.
+        val amplitude = if (target) 1f else -0.7f
         pull.animateTo(
             amplitude,
             androidx.compose.animation.core.tween(190, easing = FastOutSlowInEasing),

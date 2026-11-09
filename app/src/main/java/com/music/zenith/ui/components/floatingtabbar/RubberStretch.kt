@@ -12,9 +12,9 @@ import androidx.compose.ui.graphics.graphicsLayer
  */
 internal fun Modifier.rubberStretch(liftPx: Float, stretch: () -> Float): Modifier = graphicsLayer {
     val p = stretch()
-    transformOrigin = TransformOrigin(0.5f, 1f)
+    transformOrigin = TransformOrigin(0.5f, if (p >= 0f) 1f else 0f)
     translationY = -liftPx * p
-    scaleY = 1f + 0.12f * p
-    scaleX = 1f - 0.05f * p
+    scaleY = 1f + 0.12f * kotlin.math.abs(p)
+    scaleX = 1f - 0.05f * kotlin.math.abs(p)
     clip = false
 }
