@@ -72,10 +72,19 @@ enum class OutputPcmMode(val label: String) {
  * [blurScale] pengali radius blur. Balanced = tampilan bawaan sebelumnya.
  * Lensa, highlight, dan shadow tidak berubah di semua mode.
  */
-enum class GlassClarity(val label: String, val tintAlpha: Float, val blurScale: Float) {
-    CLEAR("Clear", 0.06f, 0.4f),
-    BALANCED("Balanced", 0.30f, 1f),
-    FROSTED("Frosted", 0.46f, 1.35f),
+enum class GlassClarity(
+    val label: String,
+    val tintAlpha: Float,
+    val blurScale: Float,
+    val saturation: Float,
+    val resolutionScale: Float,
+    val lensScale: Float,
+) {
+    // Clear: tanpa blur, resolusi sampling tinggi (tidak buram saat di-upscale),
+    // tint nyaris nol, refraksi tepi sedikit lebih kuat.
+    CLEAR("Clear", 0.05f, 0f, 1.1f, 0.75f, 1.25f),
+    BALANCED("Balanced", 0.30f, 1f, 1.5f, 0.33f, 1f),
+    FROSTED("Frosted", 0.46f, 1.35f, 1.5f, 0.33f, 1f),
 }
 
 /**

@@ -223,9 +223,10 @@ fun Modifier.liquidGlass(
     val backdrop = LocalAppBackdrop.current
     val exportedBackdrop = LocalGlassExport.current
     val density = LocalDensity.current
-    val blurPx = with(density) { BLUR_RADIUS_DP.dp.toPx() } * GLASS_RESOLUTION_SCALE * clarity.blurScale
-    val lensHeightPx = with(density) { (LENS_HEIGHT * LENS_MAX_DP).dp.toPx() } * GLASS_RESOLUTION_SCALE
-    val lensAmountPx = with(density) { (LENS_AMOUNT * LENS_MAX_DP).dp.toPx() } * GLASS_RESOLUTION_SCALE
+    val resolution = clarity.resolutionScale
+    val blurPx = with(density) { BLUR_RADIUS_DP.dp.toPx() } * resolution * clarity.blurScale
+    val lensHeightPx = with(density) { (LENS_HEIGHT * LENS_MAX_DP).dp.toPx() } * resolution
+    val lensAmountPx = with(density) { (LENS_AMOUNT * LENS_MAX_DP).dp.toPx() } * resolution * clarity.lensScale
     val themeTint = if (MaterialTheme.colorScheme.surface.luminance() > 0.5f) {
         Color(0xFFFAFAFA)
     } else {
@@ -238,7 +239,7 @@ fun Modifier.liquidGlass(
         shape = { shape },
         effects = {
             // Frosted: hanya saturasi ringan + blur, tanpa lensa (bagian terberat di GPU).
-            colorControls(saturation = if (frosted) 1.15f else 1f + 0.5f * VIBRANCY)
+            colorControls(saturation = if (frosted) 1.15f else clarity.saturation)
             blur(if (frosted) blurPx * 1.4f else blurPx)
             if (!frosted && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 lens(
@@ -255,6 +256,6 @@ fun Modifier.liquidGlass(
             drawRect(color = surfaceTintColor, size = size)
         },
         exportedBackdrop = exportedBackdrop,
-        backdropScale = GLASS_RESOLUTION_SCALE,
+        backdropScale = resolution,
     )
 }
