@@ -112,22 +112,37 @@ class PlayerDock {
     /** Where the player's window starts on screen. Measured once the sheet is laid out. */
     internal var windowOrigin: Offset = Offset.Zero
 
+    // Dozens of layout, graphics-layer and draw blocks ask for the pill every
+    // frame of an open or close, and each ask walks the coordinate chain twice.
+    // The pill does not move during the trip, so one answer serves the frame.
+    private var pillCache: Rect? = null
+    private var pillCacheNanos = 0L
+
     fun reportMiniPill(coordinates: LayoutCoordinates) {
         miniPill = coordinates
+        pillCache = null
     }
 
     fun releaseMiniPill(coordinates: LayoutCoordinates) {
-        if (miniPill === coordinates) miniPill = null
+        if (miniPill === coordinates) {
+            miniPill = null
+            pillCache = null
+        }
     }
 
     /** The pill in the player window's own pixels, or null with no pill on screen. */
     fun miniPillInWindow(): Rect? {
         val c = miniPill?.takeIf { it.isAttached } ?: return null
+        val now = System.nanoTime()
+        pillCache?.let { if (now - pillCacheNanos < PILL_CACHE_NANOS) return it }
         val size = c.size.toSize()
         return Rect(
             c.localToScreen(Offset.Zero) - windowOrigin,
             c.localToScreen(Offset(size.width, size.height)) - windowOrigin,
-        )
+        ).also {
+            pillCache = it
+            pillCacheNanos = now
+        }
     }
 
     /**
@@ -307,6 +322,9 @@ class PlayerDock {
 
 /** The [PlayerDock] around the player, if its host has a mini player to dock into. */
 val LocalPlayerDock = staticCompositionLocalOf<PlayerDock?> { null }
+
+/** How long one measurement of the mini pill stands, in nanoseconds: under a frame. */
+private const val PILL_CACHE_NANOS = 8_000_000L
 
 /** The share of the opening over which the glass gives way to the plain panel. */
 private const val PANEL_FILL_UNTIL = 0.2f
