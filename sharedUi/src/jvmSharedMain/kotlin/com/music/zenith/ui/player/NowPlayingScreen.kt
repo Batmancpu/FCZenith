@@ -526,6 +526,21 @@ private fun dockEaseThumb(t: Float): Float {
 private const val DOCK_COVER_START_AT = 0.05f
 
 /**
+ * Di awal drag cover kartu ditahan di tengah tinggi panel (jarak atas dan bawah
+ * sama). Penuh sejak drag sejauh [DOCK_CENTRE_RISE_AT], bertahan sampai
+ * [DOCK_CENTRE_HOLD_TO], lalu lepas bertahap sampai [DOCK_CENTRE_END_AT] ke
+ * jalur terbang biasa. Di 0 pengaruhnya 0, jadi cover tidak melompat dari mini.
+ */
+private const val DOCK_CENTRE_RISE_AT = 0.06f
+private const val DOCK_CENTRE_HOLD_TO = 0.30f
+private const val DOCK_CENTRE_END_AT = 0.70f
+
+private fun dockSmooth(x: Float): Float {
+    val t = x.coerceIn(0f, 1f)
+    return t * t * (3f - 2f * t)
+}
+
+/**
  * Smoothstep: 0 di mini player dan sampai [DOCK_COVER_START_AT], 1 begitu drag melewati
  * [DOCK_COVER_FULL_AT]. Tertunda di awal supaya cover tidak lebih besar dari panelnya.
  */
@@ -3602,8 +3617,32 @@ fun NowPlayingScreen(
                         // player: tidak lewat tepi atas panel (yang memotong bagian atas
                         // cover) dan tidak keluar dari kiri/kanan. Tepi atas panel di
                         // koordinat kotak ini adalah bannerTopPx.
-                        fun fitToPanel(source: Rect, active: Boolean): Rect {
-                            if (!active) return source
+                        fun fitToPanel(rawSource: Rect, active: Boolean): Rect {
+                            if (!active) return rawSource
+                            // Cover kartu (bukan banner full-bleed) diletakkan di tengah tinggi
+                            // panel selagi panel masih tumbuh dari pill, supaya jarak atas dan
+                            // bawahnya sama dan ia naik bersama panel, tidak menempel ke atas.
+                            val source = if (heroMode || dock == null || playerBounds.height <= 0) {
+                                rawSource
+                            } else {
+                                val open = dock.openFraction()
+                                val rise = dockSmooth(open / DOCK_CENTRE_RISE_AT)
+                                val fall = dockSmooth(
+                                    (open - DOCK_CENTRE_HOLD_TO) / (DOCK_CENTRE_END_AT - DOCK_CENTRE_HOLD_TO),
+                                )
+                                val share = rise * (1f - fall)
+                                if (share <= 0f) {
+                                    rawSource
+                                } else {
+                                    val panel = dock.panelBounds(
+                                        Size(playerBounds.width.toFloat(), playerBounds.height.toFloat()),
+                                    )
+                                    val panelTop = bannerTopPx.toFloat()
+                                    val panelHeight = panel.bottom - panel.top
+                                    val centredTop = panelTop + (panelHeight - rawSource.height) / 2f
+                                    rawSource.translate(0f, (centredTop - rawSource.top) * share)
+                                }
+                            }
                             // Tepi bawah panel di koordinat kotak ini: cover diangkat supaya
                             // bagian bawahnya tidak tertutup panel yang masih setinggi pill.
                             val panelBottom = if (dock != null && playerBounds.height > 0) {
