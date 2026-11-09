@@ -526,7 +526,7 @@ private fun TopResultCard(
             .contextClick(onLongPress),
     ) {
         Text(
-            text = "Top result",
+            text = stringResource(Res.string.search_top_result),
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurface,
         )

@@ -186,6 +186,9 @@
     <string name="shelf_listen_again">Listen again</string>
     <string name="shelf_mixed_for_you">Mixed for you</string>
     <string name="shelf_new_releases">New releases</string>
+    <string name="shelf_new_albums_singles">New albums &amp; singles</string>
+    <string name="card_monthly_listeners_format">%1$s monthly listeners</string>
+    <string name="search_top_result">Top result</string>
     <string name="shelf_quick_picks">Quick picks</string>
     <string name="shelf_recents">Recents</string>
     <string name="shelf_recommended_music_videos">Recommended music videos</string>

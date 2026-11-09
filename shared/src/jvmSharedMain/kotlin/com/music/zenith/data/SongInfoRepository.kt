@@ -36,16 +36,18 @@ data class SongInfo(
  */
 fun compactCount(raw: String): String {
     val n = raw.toLongOrNull()?.takeIf { it >= 0 } ?: return raw
+    val locale = java.util.Locale.forLanguageTag(Innertube.currentLocaleTag)
+    val indonesian = locale.language == "id"
     val (unit, suffix) = when {
-        n >= 1_000_000_000 -> 1_000_000_000L to "B"
-        n >= 1_000_000 -> 1_000_000L to "M"
-        n >= 1_000 -> 1_000L to "K"
+        n >= 1_000_000_000 -> 1_000_000_000L to (if (indonesian) " M" else "B")
+        n >= 1_000_000 -> 1_000_000L to (if (indonesian) " jt" else "M")
+        n >= 1_000 -> 1_000L to (if (indonesian) " rb" else "K")
         else -> return n.toString()
     }
     val whole = n / unit
     if (whole >= 10) return "$whole$suffix"
     val tenth = n % unit * 10 / unit
-    val separator = java.text.DecimalFormatSymbols.getInstance().decimalSeparator
+    val separator = java.text.DecimalFormatSymbols.getInstance(locale).decimalSeparator
     return if (tenth == 0L) "$whole$suffix" else "$whole$separator$tenth$suffix"
 }
 

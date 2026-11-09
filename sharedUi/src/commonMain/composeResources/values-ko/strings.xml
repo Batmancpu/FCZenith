@@ -185,6 +185,9 @@
     <string name="shelf_listen_again">다시 듣기</string>
     <string name="shelf_mixed_for_you">맞춤 믹스</string>
     <string name="shelf_new_releases">신규 발매</string>
+    <string name="shelf_new_albums_singles">새 앨범 및 싱글</string>
+    <string name="card_monthly_listeners_format">월간 청취자 %1$s명</string>
+    <string name="search_top_result">상위 검색결과</string>
     <string name="shelf_quick_picks">빠른 선곡</string>
     <string name="shelf_recents">최근 항목</string>
     <string name="shelf_recommended_music_videos">추천 뮤직비디오</string>

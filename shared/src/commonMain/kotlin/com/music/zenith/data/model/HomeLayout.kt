@@ -6,8 +6,8 @@ const val HOME_SLOT_TOP_PICKS = "slot:top-picks"
 /** Key of the Find Your Mood slot on Home. */
 const val HOME_SLOT_MOODS = "slot:moods"
 
-private val LISTEN_AGAIN_ALIASES = listOf("Listen again", "Nghe lại", "もう一度聴く")
-private val QUICK_PICKS_ALIASES = listOf("Quick picks", "Lựa chọn nhanh", "Chọn nhanh đài phát", "クイック ミックス")
+private val LISTEN_AGAIN_ALIASES = listOf("Listen again", "Nghe lại", "もう一度聴く", "Dengarkan lagi")
+private val QUICK_PICKS_ALIASES = listOf("Quick picks", "Lựa chọn nhanh", "Chọn nhanh đài phát", "クイック ミックス", "Pilihan cepat")
 
 /**
  * A stable key for a feed shelf. The same shelf keeps its key across app
