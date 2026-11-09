@@ -338,7 +338,7 @@ fun FloatingTabBar(
         remember(inlineAccessory, pullPx) {
             inlineAccessory?.let { acc ->
                 val wrapped: @Composable SharedTransitionScope.(Modifier, AnimatedVisibilityScope) -> Unit =
-                    { m, s -> acc(m.rubberStretch(pullPx) { pull.value }, s) }
+                    { m, s -> acc(Modifier.rubberStretch(pullPx) { pull.value }.then(m), s) }
                 wrapped
             }
         }
@@ -346,7 +346,7 @@ fun FloatingTabBar(
         remember(expandedAccessory, pullPx) {
             expandedAccessory?.let { acc ->
                 val wrapped: @Composable SharedTransitionScope.(Modifier, AnimatedVisibilityScope) -> Unit =
-                    { m, s -> acc(m.rubberStretch(pullPx) { pull.value }, s) }
+                    { m, s -> acc(Modifier.rubberStretch(pullPx) { pull.value }.then(m), s) }
                 wrapped
             }
         }
