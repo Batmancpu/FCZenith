@@ -70,8 +70,25 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.pulltorefresh.PullToRefreshState
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Velocity
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -846,36 +863,263 @@ fun DownloadedBadge(videoId: String, tint: Color, modifier: Modifier = Modifier)
     )
 }
 
+/** Finger-to-offset distance at which a pull counts as a refresh request. */
+private val ELASTIC_PULL_THRESHOLD = 80.dp
+
+/** Where the page rests while a refresh is running. */
+private val ELASTIC_PULL_HOLD = 56.dp
+
+/** The rubber-band's asymptote: the page can never be pushed this far. */
+private val ELASTIC_PULL_RANGE = 600.dp
+
+/** iOS's UIScrollView rubber-band coefficient. */
+private const val ELASTIC_PULL_RUBBER = 0.6f
+
+/** How long a release waits for the refresh to actually start before letting go. */
+private const val ELASTIC_PULL_START_GRACE_MS = 1200L
+
 /**
- * Pull-to-refresh for the tab feeds, with the usual circular puck suppressed.
+ * State of the elastic pull-to-refresh: the whole page follows the finger with
+ * an iOS-style rubber-band, is held at a rest distance while a refresh runs and
+ * springs back when it ends.
  *
- * The feeds sit under a frosted bar that already occupies the top 96dp, so a
- * puck drawn here would be blurred out by the glass it lands behind. The bar
- * draws its own puck instead, sliding out from under its bottom edge — which
- * is why [state] is hoisted: the bar lives beside this content, not inside it,
- * and has to follow the same drag.
+ * Hoisted by the caller and bound to the caller's scope, so a pull released on
+ * a page that then leaves composition still finishes its spring-back.
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@Stable
+class ElasticRefreshState internal constructor(private val scope: CoroutineScope) {
+    /** How far the page is pushed down, in px. Read in layer/draw blocks only. */
+    var offset by mutableFloatStateOf(0f)
+        private set
+
+    /** True while the pull is past the refresh threshold. */
+    var armed by mutableStateOf(false)
+        private set
+
+    /** True from a releasing pull that started a refresh until the refresh is over. */
+    var holding by mutableStateOf(false)
+        private set
+
+    internal var thresholdPx = 0f
+        private set
+    private var holdPx = 0f
+    private var rangePx = 1f
+    private var rawDrag = 0f
+    private var dragging = false
+    private var started = false
+    private var anim: Job? = null
+
+    internal fun configure(thresholdPx: Float, holdPx: Float, rangePx: Float) {
+        this.thresholdPx = thresholdPx
+        this.holdPx = holdPx
+        this.rangePx = rangePx
+    }
+
+    private fun resist(x: Float): Float =
+        rangePx * (1f - 1f / (x * ELASTIC_PULL_RUBBER / rangePx + 1f))
+
+    private fun unresist(y: Float): Float {
+        val p = (y / rangePx).coerceIn(0f, 0.98f)
+        return rangePx * (1f / (1f - p) - 1f) / ELASTIC_PULL_RUBBER
+    }
+
+    /** Moves the page by [delta] finger px (down is positive); returns what was used. */
+    internal fun dragBy(delta: Float): Float {
+        if (!dragging) {
+            anim?.cancel()
+            anim = null
+            rawDrag = unresist(offset)
+            dragging = true
+        }
+        val next = (rawDrag + delta).coerceAtLeast(0f)
+        val used = next - rawDrag
+        rawDrag = next
+        offset = resist(next)
+        if (!armed && offset >= thresholdPx) {
+            armed = true
+        } else if (armed && offset < thresholdPx * 0.92f) {
+            armed = false
+        }
+        return used
+    }
+
+    /** The finger lifted. True if the page was pulled and the release was handled here. */
+    internal fun release(refreshingNow: Boolean, onRefresh: () -> Unit): Boolean {
+        if (!dragging) return false
+        dragging = false
+        rawDrag = 0f
+        if (offset <= 0f) {
+            armed = false
+            return false
+        }
+        val fire = armed && !holding
+        armed = false
+        if (fire) {
+            holding = true
+            started = refreshingNow
+            settleTo(holdPx)
+            onRefresh()
+            scope.launch {
+                delay(ELASTIC_PULL_START_GRACE_MS)
+                if (holding && !started) finish()
+            }
+        } else {
+            settleTo(0f)
+        }
+        return true
+    }
+
+    internal fun onRefreshingChanged(refreshing: Boolean) {
+        if (refreshing) {
+            started = true
+        } else if (holding && started) {
+            finish()
+        }
+    }
+
+    /** The page is back on screen: drop anything a previous visit left half-done. */
+    internal fun onAttach() {
+        dragging = false
+        rawDrag = 0f
+        armed = false
+        if (!holding && offset > 0f) settleTo(0f)
+    }
+
+    private fun finish() {
+        holding = false
+        started = false
+        if (!dragging) settleTo(0f)
+    }
+
+    private fun settleTo(target: Float) {
+        anim?.cancel()
+        anim = scope.launch {
+            animate(
+                initialValue = offset,
+                targetValue = target,
+                animationSpec = spring(dampingRatio = 0.9f, stiffness = 260f),
+            ) { value, _ -> offset = value.coerceAtLeast(0f) }
+        }
+    }
+}
+
+@Composable
+fun rememberElasticRefreshState(): ElasticRefreshState {
+    val scope = rememberCoroutineScope()
+    return remember(scope) { ElasticRefreshState(scope) }
+}
+
+private class ElasticRefreshConnection(
+    private val state: ElasticRefreshState,
+    private val isRefreshing: () -> Boolean,
+    private val onRefresh: () -> Unit,
+) : NestedScrollConnection {
+    override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+        if (source != NestedScrollSource.UserInput || state.holding) return Offset.Zero
+        // Pushing back up: the page gives its offset back before the list scrolls.
+        if (available.y < 0f && state.offset > 0f) return Offset(0f, state.dragBy(available.y))
+        return Offset.Zero
+    }
+
+    override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+        if (source != NestedScrollSource.UserInput || state.holding) return Offset.Zero
+        // What the list could not take is the pull past its top edge.
+        if (available.y > 0f) return Offset(0f, state.dragBy(available.y))
+        return Offset.Zero
+    }
+
+    override suspend fun onPreFling(available: Velocity): Velocity =
+        if (state.release(isRefreshing(), onRefresh)) available else Velocity.Zero
+}
+
+/**
+ * Pull-to-refresh for the tab feeds: the whole page follows the finger with an
+ * iOS-style rubber-band instead of a puck drawn over it.
+ *
+ * Past the threshold a release holds the page at a rest distance and calls
+ * [onRefresh] once; when [refreshing] goes back to false the page springs home.
+ * [topInset] is the frosted bar's height, so the small hint in the gap sits
+ * below the bar. [state] is hoisted so a feed that leaves the screen mid-pull
+ * keeps its place.
+ */
 @Composable
 fun PullToRefresh(
     refreshing: Boolean,
     onRefresh: () -> Unit,
-    state: PullToRefreshState,
+    state: ElasticRefreshState,
     modifier: Modifier = Modifier,
+    topInset: Dp = 0.dp,
     content: @Composable () -> Unit,
 ) {
     if (!LocalPullToRefreshEnabled.current) {
         Box(modifier.fillMaxSize()) { content() }
         return
     }
-    PullToRefreshBox(
-        isRefreshing = refreshing,
-        onRefresh = onRefresh,
-        state = state,
-        modifier = modifier.fillMaxSize(),
-        indicator = {},
-    ) {
-        content()
+    val density = LocalDensity.current
+    remember(density.density) {
+        state.configure(
+            thresholdPx = with(density) { ELASTIC_PULL_THRESHOLD.toPx() },
+            holdPx = with(density) { ELASTIC_PULL_HOLD.toPx() },
+            rangePx = with(density) { ELASTIC_PULL_RANGE.toPx() },
+        )
+    }
+    val haptics = rememberHaptics()
+    val latestRefreshing by rememberUpdatedState(refreshing)
+    val latestOnRefresh by rememberUpdatedState(onRefresh)
+    val connection = remember(state) {
+        ElasticRefreshConnection(state, { latestRefreshing }, { latestOnRefresh() })
+    }
+    LaunchedEffect(state) { state.onAttach() }
+    LaunchedEffect(refreshing) { state.onRefreshingChanged(refreshing) }
+    LaunchedEffect(state) {
+        snapshotFlow { state.armed }.collect { if (it) haptics.play(Haptic.Tick) }
+    }
+    Box(modifier.fillMaxSize().nestedScroll(connection)) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .graphicsLayer { translationY = state.offset },
+        ) {
+            content()
+        }
+        ElasticRefreshHint(state = state, topInset = topInset)
+    }
+}
+
+/**
+ * A thin arc in the gap the pull opens: it fills with the drag, then turns
+ * while the refresh runs. It lives in the page, so it goes where the page goes.
+ * Composed only while the page is displaced, so nothing animates at rest.
+ */
+@Composable
+private fun ElasticRefreshHint(state: ElasticRefreshState, topInset: Dp) {
+    val visible by remember(state) { derivedStateOf { state.offset > 0f } }
+    if (!visible) return
+    val color = MaterialTheme.colorScheme.onSurfaceVariant
+    val spin = rememberInfiniteTransition(label = "elasticRefreshSpin")
+    val angle by spin.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(900, easing = LinearEasing)),
+        label = "elasticRefreshAngle",
+    )
+    Canvas(Modifier.fillMaxSize()) {
+        val pushed = state.offset
+        val progress = (pushed / state.thresholdPx.coerceAtLeast(1f)).coerceIn(0f, 1f)
+        val alpha = (progress * 1.6f).coerceAtMost(1f) * 0.7f
+        val radius = 7.dp.toPx()
+        val cx = size.width / 2f
+        val cy = topInset.toPx() + pushed / 2f
+        val holding = state.holding
+        drawArc(
+            color = color.copy(alpha = alpha),
+            startAngle = if (holding) -90f + angle else -90f + progress * 120f,
+            sweepAngle = if (holding) 270f else (300f * progress).coerceAtLeast(10f),
+            useCenter = false,
+            topLeft = Offset(cx - radius, cy - radius),
+            size = Size(radius * 2f, radius * 2f),
+            style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round),
+        )
     }
 }
 

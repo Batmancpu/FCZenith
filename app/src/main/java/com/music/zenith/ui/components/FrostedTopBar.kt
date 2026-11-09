@@ -380,7 +380,6 @@ fun FrostedTopBar(
             }
         }
         HorizontalDivider(thickness = 0.5.dp, color = dividerColor)
-        RefreshPuck(refreshing = refreshing, pullFraction = pullFraction)
     }
 }
 
@@ -704,80 +703,8 @@ fun TopBarAccountButton(
     }
 }
 
-/**
- * The refresh indicator: a round puck that slides out from under the bar's
- * bottom edge as the list is pulled, Chrome-style.
- *
- * It is drawn by the bar rather than by the pull-to-refresh box, so it lands on
- * top of the glass instead of behind it, and it is clipped to the band just
- * below the bar so it emerges from the edge instead of appearing over the
- * status bar. Its position is the pull state's own distance fraction — which
- * the pull box holds at 1 while refreshing and animates back to 0 when done —
- * so the slide down, the rest while loading and the slide back up are all one
- * value. The arc fills with the drag, then spins once the refresh is away.
- *
- * Laid out at zero height, so the bar keeps its size and the puck overhangs
- * the content without taking any touches from it.
- */
-@Composable
-private fun RefreshPuck(refreshing: Boolean, pullFraction: () -> Float, modifier: Modifier = Modifier) {
-    val currentFraction by rememberUpdatedState(pullFraction)
-    val pulling by remember { derivedStateOf { currentFraction() > 0f } }
-    if (!refreshing && !pulling) return
-
-    val travel = with(LocalDensity.current) { (PUCK_REST + PUCK_SIZE).toPx() }
-    Box(
-        modifier = modifier
-            .layout { measurable, constraints ->
-                val placeable = measurable.measure(constraints.copy(minHeight = 0))
-                layout(placeable.width, 0) { placeable.place(0, 0) }
-            }
-            .fillMaxWidth()
-            .height(PUCK_REST + PUCK_SIZE + PUCK_OVERSHOOT + 12.dp)
-            .clipToBounds(),
-        contentAlignment = Alignment.TopCenter,
-    ) {
-        Box(
-            modifier = Modifier
-                .graphicsLayer {
-                    val f = currentFraction().coerceIn(0f, 2f)
-                    // Past the threshold the puck keeps following, but
-                    // reluctantly, like the list under it.
-                    val eased = if (f <= 1f) f else 1f + (f - 1f) * 0.35f
-                    translationY = travel * eased - PUCK_SIZE.toPx()
-                    alpha = (f * 3f).coerceAtMost(1f)
-                }
-                .shadow(6.dp, CircleShape)
-                .size(PUCK_SIZE)
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh, CircleShape),
-            contentAlignment = Alignment.Center,
-        ) {
-            val indicatorModifier = Modifier.size(22.dp)
-            if (refreshing) {
-                CircularProgressIndicator(
-                    modifier = indicatorModifier,
-                    color = MaterialTheme.colorScheme.primary,
-                    strokeWidth = 2.5.dp,
-                    strokeCap = StrokeCap.Round,
-                )
-            } else {
-                CircularProgressIndicator(
-                    progress = { (currentFraction() * 0.8f).coerceIn(0f, 0.8f) },
-                    modifier = indicatorModifier.graphicsLayer {
-                        rotationZ = currentFraction().coerceIn(0f, 2f) * 180f
-                    },
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = Color.Transparent,
-                    strokeWidth = 2.5.dp,
-                    strokeCap = StrokeCap.Round,
-                    gapSize = 0.dp,
-                )
-            }
-        }
-    }
-}
-
-private val PUCK_SIZE = 40.dp
+// Refresh feedback lives in the page itself (see PullToRefresh): the page
+// follows the finger, so the bar draws no puck of its own.
 
 /**
  * The floating top controls' height — the back circle and the actions pill

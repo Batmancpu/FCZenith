@@ -80,7 +80,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
+import com.music.zenith.ui.components.rememberElasticRefreshState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -1246,11 +1246,11 @@ private fun ZenithApp(
     }
 
 
-    // Pull-to-refresh: the drag lives with the feed, but the indicator is the
-    // line under the top bar, so the state has to be visible to both.
-    val homePull = rememberPullToRefreshState()
-    val explorePull = rememberPullToRefreshState()
-    val libraryPull = rememberPullToRefreshState()
+    // Pull-to-refresh: the whole feed follows the finger, so the state lives
+    // here to survive tab switches while a pull or a refresh is in flight.
+    val homePull = rememberElasticRefreshState()
+    val explorePull = rememberElasticRefreshState()
+    val libraryPull = rememberElasticRefreshState()
     val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
     val currentFeed = when {
         route != null || detail != null -> null
@@ -1271,21 +1271,9 @@ private fun ZenithApp(
     // atau hilang, jadi penerbangan dihentikan, bukan dibiarkan mengikuti.
     LaunchedEffect(selectedTab) { cancelCoverFlight() }
 
-    val currentPull = when (currentFeed) {
-        MainViewModel.Feed.HOME -> homePull
-        MainViewModel.Feed.EXPLORE -> explorePull
-        MainViewModel.Feed.LIBRARY -> libraryPull
-        null -> null
-    }
-    // Kotak pull yang dilepas dari layar saat refresh berjalan (pindah tab,
-    // halaman mood dibuka di atas Explore) tidak melihat refresh selesai, dan
-    // state-nya tertinggal di threshold sehingga puck di bar membeku. Rapikan
-    // setiap kali feed yang tampil tidak sedang refresh.
-    val currentFeedRefreshing = currentFeed != null && currentFeed in refreshing
-    LaunchedEffect(currentFeed, currentFeedRefreshing) {
-        val pull = currentPull ?: return@LaunchedEffect
-        if (!currentFeedRefreshing && pull.distanceFraction > 0f) pull.animateToHidden()
-    }
+    // State pull yang tertinggal saat feed keluar layar (pindah tab, halaman
+    // mood dibuka di atas Explore) dirapikan oleh PullToRefresh sendiri begitu
+    // feed tampil lagi, jadi tidak perlu dibersihkan dari sini.
     val scrolled by remember(currentListState) {
         derivedStateOf {
             currentListState.firstVisibleItemIndex > 0 ||
@@ -4010,7 +3998,6 @@ private fun ZenithApp(
                         }
                     },
                     refreshing = currentFeed != null && currentFeed in refreshing,
-                    pullFraction = { currentPull?.distanceFraction ?: 0f },
                     // The same step the back gesture takes — see [goBack] —
                     // offered on anything pushed over a tab.
                     onBack = when {
