@@ -253,8 +253,6 @@
     <string name="stop_music_on_close_subtitle">Menghentikan pemutaran saat aplikasi digeser keluar dari aplikasi terbaru</string>
     <string name="hide_volume_bar">Sembunyikan bilah volume</string>
     <string name="hide_volume_bar_subtitle">Menghapus penggeser volume dari pemutar utama</string>
-    <string name="show_music_video">Tampilkan video musik</string>
-    <string name="show_music_video_subtitle">Memutar video musik di tempat cover. Matikan agar selalu memakai thumbnail</string>
     <string name="hide_status_bar_in_player">Sembunyikan bilah status di pemutar</string>
     <string name="hide_status_bar_in_player_subtitle">Menyembunyikan jam, baterai, dan ikon notifikasi saat pemutar utama terbuka</string>
     <string name="hide_song_status">Sembunyikan status lagu</string>
