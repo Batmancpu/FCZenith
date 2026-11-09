@@ -75,8 +75,6 @@ import dev.chrisbanes.haze.materials.HazeMaterials
 fun HomeLayoutDialog(
     hazeState: HazeState,
     shelves: List<HomeShelf>,
-    withTopPicks: Boolean,
-    withMoods: Boolean,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -84,16 +82,33 @@ fun HomeLayoutDialog(
     val layout by AppSettings.homeLayout.collectAsStateWithLifecycle()
     val shape = RoundedCornerShape(ALERT_CORNER)
 
-    val titles = remember(shelves, withTopPicks) {
-        homeFeedShelves(shelves, dropEditorial = withTopPicks)
+    // Top Picks and Find Your Mood hide with the layout. AppSettings keeps these
+    // two flags in step with it, so a flag set before any layout existed still
+    // reads as hidden here.
+    val topPicksHidden by AppSettings.hideHomeTopPicks.collectAsStateWithLifecycle()
+    val moodsHidden by AppSettings.hideHomeMoods.collectAsStateWithLifecycle()
+    // Home keeps the release row out of the feed only while Top Picks shows.
+    val titles = remember(shelves, topPicksHidden) {
+        homeFeedShelves(shelves, dropEditorial = !topPicksHidden)
             .distinctBy { homeShelfKey(it.title) }
             .associate { homeShelfKey(it.title) to it.title }
     }
-    val defaults = remember(shelves, withTopPicks, withMoods) {
-        homeDefaultSlotKeys(shelves, withTopPicks, withMoods)
+    val defaults = remember(shelves, topPicksHidden) {
+        homeDefaultSlotKeys(
+            shelves,
+            withTopPicks = true,
+            withMoods = true,
+            dropEditorial = !topPicksHidden,
+        )
     }
     val order = remember(layout, defaults) { layout.arrange(defaults, dropHidden = false) { it } }
-    val hidden = remember(layout, order) { order.filter { layout.isHidden(it) }.toSet() }
+    val hidden = remember(layout, order, topPicksHidden, moodsHidden) {
+        order.filter {
+            layout.isHidden(it) ||
+                (it == HOME_SLOT_TOP_PICKS && topPicksHidden) ||
+                (it == HOME_SLOT_MOODS && moodsHidden)
+        }.toSet()
+    }
 
     fun save(keys: List<String>, hiddenKeys: Set<String>) {
         if (keys.isEmpty()) return

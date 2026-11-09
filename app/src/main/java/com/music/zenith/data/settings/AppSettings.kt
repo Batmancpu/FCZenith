@@ -15,6 +15,8 @@ import com.music.zenith.BuildConfig
 import com.music.zenith.auth.AuthStore
 import com.music.zenith.data.canvas.SpotifyToken
 import com.music.zenith.data.lyrics.LyricsSource
+import com.music.zenith.data.model.HOME_SLOT_MOODS
+import com.music.zenith.data.model.HOME_SLOT_TOP_PICKS
 import com.music.zenith.data.model.HomeLayout
 import com.music.zenith.data.sources.SourceKind
 import com.music.zenith.playback.EqLayout
@@ -1737,6 +1739,20 @@ object AppSettings {
     fun setHomeLayout(value: HomeLayout) {
         homeLayout.value = value
         prefs.edit().putString(KEY_HOME_LAYOUT, value.encode()).apply()
+        // Top Picks and Find Your Mood are hidden from the layout now: keep their
+        // flags in step, since the feed and Home still read them. Resetting the
+        // layout shows both again.
+        if (!value.isCustom) {
+            setHideHomeTopPicks(false)
+            setHideHomeMoods(false)
+        } else {
+            if (value.slots.any { it.key == HOME_SLOT_TOP_PICKS }) {
+                setHideHomeTopPicks(value.isHidden(HOME_SLOT_TOP_PICKS))
+            }
+            if (value.slots.any { it.key == HOME_SLOT_MOODS }) {
+                setHideHomeMoods(value.isHidden(HOME_SLOT_MOODS))
+            }
+        }
     }
 
     fun setReduceDynamicBlur(value: Boolean) {

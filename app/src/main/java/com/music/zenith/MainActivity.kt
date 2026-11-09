@@ -5842,8 +5842,6 @@ private fun ZenithApp(
             HomeLayoutDialog(
                 hazeState = hazeState,
                 shelves = (visibleHomeState as? UiState.Success)?.data.orEmpty(),
-                withTopPicks = !hideHomeTopPicks,
-                withMoods = !hideHomeMoods,
                 onDismiss = { showHomeLayout = false },
             )
         }

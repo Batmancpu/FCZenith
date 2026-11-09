@@ -393,8 +393,9 @@ fun homeDefaultSlotKeys(
     shelves: List<HomeShelf>,
     withTopPicks: Boolean,
     withMoods: Boolean,
+    dropEditorial: Boolean = withTopPicks,
 ): List<String> {
-    val ordered = homeFeedShelves(shelves, dropEditorial = withTopPicks)
+    val ordered = homeFeedShelves(shelves, dropEditorial = dropEditorial)
     val moodAt = (ordered.indexOfFirst { it.title.trim().equals(RECENTS_TITLE, ignoreCase = true) }
         .takeIf { it >= 0 } ?: 1) + 1
     return buildList {

@@ -309,8 +309,6 @@ fun SettingsScreen(
     val autoMusicOnly by AppSettings.autoMusicOnly.collectAsStateWithLifecycle()
     val hideHomeRecents by AppSettings.hideHomeRecents.collectAsStateWithLifecycle()
     val hideHomeVideos by AppSettings.hideHomeVideos.collectAsStateWithLifecycle()
-    val hideHomeTopPicks by AppSettings.hideHomeTopPicks.collectAsStateWithLifecycle()
-    val hideHomeMoods by AppSettings.hideHomeMoods.collectAsStateWithLifecycle()
     val squareVideoCovers by AppSettings.squareVideoCovers.collectAsStateWithLifecycle()
     val filterNonMusicAudio by AppSettings.filterNonMusicAudio.collectAsStateWithLifecycle()
     val localMusicFolderUri by AppSettings.localMusicFolderUri.collectAsStateWithLifecycle()
@@ -1011,36 +1009,6 @@ fun SettingsScreen(
                         )
                     },
                     onClick = { AppSettings.setHideHomeVideos(!hideHomeVideos) },
-                )
-            }
-            val hideHomeTopPicksTitle = stringResource(R.string.hide_home_top_picks)
-            row(hideHomeTopPicksTitle, "top picks", "recommendations", "for you", "home", "feed") {
-                SettingsRow(
-                    icon = SfIcons.Heart,
-                    title = hideHomeTopPicksTitle,
-                    subtitle = stringResource(R.string.hide_home_top_picks_subtitle),
-                    trailing = {
-                        IosSwitch(
-                            checked = hideHomeTopPicks,
-                            onCheckedChange = AppSettings::setHideHomeTopPicks,
-                        )
-                    },
-                    onClick = { AppSettings.setHideHomeTopPicks(!hideHomeTopPicks) },
-                )
-            }
-            val hideHomeMoodsTitle = stringResource(R.string.hide_home_moods)
-            row(hideHomeMoodsTitle, "mood", "moods", "find your mood", "home", "feed") {
-                SettingsRow(
-                    icon = SfIcons.Radio,
-                    title = hideHomeMoodsTitle,
-                    subtitle = stringResource(R.string.hide_home_moods_subtitle),
-                    trailing = {
-                        IosSwitch(
-                            checked = hideHomeMoods,
-                            onCheckedChange = AppSettings::setHideHomeMoods,
-                        )
-                    },
-                    onClick = { AppSettings.setHideHomeMoods(!hideHomeMoods) },
                 )
             }
             val customizeHomeTitle = stringResource(R.string.customize_home)
