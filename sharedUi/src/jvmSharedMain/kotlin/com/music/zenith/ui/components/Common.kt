@@ -58,6 +58,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.music.zenith.ui.haptics.Haptic
 import com.music.zenith.ui.haptics.rememberHaptics
 import kotlin.math.abs
+import kotlin.math.roundToInt
+import kotlin.math.tanh
+import androidx.compose.animation.core.Animatable
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import com.music.zenith.ui.icons.ZenithIcons
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -430,6 +437,11 @@ fun SwipeToQueueBox(
     val haptics = rememberHaptics()
     val swipeStateHolder = remember { mutableStateOf<SwipeToDismissBoxState?>(null) }
     var boxWidth by remember { mutableFloatStateOf(0f) }
+    // Where this row sits (top, height) in the root, read by the rubber pull,
+    // and whether this row is the one that was dragged.
+    val rowBounds = remember { floatArrayOf(0f, 0f) }
+    val dragFlag = remember { booleanArrayOf(false) }
+    var armedState by remember { mutableStateOf(false) }
 
     val currentOnSwipeToQueue by rememberUpdatedState(onSwipeToQueue)
 
@@ -456,29 +468,87 @@ fun SwipeToQueueBox(
     // Only a row being dragged watches its offset; idle rows run no collector.
     val dragging = swipeState.dismissDirection != SwipeToDismissBoxValue.Settled
     LaunchedEffect(swipeState, boxWidth, dragging) {
+        // Let go: the rows that were pulled along spring back past rest. Only
+        // the row that was dragged settles them, so an idle row scrolling into
+        // view can't cut a pull short.
+        if (!dragging && dragFlag[0]) {
+            dragFlag[0] = false
+            armedState = false
+            launch { SwipeRubber.near.animateTo(0f, spring(dampingRatio = 0.4f, stiffness = 260f)) }
+            launch { SwipeRubber.far.animateTo(0f, spring(dampingRatio = 0.4f, stiffness = 200f)) }
+            return@LaunchedEffect
+        }
         if (!dragging || boxWidth <= 0f) return@LaunchedEffect
+        dragFlag[0] = true
+        SwipeRubber.sourceTop = rowBounds[0]
+        SwipeRubber.sourceHeight = rowBounds[1]
+        // A light beat as the row is picked up.
+        haptics.play(Haptic.Tick)
         val armAt = boxWidth * 0.45f
         var armed = false
         snapshotFlow { try { swipeState.requireOffset() } catch (e: Exception) { 0f } }
             .collect { offset ->
+                // Rubber: the rows around the dragged one are drawn along by a
+                // damped share of the pull, the nearest most and the next one
+                // less, and never past two rows away. The pull saturates
+                // instead of growing with the finger.
+                val pull = tanh(offset / (boxWidth * 0.4f))
+                launch {
+                    SwipeRubber.near.animateTo(
+                        pull * boxWidth * 0.085f,
+                        spring(dampingRatio = 0.55f, stiffness = 380f),
+                    )
+                }
+                launch {
+                    SwipeRubber.far.animateTo(
+                        pull * boxWidth * 0.035f,
+                        spring(dampingRatio = 0.55f, stiffness = 220f),
+                    )
+                }
                 val travelled = abs(offset)
                 when {
                     !armed && travelled >= armAt -> {
                         armed = true
+                        armedState = true
                         haptics.play(Haptic.Tick)
                     }
                     // Silent, and with hysteresis: dragging back under the line
                     // re-arms, but so does the spring-back after a successful
                     // queue, and that must not buzz the same gesture twice.
-                    armed && travelled < armAt * 0.8f -> armed = false
+                    armed && travelled < armAt * 0.8f -> {
+                        armed = false
+                        armedState = false
+                    }
                 }
             }
     }
 
     SwipeToDismissBox(
         state = swipeState,
-        modifier = modifier.onSizeChanged { boxWidth = it.width.toFloat() },
-        backgroundContent = { QueueSwipeBackground(swipeState) },
+        modifier = modifier
+            .onSizeChanged { boxWidth = it.width.toFloat() }
+            .onGloballyPositioned {
+                rowBounds[0] = it.positionInRoot().y
+                rowBounds[1] = it.size.height.toFloat()
+            }
+            // Only drawn, never a swipe: the rows beside a dragged one are moved
+            // by this layer alone, so their own swipe state is never touched and
+            // being pulled can never queue them.
+            .graphicsLayer {
+                val near = SwipeRubber.near.value
+                val far = SwipeRubber.far.value
+                val sourceHeight = SwipeRubber.sourceHeight
+                translationX = if (sourceHeight > 0f) {
+                    when (abs(((rowBounds[0] - SwipeRubber.sourceTop) / sourceHeight).roundToInt())) {
+                        1 -> near
+                        2 -> far
+                        else -> 0f
+                    }
+                } else {
+                    0f
+                }
+            },
+        backgroundContent = { QueueSwipeBackground(swipeState, armedState) },
     ) {
         content()
     }
@@ -486,8 +556,15 @@ fun SwipeToQueueBox(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun QueueSwipeBackground(swipeState: SwipeToDismissBoxState) {
+private fun QueueSwipeBackground(swipeState: SwipeToDismissBoxState, armed: Boolean) {
     val playNext by AppUi.host.swipeToPlayNext.collectAsStateWithLifecycle()
+    val primary = MaterialTheme.colorScheme.primary
+    // The panel brightens as the swipe arms, so it says "let go now" itself.
+    val glow by animateFloatAsState(
+        targetValue = if (armed) 1f else 0f,
+        animationSpec = spring(dampingRatio = 0.6f, stiffness = 400f),
+        label = "queueSwipeGlow",
+    )
     Row(
         modifier = Modifier
             .fillMaxSize()
@@ -503,32 +580,89 @@ private fun QueueSwipeBackground(swipeState: SwipeToDismissBoxState) {
                     }
                 }
             }
-            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.18f))
+            .background(
+                Brush.horizontalGradient(
+                    listOf(
+                        primary.copy(alpha = 0.16f + 0.14f * glow),
+                        primary.copy(alpha = 0.28f + 0.18f * glow),
+                    ),
+                ),
+            )
             .padding(horizontal = PAGE_GUTTER),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        QueueSwipeLabel(playNext)
-        QueueSwipeLabel(playNext)
+        QueueSwipeLabel(playNext, swipeState, armed)
+        QueueSwipeLabel(playNext, swipeState, armed)
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun QueueSwipeLabel(playNext: Boolean) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(
-            if (playNext) Icons.Rounded.PlaylistPlay else Icons.Rounded.PlaylistAdd,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(20.dp),
-        )
-        Spacer(Modifier.width(6.dp))
+private fun QueueSwipeLabel(playNext: Boolean, swipeState: SwipeToDismissBoxState, armed: Boolean) {
+    val primary = MaterialTheme.colorScheme.primary
+    // The badge pops when the swipe arms and fills solid, like a button
+    // pressed in.
+    val pop by animateFloatAsState(
+        targetValue = if (armed) 1f else 0f,
+        animationSpec = spring(dampingRatio = 0.35f, stiffness = 500f),
+        label = "queueSwipePop",
+    )
+    val iconTint by animateColorAsState(
+        targetValue = if (armed) MaterialTheme.colorScheme.onPrimary else primary,
+        label = "queueSwipeIconTint",
+    )
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        // Grows and fades in with the reveal instead of sitting there from the
+        // first pixel.
+        modifier = Modifier.graphicsLayer {
+            val offset = try { swipeState.requireOffset() } catch (e: Exception) { 0f }
+            val reach = (abs(offset) / 160.dp.toPx()).coerceIn(0f, 1f)
+            alpha = reach
+            scaleX = 0.7f + 0.3f * reach
+            scaleY = 0.7f + 0.3f * reach
+        },
+    ) {
+        Box(
+            modifier = Modifier
+                .size(34.dp)
+                .graphicsLayer {
+                    val s = 1f + 0.16f * pop
+                    scaleX = s
+                    scaleY = s
+                }
+                .clip(CircleShape)
+                .background(primary.copy(alpha = 0.18f + 0.77f * pop)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = if (playNext) ZenithIcons.PlayNext else ZenithIcons.PlayLast,
+                contentDescription = null,
+                tint = iconTint,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+        Spacer(Modifier.width(10.dp))
         Text(
             text = stringResource(if (playNext) Res.string.play_next else Res.string.queue),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = primary,
         )
     }
+}
+
+/**
+ * The pull shared by every swipeable row on screen: where the dragged row is,
+ * and how far the row beside it and the one after that are drawn along. The
+ * two are springs, so they trail the finger and overshoot on release.
+ */
+private object SwipeRubber {
+    var sourceTop = 0f
+    var sourceHeight = 0f
+    val near = Animatable(0f)
+    val far = Animatable(0f)
 }
 
 @OptIn(ExperimentalFoundationApi::class)
