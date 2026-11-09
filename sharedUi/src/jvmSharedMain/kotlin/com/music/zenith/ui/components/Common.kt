@@ -86,6 +86,9 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Velocity
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -885,6 +888,10 @@ private const val ELASTIC_PULL_START_GRACE_MS = 600L
  */
 private const val ELASTIC_PULL_MIN_HOLD_MS = 900L
 
+/** Unit vectors of the indicator's 12 spokes, clockwise from twelve o'clock. */
+private val ELASTIC_SPOKE_COS = FloatArray(12) { cos((-90.0 + it * 30.0) * PI / 180.0).toFloat() }
+private val ELASTIC_SPOKE_SIN = FloatArray(12) { sin((-90.0 + it * 30.0) * PI / 180.0).toFloat() }
+
 /**
  * State of the elastic pull-to-refresh: the whole page follows the finger with
  * an iOS-style rubber-band, is held at a rest distance while a refresh runs and
@@ -1113,9 +1120,10 @@ fun PullToRefresh(
 }
 
 /**
- * Three stacked rings in the gap the pull opens, with a short label under
- * them. The rings fill one after another with the drag, then turn at their own
- * speeds and directions while the refresh runs. It lives in the page, so it
+ * An iOS-style spoke indicator in the gap the pull opens, with a short label
+ * under it. The spokes appear one by one with the drag, then a bright head
+ * steps around them, trailing a fade, while the refresh runs. It lives in the
+ * page, so it
  * goes where the page goes. Composed only while the page is displaced, so
  * nothing animates at rest.
  */
@@ -1128,7 +1136,7 @@ private fun ElasticRefreshHint(state: ElasticRefreshState, topInset: Dp) {
     val angle by spin.animateFloat(
         initialValue = 0f,
         targetValue = 360f,
-        animationSpec = infiniteRepeatable(tween(1400, easing = LinearEasing)),
+        animationSpec = infiniteRepeatable(tween(960, easing = LinearEasing)),
         label = "elasticRefreshAngle",
     )
     val blend by animateFloatAsState(
@@ -1168,33 +1176,28 @@ private fun ElasticRefreshHint(state: ElasticRefreshState, topInset: Dp) {
                 },
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Canvas(Modifier.size(24.dp)) {
-                val pushed = state.offset
-                val progress = (pushed / state.thresholdPx.coerceAtLeast(1f)).coerceIn(0f, 1f)
+            Canvas(Modifier.size(22.dp)) {
+                val progress = (state.offset / state.thresholdPx.coerceAtLeast(1f)).coerceIn(0f, 1f)
                 val center = Offset(size.width / 2f, size.height / 2f)
-                val stroke = Stroke(width = 1.6.dp.toPx(), cap = StrokeCap.Round)
-                for (i in 0 until 3) {
-                    val radius = (10.5f - 3.5f * i).dp.toPx()
-                    // Outer ring first, each one a beat behind the last.
-                    val fill = (progress * 1.5f - i * 0.25f).coerceIn(0f, 1f)
-                    val pullSweep = 30f + 270f * fill
-                    val holdSweep = 250f - 40f * i
-                    val sweep = pullSweep + (holdSweep - pullSweep) * blend
-                    val dir = if (i == 1) -1f else 1f
-                    val pullRot = -90f + dir * pushed * 0.25f * (1f + i * 0.4f)
-                    val speed = when (i) {
-                        0 -> 1f
-                        1 -> -2f
-                        else -> 3f
-                    }
-                    drawArc(
-                        color = color.copy(alpha = 0.35f + 0.25f * i),
-                        startAngle = pullRot + angle * speed * blend,
-                        sweepAngle = sweep,
-                        useCenter = false,
-                        topLeft = Offset(center.x - radius, center.y - radius),
-                        size = Size(radius * 2f, radius * 2f),
-                        style = stroke,
+                val inner = 5.5.dp.toPx()
+                val outer = 10.dp.toPx()
+                val strokeWidth = 2.2.dp.toPx()
+                // Like iOS's activity indicator, the head steps from spoke to spoke.
+                val head = (angle / 30f).toInt() % 12
+                for (i in 0 until 12) {
+                    val pullAlpha = (progress * 12f - i).coerceIn(0f, 1f) * 0.5f
+                    val behind = (head - i + 12) % 12
+                    val spinAlpha = 1f - behind * 0.075f
+                    val a = pullAlpha + (spinAlpha - pullAlpha) * blend
+                    if (a <= 0.01f) continue
+                    val dx = ELASTIC_SPOKE_COS[i]
+                    val dy = ELASTIC_SPOKE_SIN[i]
+                    drawLine(
+                        color = color.copy(alpha = a),
+                        start = Offset(center.x + dx * inner, center.y + dy * inner),
+                        end = Offset(center.x + dx * outer, center.y + dy * outer),
+                        strokeWidth = strokeWidth,
+                        cap = StrokeCap.Round,
                     )
                 }
             }
