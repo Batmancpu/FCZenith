@@ -309,7 +309,34 @@ fun FloatingTabBar(
 
     val isAccessoryShared = inlineAccessory != null && expandedAccessory != null
 
-    SharedTransitionLayout(modifier = modifier) {
+    // Saat mengecil, bar ditarik sedikit ke atas seolah terseret halaman, lalu
+    // mengendap ke bentuk inline dengan pegas. Dibaca di graphicsLayer saja.
+    val pull = remember { androidx.compose.animation.core.Animatable(0f) }
+    val pullPx = with(LocalDensity.current) { 16.dp.toPx() }
+    LaunchedEffect(scrollConnection.isInline) {
+        if (scrollConnection.isInline) {
+            pull.animateTo(1f, androidx.compose.animation.core.tween(150, easing = FastOutSlowInEasing))
+            pull.animateTo(
+                0f,
+                androidx.compose.animation.core.spring(dampingRatio = 0.55f, stiffness = 240f),
+            )
+        } else {
+            pull.animateTo(
+                0f,
+                androidx.compose.animation.core.spring(dampingRatio = 0.7f, stiffness = 300f),
+            )
+        }
+    }
+
+    SharedTransitionLayout(
+        modifier = modifier.graphicsLayer {
+            val p = pull.value
+            transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 1f)
+            translationY = -pullPx * p
+            scaleX = 1f - 0.03f * p
+            scaleY = 1f + 0.04f * p
+        },
+    ) {
         AnimatedContent(
             targetState = scrollConnection.isInline,
             transitionSpec = {
@@ -393,6 +420,10 @@ class FloatingTabBarScrollConnection(
     var isInline by mutableStateOf(initialIsInline)
         private set
 
+    /** Naik setiap kali halaman menyentuh batas atas saat bar masih inline; dibaca untuk menunda expand. */
+    var topSignal by mutableIntStateOf(0)
+        private set
+
     private var accumulatedScroll = 0f
 
     fun expand() {
@@ -463,7 +494,7 @@ class FloatingTabBarScrollConnection(
             isInline &&
             available.y > 0f
         ) {
-            expand()
+            topSignal++
         }
         return Offset.Zero
     }

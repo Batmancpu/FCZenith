@@ -251,6 +251,7 @@ import com.music.zenith.ui.components.FLOATING_BAR_MAX_WIDTH
 import com.music.zenith.ui.components.FloatingBottomBar
 import com.music.zenith.ui.components.GlassNavBar
 import com.music.zenith.ui.components.floatingtabbar.rememberFloatingTabBarScrollConnection
+import kotlinx.coroutines.flow.collectLatest
 import com.music.zenith.ui.components.FrostedTopBar
 import com.music.zenith.ui.components.LastfmLoginAlert
 import com.music.zenith.ui.components.LocalAppBackdrop
@@ -1246,7 +1247,22 @@ private fun ZenithApp(
     // The collapsed bar stays collapsed while scrolling up, and opens only at the top.
     LaunchedEffect(currentListState) {
         androidx.compose.runtime.snapshotFlow { currentListState.canScrollBackward }
-            .collect { canScrollBack -> if (!canScrollBack) navBarScroll.expand() }
+            .collectLatest { canScrollBack ->
+                if (!canScrollBack) {
+                    delay(NAV_BAR_EXPAND_DELAY_MS)
+                    navBarScroll.expand()
+                }
+            }
+    }
+    // Halaman yang di-push: sinyal batas atas dari scroll connection, juga ditunda.
+    LaunchedEffect(navBarScroll) {
+        androidx.compose.runtime.snapshotFlow { navBarScroll.topSignal }
+            .collectLatest { signal ->
+                if (signal > 0) {
+                    delay(NAV_BAR_EXPAND_DELAY_MS)
+                    navBarScroll.expand()
+                }
+            }
     }
 
     // Pull-to-refresh: the drag lives with the feed, but the indicator is the
@@ -6549,6 +6565,7 @@ private fun Isolated(content: @Composable () -> Unit) = content()
 /** Longer than the ⋯ menu's exit, so its panel keeps its frost on the way out. */
 private const val SNAPSHOT_RELEASE_DELAY_MS = 400L
 
+private const val NAV_BAR_EXPAND_DELAY_MS = 180L
 private const val TAB_HOME = 0
 private const val TAB_EXPLORE = 1
 private const val TAB_LIBRARY = 2
