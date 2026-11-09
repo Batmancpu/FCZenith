@@ -1,5 +1,6 @@
 package com.music.zenith.ui.screens
 
+import com.music.zenith.ui.components.VideoThumbnails
 import com.music.zenith.ui.components.trackArtSize
 import com.music.zenith.ui.components.contextClick
 import com.music.zenith.ui.AppUi
@@ -1066,11 +1067,11 @@ fun VideoShelfCard(
     }
 }
 
-/** A music video's frame. */
-const val VIDEO_ASPECT = 16f / 9f
+/** A music video's frame, or a square one when square video covers are on. */
+val VIDEO_ASPECT: Float get() = if (VideoThumbnails.square) 1f else 16f / 9f
 
 /** Wide enough that a 16:9 card stands about as tall as a square [SHELF_CARD_WIDTH] one. */
-val VIDEO_CARD_WIDTH = 248.dp
+val VIDEO_CARD_WIDTH: Dp get() = if (VideoThumbnails.square) SHELF_CARD_WIDTH else 248.dp
 
 /**
  * A card that isn't a thing yet — the dashed "New playlist" tile at the head

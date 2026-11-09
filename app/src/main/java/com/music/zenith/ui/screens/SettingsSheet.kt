@@ -305,6 +305,11 @@ fun SettingsScreen(
     val dontRepeatSuggestions by AppSettings.dontRepeatSuggestions.collectAsStateWithLifecycle()
     val smartVersionAlignment by AppSettings.smartVersionAlignment.collectAsStateWithLifecycle()
     val autoMusicOnly by AppSettings.autoMusicOnly.collectAsStateWithLifecycle()
+    val hideHomeRecents by AppSettings.hideHomeRecents.collectAsStateWithLifecycle()
+    val hideHomeVideos by AppSettings.hideHomeVideos.collectAsStateWithLifecycle()
+    val hideHomeTopPicks by AppSettings.hideHomeTopPicks.collectAsStateWithLifecycle()
+    val hideHomeMoods by AppSettings.hideHomeMoods.collectAsStateWithLifecycle()
+    val squareVideoCovers by AppSettings.squareVideoCovers.collectAsStateWithLifecycle()
     val filterNonMusicAudio by AppSettings.filterNonMusicAudio.collectAsStateWithLifecycle()
     val localMusicFolderUri by AppSettings.localMusicFolderUri.collectAsStateWithLifecycle()
     val highPerformanceMode by AppSettings.highPerformanceMode.collectAsStateWithLifecycle()
@@ -957,6 +962,99 @@ fun SettingsScreen(
                         onClick = onEqualizer,
                     )
                 }
+            }
+        }
+
+        if (shows(SettingsCategory.CONTENT)) SearchableSettingsGroup(search, header = stringResource(R.string.content_feed)) {
+            val audioFirstTitle = stringResource(R.string.auto_music_only)
+            row(audioFirstTitle, "video", "audio", "music video", "convert", "autoplay") {
+                SettingsRow(
+                    icon = SfIcons.MusicNote,
+                    title = audioFirstTitle,
+                    subtitle = stringResource(R.string.auto_music_only_subtitle),
+                    trailing = {
+                        IosSwitch(
+                            checked = autoMusicOnly,
+                            onCheckedChange = AppSettings::setAutoMusicOnly,
+                        )
+                    },
+                    onClick = { AppSettings.setAutoMusicOnly(!autoMusicOnly) },
+                )
+            }
+            val hideHomeRecentsTitle = stringResource(R.string.hide_home_recents)
+            row(hideHomeRecentsTitle, "recents", "recent", "history", "home", "feed") {
+                SettingsRow(
+                    icon = SfIcons.History,
+                    title = hideHomeRecentsTitle,
+                    subtitle = stringResource(R.string.hide_home_recents_subtitle),
+                    trailing = {
+                        IosSwitch(
+                            checked = hideHomeRecents,
+                            onCheckedChange = AppSettings::setHideHomeRecents,
+                        )
+                    },
+                    onClick = { AppSettings.setHideHomeRecents(!hideHomeRecents) },
+                )
+            }
+            val hideHomeVideosTitle = stringResource(R.string.hide_home_videos)
+            row(hideHomeVideosTitle, "video", "music video", "home", "feed") {
+                SettingsRow(
+                    icon = SfIcons.Video,
+                    title = hideHomeVideosTitle,
+                    subtitle = stringResource(R.string.hide_home_videos_subtitle),
+                    trailing = {
+                        IosSwitch(
+                            checked = hideHomeVideos,
+                            onCheckedChange = AppSettings::setHideHomeVideos,
+                        )
+                    },
+                    onClick = { AppSettings.setHideHomeVideos(!hideHomeVideos) },
+                )
+            }
+            val hideHomeTopPicksTitle = stringResource(R.string.hide_home_top_picks)
+            row(hideHomeTopPicksTitle, "top picks", "recommendations", "for you", "home", "feed") {
+                SettingsRow(
+                    icon = SfIcons.Heart,
+                    title = hideHomeTopPicksTitle,
+                    subtitle = stringResource(R.string.hide_home_top_picks_subtitle),
+                    trailing = {
+                        IosSwitch(
+                            checked = hideHomeTopPicks,
+                            onCheckedChange = AppSettings::setHideHomeTopPicks,
+                        )
+                    },
+                    onClick = { AppSettings.setHideHomeTopPicks(!hideHomeTopPicks) },
+                )
+            }
+            val hideHomeMoodsTitle = stringResource(R.string.hide_home_moods)
+            row(hideHomeMoodsTitle, "mood", "moods", "find your mood", "home", "feed") {
+                SettingsRow(
+                    icon = SfIcons.Radio,
+                    title = hideHomeMoodsTitle,
+                    subtitle = stringResource(R.string.hide_home_moods_subtitle),
+                    trailing = {
+                        IosSwitch(
+                            checked = hideHomeMoods,
+                            onCheckedChange = AppSettings::setHideHomeMoods,
+                        )
+                    },
+                    onClick = { AppSettings.setHideHomeMoods(!hideHomeMoods) },
+                )
+            }
+            val squareVideoCoversTitle = stringResource(R.string.square_video_covers)
+            row(squareVideoCoversTitle, "video", "thumbnail", "cover", "artwork", "square", "player") {
+                SettingsRow(
+                    icon = SfIcons.Album,
+                    title = squareVideoCoversTitle,
+                    subtitle = stringResource(R.string.square_video_covers_subtitle),
+                    trailing = {
+                        IosSwitch(
+                            checked = squareVideoCovers,
+                            onCheckedChange = AppSettings::setSquareVideoCovers,
+                        )
+                    },
+                    onClick = { AppSettings.setSquareVideoCovers(!squareVideoCovers) },
+                )
             }
         }
 
@@ -1692,21 +1790,6 @@ fun SettingsScreen(
         }
 
         if (shows(SettingsCategory.ADVANCED)) SearchableSettingsGroup(search, header = stringResource(R.string.advanced_options)) {
-            val autoMusicOnlyTitle = stringResource(R.string.auto_music_only)
-            row(autoMusicOnlyTitle, "video", "audio", "music video", "convert", "autoplay") {
-                SettingsRow(
-                    icon = SfIcons.MusicNote,
-                    title = autoMusicOnlyTitle,
-                    subtitle = stringResource(R.string.auto_music_only_subtitle),
-                    trailing = {
-                        IosSwitch(
-                            checked = autoMusicOnly,
-                            onCheckedChange = AppSettings::setAutoMusicOnly,
-                        )
-                    },
-                    onClick = { AppSettings.setAutoMusicOnly(!autoMusicOnly) },
-                )
-            }
             val smartAlignmentTitle = stringResource(R.string.smart_version_alignment)
             row(smartAlignmentTitle, "alignment", "sync", "waveform", "video", "audio", "skit", "intro") {
                 SettingsRow(
@@ -2883,6 +2966,7 @@ internal fun SegmentedControl(
 enum class SettingsCategory(@param:StringRes val title: Int) {
     DOWNLOADS(R.string.downloads),
     PLAYBACK(R.string.playback),
+    CONTENT(R.string.content_feed),
     APPEARANCE(R.string.appearance),
     PERFORMANCE(R.string.performance),
     LOCAL_MUSIC(R.string.local_music),
@@ -2897,6 +2981,7 @@ enum class SettingsCategory(@param:StringRes val title: Int) {
         get() = when (this) {
             DOWNLOADS -> SfIcons.Download
             PLAYBACK -> SfIcons.PlayCircle
+            CONTENT -> SfIcons.FilterAlt
             APPEARANCE -> SfIcons.Appearance
             PERFORMANCE -> SfIcons.Performance
             LOCAL_MUSIC -> SfIcons.LibraryMusic

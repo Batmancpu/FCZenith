@@ -18,6 +18,7 @@ import com.music.zenith.data.lyrics.LyricsSource
 import com.music.zenith.data.sources.SourceKind
 import com.music.zenith.playback.EqLayout
 import com.music.zenith.playback.EqualizerPreset
+import com.music.zenith.ui.components.VideoThumbnails
 import kotlinx.coroutines.flow.MutableStateFlow
 
 
@@ -543,6 +544,21 @@ object AppSettings {
 
     /** Music video diputar sebagai versi audionya — lihat [com.music.zenith.playback.MusicOnlyPlayback]. */
     val autoMusicOnly = MutableStateFlow(false)
+
+    /** Removes the Recents row from Home. */
+    val hideHomeRecents = MutableStateFlow(false)
+
+    /** Removes music videos from Home, plus any row left with nothing else in it. */
+    val hideHomeVideos = MutableStateFlow(false)
+
+    /** Removes the Top Picks for You row from Home. */
+    val hideHomeTopPicks = MutableStateFlow(false)
+
+    /** Removes the mood row from Home. The Moods page in Explore stays. */
+    val hideHomeMoods = MutableStateFlow(false)
+
+    /** Shows every music video as a square, see [VideoThumbnails]. */
+    val squareVideoCovers = MutableStateFlow(false)
 
     /** Drops haze blur (status bar, mini player, bottom fade, lyrics focus) for a solid-fill look. */
     val reduceDynamicBlur = MutableStateFlow(false)
@@ -1196,6 +1212,12 @@ object AppSettings {
         dontRepeatSuggestions.value = prefs.getBoolean(KEY_DONT_REPEAT_SUGGESTIONS, false)
         smartVersionAlignment.value = prefs.getBoolean(KEY_SMART_VERSION_ALIGNMENT, true)
         autoMusicOnly.value = prefs.getBoolean(KEY_AUTO_MUSIC_ONLY, false)
+        hideHomeRecents.value = prefs.getBoolean(KEY_HIDE_HOME_RECENTS, false)
+        hideHomeVideos.value = prefs.getBoolean(KEY_HIDE_HOME_VIDEOS, false)
+        hideHomeTopPicks.value = prefs.getBoolean(KEY_HIDE_HOME_TOP_PICKS, false)
+        hideHomeMoods.value = prefs.getBoolean(KEY_HIDE_HOME_MOODS, false)
+        squareVideoCovers.value = prefs.getBoolean(KEY_SQUARE_VIDEO_COVERS, false)
+        VideoThumbnails.square = squareVideoCovers.value
         reduceDynamicBlur.value = prefs.getBoolean(KEY_REDUCE_BLUR, false)
         liquidGlass.value = prefs.getBoolean(KEY_LIQUID_GLASS, false)
         frostedGlass.value = prefs.getBoolean(KEY_FROSTED_GLASS, false)
@@ -1679,6 +1701,32 @@ object AppSettings {
     fun setAutoMusicOnly(value: Boolean) {
         autoMusicOnly.value = value
         prefs.edit().putBoolean(KEY_AUTO_MUSIC_ONLY, value).apply()
+    }
+
+    fun setHideHomeRecents(value: Boolean) {
+        hideHomeRecents.value = value
+        prefs.edit().putBoolean(KEY_HIDE_HOME_RECENTS, value).apply()
+    }
+
+    fun setHideHomeVideos(value: Boolean) {
+        hideHomeVideos.value = value
+        prefs.edit().putBoolean(KEY_HIDE_HOME_VIDEOS, value).apply()
+    }
+
+    fun setHideHomeTopPicks(value: Boolean) {
+        hideHomeTopPicks.value = value
+        prefs.edit().putBoolean(KEY_HIDE_HOME_TOP_PICKS, value).apply()
+    }
+
+    fun setHideHomeMoods(value: Boolean) {
+        hideHomeMoods.value = value
+        prefs.edit().putBoolean(KEY_HIDE_HOME_MOODS, value).apply()
+    }
+
+    fun setSquareVideoCovers(value: Boolean) {
+        squareVideoCovers.value = value
+        VideoThumbnails.square = value
+        prefs.edit().putBoolean(KEY_SQUARE_VIDEO_COVERS, value).apply()
     }
 
     fun setReduceDynamicBlur(value: Boolean) {
@@ -2506,6 +2554,11 @@ object AppSettings {
     private const val KEY_DONT_REPEAT_SUGGESTIONS = "dont_repeat_suggestions"
     private const val KEY_SMART_VERSION_ALIGNMENT = "smart_version_alignment"
     private const val KEY_AUTO_MUSIC_ONLY = "auto_music_only"
+    private const val KEY_HIDE_HOME_RECENTS = "hide_home_recents"
+    private const val KEY_HIDE_HOME_VIDEOS = "hide_home_videos"
+    private const val KEY_HIDE_HOME_TOP_PICKS = "hide_home_top_picks"
+    private const val KEY_HIDE_HOME_MOODS = "hide_home_moods"
+    private const val KEY_SQUARE_VIDEO_COVERS = "square_video_covers"
     private const val KEY_REDUCE_BLUR = "reduce_dynamic_blur"
     private const val KEY_LIQUID_GLASS = "liquid_glass"
     private const val KEY_FROSTED_GLASS = "frosted_glass"

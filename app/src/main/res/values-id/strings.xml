@@ -1112,8 +1112,19 @@
 
     <string name="smart_version_alignment">Penyelarasan audio cerdas</string>
     <string name="smart_version_alignment_subtitle">Menganalisis gelombang audio untuk mencocokkan momen pemutaran yang tepat</string>
-    <string name="auto_music_only">Utamakan versi audio saja</string>
-    <string name="auto_music_only_subtitle">Music video diputar sebagai versi audionya, dan lagu berikutnya di antrean dikonversi lebih dulu agar Automix dan crossfade berfungsi</string>
+    <string name="auto_music_only">Audio daripada video</string>
+    <string name="auto_music_only_subtitle">Music video beralih ke trek audionya, dan lagu berikutnya di antrean disiapkan lebih awal agar Automix dan crossfade tetap berjalan</string>
+    <string name="content_feed">Konten &amp; Beranda</string>
+    <string name="hide_home_recents">Sembunyikan terakhir diputar</string>
+    <string name="hide_home_recents_subtitle">Menghapus baris Recents dari Beranda. Riwayat Anda tidak berubah</string>
+    <string name="hide_home_videos">Sembunyikan video di Beranda</string>
+    <string name="hide_home_videos_subtitle">Baris yang hanya berisi video ikut hilang. Pencarian, artis, dan playlist tetap menampilkannya</string>
+    <string name="hide_home_top_picks">Sembunyikan Pilihan Teratas</string>
+    <string name="hide_home_top_picks_subtitle">Menghapus baris Pilihan Teratas untuk Anda dari Beranda</string>
+    <string name="hide_home_moods">Sembunyikan Mood</string>
+    <string name="hide_home_moods_subtitle">Menghapus baris mood dari Beranda. Mood di Jelajahi tetap tersedia</string>
+    <string name="square_video_covers">Sampul video persegi</string>
+    <string name="square_video_covers_subtitle">Menampilkan semua music video berbentuk persegi, di daftar, kartu, dan pemutar</string>
 
     <string name="equalizer_footer">Shapes the sound inside Zenith, before it reaches the system.</string>
 

@@ -136,6 +136,7 @@ import com.music.zenith.data.model.ShelfItem
 import com.music.zenith.data.model.Song
 import com.music.zenith.data.model.isUnresolvedSpotify
 import com.music.zenith.data.model.UiState
+import com.music.zenith.data.model.withoutVideos
 import com.music.zenith.data.model.UserPlaylist
 import com.music.zenith.data.model.EntityType
 import com.music.zenith.data.model.SearchHistoryEntity
@@ -854,6 +855,22 @@ private fun ZenithApp(
     )
 
     val homeState by viewModel.home.collectAsStateWithLifecycle()
+    val hideHomeRecents by AppSettings.hideHomeRecents.collectAsStateWithLifecycle()
+    val hideHomeVideos by AppSettings.hideHomeVideos.collectAsStateWithLifecycle()
+    val hideHomeTopPicks by AppSettings.hideHomeTopPicks.collectAsStateWithLifecycle()
+    val hideHomeMoods by AppSettings.hideHomeMoods.collectAsStateWithLifecycle()
+    // Only what Home draws: Top Picks and Explore keep reading the full feed.
+    val visibleHomeState = remember(homeState, hideHomeVideos, hideHomeRecents) {
+        val loaded = homeState as? UiState.Success
+        if (loaded != null && (hideHomeVideos || hideHomeRecents)) {
+            var shelves = loaded.data
+            if (hideHomeRecents) shelves = shelves.filterNot { it.title == YtMusicRepository.RECENT_TITLE }
+            if (hideHomeVideos) shelves = shelves.withoutVideos()
+            UiState.Success(shelves)
+        } else {
+            homeState
+        }
+    }
     val homeLoadingMore by viewModel.homeLoadingMore.collectAsStateWithLifecycle()
     val homeRecentlyPlayedLoading by viewModel.homeRecentlyPlayedLoading.collectAsStateWithLifecycle()
     val topPicks by viewModel.topPicks.collectAsStateWithLifecycle()
@@ -3463,7 +3480,7 @@ private fun ZenithApp(
                             )
                         } else when ((destination as? AppDestination.Tab)?.index ?: selectedTab) {
                             TAB_HOME -> HomeScreen(
-                                state = homeState,
+                                state = visibleHomeState,
                                 listState = homeListState,
                                 currentSong = player.song,
                                 isPlaying = player.isPlaying,
@@ -3497,18 +3514,19 @@ private fun ZenithApp(
                                 contentPadding = listPadding,
                                 onLoadMore = viewModel::loadMoreHome,
                                 loadingMore = homeLoadingMore,
-                                recentlyPlayedLoading = homeRecentlyPlayedLoading,
+                                recentlyPlayedLoading = homeRecentlyPlayedLoading && !hideHomeRecents,
                                 topPicks = topPicks,
                                 topPicksLoading = topPicksLoading,
                                 listenerName = account?.name,
-                                onTopPickClick = { pick, label ->
+                                onTopPickClick = { pick: TopPick, label: String ->
                                     if (pick.kind == TopPickKind.MOOD) {
                                         navigator.push(AppRoute.Moods)
                                     } else {
                                         openTopPick(pick, label)
                                     }
-                                },
-                                onMoodClick = playMood,
+                                    Unit
+                                }.takeUnless { hideHomeTopPicks },
+                                onMoodClick = playMood.takeUnless { hideHomeMoods },
                                 onMoodsShowAll = { navigator.push(AppRoute.Moods) },
                                 onPlaySongs = { songs -> play(songs, 0) },
                                 artworkMotion = artworkMotion,

@@ -13,6 +13,7 @@ import com.music.zenith.sharedui.resources.*
 
 import androidx.compose.ui.graphics.ImageBitmap
 import com.music.zenith.ui.components.TrackTextSwitch
+import com.music.zenith.ui.components.VideoThumbnails
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -1055,6 +1056,9 @@ fun NowPlayingScreen(
     // A music video plays its own picture where the sleeve is — see
     // [MusicVideoSurface] — and takes the place of any animated cover.
     val videoMode = showsMusicVideo(song)
+    // Square video covers: the picture takes the sleeve's own slot, cropped to
+    // it, instead of the full-width box at the video's shape.
+    val squareVideo = videoMode && VideoThumbnails.square
     val canvas = rememberCanvasArtwork(song)?.takeUnless { videoMode }?.let {
         // Apple's 3:4 rendition runs under the whole phone screen, the way its
         // own player shows it; the square one stays the fallback.
@@ -3390,7 +3394,7 @@ fun NowPlayingScreen(
                         // Collapsed, the thumbnail is a music video's own shape at
                         // the header's height, as every list shows one — see
                         // [trackArtSize] — and the credits start past it.
-                        val thumbWidth = if (videoMode) THUMB_SIZE * (16f / 9f) else THUMB_SIZE
+                        val thumbWidth = if (videoMode && !squareVideo) THUMB_SIZE * (16f / 9f) else THUMB_SIZE
                         fun titleStart(): Dp = lerp(0.dp, thumbWidth + 12.dp, p())
 
                         // How far down the *screen* the sleeve's bottom edge sits, which
@@ -3467,7 +3471,7 @@ fun NowPlayingScreen(
                                 ),
                                 size = Size(side, side),
                             )
-                            if (!videoMode) return@with square
+                            if (!videoMode || squareVideo) return@with square
                             // A music video's card is its picture box: the
                             // player's full width at the video's shape, centred
                             // on the square's slot — the frame the sleeve flies
@@ -4246,14 +4250,22 @@ fun NowPlayingScreen(
                                 Box(
                                     modifier = Modifier
                                         .offset {
+                                            if (squareVideo) {
+                                                val side = artSize().roundToPx()
+                                                return@offset IntOffset(
+                                                    fromStart(artStart().roundToPx().toFloat(), side.toFloat()).roundToInt(),
+                                                    artTop().roundToPx(),
+                                                )
+                                            }
                                             val height = (boxWidthPx / aspect).roundToInt()
                                             val centre = (artTop() + artSize() / 2).roundToPx()
                                             IntOffset(0, centre - height / 2)
                                         }
                                         .layout { measurable, _ ->
-                                            val height = (boxWidthPx / aspect).roundToInt()
-                                            val placeable = measurable.measure(Constraints.fixed(boxWidthPx, height))
-                                            layout(boxWidthPx, height) { placeable.placeRelative(0, 0) }
+                                            val width = if (squareVideo) artSize().roundToPx() else boxWidthPx
+                                            val height = if (squareVideo) width else (boxWidthPx / aspect).roundToInt()
+                                            val placeable = measurable.measure(Constraints.fixed(width, height))
+                                            layout(width, height) { placeable.placeRelative(0, 0) }
                                         }
                                         .graphicsLayer {
                                             alpha = (1f - p() * 2f).coerceIn(0f, 1f)
@@ -4271,6 +4283,7 @@ fun NowPlayingScreen(
                                     }
                                     MusicVideoSurface(
                                         videoId = song.videoId,
+                                        fit = !squareVideo,
                                         onRenderedChanged = { videoRendered = it },
                                         modifier = Modifier
                                             .fillMaxSize()
