@@ -4611,7 +4611,7 @@ fun NowPlayingScreen(
                                     size = 28.dp,
                                     popOnActive = true,
                                 )
-                                Spacer(Modifier.width(16.dp))
+                                Spacer(Modifier.width(8.dp))
                             }
                             // While the lyrics are up the menu glyph becomes the share
                             // entry: the same pick mode a long-press on a line opens,
