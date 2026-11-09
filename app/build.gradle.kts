@@ -208,6 +208,10 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+    androidResources {
+        // Model ONNX tetap di repo tetapi tidak dibundel; app mengunduhnya saat dibutuhkan.
+        ignoreAssetsPattern = "!.svn:!.git:!.ds_store:!*.scc:.*:<dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~:!*.onnx"
+    }
     packaging {
         resources {
             // SMBJ's BouncyCastle and jspecify both ship this descriptor.
