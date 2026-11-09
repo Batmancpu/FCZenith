@@ -659,6 +659,15 @@
     <string name="version_cut_measuring">menganalisis</string>
     <string name="version_cut_aligned">selaras</string>
     <string name="automix_enabled_subtitle">Mengatur waktu dan memadukan setiap transisi dari trek itu sendiri. Nonaktifkan jika ponsel menjadi panas atau pemutaran tersendat.</string>
+    <string name="automix_model_title">Unduh model Automix</string>
+    <string name="automix_model_message">Automix membutuhkan dua model analisis. Model diunduh sekali dari GitHub dan disimpan di perangkat ini. Disarankan memakai Wi-Fi.</string>
+    <string name="automix_model_download">Unduh</string>
+    <string name="automix_model_downloading_title">Mengunduh model…</string>
+    <string name="automix_model_downloading_message">%1$d%% selesai</string>
+    <string name="automix_model_hide">Sembunyikan</string>
+    <string name="automix_model_failed_title">Unduhan gagal</string>
+    <string name="automix_model_failed_message">Model Automix tidak dapat diunduh. Periksa koneksi lalu coba lagi.</string>
+    <string name="automix_model_retry">Coba lagi</string>
     <string name="automix_disabled_subtitle">Mengatur waktu dan memadukan transisi secara otomatis, tanpa penggeser. Performa dapat bervariasi pada perangkat yang lebih lambat.</string>
     <string name="advanced_automix">Automix Lanjutan</string>
     <string name="advanced_automix_subtitle">Mencampur seperti DJ: menjaga ketukan tetap selaras, melakukan setiap perpindahan tepat di ketukan, dan memotong antar lagu yang tidak cocok. Tanpa pemrosesan tambahan.</string>

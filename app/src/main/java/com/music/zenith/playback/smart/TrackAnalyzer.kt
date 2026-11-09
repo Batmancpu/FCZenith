@@ -94,14 +94,13 @@ class TrackAnalyzer(private val context: Context, private val cache: AudioCache)
      */
     private fun unpackedAsset(name: String): String {
         val file = java.io.File(context.filesDir, name)
-        if (file.exists() && file.length() > 0L) return file.absolutePath
-        val bundled = runCatching { context.assets.open(name) }.getOrNull()
-        if (bundled != null) {
+        if (!file.exists() || file.length() == 0L) {
+            // Tidak mengunduh sendiri: model diunduh lewat popup di pengaturan Automix.
+            val bundled = runCatching { context.assets.open(name) }.getOrNull()
+                ?: error("Model $name belum diunduh")
             bundled.use { input ->
                 file.outputStream().use { output -> input.copyTo(output) }
             }
-        } else {
-            downloadModel(name, file)
         }
         return file.absolutePath
     }

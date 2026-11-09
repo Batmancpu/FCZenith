@@ -869,6 +869,15 @@
     <string name="version_cut_measuring">분석 중</string>
     <string name="version_cut_aligned">정렬됨</string>
     <string name="automix_enabled_subtitle">곡 자체를 분석해 모든 전환의 타이밍과 블렌딩을 맞춰요. 기기가 뜨거워지거나 재생이 끊기면 꺼 주세요.</string>
+    <string name="automix_model_title">Automix 모델 다운로드</string>
+    <string name="automix_model_message">Automix에는 분석 모델 두 개가 필요해요. GitHub에서 한 번만 다운로드하며 이 기기에 저장돼요. Wi-Fi 사용을 권장해요.</string>
+    <string name="automix_model_download">다운로드</string>
+    <string name="automix_model_downloading_title">모델 다운로드 중…</string>
+    <string name="automix_model_downloading_message">%1$d%% 완료</string>
+    <string name="automix_model_hide">숨기기</string>
+    <string name="automix_model_failed_title">다운로드 실패</string>
+    <string name="automix_model_failed_message">Automix 모델을 다운로드하지 못했어요. 연결을 확인하고 다시 시도하세요.</string>
+    <string name="automix_model_retry">다시 시도</string>
     <string name="automix_disabled_subtitle">슬라이더 없이 전환의 타이밍과 블렌딩을 자동으로 맞춰요. 느린 기기에서는 성능이 달라질 수 있어요.</string>
     <string name="advanced_automix">고급 Automix</string>
     <string name="advanced_automix_subtitle">DJ처럼 믹스해요: 비트를 맞추고, 비트에 맞춰 전환하며, 어울리지 않는 곡 사이는 컷으로 이어요. 추가 처리는 없어요.</string>

@@ -183,6 +183,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.isActive
+import com.music.zenith.playback.smart.AutomixModels
 import kotlin.math.roundToInt
 import java.util.Locale
 
@@ -350,6 +353,30 @@ fun SettingsScreen(
     var importStatus by remember { mutableStateOf<String?>(null) }
     var confirmImport by remember { mutableStateOf(false) }
     var confirmClearSongCache by remember { mutableStateOf(false) }
+    // Popup unduh model Automix: 0 tidak tampil, 1 tanya, 2 mengunduh, 3 gagal, 4 mengunduh (disembunyikan).
+    var automixModelStep by remember { mutableStateOf(0) }
+    var automixModelProgress by remember { mutableStateOf(0) }
+    var automixModelJob by remember { mutableStateOf<Job?>(null) }
+    val automixModelScope = rememberCoroutineScope()
+    val startAutomixDownload: () -> Unit = {
+        automixModelProgress = 0
+        automixModelStep = 2
+        automixModelJob = automixModelScope.launch {
+            val ok = withContext(Dispatchers.IO) {
+                AutomixModels.download(
+                    context = context,
+                    onProgress = { automixModelProgress = it },
+                    isCancelled = { !isActive },
+                )
+            }
+            if (ok) {
+                AppSettings.setSmartFadeEnabled(true)
+                automixModelStep = 0
+            } else {
+                automixModelStep = 3
+            }
+        }
+    }
     var confirmClearCanvasCache by remember { mutableStateOf(false) }
     // Batas baru yang lebih kecil dari isi cache ditahan dulu (belum disimpan) sampai user setuju.
     var pendingSongLimitBytes by remember { mutableStateOf<Long?>(null) }
@@ -840,10 +867,22 @@ fun SettingsScreen(
                         trailing = {
                             IosSwitch(
                                 checked = smartFade,
-                                onCheckedChange = AppSettings::setSmartFadeEnabled,
+                                onCheckedChange = { on ->
+                                    if (on && !AutomixModels.isReady(context)) {
+                                        automixModelStep = 1
+                                    } else {
+                                        AppSettings.setSmartFadeEnabled(on)
+                                    }
+                                },
                             )
                         },
-                        onClick = { AppSettings.setSmartFadeEnabled(!smartFade) },
+                        onClick = {
+                            if (!smartFade && !AutomixModels.isReady(context)) {
+                                automixModelStep = 1
+                            } else {
+                                AppSettings.setSmartFadeEnabled(!smartFade)
+                            }
+                        },
                     )
                 }
             }
@@ -1881,6 +1920,41 @@ fun SettingsScreen(
                 loader.diskCache?.clear()
                 Toast.makeText(context, context.getString(R.string.image_cache_cleared), Toast.LENGTH_SHORT).show()
             },
+        )
+    }
+
+    // Automix needs two models that are not in the APK; ask before fetching them.
+    if (automixModelStep == 1) {
+        IosConfirmDialog(
+            title = stringResource(R.string.automix_model_title),
+            message = stringResource(R.string.automix_model_message),
+            confirmText = stringResource(R.string.automix_model_download),
+            dismissText = stringResource(R.string.cancel),
+            onDismiss = { automixModelStep = 0 },
+            onConfirm = { startAutomixDownload() },
+        )
+    }
+    if (automixModelStep == 2) {
+        IosConfirmDialog(
+            title = stringResource(R.string.automix_model_downloading_title),
+            message = stringResource(R.string.automix_model_downloading_message, automixModelProgress),
+            confirmText = stringResource(R.string.cancel),
+            dismissText = stringResource(R.string.automix_model_hide),
+            onDismiss = { automixModelStep = 4 },
+            onConfirm = {
+                automixModelJob?.cancel()
+                automixModelStep = 0
+            },
+        )
+    }
+    if (automixModelStep == 3) {
+        IosConfirmDialog(
+            title = stringResource(R.string.automix_model_failed_title),
+            message = stringResource(R.string.automix_model_failed_message),
+            confirmText = stringResource(R.string.automix_model_retry),
+            dismissText = stringResource(R.string.cancel),
+            onDismiss = { automixModelStep = 0 },
+            onConfirm = { startAutomixDownload() },
         )
     }
 
