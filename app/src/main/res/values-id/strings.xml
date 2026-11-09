@@ -1114,6 +1114,8 @@
 
     <string name="smart_version_alignment">Penyelarasan audio cerdas</string>
     <string name="smart_version_alignment_subtitle">Menganalisis gelombang audio untuk mencocokkan momen pemutaran yang tepat</string>
+    <string name="auto_music_only">Alihkan music video ke audio otomatis</string>
+    <string name="auto_music_only_subtitle">Video dari radio dan putar otomatis diganti ke versi audionya. Video yang kamu pilih sendiri tetap diputar sebagai video.</string>
 
     <string name="equalizer_footer">Shapes the sound inside Zenith, before it reaches the system.</string>
 

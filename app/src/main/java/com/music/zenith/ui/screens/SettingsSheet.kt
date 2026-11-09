@@ -305,6 +305,7 @@ fun SettingsScreen(
     val swipeToPlayNext by AppSettings.swipeToPlayNext.collectAsStateWithLifecycle()
     val dontRepeatSuggestions by AppSettings.dontRepeatSuggestions.collectAsStateWithLifecycle()
     val smartVersionAlignment by AppSettings.smartVersionAlignment.collectAsStateWithLifecycle()
+    val autoMusicOnly by AppSettings.autoMusicOnly.collectAsStateWithLifecycle()
     val filterNonMusicAudio by AppSettings.filterNonMusicAudio.collectAsStateWithLifecycle()
     val localMusicFolderUri by AppSettings.localMusicFolderUri.collectAsStateWithLifecycle()
     val highPerformanceMode by AppSettings.highPerformanceMode.collectAsStateWithLifecycle()
@@ -1707,6 +1708,21 @@ fun SettingsScreen(
         }
 
         if (shows(SettingsCategory.ADVANCED)) SearchableSettingsGroup(search, header = stringResource(R.string.advanced_options)) {
+            val autoMusicOnlyTitle = stringResource(R.string.auto_music_only)
+            row(autoMusicOnlyTitle, "video", "audio", "music video", "convert", "autoplay") {
+                SettingsRow(
+                    icon = SfIcons.MusicNote,
+                    title = autoMusicOnlyTitle,
+                    subtitle = stringResource(R.string.auto_music_only_subtitle),
+                    trailing = {
+                        IosSwitch(
+                            checked = autoMusicOnly,
+                            onCheckedChange = AppSettings::setAutoMusicOnly,
+                        )
+                    },
+                    onClick = { AppSettings.setAutoMusicOnly(!autoMusicOnly) },
+                )
+            }
             val smartAlignmentTitle = stringResource(R.string.smart_version_alignment)
             row(smartAlignmentTitle, "alignment", "sync", "waveform", "video", "audio", "skit", "intro") {
                 SettingsRow(

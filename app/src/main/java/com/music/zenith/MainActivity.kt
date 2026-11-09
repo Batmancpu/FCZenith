@@ -1673,6 +1673,12 @@ private fun ZenithApp(
         val current = player.song ?: return@LaunchedEffect
         if (controller == null || partyState.inParty) return@LaunchedEffect
         if (!current.isVideo) return@LaunchedEffect
+        // Hanya video yang masuk otomatis (radio/autoplay) yang ditukar ke audio.
+        // Video yang dipilih sendiri (tap, Play next, Add to queue, album/playlist)
+        // tetap diputar sebagai video, tanpa pause dan tanpa jeda.
+        if (!AppSettings.autoMusicOnly.value ||
+            current.queueTier != com.music.zenith.data.model.QueueTier.AUTOPLAY
+        ) return@LaunchedEffect
         if (current.videoId == keepVideoId || current.videoId in missingVersions ||
             YtMusicRepository.hasNoAudioVersion(current.videoId)
         ) return@LaunchedEffect
