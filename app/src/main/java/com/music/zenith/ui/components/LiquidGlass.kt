@@ -122,13 +122,16 @@ fun glassContentColor(): Color =
 @Composable
 fun glassIndicatorColor(): Color =
     if (MaterialTheme.colorScheme.surface.luminance() > 0.5f) {
-        Color.White.copy(alpha = 0.5f)
+        Color.White.copy(alpha = LIGHT_INDICATOR_OPACITY)
     } else {
         Color.White.copy(alpha = DARK_INDICATOR_OPACITY)
     }
 
 /** The selected tab's pill in dark theme, a step whiter than the bar. */
-private const val DARK_INDICATOR_OPACITY = 0.14f
+private const val DARK_INDICATOR_OPACITY = 0.30f
+
+/** The selected tab's pill in light theme. */
+private const val LIGHT_INDICATOR_OPACITY = 0.65f
 
 /**
  * A lightweight visual match for liquid glass over a stable background.

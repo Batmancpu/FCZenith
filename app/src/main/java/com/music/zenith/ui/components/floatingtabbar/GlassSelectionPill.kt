@@ -563,7 +563,7 @@ internal fun FlatSelectionPill(
             backdrop = backdrop,
             shape = { shape },
             effects = {
-                colorControls(saturation = INDICATOR_SATURATION)
+                colorControls(brightness = INDICATOR_BRIGHTNESS, saturation = INDICATOR_SATURATION)
                 blur(blurPx)
             },
             highlight = null,
@@ -577,7 +577,10 @@ internal fun FlatSelectionPill(
 private val INDICATOR_BLUR = 10.dp
 
 /** Saturation of the page and bar glass seen through the resting indicator. */
-private const val INDICATOR_SATURATION = 2.2f
+private const val INDICATOR_SATURATION = 2.4f
+
+/** A small lift so the blurred backdrop under the indicator reads brighter than the bar. */
+private const val INDICATOR_BRIGHTNESS = 0.05f
 
 /** What the resting indicator blurs: the page, then the bar's own glass over it. */
 private class PageAndBarBackdrop(
