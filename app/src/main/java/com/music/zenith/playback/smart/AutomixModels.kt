@@ -4,9 +4,120 @@ import android.content.Context
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import android.content.Intent
+import androidx.core.content.ContextCompat
+import com.music.zenith.data.model.Song
+import com.music.zenith.data.settings.AppSettings
+import com.music.zenith.download.AutomixModelService
+import com.music.zenith.download.DownloadSession
+import java.util.concurrent.atomic.AtomicLong
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.withContext
 
-/** Dua model ONNX Automix: tidak dibundel di APK, diunduh dari repo setelah pengguna setuju. */
+/** Dua model ONNX Automix: tidak dibundel di APK, diunduh sekali setelah pengguna setuju. */
 object AutomixModels {
+    /** Id baris di manager unduhan (DownloadSession). */
+    const val SESSION_ID = "zenith.automix.models"
+
+    private val lock = Any()
+
+    /** Naik tiap start/cancel; unduhan lama yang dibatalkan berhenti sendiri saat ketahuan berbeda. */
+    private val generation = AtomicLong(0L)
+
+    private val _downloading = MutableStateFlow(false)
+
+    /** True selama unduhan berjalan. Saklar Automix tampil ON selama ini true. */
+    val downloading: StateFlow<Boolean> = _downloading.asStateFlow()
+
+    private val _progress = MutableStateFlow(0)
+    val progress: StateFlow<Int> = _progress.asStateFlow()
+
+    private val sessionSong = Song(
+        videoId = SESSION_ID,
+        title = "Automix models",
+        artist = "Automix",
+        thumbnailUrl = null,
+    )
+
+    /**
+     * Memulai unduhan lewat [AutomixModelService]. Bila model sudah ada, langsung
+     * menyalakan Automix. Aman dipanggil berulang: unduhan yang sedang jalan tidak digandakan.
+     */
+    fun start(context: Context) {
+        val app = context.applicationContext
+        if (isReady(app)) {
+            AppSettings.setSmartFadeEnabled(true)
+            return
+        }
+        synchronized(lock) {
+            if (_downloading.value) return
+            generation.incrementAndGet()
+            _progress.value = 0
+            _downloading.value = true
+        }
+        DownloadSession.queued(sessionSong)
+        runCatching {
+            ContextCompat.startForegroundService(app, Intent(app, AutomixModelService::class.java))
+        }.onFailure {
+            synchronized(lock) {
+                generation.incrementAndGet()
+                _downloading.value = false
+            }
+            DownloadSession.failed(SESSION_ID, "Download can't start right now")
+        }
+    }
+
+    /** Membatalkan unduhan: saklar kembali OFF dan barisnya hilang dari manager. */
+    fun cancel() {
+        synchronized(lock) {
+            generation.incrementAndGet()
+            _downloading.value = false
+            _progress.value = 0
+        }
+        DownloadSession.forget(SESSION_ID)
+    }
+
+    /** Dipanggil [AutomixModelService]; memblokir sampai selesai, gagal, atau dibatalkan. */
+    internal suspend fun runPending(context: Context) {
+        withContext(Dispatchers.IO) {
+            val gen = synchronized(lock) {
+                if (!_downloading.value) return@withContext
+                generation.get()
+            }
+            DownloadSession.running(SESSION_ID, 0f)
+            val ok = download(
+                context = context,
+                onProgress = { percent ->
+                    if (generation.get() == gen) {
+                        _progress.value = percent
+                        DownloadSession.running(SESSION_ID, percent / 100f)
+                    }
+                },
+                isCancelled = { generation.get() != gen || !isActive },
+            )
+            val stillWanted = synchronized(lock) {
+                if (generation.get() != gen) {
+                    false
+                } else {
+                    _downloading.value = false
+                    true
+                }
+            }
+            // Dibatalkan atau digantikan unduhan baru: yang membatalkan sudah melapor.
+            if (!stillWanted) return@withContext
+            if (ok) {
+                _progress.value = 100
+                AppSettings.setSmartFadeEnabled(true)
+                DownloadSession.done(SESSION_ID)
+            } else {
+                DownloadSession.failed(SESSION_ID, "Download failed. Check your connection and try again.")
+            }
+        }
+    }
     private const val BASE_URL =
         "https://github.com/rezapranata089-bit/Zenith/raw/main/app/src/main/assets/"
 
@@ -50,7 +161,7 @@ object AutomixModels {
         onFraction: (Float) -> Unit,
     ): Boolean {
         val target = File(context.filesDir, name)
-        val temp = File(context.filesDir, "$name.part")
+        val temp = File(context.filesDir, "$name.${System.nanoTime()}.part")
         var connection: HttpURLConnection? = null
         try {
             connection = URL(BASE_URL + name).openConnection() as HttpURLConnection
@@ -73,7 +184,8 @@ object AutomixModels {
                     }
                 }
             }
-            return temp.length() > 0L && temp.renameTo(target)
+            // Ukuran harus sama dengan yang dijanjikan server, supaya model terpotong tidak dipakai.
+            return temp.length() > 0L && (total <= 0L || temp.length() == total) && temp.renameTo(target)
         } catch (e: Exception) {
             return false
         } finally {

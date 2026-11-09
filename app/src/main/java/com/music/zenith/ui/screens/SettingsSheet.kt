@@ -353,28 +353,19 @@ fun SettingsScreen(
     var importStatus by remember { mutableStateOf<String?>(null) }
     var confirmImport by remember { mutableStateOf(false) }
     var confirmClearSongCache by remember { mutableStateOf(false) }
-    // Popup unduh model Automix: 0 tidak tampil, 1 tanya, 2 mengunduh, 3 gagal, 4 mengunduh (disembunyikan).
+    // Popup konfirmasi unduh model Automix: 0 tidak tampil, 1 tanya.
+    // Unduhannya berjalan di AutomixModelService dan tampil di manager unduhan.
     var automixModelStep by remember { mutableStateOf(0) }
-    var automixModelProgress by remember { mutableStateOf(0) }
-    var automixModelJob by remember { mutableStateOf<Job?>(null) }
-    val automixModelScope = rememberCoroutineScope()
+    val automixDownloading by AutomixModels.downloading.collectAsStateWithLifecycle()
     val startAutomixDownload: () -> Unit = {
-        automixModelProgress = 0
-        automixModelStep = 2
-        automixModelJob = automixModelScope.launch {
-            val ok = withContext(Dispatchers.IO) {
-                AutomixModels.download(
-                    context = context,
-                    onProgress = { automixModelProgress = it },
-                    isCancelled = { !isActive },
-                )
-            }
-            if (ok) {
-                AppSettings.setSmartFadeEnabled(true)
-                automixModelStep = 0
-            } else {
-                automixModelStep = 3
-            }
+        automixModelStep = 0
+        AutomixModels.start(context)
+    }
+    // Automix tidak boleh menyala tanpa modelnya (mis. data lama atau hasil restore).
+    LaunchedEffect(smartFade) {
+        if (smartFade) {
+            val ready = withContext(Dispatchers.IO) { AutomixModels.isReady(context) }
+            if (!ready) AppSettings.setSmartFadeEnabled(false)
         }
     }
     var confirmClearCanvasCache by remember { mutableStateOf(false) }
@@ -853,6 +844,15 @@ fun SettingsScreen(
                     )
                 }
             }
+            val toggleAutomix: (Boolean) -> Unit = { on ->
+                when {
+                    !on && automixDownloading -> AutomixModels.cancel()
+                    !on -> AppSettings.setSmartFadeEnabled(false)
+                    automixDownloading -> Unit
+                    AutomixModels.isReady(context) -> AppSettings.setSmartFadeEnabled(true)
+                    else -> automixModelStep = 1
+                }
+            }
             val automixTitle = stringResource(R.string.automix)
             row(automixTitle, "crossfade", "smart fade", "mix") {
                 BypassedByBitPerfect(bitPerfectReady) {
@@ -866,23 +866,11 @@ fun SettingsScreen(
                         },
                         trailing = {
                             IosSwitch(
-                                checked = smartFade,
-                                onCheckedChange = { on ->
-                                    if (on && !AutomixModels.isReady(context)) {
-                                        automixModelStep = 1
-                                    } else {
-                                        AppSettings.setSmartFadeEnabled(on)
-                                    }
-                                },
+                                checked = smartFade || automixDownloading,
+                                onCheckedChange = { on -> toggleAutomix(on) },
                             )
                         },
-                        onClick = {
-                            if (!smartFade && !AutomixModels.isReady(context)) {
-                                automixModelStep = 1
-                            } else {
-                                AppSettings.setSmartFadeEnabled(!smartFade)
-                            }
-                        },
+                        onClick = { toggleAutomix(!(smartFade || automixDownloading)) },
                     )
                 }
             }
@@ -1934,30 +1922,6 @@ fun SettingsScreen(
             onConfirm = { startAutomixDownload() },
         )
     }
-    if (automixModelStep == 2) {
-        IosConfirmDialog(
-            title = stringResource(R.string.automix_model_downloading_title),
-            message = stringResource(R.string.automix_model_downloading_message, automixModelProgress),
-            confirmText = stringResource(R.string.cancel),
-            dismissText = stringResource(R.string.automix_model_hide),
-            onDismiss = { automixModelStep = 4 },
-            onConfirm = {
-                automixModelJob?.cancel()
-                automixModelStep = 0
-            },
-        )
-    }
-    if (automixModelStep == 3) {
-        IosConfirmDialog(
-            title = stringResource(R.string.automix_model_failed_title),
-            message = stringResource(R.string.automix_model_failed_message),
-            confirmText = stringResource(R.string.automix_model_retry),
-            dismissText = stringResource(R.string.cancel),
-            onDismiss = { automixModelStep = 0 },
-            onConfirm = { startAutomixDownload() },
-        )
-    }
-
     // Everything in the Cached songs folder goes with it, so say so first.
     if (confirmClearSongCache) {
         IosConfirmDialog(

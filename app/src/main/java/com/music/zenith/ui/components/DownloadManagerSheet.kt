@@ -62,6 +62,7 @@ import com.music.zenith.data.model.artworkAt
 import com.music.zenith.download.DownloadProgress
 import com.music.zenith.download.DownloadSession
 import com.music.zenith.download.Downloads
+import com.music.zenith.playback.smart.AutomixModels
 import com.music.zenith.ui.haptics.Haptic
 import com.music.zenith.ui.haptics.rememberHaptics
 
@@ -287,7 +288,13 @@ fun DownloadManagerPage(
             DownloadManagerRow(
                 item = item,
                 onCancel = { Downloads.cancel(item.videoId) },
-                onRetry = { Downloads.enqueue(context, item.song, item.from) },
+                onRetry = {
+                    if (item.videoId == AutomixModels.SESSION_ID) {
+                        AutomixModels.start(context)
+                    } else {
+                        Downloads.enqueue(context, item.song, item.from)
+                    }
+                },
             )
         }
     }
@@ -393,7 +400,13 @@ private fun DownloadManagerRow(
                         },
                     )
                 }
-                is DownloadProgress.Done -> RowStatus(stringResource(R.string.saved_to_zenith_folder))
+                is DownloadProgress.Done -> RowStatus(
+                    if (item.videoId == AutomixModels.SESSION_ID) {
+                        "Ready to use"
+                    } else {
+                        stringResource(R.string.saved_to_zenith_folder)
+                    },
+                )
                 is DownloadProgress.Failed ->
                     RowStatus(progress.reason, MaterialTheme.colorScheme.error)
             }

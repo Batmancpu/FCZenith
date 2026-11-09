@@ -331,6 +331,12 @@
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
+        <!-- Unduhan model Automix (sekitar 30 MB), tampil di manager unduhan. -->
+        <service
+            android:name=".download.AutomixModelService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
         <!-- The tap on a "new songs in this playlist" notification. See PlaylistSync. -->
         <receiver
             android:name=".download.PlaylistSyncApproval"

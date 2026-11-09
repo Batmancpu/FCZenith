@@ -1054,7 +1054,8 @@ object AppSettings {
             .orEmpty()
         prefs.edit()
             .putInt(KEY_CROSSFADE, 10)
-            .putBoolean(KEY_SMART_FADE, capable)
+            // Selalu OFF di instalasi baru: model Automix belum ada dan baru diunduh saat saklar dinyalakan.
+            .putBoolean(KEY_SMART_FADE, false)
             .putString(KEY_AUTOMIX_PERFORMANCE_MODE, if (capable) "PERFORMANCE" else "BALANCED")
             .putBoolean(KEY_SKIP_SILENCE, true)
             .putString(KEY_OUTPUT_PCM_MODE, if (floatOk) "FLOAT_32" else "PCM_16")

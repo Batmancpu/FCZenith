@@ -948,7 +948,7 @@
     <string name="version_cut_aligned">aligned</string>
     <string name="automix_enabled_subtitle">Times and blends every transition from the tracks themselves. Turn it off if the phone gets hot or playback stutters.</string>
     <string name="automix_model_title">Download Automix models</string>
-    <string name="automix_model_message">Automix needs two analysis models. They download once from GitHub and stay on this device. Wi-Fi is recommended.</string>
+    <string name="automix_model_message">Automix needs two small analysis models (about 30 MB). They download once and stay on this device.</string>
     <string name="automix_model_download">Download</string>
     <string name="automix_model_downloading_title">Downloading models…</string>
     <string name="automix_model_downloading_message">%1$d%% complete</string>
