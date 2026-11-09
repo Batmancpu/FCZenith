@@ -236,6 +236,12 @@ fun Modifier.liquidGlass(
         Color(0xFF121212)
     }
     val surfaceTintColor = surfaceTint ?: themeTint.copy(alpha = clarity.tintAlpha)
+    // White 10% vanishes against a light page; use a dark hairline there.
+    val edgeColor = if (MaterialTheme.colorScheme.surface.luminance() > 0.5f) {
+        Color.Black.copy(alpha = 0.10f)
+    } else {
+        GLASS_EDGE_COLOR
+    }
 
     return drawBackdrop(
         backdrop = backdrop,
@@ -260,5 +266,5 @@ fun Modifier.liquidGlass(
         },
         exportedBackdrop = exportedBackdrop,
         backdropScale = resolution,
-    )
+    ).border(GLASS_EDGE_WIDTH, edgeColor, shape)
 }
