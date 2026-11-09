@@ -1123,6 +1123,11 @@
     <string name="hide_home_top_picks_subtitle">Menghapus baris Pilihan Teratas untuk Anda dari Beranda</string>
     <string name="hide_home_moods">Sembunyikan Mood</string>
     <string name="hide_home_moods_subtitle">Menghapus baris mood dari Beranda. Mood di Jelajahi tetap tersedia</string>
+    <string name="customize_home">Atur susunan Beranda</string>
+    <string name="customize_home_subtitle">Ubah urutan baris dan pilih mana yang tampil</string>
+    <string name="home_layout_description">Seret baris lewat gagangnya untuk memindahkan. Hapus centang untuk menyembunyikannya dari Beranda.</string>
+    <string name="home_layout_empty">Beranda masih dimuat. Buka lagi setelah barisnya muncul.</string>
+    <string name="home_row_top_picks">Pilihan Teratas untuk Anda</string>
     <string name="square_video_covers">Sampul video persegi</string>
     <string name="square_video_covers_subtitle">Menampilkan semua music video berbentuk persegi, di daftar, kartu, dan pemutar</string>
 

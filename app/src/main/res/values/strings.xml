@@ -297,6 +297,11 @@
     <string name="hide_home_top_picks_subtitle">Removes the Top Picks for You row from Home</string>
     <string name="hide_home_moods">Hide Moods</string>
     <string name="hide_home_moods_subtitle">Removes the mood row from Home. Moods in Explore stay available</string>
+    <string name="customize_home">Customize Home</string>
+    <string name="customize_home_subtitle">Reorder rows and choose which ones show</string>
+    <string name="home_layout_description">Drag a row by its handle to move it. Untick a row to hide it from Home.</string>
+    <string name="home_layout_empty">Home is still loading. Open this again once the rows have appeared.</string>
+    <string name="home_row_top_picks">Top Picks for You</string>
     <string name="square_video_covers">Square video covers</string>
     <string name="square_video_covers_subtitle">Shows every music video as a square, in lists, cards and the player</string>
     <string name="equalizer">Equalizer</string>

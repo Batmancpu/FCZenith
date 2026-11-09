@@ -289,6 +289,7 @@ import com.music.zenith.ui.components.optimizedHazeEffect
 import com.music.zenith.ui.components.topBarContentPadding
 import com.music.zenith.ui.components.topBarHeight
 import com.music.zenith.ui.components.AppLanguageDialog
+import com.music.zenith.ui.components.HomeLayoutDialog
 import com.music.zenith.ui.components.TranslationLanguageDialog
 import com.music.zenith.ui.components.LyricsSourcesDialog
 import com.music.zenith.ui.components.ServerEditorHost
@@ -676,6 +677,7 @@ private fun ZenithApp(
     var librarySortMenuOpen by remember { mutableStateOf(false) }
     var showLyricsSources by remember { mutableStateOf(false) }
     var showAppLanguage by remember { mutableStateOf(false) }
+    var showHomeLayout by remember { mutableStateOf(false) }
     var showTranslationLanguage by remember { mutableStateOf(false) }
     var showAccountSelector by remember { mutableStateOf(false) }
     // The popup has started leaving: the header's profile button returns with it.
@@ -3223,6 +3225,7 @@ private fun ZenithApp(
                                 onListenTogether = { navigator.push(AppRoute.ListenTogether) },
                                 onSpotifyCanvasAuth = { showSpotifyCanvasAuth = true },
                                 onAppLanguage = { showAppLanguage = true },
+                                onCustomizeHome = { showHomeLayout = true },
                                 onEditSignatureApi = { editingSignatureApi = true },
                                 onConfirmBitPerfect = { confirmBitPerfect = it },
                                 onConfirmFixedVolume = { confirmFixedVolume = true },
@@ -5831,6 +5834,17 @@ private fun ZenithApp(
             AppLanguageDialog(
                 hazeState = hazeState,
                 onDismiss = { showAppLanguage = false },
+            )
+        }
+
+        if (showHomeLayout) {
+            BackHandler { showHomeLayout = false }
+            HomeLayoutDialog(
+                hazeState = hazeState,
+                shelves = (visibleHomeState as? UiState.Success)?.data.orEmpty(),
+                withTopPicks = !hideHomeTopPicks,
+                withMoods = !hideHomeMoods,
+                onDismiss = { showHomeLayout = false },
             )
         }
 

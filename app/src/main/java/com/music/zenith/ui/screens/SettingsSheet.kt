@@ -234,6 +234,8 @@ fun SettingsScreen(
     onOpenSection: (SettingsCategory) -> Unit = {},
     /** Opens a choice with more options than its row can show, as a page. */
     onOpenChoice: (SettingsChoiceKind) -> Unit = {},
+    /** Opens the dialog that orders and hides Home's rows. */
+    onCustomizeHome: () -> Unit = {},
 ) {
     val context = LocalContext.current
 
@@ -1039,6 +1041,15 @@ fun SettingsScreen(
                         )
                     },
                     onClick = { AppSettings.setHideHomeMoods(!hideHomeMoods) },
+                )
+            }
+            val customizeHomeTitle = stringResource(R.string.customize_home)
+            row(customizeHomeTitle, "layout", "order", "arrange", "reorder", "rows", "home", "feed") {
+                SettingsRow(
+                    icon = SfIcons.PlaylistPlay,
+                    title = customizeHomeTitle,
+                    subtitle = stringResource(R.string.customize_home_subtitle),
+                    onClick = onCustomizeHome,
                 )
             }
             val squareVideoCoversTitle = stringResource(R.string.square_video_covers)

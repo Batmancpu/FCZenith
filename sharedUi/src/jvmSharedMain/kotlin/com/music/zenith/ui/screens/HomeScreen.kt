@@ -375,6 +375,43 @@ fun HomeScreen(
 }
 
 /**
+ * The shelves Home draws from a loaded feed, in the order it draws them when the
+ * listener has not arranged anything. [dropEditorial] is true wherever Top Picks
+ * is on, since the release row then leads Explore instead.
+ */
+fun homeFeedShelves(shelves: List<HomeShelf>, dropEditorial: Boolean = true): List<HomeShelf> {
+    val editorial = if (dropEditorial) editorialShelfIndex(shelves) else null
+    val kept = if (editorial != null) shelves.filterIndexed { index, _ -> index != editorial } else shelves
+    return kept.withListenAgainFirst().withQuickPicksInListenAgainSlot().withOtherModelBelowListenAgain()
+}
+
+/**
+ * Every slot Home has right now, as layout keys, in the order Home draws them
+ * without a saved layout: Top Picks first, Find Your Mood after Recents.
+ */
+fun homeDefaultSlotKeys(
+    shelves: List<HomeShelf>,
+    withTopPicks: Boolean,
+    withMoods: Boolean,
+): List<String> {
+    val ordered = homeFeedShelves(shelves, dropEditorial = withTopPicks)
+    val moodAt = (ordered.indexOfFirst { it.title.trim().equals(RECENTS_TITLE, ignoreCase = true) }
+        .takeIf { it >= 0 } ?: 1) + 1
+    return buildList {
+        if (withTopPicks) add(HOME_SLOT_TOP_PICKS)
+        ordered.forEachIndexed { index, shelf ->
+            if (withMoods && index == moodAt) add(HOME_SLOT_MOODS)
+            add(homeShelfKey(shelf.title))
+        }
+        if (withMoods && moodAt >= ordered.size) add(HOME_SLOT_MOODS)
+    }.distinct()
+}
+
+/** A shelf's title the way Home shows it, for the layout dialog. */
+@Composable
+fun homeShelfLabel(title: String): String = localizeShelfTitle(title.trim().replace('\n', ' '))
+
+/**
  * Recents mirrors the artist page's top-tracks pager. Any other lead shelf keeps
  * Apple's full-bleed treatment, while the remaining shelves use square cards.
  */
