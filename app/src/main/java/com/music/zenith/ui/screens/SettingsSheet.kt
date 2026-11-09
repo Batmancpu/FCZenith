@@ -1961,22 +1961,22 @@ fun SettingsScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 24.dp, bottom = 8.dp),
+                    .padding(top = 14.dp, bottom = 4.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
                         text = "Zenith $version",
-                        style = MaterialTheme.typography.labelLarge,
+                        style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
                         text = stringResource(R.string.footer_github),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textDecoration = TextDecoration.Underline,
                         modifier = Modifier.clickable {
                             context.openLink("https://github.com/rezapranata089-bit/Zenith")
@@ -1984,8 +1984,8 @@ fun SettingsScreen(
                     )
                     Text(
                         text = stringResource(R.string.footer_developer),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textDecoration = TextDecoration.Underline,
                         modifier = Modifier.clickable {
                             context.openLink("https://github.com/rezapranata089-bit")
@@ -1994,9 +1994,9 @@ fun SettingsScreen(
                 }
                 Text(
                     text = "Made by Zeuxxi",
-                    style = MaterialTheme.typography.labelLarge,
+                    style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 2.dp),
+                    modifier = Modifier.padding(top = 1.dp),
                 )
             }
         }
