@@ -381,6 +381,9 @@
     <string name="progressive_blur">프로그레시브 블러</string>
     <string name="frosted_glass">경량 글래스</string>
     <string name="glass_clarity">유리 투명도</string>
+    <string name="glass_clarity_clear">투명</string>
+    <string name="glass_clarity_balanced">균형</string>
+    <string name="glass_clarity_frosted">서리</string>
     <string name="liquid_glass_unavailable">Android 12 이상이 필요해요</string>
     <string name="full_screen_cover_art">전체 화면 커버 아트</string>
     <string name="legacy_mesh_gradient">레거시 메시 그라데이션</string>

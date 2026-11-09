@@ -1141,12 +1141,43 @@ fun SettingsScreen(
                             color = MaterialTheme.colorScheme.onBackground,
                             modifier = Modifier.padding(start = ROW_INSET, end = ROW_INSET, bottom = 8.dp),
                         )
-                        SegmentedControl(
-                            options = GlassClarity.entries.map(GlassClarity::label),
-                            selectedIndex = GlassClarity.entries.indexOf(glassClarity),
-                            onSelect = { AppSettings.setGlassClarity(GlassClarity.entries[it]) },
-                            modifier = Modifier.padding(start = ROW_INSET, end = ROW_INSET, bottom = 12.dp),
+                        // 9 titik snap: Clear (kiri), Balanced (tengah), Frosted (kanan)
+                        // dan 3 posisi di antara tiap titik.
+                        IosSlider(
+                            value = glassClarity.level,
+                            onValueChange = { AppSettings.setGlassClarity(it) },
+                            valueRange = 0f..1f,
+                            steps = 7,
+                            activeColor = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(horizontal = ROW_INSET),
                         )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = ROW_INSET, end = ROW_INSET, top = 4.dp, bottom = 12.dp),
+                        ) {
+                            Text(
+                                text = stringResource(R.string.glass_clarity_clear),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Start,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Text(
+                                text = stringResource(R.string.glass_clarity_balanced),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Text(
+                                text = stringResource(R.string.glass_clarity_frosted),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.End,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
                     }
                 }
                 val frostedGlassTitle = stringResource(R.string.frosted_glass)

@@ -1459,6 +1459,9 @@
     <string name="progressive_blur">Blur progresif</string>
     <string name="frosted_glass">Glass versi ringan</string>
     <string name="glass_clarity">Kejernihan kaca</string>
+    <string name="glass_clarity_clear">Jernih</string>
+    <string name="glass_clarity_balanced">Seimbang</string>
+    <string name="glass_clarity_frosted">Buram es</string>
     <string name="remove_from_history">Hapus dari riwayat</string>
     <string name="remove_from_history_failed">Tidak dapat menghapus dari riwayat</string>
     <string name="addon_blocked_title">Tidak dapat memutar lagu ini</string>

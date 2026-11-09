@@ -431,6 +431,9 @@
     <string name="progressive_blur">Progressive Blur</string>
     <string name="frosted_glass">Lightweight Glass</string>
     <string name="glass_clarity">Glass clarity</string>
+    <string name="glass_clarity_clear">Clear</string>
+    <string name="glass_clarity_balanced">Balanced</string>
+    <string name="glass_clarity_frosted">Frosted</string>
     <string name="liquid_glass_unavailable">Requires Android 12 or newer</string>
     <string name="full_screen_cover_art">Full-screen cover art</string>
     <string name="legacy_mesh_gradient">Legacy mesh gradient</string>
