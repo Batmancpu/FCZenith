@@ -318,7 +318,14 @@ fun FloatingTabBar(
     var shownInline by remember { mutableStateOf(scrollConnection.isInline) }
     LaunchedEffect(scrollConnection.isInline) {
         val target = scrollConnection.isInline
-        if (target == shownInline) return@LaunchedEffect
+        if (target == shownInline) {
+            // Berbalik sebelum sempat dilepas: karet kembali diam, tidak tertahan tegang.
+            pull.animateTo(
+                0f,
+                androidx.compose.animation.core.spring(dampingRatio = 0.6f, stiffness = 300f),
+            )
+            return@LaunchedEffect
+        }
         // Mengecil: player penuh ditarik ke atas. Membesar: pil ditarik ke bawah.
         val amplitude = if (target) 1f else -0.7f
         pull.animateTo(
@@ -379,6 +386,7 @@ fun FloatingTabBar(
                     accessory = inlineWithPull,
                     isAccessoryShared = isAccessoryShared,
                     onInlineTabClick = { scrollConnection.expand() },
+                    neighbourPull = { pull.value },
                     colors = colors,
                     shapes = shapes,
                     sizes = sizes,
@@ -430,7 +438,8 @@ class FloatingTabBarScrollConnection(
     initialIsInline: Boolean = false,
     private val scrollThresholdPx: Float,
     private val inlineBehavior: FloatingTabBarInlineBehavior = FloatingTabBarInlineBehavior.OnScrollDown,
-    private val expandOnlyAtTop: Boolean = false
+    private val expandOnlyAtTop: Boolean = false,
+    private val expandThresholdPx: Float = scrollThresholdPx
 ) : NestedScrollConnection {
     var isInline by mutableStateOf(initialIsInline)
         private set
@@ -474,7 +483,7 @@ class FloatingTabBarScrollConnection(
                     // Scrolling down enough - transition to inline mode
                     isInline = true
                     accumulatedScroll = 0f // Reset after state change
-                } else if (accumulatedScroll >= scrollThresholdPx && isInline && !expandOnlyAtTop) {
+                } else if (accumulatedScroll >= expandThresholdPx && isInline && !expandOnlyAtTop) {
                     // Scrolling up enough - transition to expanded mode
                     isInline = false
                     accumulatedScroll = 0f // Reset after state change
@@ -528,11 +537,19 @@ fun rememberFloatingTabBarScrollConnection(
     initialIsInline: Boolean = false,
     scrollThreshold: Dp = 50.dp,
     inlineBehavior: FloatingTabBarInlineBehavior = FloatingTabBarInlineBehavior.OnScrollDown,
-    expandOnlyAtTop: Boolean = false
+    expandOnlyAtTop: Boolean = false,
+    expandThreshold: Dp = scrollThreshold
 ): FloatingTabBarScrollConnection = with(LocalDensity.current) {
     val scrollThresholdPx = scrollThreshold.toPx()
-    remember(scrollThresholdPx, inlineBehavior, initialIsInline, expandOnlyAtTop) {
-        FloatingTabBarScrollConnection(initialIsInline, scrollThresholdPx, inlineBehavior, expandOnlyAtTop)
+    val expandThresholdPx = expandThreshold.toPx()
+    remember(scrollThresholdPx, expandThresholdPx, inlineBehavior, initialIsInline, expandOnlyAtTop) {
+        FloatingTabBarScrollConnection(
+            initialIsInline,
+            scrollThresholdPx,
+            inlineBehavior,
+            expandOnlyAtTop,
+            expandThresholdPx,
+        )
     }
 }
 
@@ -601,7 +618,8 @@ private fun SharedTransitionScope.InlineBar(
     sizes: FloatingTabBarSizes,
     elevations: FloatingTabBarElevations,
     tabBarContentModifier: @Composable () -> Modifier,
-    animatedVisibilityScope: AnimatedVisibilityScope
+    animatedVisibilityScope: AnimatedVisibilityScope,
+    neighbourPull: () -> Float = { 0f }
 ) {
     val inlineTab = scope.getInlineTab(selectedTabKey)
     val standaloneTab = scope.standaloneTab
@@ -633,6 +651,7 @@ private fun SharedTransitionScope.InlineBar(
                 modifier = Modifier
                     .chromePushSide(chromeProgress, startSign, chromeSidePush)
                     .jellyPushSide(jellyPush, startSign, sizes.inlineComponentSpacing)
+                    .neighbourPull(neighbourPull, startSign)
             )
         }
 
@@ -663,6 +682,7 @@ private fun SharedTransitionScope.InlineBar(
                     .aspectRatio(1f)
                     .chromePushSide(chromeProgress, -startSign, chromeSidePush)
                     .jellyPushSide(jellyPush, -startSign, sizes.inlineComponentSpacing)
+                    .neighbourPull(neighbourPull, -startSign)
             )
         }
     }
