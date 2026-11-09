@@ -66,6 +66,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.ScrollState
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
@@ -755,8 +762,61 @@ private fun BluetoothCodecPermissionRow() {
     }
 }
 
+/**
+ * One source: the row itself and, for an addon that offers a choice of
+ * renditions, its quality pills on a line below. The pills get the full width
+ * of the row rather than the column beside the switch, so more of them are
+ * visible at once and the rest scroll in from a faded edge.
+ */
 @Composable
 private fun SourceRow(
+    position: Int,
+    config: SourceConfig,
+    health: SourceHealth?,
+    onClick: (() -> Unit)?,
+    onToggle: ((Boolean) -> Unit)?,
+    skippedByQuality: Boolean = false,
+    awaitingOutput: LosslessOutput.State? = null,
+    onMetered: Boolean = false,
+    ceiling: AudioQuality = AudioQuality.LOSSLESS,
+    onPickQuality: (String) -> Unit = {},
+    handle: (@Composable () -> Unit)? = null,
+) {
+    val dimmed = !config.enabled || skippedByQuality || awaitingOutput != null
+    Column(modifier = Modifier.fillMaxWidth()) {
+        SourceRowHeader(
+            position = position,
+            config = config,
+            health = health,
+            onClick = onClick,
+            onToggle = onToggle,
+            skippedByQuality = skippedByQuality,
+            awaitingOutput = awaitingOutput,
+            onMetered = onMetered,
+            ceiling = ceiling,
+            handle = handle,
+        )
+        // Read off the stored manifest, so it can be set while the addon
+        // is down or waiting on a lossless output. Only when the addon
+        // actually offers a choice (two or more renditions).
+        if (config.kind == SourceKind.ADDON && config.isComplete && config.qualityOptions.isNotEmpty()) {
+            AddonQualityStrip(
+                options = config.qualityOptions,
+                selected = config.activeQuality,
+                onPick = onPickQuality,
+                // Lines up with the source's name: position + gap + icon + gap.
+                startInset = ROW_INSET + 18.dp + 6.dp + ICON_SIZE + ICON_GAP,
+                endInset = ROW_INSET,
+                modifier = Modifier
+                    .alpha(if (dimmed) 0.4f else 1f)
+                    .padding(bottom = 10.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun SourceRowHeader(
     position: Int,
     config: SourceConfig,
     health: SourceHealth?,
@@ -770,8 +830,6 @@ private fun SourceRow(
     /** Which of the two ceilings [ceiling] is, so the row can name it. */
     onMetered: Boolean = false,
     ceiling: AudioQuality = AudioQuality.LOSSLESS,
-    /** Stores the listener's `quality` pick for an addon that offers a choice. */
-    onPickQuality: (String) -> Unit = {},
     /**
      * The drag grip, for a row whose position is the user's to set. Passed in
      * rather than drawn here because the gesture belongs to the list that knows
@@ -896,16 +954,6 @@ private fun SourceRow(
                     )
                 }
             }
-            // Read off the stored manifest, so it can be set while the addon
-            // is down or waiting on a lossless output. Only when the addon
-            // actually offers a choice (two or more renditions).
-            if (config.kind == SourceKind.ADDON && config.isComplete && config.qualityOptions.isNotEmpty()) {
-                AddonQualityStrip(
-                    options = config.qualityOptions,
-                    selected = config.activeQuality,
-                    onPick = onPickQuality,
-                )
-            }
         }
         Spacer(Modifier.width(8.dp))
         if (onToggle == null) {
@@ -936,16 +984,24 @@ private fun SourceRow(
  * Every rendition the addon lists is visible at once and one tap picks it,
  * where a single "current value" link would hide the list behind a dialog.
  * The filled pill is the one in force; the row scrolls sideways for addons
- * that list more than fit.
+ * that list more than fit, running the full width of the row and fading out
+ * at whichever edge still has pills beyond it.
  */
 @Composable
 private fun AddonQualityStrip(
     options: List<AddonQualityOption>,
     selected: AddonQualityOption?,
     onPick: (String) -> Unit,
+    startInset: Dp,
+    endInset: Dp,
+    modifier: Modifier = Modifier,
 ) {
-    Column(modifier = Modifier.padding(top = 8.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+    val scroll = rememberScrollState()
+    Column(modifier = modifier) {
+        Row(
+            modifier = Modifier.padding(start = startInset),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Icon(
                 imageVector = SfIcons.Tune,
                 contentDescription = null,
@@ -963,7 +1019,10 @@ private fun AddonQualityStrip(
         Row(
             modifier = Modifier
                 .padding(top = 6.dp)
-                .horizontalScroll(rememberScrollState()),
+                .fillMaxWidth()
+                .horizontalEdgeFade(scroll, 28.dp)
+                .horizontalScroll(scroll)
+                .padding(start = startInset, end = endInset),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             options.forEach { option ->
@@ -1002,6 +1061,31 @@ private fun AddonQualityStrip(
         }
     }
 }
+
+/**
+ * Fades the viewport's left and right edges out, each only while there is
+ * content scrolled past it. Read in the draw phase, so scrolling redraws the
+ * mask without recomposing the row.
+ */
+private fun Modifier.horizontalEdgeFade(scroll: ScrollState, width: Dp): Modifier =
+    graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+        .drawWithContent {
+            drawContent()
+            if (size.width <= 0f) return@drawWithContent
+            val fadePx = width.toPx().coerceAtMost(size.width / 2f)
+            val fraction = fadePx / size.width
+            val startFade = (scroll.value / fadePx).coerceIn(0f, 1f)
+            val endFade = ((scroll.maxValue - scroll.value) / fadePx).coerceIn(0f, 1f)
+            drawRect(
+                brush = Brush.horizontalGradient(
+                    0f to Color.Black.copy(alpha = 1f - startFade),
+                    fraction to Color.Black,
+                    1f - fraction to Color.Black,
+                    1f to Color.Black.copy(alpha = 1f - endFade),
+                ),
+                blendMode = BlendMode.DstIn,
+            )
+        }
 
 @Composable
 private fun AudioQuality.localizedLabel(): String = stringResource(
