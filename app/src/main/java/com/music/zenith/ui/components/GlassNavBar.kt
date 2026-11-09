@@ -58,6 +58,7 @@ import com.music.zenith.R
 import com.music.zenith.data.model.ROW_ART_PX
 import com.music.zenith.data.model.Song
 import com.music.zenith.data.model.artworkAt
+import com.music.zenith.playback.MusicOnlyPlayback
 import com.music.zenith.ui.components.floatingtabbar.FloatingTabBar
 import com.music.zenith.ui.components.floatingtabbar.FloatingTabBarDefaults
 import com.music.zenith.ui.components.floatingtabbar.FloatingTabBarScrollConnection
@@ -429,7 +430,7 @@ private fun GlassNowPlaying(
             // A music video plays in the cover's place at its own 16:9, as in
             // the floating mini player; the full player takes it over when up.
             val artWidth by animateDpAsState(
-                targetValue = if (song.isVideo && showMusicVideo) ACCESSORY_ART_SIZE * (16f / 9f) else ACCESSORY_ART_SIZE,
+                targetValue = if (song.isVideo && showMusicVideo && MusicOnlyPlayback.showsPicture(song.videoId)) ACCESSORY_ART_SIZE * (16f / 9f) else ACCESSORY_ART_SIZE,
                 label = "glassMiniArtWidth",
             )
             Box(
@@ -447,7 +448,7 @@ private fun GlassNowPlaying(
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
                 )
-                if (song.isVideo && showMusicVideo) {
+                if (song.isVideo && showMusicVideo && MusicOnlyPlayback.showsPicture(song.videoId)) {
                     AndroidMusicVideo(
                         videoId = song.videoId,
                         fit = false,

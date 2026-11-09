@@ -544,11 +544,8 @@ object AppSettings {
     /** Analyzes audio waveform/envelope to align matching playback moment between versions. */
     val smartVersionAlignment = MutableStateFlow(true)
 
-    /**
-     * Music video yang masuk otomatis (radio/autoplay) ditukar ke versi audionya.
-     * Video yang dipilih user sendiri tidak pernah ditukar otomatis.
-     */
-    val autoMusicOnly = MutableStateFlow(true)
+    /** Music video diputar sebagai versi audionya — lihat [com.music.zenith.playback.MusicOnlyPlayback]. */
+    val autoMusicOnly = MutableStateFlow(false)
 
     /** Drops haze blur (status bar, mini player, bottom fade, lyrics focus) for a solid-fill look. */
     val reduceDynamicBlur = MutableStateFlow(false)
@@ -1203,7 +1200,7 @@ object AppSettings {
         swipeToPlayNext.value = prefs.getBoolean(KEY_SWIPE_TO_PLAY_NEXT, false)
         dontRepeatSuggestions.value = prefs.getBoolean(KEY_DONT_REPEAT_SUGGESTIONS, false)
         smartVersionAlignment.value = prefs.getBoolean(KEY_SMART_VERSION_ALIGNMENT, true)
-        autoMusicOnly.value = prefs.getBoolean(KEY_AUTO_MUSIC_ONLY, true)
+        autoMusicOnly.value = prefs.getBoolean(KEY_AUTO_MUSIC_ONLY, false)
         reduceDynamicBlur.value = prefs.getBoolean(KEY_REDUCE_BLUR, false)
         liquidGlass.value = prefs.getBoolean(KEY_LIQUID_GLASS, false)
         frostedGlass.value = prefs.getBoolean(KEY_FROSTED_GLASS, false)

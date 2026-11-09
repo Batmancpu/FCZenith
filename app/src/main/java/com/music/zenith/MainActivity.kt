@@ -1665,25 +1665,8 @@ private fun ZenithApp(
         }
     }
 
-    // Music videos are never played as videos: whenever one becomes the current
-    // track it is swapped for its official audio release. Skipped inside a
-    // listening party (everyone there plays one cut), after an explicit Revert
-    // (keepVideoId), and when no audio version exists (missingVersions).
-    LaunchedEffect(player.song?.videoId, controller, partyState.inParty) {
-        val current = player.song ?: return@LaunchedEffect
-        if (controller == null || partyState.inParty) return@LaunchedEffect
-        if (!current.isVideo) return@LaunchedEffect
-        // Hanya video yang masuk otomatis (radio/autoplay) yang ditukar ke audio.
-        // Video yang dipilih sendiri (tap, Play next, Add to queue, album/playlist)
-        // tetap diputar sebagai video, tanpa pause dan tanpa jeda.
-        if (!AppSettings.autoMusicOnly.value ||
-            current.queueTier != com.music.zenith.data.model.QueueTier.AUTOPLAY
-        ) return@LaunchedEffect
-        if (current.videoId == keepVideoId || current.videoId in missingVersions ||
-            YtMusicRepository.hasNoAudioVersion(current.videoId)
-        ) return@LaunchedEffect
-        switchToMusicOnly(current, pauseWhileResolving = true)
-    }
+    // Konversi music video ke audio dilakukan PlaybackService sebelum lagu diputar
+    // (lihat MusicOnlyPlayback); di sini hanya tombol manual di menu pemutar.
 
     /**
      * A song picked on its own — off a home card or a search hit — starts a

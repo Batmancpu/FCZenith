@@ -61,6 +61,11 @@ object YtMusicRepository {
     fun hasNoAudioVersion(videoId: String): Boolean = audioVersionCache[videoId]?.videoId == videoId
     fun cachedVideoVersion(videoId: String): Song? = videoVersionCache[videoId]
 
+    /** Kembali dari [audioId] ke video berarti ke [video], baris asal konversinya. */
+    fun rememberVideoVersion(audioId: String, video: Song) {
+        videoVersionCache[audioId] = video
+    }
+
     /**
      * How a position in [fromId] maps into [toId], when YouTube Music paired
      * the two itself and said how they line up. Null for a pair found by
