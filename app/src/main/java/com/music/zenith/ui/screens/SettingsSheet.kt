@@ -162,6 +162,7 @@ import com.music.zenith.data.scrobbling.LastFM
 import com.music.zenith.data.listentogether.ListenTogether
 import com.music.zenith.data.settings.AppSettings
 import com.music.zenith.data.settings.OutputPcmMode
+import com.music.zenith.data.settings.GlassClarity
 import com.music.zenith.data.settings.BitPerfectMode
 import com.music.zenith.playback.AudioOutputStatus
 import com.music.zenith.playback.audio.bitperfect.BitPerfectOutput
@@ -263,6 +264,7 @@ fun SettingsScreen(
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
     val liquidGlass by AppSettings.liquidGlass.collectAsStateWithLifecycle()
     val frostedGlass by AppSettings.frostedGlass.collectAsStateWithLifecycle()
+    val glassClarity by AppSettings.glassClarity.collectAsStateWithLifecycle()
     val progressiveBlur by AppSettings.progressiveBlur.collectAsStateWithLifecycle()
     val liquidGlassSupported = isGlassSupported()
     val lyricsBlur by AppSettings.lyricsBlur.collectAsStateWithLifecycle()
@@ -1129,6 +1131,23 @@ fun SettingsScreen(
             // its own. Its own switch because it costs frames of its own. Reduce
             // dynamic blur turns it off.
             if (liquidGlass && liquidGlassSupported) {
+                val glassClarityTitle = stringResource(R.string.glass_clarity)
+                row(glassClarityTitle, "clear", "transparent", "opacity", "glass", "clarity", divided = false) {
+                    Column {
+                        Text(
+                            text = glassClarityTitle,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onBackground,
+                            modifier = Modifier.padding(start = ROW_INSET, end = ROW_INSET, bottom = 8.dp),
+                        )
+                        SegmentedControl(
+                            options = GlassClarity.entries.map(GlassClarity::label),
+                            selectedIndex = GlassClarity.entries.indexOf(glassClarity),
+                            onSelect = { AppSettings.setGlassClarity(GlassClarity.entries[it]) },
+                            modifier = Modifier.padding(start = ROW_INSET, end = ROW_INSET, bottom = 12.dp),
+                        )
+                    }
+                }
                 val frostedGlassTitle = stringResource(R.string.frosted_glass)
                 row(frostedGlassTitle, "frosted", "glass", "lite", "light", "performance", divided = false) {
                     SettingsSubRow(

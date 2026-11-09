@@ -215,6 +215,7 @@ fun Modifier.liquidGlass(
     if (!isGlassSupported()) return this
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
     val frosted by AppSettings.frostedGlass.collectAsStateWithLifecycle()
+    val clarity by AppSettings.glassClarity.collectAsStateWithLifecycle()
     if (reduceDynamicBlur) {
         return background(MaterialTheme.colorScheme.surface, shape)
             .border(GLASS_EDGE_WIDTH, GLASS_EDGE_COLOR, shape)
@@ -222,7 +223,7 @@ fun Modifier.liquidGlass(
     val backdrop = LocalAppBackdrop.current
     val exportedBackdrop = LocalGlassExport.current
     val density = LocalDensity.current
-    val blurPx = with(density) { BLUR_RADIUS_DP.dp.toPx() } * GLASS_RESOLUTION_SCALE
+    val blurPx = with(density) { BLUR_RADIUS_DP.dp.toPx() } * GLASS_RESOLUTION_SCALE * clarity.blurScale
     val lensHeightPx = with(density) { (LENS_HEIGHT * LENS_MAX_DP).dp.toPx() } * GLASS_RESOLUTION_SCALE
     val lensAmountPx = with(density) { (LENS_AMOUNT * LENS_MAX_DP).dp.toPx() } * GLASS_RESOLUTION_SCALE
     val themeTint = if (MaterialTheme.colorScheme.surface.luminance() > 0.5f) {
@@ -230,7 +231,7 @@ fun Modifier.liquidGlass(
     } else {
         Color(0xFF121212)
     }
-    val surfaceTintColor = surfaceTint ?: themeTint.copy(alpha = SURFACE_OPACITY)
+    val surfaceTintColor = surfaceTint ?: themeTint.copy(alpha = clarity.tintAlpha)
 
     return drawBackdrop(
         backdrop = backdrop,

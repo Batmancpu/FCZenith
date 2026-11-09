@@ -378,6 +378,7 @@
     <string name="liquid_glass_subtitle">플로팅 내비게이션 바에 빛을 실제로 굴절시키는 유리를 적용해요. Android 12 이상에서만 지원되며 GPU를 더 많이 사용해요.</string>
     <string name="progressive_blur">프로그레시브 블러</string>
     <string name="frosted_glass">프로스티드 글래스 (더 가벼움)</string>
+    <string name="glass_clarity">유리 투명도</string>
     <string name="liquid_glass_unavailable">Android 12 이상이 필요해요</string>
     <string name="full_screen_cover_art">전체 화면 커버 아트</string>
     <string name="legacy_mesh_gradient">레거시 메시 그라데이션</string>

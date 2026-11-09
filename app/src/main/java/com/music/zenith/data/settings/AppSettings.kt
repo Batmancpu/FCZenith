@@ -68,6 +68,17 @@ enum class OutputPcmMode(val label: String) {
 }
 
 /**
+ * Seberapa jernih Liquid Glass: [tintAlpha] adalah lapisan warna di atas kaca,
+ * [blurScale] pengali radius blur. Balanced = tampilan bawaan sebelumnya.
+ * Lensa, highlight, dan shadow tidak berubah di semua mode.
+ */
+enum class GlassClarity(val label: String, val tintAlpha: Float, val blurScale: Float) {
+    CLEAR("Clear", 0.06f, 0.4f),
+    BALANCED("Balanced", 0.30f, 1f),
+    FROSTED("Frosted", 0.46f, 1.35f),
+}
+
+/**
  * Which exclusive output, if any, a track is sent to unchanged. Declared in
  * the order the settings picker lists them; persisted by name, so the order
  * can change freely.
@@ -579,6 +590,9 @@ object AppSettings {
      * ringan di HP spek rendah. Hanya berlaku saat [liquidGlass] aktif.
      */
     val frostedGlass = MutableStateFlow(false)
+
+    /** Kejernihan Liquid Glass: Clear / Balanced / Frosted. Hanya berlaku saat [liquidGlass] aktif. */
+    val glassClarity = MutableStateFlow(GlassClarity.BALANCED)
 
     /**
      * Blurs what scrolls under the status bar and the top controls, easing out
@@ -1229,6 +1243,12 @@ object AppSettings {
         reduceDynamicBlur.value = prefs.getBoolean(KEY_REDUCE_BLUR, false)
         liquidGlass.value = prefs.getBoolean(KEY_LIQUID_GLASS, false)
         frostedGlass.value = prefs.getBoolean(KEY_FROSTED_GLASS, false)
+        glassClarity.value = runCatching {
+            GlassClarity.valueOf(
+                prefs.getString(KEY_GLASS_CLARITY, GlassClarity.BALANCED.name)
+                    ?: GlassClarity.BALANCED.name,
+            )
+        }.getOrDefault(GlassClarity.BALANCED)
         progressiveBlur.value = prefs.getBoolean(KEY_PROGRESSIVE_BLUR, false)
         lyricsBlur.value = prefs.getBoolean(KEY_LYRICS_BLUR, true)
         liquidFlow.value = prefs.getBoolean(KEY_LIQUID_FLOW, true)
@@ -1777,6 +1797,11 @@ object AppSettings {
     fun setFrostedGlass(value: Boolean) {
         frostedGlass.value = value
         prefs.edit().putBoolean(KEY_FROSTED_GLASS, value).apply()
+    }
+
+    fun setGlassClarity(value: GlassClarity) {
+        glassClarity.value = value
+        prefs.edit().putString(KEY_GLASS_CLARITY, value.name).apply()
     }
 
     fun setProgressiveBlur(value: Boolean) {
@@ -2595,6 +2620,7 @@ object AppSettings {
     private const val KEY_REDUCE_BLUR = "reduce_dynamic_blur"
     private const val KEY_LIQUID_GLASS = "liquid_glass"
     private const val KEY_FROSTED_GLASS = "frosted_glass"
+    private const val KEY_GLASS_CLARITY = "glass_clarity"
     private const val KEY_PROGRESSIVE_BLUR = "progressive_blur"
     private const val KEY_LYRICS_BLUR = "lyrics_blur"
     private const val KEY_LIQUID_FLOW = "liquid_flow_motion"
