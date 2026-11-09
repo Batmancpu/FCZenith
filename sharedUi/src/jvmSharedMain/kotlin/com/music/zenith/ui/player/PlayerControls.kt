@@ -132,6 +132,7 @@ import com.music.zenith.data.model.Song
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 import kotlin.math.roundToInt
+import androidx.compose.runtime.rememberCoroutineScope
 
 /**
  * How long the shuffle glyph ignores further taps after one lands.
@@ -525,6 +526,7 @@ internal fun TransportRow(
             onClick = onPrevious,
             enabled = previousEnabled,
             haptic = Haptic.SkipPrevious,
+            direction = -1,
         )
         if (isLoading) {
             // Same footprint as the play/pause target — a smaller box here
@@ -555,6 +557,7 @@ internal fun TransportRow(
             onClick = onNext,
             enabled = nextEnabled,
             haptic = Haptic.SkipNext,
+            direction = 1,
         )
     }
 }
@@ -807,6 +810,8 @@ private fun TransportGlyph(
     haptic: Haptic = Haptic.Tap,
     /** Vertical squash of the glyph alone; its width and touch box are untouched. */
     heightScale: Float = 1f,
+    /** -1 kicks the glyph left, 1 kicks it right on tap; 0 means no kick. */
+    direction: Int = 0,
 ) {
     val haptics = rememberHaptics()
     // Faded rather than hidden: the row keeps its shape at the ends of a queue.
@@ -820,19 +825,56 @@ private fun TransportGlyph(
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val pressScale = animateFloatAsState(
-        targetValue = if (pressed && enabled) 0.80f else 1f,
-        animationSpec = spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMedium),
+        targetValue = if (pressed && enabled) 0.72f else 1f,
+        animationSpec = spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessMedium),
         label = "transportPress",
     )
+    // Soft disc under the finger while it is held.
+    val pressDisc by animateFloatAsState(
+        targetValue = if (pressed && enabled) 0.18f else 0f,
+        animationSpec = tween(durationMillis = if (pressed) 70 else 260),
+        label = "transportDisc",
+    )
+    // On tap: the glyph is kicked the way it points and rebounds, with a ring.
+    val scope = rememberCoroutineScope()
+    val kick = remember { Animatable(0f) }
+    val ring = remember { Animatable(0f) }
     Box(
         modifier = Modifier
             .size(touchSize)
+            .drawBehind {
+                if (pressDisc > 0f) {
+                    drawCircle(
+                        color = Color.White.copy(alpha = pressDisc),
+                        radius = this.size.minDimension / 2f,
+                    )
+                }
+                val p = ring.value
+                if (p > 0f && p < 1f) {
+                    drawCircle(
+                        color = Color.White.copy(alpha = (1f - p) * 0.45f),
+                        radius = this.size.minDimension / 2f * (0.55f + 0.45f * p),
+                        style = Stroke(width = 2.dp.toPx() * (1f - p) + 0.5f),
+                    )
+                }
+            }
             .clickable(
                 interactionSource = interaction,
                 indication = null,
                 enabled = enabled,
             ) {
                 haptics.play(haptic)
+                if (direction != 0) {
+                    scope.launch {
+                        kick.snapTo(0f)
+                        kick.animateTo(direction.toFloat(), tween(durationMillis = 80, easing = FastOutSlowInEasing))
+                        kick.animateTo(0f, spring(dampingRatio = 0.4f, stiffness = Spring.StiffnessMediumLow))
+                    }
+                    scope.launch {
+                        ring.snapTo(0f)
+                        ring.animateTo(1f, tween(durationMillis = 420, easing = FastOutSlowInEasing))
+                    }
+                }
                 onClick()
             },
         contentAlignment = Alignment.Center,
@@ -863,8 +905,10 @@ private fun TransportGlyph(
                 modifier = Modifier
                     .size(size)
                     .graphicsLayer {
-                        scaleX = pressScale.value
-                        scaleY = pressScale.value
+                        val k = kick.value
+                        translationX = k * 12.dp.toPx()
+                        scaleX = pressScale.value * (1f + kotlin.math.abs(k) * 0.15f)
+                        scaleY = pressScale.value * (1f - kotlin.math.abs(k) * 0.06f)
                     }
                     .then(if (heightScale != 1f) Modifier.graphicsLayer { scaleY = heightScale } else Modifier),
             )
