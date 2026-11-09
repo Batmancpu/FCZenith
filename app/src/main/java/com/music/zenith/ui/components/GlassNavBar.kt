@@ -127,7 +127,14 @@ fun GlassNavBar(
     // lambda, which the tab bar sees as a changed argument and recomposes on.
     val pillShape = remember { RoundedCornerShape(percent = 50) }
     val contentColor = glassContentColor()
-val selectedColor = MaterialTheme.colorScheme.primary
+// Tema gelap: aksen dicerahkan supaya tetap terbaca di atas glass yang memantulkan
+// cover cerah. Tema terang tidak berubah.
+val isDarkGlass = contentColor == Color.White
+val selectedColor = if (isDarkGlass) {
+    lerp(MaterialTheme.colorScheme.primary, Color.White, 0.35f)
+} else {
+    MaterialTheme.colorScheme.primary
+}
 val unselectedColor = contentColor.copy(alpha = 0.90f)
 val haptics = rememberHaptics()
     // Goyangan jelly pill now playing, dibagikan ke tab dan Search di sebelahnya.
@@ -223,7 +230,9 @@ val haptics = rememberHaptics()
         colors = FloatingTabBarDefaults.colors(
             backgroundColor = Color.Transparent,
             accessoryBackgroundColor = Color.Transparent,
-            indicatorColor = glassIndicatorColor(),
+            // Tema gelap: indikator digelapkan seperti Apple Music, bukan diangkat
+            // putih, supaya ikon dan teks aktif yang cerah menonjol darinya.
+            indicatorColor = if (isDarkGlass) Color.Black.copy(alpha = 0.30f) else glassIndicatorColor(),
         ),
         // Flat, because the glass is not. Every surface here already draws its
         // own [Shadow.Default] as part of the backdrop pass, and the library's
