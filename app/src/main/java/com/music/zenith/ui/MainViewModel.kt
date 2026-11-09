@@ -1568,6 +1568,17 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
         viewModelScope.launch {
+            // A hidden row is never fetched; turning it back on fetches it then.
+            AppSettings.hideHomeRecents.drop(1).collect { hidden ->
+                if (!hidden) loadHomeRecents(listenerKey(), homeLoadGeneration.get())
+            }
+        }
+        viewModelScope.launch {
+            AppSettings.hideHomeTopPicks.drop(1).collect { hidden ->
+                if (!hidden) loadTopPicks(listenerKey(), rebuild = false)
+            }
+        }
+        viewModelScope.launch {
             combine(
                 AppSettings.smbHost,
                 AppSettings.smbShare,
@@ -1853,12 +1864,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         homeContinuation = null
         homeSeenTitles.clear()
         _homeLoadingMore.value = false
-        _homeRecentlyPlayedLoading.value = _signedIn.value
+        _homeRecentlyPlayedLoading.value = _signedIn.value && !AppSettings.hideHomeRecents.value
         // The core feed plus one browse per supplement. Recently played is left
         // out: it has its own skeleton at the head of the page rather than the
         // one at the tail.
         _homePendingShelves.value = 1 + YtMusicRepository.HOME_SUPPLEMENT_BROWSE_IDS.size
-        loadTopPicks(identity, rebuild = false)
+        if (!AppSettings.hideHomeTopPicks.value) loadTopPicks(identity, rebuild = false)
         viewModelScope.launch {
             launch {
                 try {
@@ -1877,20 +1888,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     homeShelfRequestSettled(identity, generation)
                 }
             }
-            if (_signedIn.value) {
-                launch {
-                    YtMusicRepository.homeRecentlyPlayed()
-                        .onSuccess { shelf ->
-                            if (isCurrentHomeLoad(identity, generation)) {
-                                _homeRecentlyPlayedLoading.value = false
-                                shelf?.let { publishHomeShelves(listOf(it), prepend = true) }
-                            }
-                        }
-                        .onFailure {
-                            if (isCurrentHomeLoad(identity, generation)) _homeRecentlyPlayedLoading.value = false
-                        }
-                }
-            }
+            if (_signedIn.value && !AppSettings.hideHomeRecents.value) loadHomeRecents(identity, generation)
             YtMusicRepository.HOME_SUPPLEMENT_BROWSE_IDS.forEach { browseId ->
                 launch {
                     try {
@@ -1949,6 +1947,24 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Fetches the account's Recents row and puts it at the head of Home. Signed-in only. */
+    private fun loadHomeRecents(identity: String?, generation: Long) {
+        if (!_signedIn.value) return
+        _homeRecentlyPlayedLoading.value = true
+        viewModelScope.launch {
+            YtMusicRepository.homeRecentlyPlayed()
+                .onSuccess { shelf ->
+                    if (isCurrentHomeLoad(identity, generation)) {
+                        _homeRecentlyPlayedLoading.value = false
+                        shelf?.let { publishHomeShelves(listOf(it), prepend = true) }
+                    }
+                }
+                .onFailure {
+                    if (isCurrentHomeLoad(identity, generation)) _homeRecentlyPlayedLoading.value = false
+                }
+        }
+    }
+
     /** The hour the row on screen was built in, e.g. `2026-10-21T15`. */
     private var topPicksSlotShown: String? = null
 
@@ -1958,6 +1974,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      * next one. A no-op otherwise, and while one is building.
      */
     fun refreshTopPicksIfStale() {
+        if (AppSettings.hideHomeTopPicks.value) return
         if (topPicksJob?.isActive == true) return
         if (topPicksSlotShown == null || topPicksSlotShown == topPicksSlot()) return
         loadTopPicks(listenerKey(), rebuild = false)
@@ -2026,10 +2043,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Refreshes the core feed without blanking the current Play page first. */
     private suspend fun refreshHome(identity: String?) = coroutineScope {
-        val recent = if (_signedIn.value) async { YtMusicRepository.homeRecentlyPlayed() } else null
+        val recent = if (_signedIn.value && !AppSettings.hideHomeRecents.value) {
+            async { YtMusicRepository.homeRecentlyPlayed() }
+        } else {
+            null
+        }
         // Top Picks keeps to its hour; a pull refreshes the feed, not the
         // picks, unless the hour has already turned over.
-        if (topPicksJob?.isActive != true) loadTopPicks(identity, rebuild = false)
+        if (!AppSettings.hideHomeTopPicks.value && topPicksJob?.isActive != true) loadTopPicks(identity, rebuild = false)
         YtMusicRepository.home().onSuccess { feed ->
             if (identity != listenerKey()) return@onSuccess
             homeContinuation = feed.continuation
