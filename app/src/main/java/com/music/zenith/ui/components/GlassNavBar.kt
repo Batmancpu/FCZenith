@@ -128,7 +128,7 @@ fun GlassNavBar(
     val pillShape = remember { RoundedCornerShape(percent = 50) }
     val contentColor = glassContentColor()
     val selectedColor = MaterialTheme.colorScheme.primary
-    val unselectedColor = contentColor.copy(alpha = 0.65f)
+    val unselectedColor = contentColor.copy(alpha = 0.85f)
     val haptics = rememberHaptics()
     // Goyangan jelly pill now playing, dibagikan ke tab dan Search di sebelahnya.
     val jellyPush = remember { JellyPush() }
