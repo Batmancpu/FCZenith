@@ -3659,7 +3659,17 @@ fun NowPlayingScreen(
                             // Di menu lirik/queue (p = 1) cover adalah thumbnail header:
                             // ia ikut panel dulu, tidak lebih dulu terbang ke mini player.
                             val ease = base + (dockEaseThumb(dockT()) - base) * p()
-                            return lerp(mini, rect.translate(0f, -unridden), ease)
+                            val flown = lerp(mini, rect.translate(0f, -unridden), ease)
+                            // Di awal drag target cover (sleeve di atas sheet) masih lebih
+                            // rendah dari mini player, jadi kurva lebar panel yang cepat
+                            // menyeret cover turun lebih dulu dari panelnya. Kaki cover
+                            // ditahan di kaki cover mini: ia hanya tumbuh ke atas dan ke
+                            // kanan, lalu naik bersama panel. Banner full-bleed tidak berubah.
+                            return if (heroMode || flown.bottom <= mini.bottom) {
+                                flown
+                            } else {
+                                flown.translate(0f, mini.bottom - flown.bottom)
+                            }
                         }
                         // The banner's dissolve, firmed up into the cover's hard edge as
                         // it docks.
