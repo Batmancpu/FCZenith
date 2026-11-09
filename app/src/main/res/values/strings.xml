@@ -287,7 +287,7 @@
     <string name="smart_version_alignment">Smart audio alignment</string>
     <string name="smart_version_alignment_subtitle">Analyze audio waveforms to match the exact corresponding playback moment</string>
     <string name="auto_music_only">Audio over video</string>
-    <string name="auto_music_only_subtitle">Music videos switch to their audio track, and the next song in the queue is prepared early so Automix and crossfade keep working</string>
+    <string name="auto_music_only_subtitle">Music videos play as audio automatically</string>
     <string name="content_feed">Content &amp; Feed</string>
     <string name="hide_home_recents">Hide recently played</string>
     <string name="hide_home_recents_subtitle">Removes the Recents row from Home. Your history stays as it is</string>

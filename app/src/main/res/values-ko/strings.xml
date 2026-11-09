@@ -275,7 +275,7 @@
     <string name="smart_version_alignment">스마트 오디오 정렬</string>
     <string name="smart_version_alignment_subtitle">오디오 파형을 분석해 정확히 대응하는 재생 위치를 맞춰요</string>
     <string name="auto_music_only">비디오보다 오디오</string>
-    <string name="auto_music_only_subtitle">뮤직비디오가 오디오 트랙으로 바뀌고, 대기열의 다음 곡은 미리 준비돼 Automix와 크로스페이드가 계속 작동해요</string>
+    <string name="auto_music_only_subtitle">뮤직비디오를 자동으로 오디오로 재생해요</string>
     <string name="content_feed">콘텐츠 및 피드</string>
     <string name="hide_home_recents">최근 재생 숨기기</string>
     <string name="hide_home_recents_subtitle">홈에서 최근 재생 줄을 없애요. 기록은 그대로 남아요</string>
