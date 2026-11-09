@@ -103,7 +103,13 @@ fun HomeLayoutDialog(
             dropEditorial = !topPicksHidden,
         )
     }
-    val order = remember(layout, defaults) { layout.arrange(defaults, dropHidden = false) { it } }
+    // The feed is personalised and changes on every load, so a saved row can be
+    // missing from it right now. Keep those rows in the list at their saved place
+    // instead of letting them vanish until the feed happens to return them.
+    val order = remember(layout, defaults) {
+        val remembered = layout.slots.map { it.key }.filter { it !in defaults }
+        layout.arrange(defaults + remembered, dropHidden = false) { it }
+    }
     val hidden = remember(layout, order, topPicksHidden, moodsHidden, recentsHidden) {
         order.filter {
             layout.isHidden(it) ||
@@ -179,7 +185,7 @@ fun HomeLayoutDialog(
                 )
             }
 
-            if (shelves.isEmpty()) {
+            if (shelves.isEmpty() && !layout.isCustom) {
                 AlertRule()
                 Text(
                     text = stringResource(R.string.home_layout_empty),
@@ -218,7 +224,11 @@ fun HomeLayoutDialog(
 private fun homeSlotTitle(slot: String, titles: Map<String, String>): String = when (slot) {
     HOME_SLOT_TOP_PICKS -> stringResource(R.string.home_row_top_picks)
     HOME_SLOT_MOODS -> stringResource(R.string.find_your_mood)
-    else -> homeShelfLabel(titles[slot].orEmpty())
+    "shelf:listen-again" -> homeShelfLabel(titles[slot] ?: "Listen again")
+    "shelf:quick-picks" -> homeShelfLabel(titles[slot] ?: "Quick picks")
+    else -> homeShelfLabel(
+        titles[slot] ?: slot.removePrefix("shelf:").replaceFirstChar { it.uppercase() },
+    )
 }
 
 /**
