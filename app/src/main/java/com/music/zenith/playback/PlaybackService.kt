@@ -1960,6 +1960,10 @@ class PlaybackService : MediaLibraryService() {
                 !MusicOnlyPlayback.wants(item) &&
                     (!DirectSourceGate.isActive() || DirectSourceGate.isStreamReady(item))
             },
+            // Never blend into a music video whose audio version is still
+            // being looked up: the standby copy of the queue would never see
+            // the conversion and would play the video's own audio.
+            incomingAudioPending = { item -> MusicOnlyPlayback.wants(item) },
             mixWaveform = { item, durationMs, from, to, bins ->
                 item.localConfiguration?.uri?.let { uri ->
                     trackAnalyzer.mixWaveform(item.mediaId, uri, durationMs / 1000.0, from, to, bins)

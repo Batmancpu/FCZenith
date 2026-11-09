@@ -231,6 +231,16 @@ class CrossfadeController(
     private val loudnessGain: (String) -> Float = { 1f },
     /** The session's playhead moved on purpose during a loop mix: a loop wrap (true) or a re-anchor (false). */
     private val onMixPositionJump: (wrapped: Boolean) -> Unit = {},
+    /**
+     * True while a queue row is a music video still waiting for its audio
+     * version ("Prefer music-only version"). Such a row is only converted on
+     * the session player, and never mid-transition, so a standby loaded with a
+     * copy of the queue would play the raw video audio (a different, often
+     * uncensored recording) instead of the queued song. [begin] therefore
+     * refuses to arm into a row for which this is true; the next idle tick
+     * tries again once the row has been converted or settled.
+     */
+    private val incomingAudioPending: (MediaItem) -> Boolean = { false },
 ) {
 
     private enum class Phase {
@@ -389,6 +399,9 @@ class CrossfadeController(
 
     /** The last reason logged for the seek bar's Automix marker showing or not, so it logs on change. */
     private var lastMarkerVerdict = ""
+
+    /** The last incoming row [begin] declined for [incomingAudioPending], so it logs once per row. */
+    private var pendingAudioLoggedId: String? = null
 
     /** Decoding the mix popup's waveforms for the blend in flight. */
     private var mixViewJob: Job? = null
@@ -1503,6 +1516,21 @@ class CrossfadeController(
         if (out === into) return false
         val nextIndex = if (targetIndex != C.INDEX_UNSET) targetIndex else out.nextMediaItemIndex
         if (nextIndex == C.INDEX_UNSET) return false
+        // Not into a music video that is still waiting for its audio version:
+        // the conversion only ever touches the session player's queue, so the
+        // standby would keep the raw video row and blend in the wrong
+        // recording. Nothing has been committed yet, so just decline; the
+        // idle tick (or the plain skip) tries again once the row is settled.
+        out.takeIf { nextIndex in 0 until it.mediaItemCount }?.getMediaItemAt(nextIndex)?.let { pending ->
+            if (incomingAudioPending(pending)) {
+                if (pendingAudioLoggedId != pending.mediaId) {
+                    pendingAudioLoggedId = pending.mediaId
+                    Log.d(TAG, "arm held: ${pending.mediaId} is still waiting for its audio version")
+                }
+                return false
+            }
+        }
+        pendingAudioLoggedId = null
         // The last blend's stretch, if it is somehow still easing off: this
         // player is about to be the outgoing side of a new one.
         endEase(clickless = false)
