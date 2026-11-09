@@ -1084,7 +1084,10 @@ private fun SharedTransitionScope.ExpandedTabs(
                             .matchParentSize()
                             .pillPlacement(
                                 center = { pillCenterInRow(pill.position) },
-                                size = { pill.liveSize(restSize, liftedSize) },
+                                size = {
+                                    if (glassPill) pill.flatSize(restSize, liftedSize)
+                                    else pill.liveSize(restSize, liftedSize)
+                                },
                             ),
                     )
                 }
