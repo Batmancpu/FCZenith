@@ -562,7 +562,7 @@ private fun ZenithApp(
     // What folds [GlassNavBar] between its expanded and inline shapes. Held here
     // rather than inside the bar because the page's scroll is what drives it,
     // and the page is a sibling of the bar rather than a child.
-    val navBarScroll = rememberFloatingTabBarScrollConnection(expandThreshold = 140.dp)
+    val navBarScroll = rememberFloatingTabBarScrollConnection(expandThreshold = 250.dp)
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     // Explore loads the first time it's shown, not at launch beside Home.
     LaunchedEffect(selectedTab) {
