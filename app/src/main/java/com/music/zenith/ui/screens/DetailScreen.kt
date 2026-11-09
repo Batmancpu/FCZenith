@@ -145,6 +145,7 @@ import com.music.zenith.ui.player.CanvasFrameGrab
 import com.music.zenith.ui.components.rememberCoverFlightTap
 import com.music.zenith.ui.components.enterReveal
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.Crossfade
 import androidx.compose.ui.draw.drawBehind
 import coil3.compose.LocalPlatformContext
 import coil3.compose.AsyncImagePainter
@@ -1569,6 +1570,18 @@ private fun PageBackground(
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
     val art = heroUrl ?: page.thumbnailUrl.artworkAt(HEADER_ART_PX)
 
+    // The photo on screen. A new one (Apple's hero replacing the YouTube
+    // thumbnail) is loaded first and swapped in with a crossfade, so the old
+    // photo never fades out onto an empty area while the new one is fetched.
+    val artContext = LocalPlatformContext.current
+    var shownArt by remember { mutableStateOf(art) }
+    LaunchedEffect(art) {
+        if (art == shownArt) return@LaunchedEffect
+        coil3.SingletonImageLoader.get(artContext)
+            .execute(ImageRequest.Builder(artContext).data(art).build())
+        shownArt = art
+    }
+
     // The photo waits for the page colour instead of showing over a black page
     // that then turns purple a moment later. A read that never finishes gives
     // up after 1.2 s so the photo is never held back for good.
@@ -1593,14 +1606,21 @@ private fun PageBackground(
                 // After the offset, so the flight lands on where the photo really is.
                 .coverFlightTarget(page.browseId, 0.dp, palette.wash),
         ) {
-            AsyncImage(
-                model = art,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
+            Crossfade(
+                targetState = shownArt,
+                animationSpec = tween(260),
+                label = "artistHeroSwap",
                 modifier = Modifier
                     .matchParentSize()
                     .background(palette.elevated),
-            )
+            ) { shown ->
+                AsyncImage(
+                    model = shown,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.matchParentSize(),
+                )
+            }
 
             // Above the still art but below the scrim, so the scrim that
             // settles the header into the page still sits over it. Always
@@ -1623,10 +1643,10 @@ private fun PageBackground(
             // rather than a fade to a flat tint. The same request as the sharp
             // copy, so it is a memory-cache hit and lands on the same frame.
             if (softenFoot) {
-                AsyncImage(
-                    model = art,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
+                Crossfade(
+                    targetState = shownArt,
+                    animationSpec = tween(260),
+                    label = "artistHeroSoftSwap",
                     modifier = Modifier
                         .matchParentSize()
                         // Offscreen so the mask cuts the blurred result rather
@@ -1639,7 +1659,14 @@ private fun PageBackground(
                         // Rectangle keeps the edges clamped to the picture's own
                         // colour rather than fading to transparent at the foot.
                         .blur(SOFT_FOOT_BLUR, BlurredEdgeTreatment.Rectangle),
-                )
+                ) { shown ->
+                    AsyncImage(
+                        model = shown,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.matchParentSize(),
+                    )
+                }
             }
 
             // Ends on the page colour at full strength, so there is no edge
