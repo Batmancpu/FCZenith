@@ -562,7 +562,7 @@ private fun ZenithApp(
     // What folds [GlassNavBar] between its expanded and inline shapes. Held here
     // rather than inside the bar because the page's scroll is what drives it,
     // and the page is a sibling of the bar rather than a child.
-    val navBarScroll = rememberFloatingTabBarScrollConnection(expandOnlyAtTop = true)
+    val navBarScroll = rememberFloatingTabBarScrollConnection()
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     // Explore loads the first time it's shown, not at launch beside Home.
     LaunchedEffect(selectedTab) {
@@ -1244,26 +1244,7 @@ private fun ZenithApp(
         TAB_LIBRARY -> libraryListState
         else -> searchListState
     }
-    // The collapsed bar stays collapsed while scrolling up, and opens only at the top.
-    LaunchedEffect(currentListState) {
-        androidx.compose.runtime.snapshotFlow { currentListState.canScrollBackward }
-            .collectLatest { canScrollBack ->
-                if (!canScrollBack) {
-                    delay(NAV_BAR_EXPAND_DELAY_MS)
-                    navBarScroll.expand()
-                }
-            }
-    }
-    // Halaman yang di-push: sinyal batas atas dari scroll connection, juga ditunda.
-    LaunchedEffect(navBarScroll) {
-        androidx.compose.runtime.snapshotFlow { navBarScroll.topSignal }
-            .collectLatest { signal ->
-                if (signal > 0) {
-                    delay(NAV_BAR_EXPAND_DELAY_MS)
-                    navBarScroll.expand()
-                }
-            }
-    }
+
 
     // Pull-to-refresh: the drag lives with the feed, but the indicator is the
     // line under the top bar, so the state has to be visible to both.
@@ -6565,7 +6546,6 @@ private fun Isolated(content: @Composable () -> Unit) = content()
 /** Longer than the ⋯ menu's exit, so its panel keeps its frost on the way out. */
 private const val SNAPSHOT_RELEASE_DELAY_MS = 400L
 
-private const val NAV_BAR_EXPAND_DELAY_MS = 180L
 private const val TAB_HOME = 0
 private const val TAB_EXPLORE = 1
 private const val TAB_LIBRARY = 2

@@ -312,30 +312,27 @@ fun FloatingTabBar(
     // Saat mengecil, bar ditarik sedikit ke atas seolah terseret halaman, lalu
     // mengendap ke bentuk inline dengan pegas. Dibaca di graphicsLayer saja.
     val pull = remember { androidx.compose.animation.core.Animatable(0f) }
-    val pullPx = with(LocalDensity.current) { 16.dp.toPx() }
+    val pullPx = with(LocalDensity.current) { 22.dp.toPx() }
+    val firstRun = remember { booleanArrayOf(true) }
     LaunchedEffect(scrollConnection.isInline) {
-        if (scrollConnection.isInline) {
-            pull.animateTo(1f, androidx.compose.animation.core.tween(150, easing = FastOutSlowInEasing))
-            pull.animateTo(
-                0f,
-                androidx.compose.animation.core.spring(dampingRatio = 0.55f, stiffness = 240f),
-            )
-        } else {
-            pull.animateTo(
-                0f,
-                androidx.compose.animation.core.spring(dampingRatio = 0.7f, stiffness = 300f),
-            )
+        if (firstRun[0]) {
+            firstRun[0] = false
+            return@LaunchedEffect
         }
+        // Karet menegang, lalu dilepas: memantul lewat titik awal dan mengendap.
+        val amplitude = if (scrollConnection.isInline) 1f else 0.7f
+        pull.animateTo(
+            amplitude,
+            androidx.compose.animation.core.tween(170, easing = FastOutSlowInEasing),
+        )
+        pull.animateTo(
+            0f,
+            androidx.compose.animation.core.spring(dampingRatio = 0.42f, stiffness = 210f),
+        )
     }
 
     SharedTransitionLayout(
-        modifier = modifier.graphicsLayer {
-            val p = pull.value
-            transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 1f)
-            translationY = -pullPx * p
-            scaleX = 1f - 0.03f * p
-            scaleY = 1f + 0.04f * p
-        },
+        modifier = modifier.rubberStretch(pullPx) { pull.value },
     ) {
         AnimatedContent(
             targetState = scrollConnection.isInline,
