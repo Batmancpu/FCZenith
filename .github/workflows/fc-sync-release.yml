@@ -1,0 +1,321 @@
+name: FC Zenith — upstream sync and Music release
+
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: fczenith-main-sync-release
+  cancel-in-progress: false
+
+jobs:
+  sync-build-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      CCACHE_DIR: /home/runner/.ccache
+      CCACHE_MAXSIZE: 1G
+      CCACHE_COMPRESS: "1"
+      CCACHE_COMPILERCHECK: content
+
+    steps:
+      - name: Checkout FCZenith main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Disable inherited Zenith-only workflows
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for workflow in build-apk.yml cleanup-artifacts.yml; do
+            if gh api --method PUT "repos/$GITHUB_REPOSITORY/actions/workflows/$workflow/disable" >/dev/null 2>&1; then
+              echo "Disabled inherited workflow: $workflow"
+            else
+              echo "No active inherited workflow to disable: $workflow"
+            fi
+          done
+
+      - name: Fetch the latest published stable upstream release
+        id: upstream
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git remote add upstream https://github.com/rezapranata089-bit/Zenith.git
+
+          TAG="$(gh api repos/rezapranata089-bit/Zenith/releases/latest --jq '.tag_name')"
+          VERSION="${TAG#v}"
+          if [[ ! "$VERSION" =~ ^[0-9]+(\.[0-9]+)+$ ]]; then
+            echo "Unexpected upstream stable release tag: $TAG" >&2
+            exit 1
+          fi
+
+          git fetch --no-tags upstream "refs/tags/$TAG:refs/tags/upstream/$TAG"
+          TARGET="refs/tags/upstream/$TAG^{commit}"
+          if git merge-base --is-ancestor "$TARGET" HEAD; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "The published upstream release $TAG is already in FCZenith main."
+          else
+            # Never force-resolve source conflicts; stop and inspect them.
+            git merge --no-edit --no-ff "$TARGET"
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Merged published upstream release $TAG."
+          fi
+
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Decide whether a release is needed
+        id: decision
+        env:
+          GH_TOKEN: ${{ github.token }}
+          UPSTREAM_VERSION: ${{ steps.upstream.outputs.version }}
+        run: |
+          set -euo pipefail
+          CURRENT_UPSTREAM_VERSION="$(sed -n 's/^upstreamVersion=//p' fc/version.properties)"
+          VERSION_NAME="$(sed -n 's/^versionName=//p' fc/version.properties)"
+          if [[ -z "$CURRENT_UPSTREAM_VERSION" || -z "$VERSION_NAME" ]]; then
+            echo "Missing FC upstreamVersion/versionName metadata." >&2
+            exit 1
+          fi
+
+          release_exists=false
+          if gh release view "v$VERSION_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            release_exists=true
+          fi
+
+          if [[ "$UPSTREAM_VERSION" != "$CURRENT_UPSTREAM_VERSION" ]]; then
+            # The parent published a new stable version. Start its FC sequence at .1.
+            python3 fc/bump-version.py "$UPSTREAM_VERSION"
+            should_release=true
+          elif [[ "$release_exists" == "false" ]]; then
+            # First FC release from the currently published stable parent version.
+            should_release=true
+          else
+            should_release=false
+          fi
+
+          VERSION_CODE="$(sed -n 's/^versionCode=//p' fc/version.properties)"
+          VERSION_NAME="$(sed -n 's/^versionName=//p' fc/version.properties)"
+          echo "should_release=$should_release" >> "$GITHUB_OUTPUT"
+          echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+          echo "version_name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
+          echo "FC release decision: $should_release ($VERSION_NAME / $VERSION_CODE), upstream $UPSTREAM_VERSION"
+
+      - name: Set up JDK 17
+        if: steps.decision.outputs.should_release == 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install ccache
+        if: steps.decision.outputs.should_release == 'true'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends ccache
+          ccache --version | head -n1
+
+      - name: Cache ccache
+        if: steps.decision.outputs.should_release == 'true'
+        uses: actions/cache@v4
+        with:
+          path: /home/runner/.ccache
+          key: fc-ccache-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            fc-ccache-${{ runner.os }}-
+
+      - name: Cache Android CMake and NDK
+        if: steps.decision.outputs.should_release == 'true'
+        uses: actions/cache@v4
+        with:
+          path: |
+            /usr/local/lib/android/sdk/cmake/3.22.1
+            /usr/local/lib/android/sdk/ndk/27.0.12077973
+          key: fc-android-sdk-cmake3.22.1-ndk27.0.12077973
+
+      - name: Install CMake and NDK
+        if: steps.decision.outputs.should_release == 'true'
+        run: |
+          SDKM="${ANDROID_HOME:-/usr/local/lib/android/sdk}/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKM" --licenses > /dev/null || true
+          "$SDKM" "cmake;3.22.1" "ndk;27.0.12077973"
+
+      - name: Set up Gradle
+        if: steps.decision.outputs.should_release == 'true'
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Verify signing password is configured
+        if: steps.decision.outputs.should_release == 'true'
+        env:
+          FC_SIGNING_KEY_PASSWORD: ${{ secrets.FC_SIGNING_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$FC_SIGNING_KEY_PASSWORD" ]]; then
+            echo "Missing repository Actions secret: FC_SIGNING_KEY_PASSWORD." >&2
+            exit 1
+          fi
+
+      - name: Install icon-resizing dependency
+        if: steps.decision.outputs.should_release == 'true'
+        run: python3 -m pip install --user Pillow
+
+      - name: Apply FC identity and launcher overlay
+        if: steps.decision.outputs.should_release == 'true'
+        env:
+          FC_VERSION_CODE: ${{ steps.decision.outputs.version_code }}
+          FC_VERSION_NAME: ${{ steps.decision.outputs.version_name }}
+        run: python3 fc/apply-overlay.py
+
+      - name: Build the Music production APK before signing
+        if: steps.decision.outputs.should_release == 'true'
+        env:
+          FC_VERSION_CODE: ${{ steps.decision.outputs.version_code }}
+          FC_VERSION_NAME: ${{ steps.decision.outputs.version_name }}
+          LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
+          LASTFM_SECRET: ${{ secrets.LASTFM_SECRET }}
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew :app:assembleProdRelease --parallel --build-cache --stacktrace \
+            -Dorg.gradle.jvmargs="-Xmx5g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8"
+
+      - name: Validate and sign the production APK
+        if: steps.decision.outputs.should_release == 'true'
+        env:
+          EXPECTED_VERSION_CODE: ${{ steps.decision.outputs.version_code }}
+          EXPECTED_VERSION_NAME: ${{ steps.decision.outputs.version_name }}
+          FC_SIGNING_KEY_PASSWORD: ${{ secrets.FC_SIGNING_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          APK_COUNT="$(find app/build/outputs/apk/prod/release -maxdepth 1 -type f -name '*.apk' | wc -l | tr -d ' ')"
+          if [[ "$APK_COUNT" != "1" ]]; then
+            echo "Expected exactly one production APK, found $APK_COUNT" >&2
+            find app/build/outputs/apk/prod/release -maxdepth 1 -type f -print
+            exit 1
+          fi
+          APK="$(find app/build/outputs/apk/prod/release -maxdepth 1 -type f -name '*.apk' -print -quit)"
+
+          BUILD_TOOLS="$(find "${ANDROID_HOME:-/usr/local/lib/android/sdk}/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n1)"
+          AAPT="$BUILD_TOOLS/aapt"
+          APKSIGNER="$BUILD_TOOLS/apksigner"
+
+          # Check package and version before signing.
+          "$AAPT" dump badging "$APK" > /tmp/fc-badging.txt
+          grep -F "package: name='com.spotify.music' versionCode='$EXPECTED_VERSION_CODE' versionName='$EXPECTED_VERSION_NAME'" /tmp/fc-badging.txt
+
+          # Generate the key only after Gradle has finished. The upstream build
+          # scripts never receive the signing password or an unlocked keystore.
+          KEYSTORE="fc/signing-key.p12"
+          if [[ ! -f "$KEYSTORE" ]]; then
+            echo "Generating the permanent FC release key."
+            keytool -genkeypair -v \
+              -alias fczenith \
+              -keyalg RSA -keysize 4096 \
+              -validity 10000 \
+              -dname "CN=FC Zenith Release" \
+              -storetype PKCS12 \
+              -keystore "$KEYSTORE" \
+              -storepass "$FC_SIGNING_KEY_PASSWORD" \
+              -keypass "$FC_SIGNING_KEY_PASSWORD"
+          else
+            echo "Reusing the existing FC release key."
+          fi
+
+          keytool -list \
+            -keystore "$KEYSTORE" \
+            -storetype PKCS12 \
+            -storepass "$FC_SIGNING_KEY_PASSWORD" \
+            -alias fczenith >/dev/null
+
+          mkdir -p dist
+          SIGNED_APK="dist/Music-v${EXPECTED_VERSION_NAME}.apk"
+          "$APKSIGNER" sign \
+            --ks "$KEYSTORE" \
+            --ks-type PKCS12 \
+            --ks-key-alias fczenith \
+            --ks-pass env:FC_SIGNING_KEY_PASSWORD \
+            --key-pass env:FC_SIGNING_KEY_PASSWORD \
+            --out "$SIGNED_APK" \
+            "$APK"
+
+          "$APKSIGNER" verify --verbose --print-certs "$SIGNED_APK" > /tmp/fc-signature.txt
+          FINGERPRINT="$(awk -F': ' '/Signer #1 certificate SHA-256 digest:/ {gsub(":", "", $2); print tolower($2); exit}' /tmp/fc-signature.txt)"
+          if [[ -z "$FINGERPRINT" ]]; then
+            echo "Could not read APK signing certificate SHA-256 fingerprint" >&2
+            cat /tmp/fc-signature.txt
+            exit 1
+          fi
+          if [[ -f fc/signing-cert-sha256.txt ]]; then
+            EXPECTED_FINGERPRINT="$(tr -d '[:space:]' < fc/signing-cert-sha256.txt | tr '[:upper:]' '[:lower:]')"
+            if [[ "$FINGERPRINT" != "$EXPECTED_FINGERPRINT" ]]; then
+              echo "Signing certificate changed; refusing to publish an update that Android may reject." >&2
+              exit 1
+            fi
+          else
+            printf '%s\n' "$FINGERPRINT" > fc/signing-cert-sha256.txt
+          fi
+
+          echo "sha256=$(sha256sum "$SIGNED_APK" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+          echo "Verified package, version and permanent signing certificate: $FINGERPRINT"
+
+      - name: Remove temporary identity overlay from source checkout
+        if: steps.decision.outputs.should_release == 'true' && always()
+        run: |
+          git restore --worktree -- app/build.gradle.kts build.gradle.kts app/src/main/res/drawable/ic_launcher_background.xml app/src/main/res/drawable/ic_launcher_foreground.xml \
+            app/src/main/res/mipmap-mdpi/ic_launcher.webp app/src/main/res/mipmap-mdpi/ic_launcher_round.webp \
+            app/src/main/res/mipmap-hdpi/ic_launcher.webp app/src/main/res/mipmap-hdpi/ic_launcher_round.webp \
+            app/src/main/res/mipmap-xhdpi/ic_launcher.webp app/src/main/res/mipmap-xhdpi/ic_launcher_round.webp \
+            app/src/main/res/mipmap-xxhdpi/ic_launcher.webp app/src/main/res/mipmap-xxhdpi/ic_launcher_round.webp \
+            app/src/main/res/mipmap-xxxhdpi/ic_launcher.webp app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.webp
+          rm -f app/src/main/res/drawable-nodpi/fc_music_icon.webp
+
+      - name: Commit the upstream sync and FC version metadata to main
+        if: steps.decision.outputs.should_release == 'true'
+        env:
+          VERSION_NAME: ${{ steps.decision.outputs.version_name }}
+        run: |
+          set -euo pipefail
+          # The overlay has already been removed from the working tree.
+          # Stage the real upstream merge plus FC release metadata and the
+          # password-protected signing key; ignored build outputs stay excluded.
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(fc): sync upstream and prepare Music v$VERSION_NAME"
+          fi
+          git push origin HEAD:main
+
+      - name: Publish Music APK to FCZenith Releases
+        if: steps.decision.outputs.should_release == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.decision.outputs.version_name }}
+          target_commitish: main
+          name: Music v${{ steps.decision.outputs.version_name }}
+          body: |
+            FC Zenith release: Music v${{ steps.decision.outputs.version_name }}.
+
+            - Android package: com.spotify.music
+            - App label: Music
+            - Built from the published stable upstream release ${{ steps.upstream.outputs.tag }}.
+            - The same FC signing certificate is checked before publishing.
+
+            Obtainium source: https://github.com/Batmancpu/FCZenith
+          files: dist/Music-v${{ steps.decision.outputs.version_name }}.apk
+          fail_on_unmatched_files: true
+          make_latest: true
