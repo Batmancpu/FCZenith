@@ -118,6 +118,8 @@ fun GlassNavBar(
     dock: PlayerDock? = null,
     /** Dragging the bar's player up into the full player. */
     pull: MiniPlayerPull? = null,
+    /** true = Search a circle of its own beside the pill; false = the last of the pill's tabs. */
+    searchSeparate: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     // Held for the same reason [tabs] is. The glass factory below closes over
@@ -141,7 +143,7 @@ fun GlassNavBar(
     // Search is the odd one out in the iOS 26 layout: a circle of its own beside
     // the pill rather than a quarter of it. It is the last tab in Zenith's
     // order, which is where the shape wants it anyway.
-    val standaloneIndex = tabs.lastIndex
+    val standaloneIndex = if (searchSeparate) tabs.lastIndex else -1
 
     // A factory, not a value — see the note in FloatingTabBar's header. Each of
     // the three surfaces gets its own glass modifier and so its own shape cache.
@@ -253,8 +255,8 @@ fun GlassNavBar(
         ),
         // Held too: this is declared `Any?`, so a fresh list every pass is a
         // changed argument by identity and defeats skipping on its own.
-        contentKey = remember(selectedIndex, tabs, contentColor, selectedColor) {
-            listOf(selectedIndex, tabs, contentColor, selectedColor)
+        contentKey = remember(selectedIndex, tabs, contentColor, selectedColor, searchSeparate) {
+            listOf(selectedIndex, tabs, contentColor, selectedColor, searchSeparate)
         },
     ) {
         tabs.forEachIndexed { index, tab ->

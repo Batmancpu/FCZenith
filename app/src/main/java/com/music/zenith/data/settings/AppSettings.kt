@@ -515,6 +515,9 @@ object AppSettings {
     /** Show a Listen Together tab in the bottom navigation bar, before Search. */
     val showListenTogetherTab = MutableStateFlow(true)
 
+    /** Search sebagai lingkaran terpisah di glass nav bar; mati = Search jadi tab keempat di dalam pil. */
+    val searchTabSeparate = MutableStateFlow(false)
+
     /** Freezes the main player's mesh gradient instead of letting it drift/crossfade. */
     val reduceAnimation = MutableStateFlow(false)
 
@@ -1225,6 +1228,7 @@ object AppSettings {
         showNerdStats.value = prefs.getBoolean(KEY_NERD_STATS, false)
         showListenTogetherButton.value = prefs.getBoolean(KEY_LISTEN_TOGETHER_BUTTON, false)
         showListenTogetherTab.value = prefs.getBoolean(KEY_LISTEN_TOGETHER_TAB, true)
+        searchTabSeparate.value = prefs.getBoolean(KEY_SEARCH_TAB_SEPARATE, false)
         reduceAnimation.value = prefs.getBoolean(KEY_REDUCE_ANIMATION, false)
         coverSlideAnimation.value = prefs.getBoolean(KEY_COVER_SLIDE_ANIMATION, true)
         coverFluidAnimation.value = prefs.getBoolean(KEY_COVER_FLUID_ANIMATION, false)
@@ -1646,6 +1650,11 @@ object AppSettings {
     fun setShowListenTogetherTab(value: Boolean) {
         showListenTogetherTab.value = value
         prefs.edit().putBoolean(KEY_LISTEN_TOGETHER_TAB, value).apply()
+    }
+
+    fun setSearchTabSeparate(value: Boolean) {
+        searchTabSeparate.value = value
+        prefs.edit().putBoolean(KEY_SEARCH_TAB_SEPARATE, value).apply()
     }
 
     fun setShowListenTogetherButton(value: Boolean) {
@@ -2603,6 +2612,7 @@ object AppSettings {
     private const val KEY_NERD_STATS = "show_nerd_stats"
     private const val KEY_LISTEN_TOGETHER_BUTTON = "show_listen_together_button"
     private const val KEY_LISTEN_TOGETHER_TAB = "show_listen_together_tab"
+    private const val KEY_SEARCH_TAB_SEPARATE = "search_tab_separate"
     private const val KEY_CACHE_LIMIT = "audio_cache_limit_bytes"
     private const val KEY_CANVAS_CACHE_LIMIT = "canvas_cache_limit_bytes"
     private const val KEY_REDUCE_ANIMATION = "reduce_animation"

@@ -1406,6 +1406,7 @@ private fun ZenithApp(
     // in right after Explore. Search still has to stay last: GlassNavBar
     // draws the final tab as its standalone circle.
     val listenTogetherTab by AppSettings.showListenTogetherTab.collectAsStateWithLifecycle()
+    val searchTabSeparate by AppSettings.searchTabSeparate.collectAsStateWithLifecycle()
     val listenTogetherTabLabel = stringResource(R.string.listen_together_tab)
     val barTabs = remember(tabs, listenTogetherTab, listenTogetherTabLabel) {
         if (!listenTogetherTab) {
@@ -4386,6 +4387,7 @@ private fun ZenithApp(
                         tabs = barTabs,
                         selectedIndex = selectedBarIndex,
                         onTabSelected = onTabSelected,
+                        searchSeparate = searchTabSeparate,
                         scrollConnection = navBarScroll,
                         song = player.song,
                         isPlaying = player.isPlaying,

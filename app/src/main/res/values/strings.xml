@@ -362,6 +362,8 @@
     <string name="clear_image_cache_warning">All stored album artwork will be deleted. It will be downloaded again when needed.</string>
     <string name="show_listen_together_tab">Show Listen Together tab</string>
     <string name="show_listen_together_tab_subtitle">Adds a Together tab to the navigation bar, right of Explore</string>
+    <string name="search_tab_separate">Separate Search tab</string>
+    <string name="search_tab_separate_subtitle">On, Search is a separate circle beside the tab bar. Off, it is one of the four tabs in the bar, like iOS</string>
     <string name="show_listen_together_button_subtitle">Off, the player shows only the audio output button between lyrics and the queue</string>
     <string name="app_icon">App icon</string>
     <string name="app_icon_default">Default</string>

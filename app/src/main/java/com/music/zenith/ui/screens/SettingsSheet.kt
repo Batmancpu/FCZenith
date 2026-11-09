@@ -258,6 +258,7 @@ fun SettingsScreen(
     val nerdStats by AppSettings.showNerdStats.collectAsStateWithLifecycle()
     val listenTogetherButton by AppSettings.showListenTogetherButton.collectAsStateWithLifecycle()
     val listenTogetherTab by AppSettings.showListenTogetherTab.collectAsStateWithLifecycle()
+    val searchTabSeparate by AppSettings.searchTabSeparate.collectAsStateWithLifecycle()
     val reduceAnimation by AppSettings.reduceAnimation.collectAsStateWithLifecycle()
     val coverSlideAnimation by AppSettings.coverSlideAnimation.collectAsStateWithLifecycle()
     val coverFluidAnimation by AppSettings.coverFluidAnimation.collectAsStateWithLifecycle()
@@ -1698,6 +1699,21 @@ fun SettingsScreen(
                         )
                     },
                     onClick = { AppSettings.setShowListenTogetherTab(!listenTogetherTab) },
+                )
+            }
+            val searchTabSeparateTitle = stringResource(R.string.search_tab_separate)
+            row(searchTabSeparateTitle, "search", "tab", "navbar", "navigation", "pencarian", "ios") {
+                SettingsRow(
+                    icon = SfIcons.Apps,
+                    title = searchTabSeparateTitle,
+                    subtitle = stringResource(R.string.search_tab_separate_subtitle),
+                    trailing = {
+                        IosSwitch(
+                            checked = searchTabSeparate,
+                            onCheckedChange = AppSettings::setSearchTabSeparate,
+                        )
+                    },
+                    onClick = { AppSettings.setSearchTabSeparate(!searchTabSeparate) },
                 )
             }
             val listenTogetherButtonTitle = stringResource(R.string.show_listen_together_button)

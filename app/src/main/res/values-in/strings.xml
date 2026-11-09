@@ -1475,6 +1475,8 @@
     <string name="clear_image_cache_warning">Semua sampul album yang tersimpan akan dihapus. Sampul akan diunduh lagi saat dibutuhkan.</string>
     <string name="show_listen_together_tab">Tampilkan tab Dengar bersama</string>
     <string name="show_listen_together_tab_subtitle">Menambahkan tab Bersama di bilah navigasi, di kanan Explore</string>
+    <string name="search_tab_separate">Pisahkan tab Search</string>
+    <string name="search_tab_separate_subtitle">Aktif, Search jadi lingkaran terpisah di samping bilah tab. Nonaktif, Search jadi salah satu dari empat tab di dalam bilah, seperti iOS</string>
     <string name="show_listen_together_button_subtitle">Jika nonaktif, pemutar hanya menampilkan tombol output audio di antara lirik dan antrean</string>
     <string name="font">Font</string>
     <string name="font_default">Default</string>

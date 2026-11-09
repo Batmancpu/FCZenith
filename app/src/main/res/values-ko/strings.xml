@@ -347,6 +347,8 @@
     <string name="clear_image_cache_warning">저장된 앨범 아트가 모두 삭제돼요. 필요할 때 다시 다운로드돼요.</string>
     <string name="show_listen_together_tab">함께 듣기 탭 표시</string>
     <string name="show_listen_together_tab_subtitle">내비게이션 바의 탐색 오른쪽에 “함께” 탭을 추가해요</string>
+    <string name="search_tab_separate">검색 탭 분리</string>
+    <string name="search_tab_separate_subtitle">켜면 검색이 탭 바 옆의 별도 원형 버튼이 돼요. 끄면 iOS처럼 바 안의 네 번째 탭이 돼요</string>
     <string name="show_listen_together_button_subtitle">끄면 플레이어의 가사와 대기열 사이에 오디오 출력 버튼만 표시돼요</string>
     <string name="app_icon">앱 아이콘</string>
     <string name="app_icon_default">기본</string>
