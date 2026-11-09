@@ -331,9 +331,25 @@ fun FloatingTabBar(
         )
     }
 
-    SharedTransitionLayout(
-        modifier = modifier.rubberStretch(pullPx) { pull.value },
-    ) {
+    // Hanya accessory (mini player) yang tertarik; tab dan Search tetap diam.
+    val inlineWithPull: (@Composable SharedTransitionScope.(Modifier, AnimatedVisibilityScope) -> Unit)? =
+        remember(inlineAccessory, pullPx) {
+            inlineAccessory?.let { acc ->
+                val wrapped: @Composable SharedTransitionScope.(Modifier, AnimatedVisibilityScope) -> Unit =
+                    { m, s -> acc(m.rubberStretch(pullPx) { pull.value }, s) }
+                wrapped
+            }
+        }
+    val expandedWithPull: (@Composable SharedTransitionScope.(Modifier, AnimatedVisibilityScope) -> Unit)? =
+        remember(expandedAccessory, pullPx) {
+            expandedAccessory?.let { acc ->
+                val wrapped: @Composable SharedTransitionScope.(Modifier, AnimatedVisibilityScope) -> Unit =
+                    { m, s -> acc(m.rubberStretch(pullPx) { pull.value }, s) }
+                wrapped
+            }
+        }
+
+    SharedTransitionLayout(modifier = modifier) {
         AnimatedContent(
             targetState = scrollConnection.isInline,
             transitionSpec = {
@@ -358,7 +374,7 @@ fun FloatingTabBar(
                     chromeSidePush = chromeSidePush,
                     jellyPush = jellyPush,
                     selectedTabKey = selectedTabKey,
-                    accessory = inlineAccessory,
+                    accessory = inlineWithPull,
                     isAccessoryShared = isAccessoryShared,
                     onInlineTabClick = { scrollConnection.expand() },
                     colors = colors,
@@ -374,7 +390,7 @@ fun FloatingTabBar(
                     chromeProgress = chromeProgress,
                     chromeDownPush = chromeDownPush,
                     selectedTabKey = selectedTabKey,
-                    accessory = expandedAccessory,
+                    accessory = expandedWithPull,
                     isAccessoryShared = isAccessoryShared,
                     colors = colors,
                     shapes = shapes,
