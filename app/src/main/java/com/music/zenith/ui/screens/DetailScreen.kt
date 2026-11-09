@@ -592,15 +592,11 @@ fun DetailScreen(
             // release's sleeve sits framed on one flat colour with nothing to
             // dissolve, so it takes the same [ArtworkPalette.background] the
             // bars at either end of the screen are already fading into.
-            val targetPageColor = if (isArtist) palette.wash else palette.background
-            // The palette arrives after the artwork does; ease to it instead of
-            // popping. Read only while drawing, so the list isn't recomposed per frame.
-            val pageColor by animateColorAsState(
-                targetValue = targetPageColor,
-                animationSpec = tween(450),
-                label = "detailPageColor",
-            )
-            BoxWithConstraints(Modifier.fillMaxSize().drawBehind { drawRect(pageColor) }) {
+            // [palette] already eases into the artwork's colour (see
+            // rememberArtworkPalette). A second ease here lagged behind every
+            // other surface painted from it, and the two showed as mismatched squares.
+            val pageColor = if (isArtist) palette.wash else palette.background
+            BoxWithConstraints(Modifier.fillMaxSize().background(pageColor)) {
                 // Measured rather than read off the window. The player runs
                 // full-screen at every window size, so this page's own width in
                 // landscape is the *whole* window. Straight off that width, the ratio hands back

@@ -473,6 +473,15 @@ fun Modifier.coverFlightTarget(
     DisposableEffect(browseId) {
         onDispose { lastBounds[0]?.let { startReturn(browseId, it, cornerPx, wash) } }
     }
+    // The page's colour is still settling when the flight lands, and the wash
+    // is only read when the sleeve is placed. Keep it current, or the picture
+    // dissolves into a stale colour beside a page that has moved on.
+    LaunchedEffect(browseId, wash) {
+        val flight = CoverFlightState.flight
+        if (flight != null && !flight.reverse && flight.browseId == browseId) {
+            CoverFlightState.targetWash = wash
+        }
+    }
     return this
         .graphicsLayer { alpha = CoverFlightState.targetAlpha(browseId) }
         .onGloballyPositioned { coordinates ->
