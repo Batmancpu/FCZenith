@@ -236,8 +236,15 @@ fun HomeScreen(
 ) {
     // Top Picks' pictures and motion wait for the feed — see LocalArtworkImages.
     val feedReady = state !is UiState.Loading
-    // A custom layout places Top Picks itself, among the other rows, once the feed is in.
-    val customHome = homeLayout.isCustom && state is UiState.Success
+    // A custom layout places Top Picks itself, among the other rows, once the feed
+    // is in. Until then it only goes above the feed when the layout puts it first;
+    // anywhere else it waits for its slot rather than jump there later.
+    val topPicksAboveFeed = if (homeLayout.isCustom) {
+        state !is UiState.Success &&
+            homeLayout.slots.firstOrNull { !it.hidden }?.key == HOME_SLOT_TOP_PICKS
+    } else {
+        true
+    }
     CompositionLocalProvider(
         LocalArtworkMotion provides (artworkMotion && feedReady),
         LocalArtworkImages provides feedReady,
@@ -280,7 +287,7 @@ fun HomeScreen(
                     )
                 }
             }
-            if (onTopPickClick != null && !customHome) {
+            if (onTopPickClick != null && topPicksAboveFeed) {
                 when {
                     !topPicks.isNullOrEmpty() -> item(key = "top-picks") {
                         TopPicksShelf(
@@ -332,6 +339,7 @@ fun HomeScreen(
                         firstIsHero = leadHero && !recentlyPlayedLoading,
                         onPlaySongs = onPlaySongs,
                         homeLayout = homeLayout,
+                        topPicksPending = onTopPickClick != null && topPicks == null && topPicksLoading,
                         topPicksItem = if (onTopPickClick != null && !topPicks.isNullOrEmpty()) {
                             {
                                 TopPicksShelf(
@@ -429,6 +437,8 @@ private fun androidx.compose.foundation.lazy.LazyListScope.itemsIndexedShelves(
     homeLayout: HomeLayout = HomeLayout(),
     /** The Top Picks row, when there is one to draw. Only placed by a custom [homeLayout]. */
     topPicksItem: (@Composable () -> Unit)? = null,
+    /** The row is still being built: a custom [homeLayout] holds its slot with a skeleton. */
+    topPicksPending: Boolean = false,
 ) {
     val ordered = shelves.withListenAgainFirst().withQuickPicksInListenAgainSlot().withOtherModelBelowListenAgain()
     // Find Your Mood sits right after Recents, so it never follows another
@@ -502,7 +512,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.itemsIndexedShelves(
         // The listener's own order: Top Picks, Find Your Mood and every shelf are
         // slots on one list. What the layout has not seen yet goes last.
         val entries = buildList<Pair<String, HomeShelf?>> {
-            if (topPicksItem != null) add(HOME_SLOT_TOP_PICKS to null)
+            if (topPicksItem != null || topPicksPending) add(HOME_SLOT_TOP_PICKS to null)
             if (onMoodClick != null) add(HOME_SLOT_MOODS to null)
             ordered.forEach { add(homeShelfKey(it.title) to it) }
         }
@@ -510,8 +520,10 @@ private fun androidx.compose.foundation.lazy.LazyListScope.itemsIndexedShelves(
         homeLayout.arrange(entries) { it.first }.forEach { (key, shelf) ->
             when {
                 shelf != null -> shelfItem(shelfIndex++, shelf)
-                key == HOME_SLOT_TOP_PICKS -> item(key = "top-picks") {
-                    if (topPicksItem != null) topPicksItem()
+                key == HOME_SLOT_TOP_PICKS -> if (topPicksItem != null) {
+                    item(key = "top-picks") { topPicksItem() }
+                } else {
+                    topPicksSkeleton()
                 }
                 else -> item(key = "find-your-mood") {
                     if (onMoodClick != null) FindYourMoodShelf(onMoodClick, onMoodsShowAll)
