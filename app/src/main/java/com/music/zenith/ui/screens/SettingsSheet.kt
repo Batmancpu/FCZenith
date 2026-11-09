@@ -491,7 +491,12 @@ fun SettingsScreen(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .verticalScroll(scrollState)
+            // A page that fits has nothing to scroll, so it takes no drag at all:
+            // otherwise the rubber band pulls it off its place for no reason.
+            .verticalScroll(
+                scrollState,
+                enabled = scrollState.canScrollForward || scrollState.canScrollBackward,
+            )
             .padding(contentPadding),
     ) {
         SettingsPageTitle(stringResource(section?.title ?: R.string.settings))
