@@ -1379,6 +1379,8 @@
     <string name="song_info_error">Some information could not be loaded.</string>
     <string name="song_info_retry">Retry</string>
     <!-- Settings: Zenith for Wear OS -->
+    <string name="footer_github">GitHub</string>
+    <string name="footer_developer">Developer</string>
     <string name="wear_os_section">Zenith for Wear OS</string>
     <string name="wear_os_page_title">Wear OS</string>
     <string name="wear_os_your_watches">Your watches</string>

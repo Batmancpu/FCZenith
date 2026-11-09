@@ -1404,6 +1404,8 @@
     <string name="onboarding_sign_in_google">Masuk dengan Google</string>
     <string name="onboarding_skip_sign_in">Lewati masuk</string>
     <string name="onboarding_back">Kembali</string>
+    <string name="footer_github">GitHub</string>
+    <string name="footer_developer">Pengembang</string>
     <string name="wear_os_section">Zenith untuk Wear OS</string>
     <string name="wear_os_page_title">Wear OS</string>
     <string name="wear_os_your_watches">Jam tangan Anda</string>

@@ -1964,48 +1964,39 @@ fun SettingsScreen(
                     .padding(top = 24.dp, bottom = 8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Text(
-                    text = "Zenith $version",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Text(
-                    text = "Made by Zeuxxi",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 2.dp),
-                )
-                Column(
-                    modifier = Modifier
-                        .padding(top = 16.dp)
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f)),
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    FooterLinkRow(
-                        icon = SfIcons.Person,
-                        title = "Developer",
-                        subtitle = "github.com/rezapranata089-bit",
-                        onClick = { context.openLink("https://github.com/rezapranata089-bit") },
+                    Text(
+                        text = "Zenith $version",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    HorizontalDivider(
-                        modifier = Modifier.padding(start = 52.dp),
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                    Text(
+                        text = stringResource(R.string.footer_github),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textDecoration = TextDecoration.Underline,
+                        modifier = Modifier.clickable {
+                            context.openLink("https://github.com/rezapranata089-bit/Zenith")
+                        },
                     )
-                    FooterLinkRow(
-                        icon = SfIcons.Star,
-                        title = "Star Zenith on GitHub",
-                        subtitle = "Source code · rezapranata089-bit/Zenith",
-                        onClick = { context.openLink("https://github.com/rezapranata089-bit/Zenith") },
+                    Text(
+                        text = stringResource(R.string.footer_developer),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textDecoration = TextDecoration.Underline,
+                        modifier = Modifier.clickable {
+                            context.openLink("https://github.com/rezapranata089-bit")
+                        },
                     )
                 }
                 Text(
-                    text = "Enjoying Zenith? A star on GitHub means a lot.",
-                    style = MaterialTheme.typography.labelSmall,
+                    text = "Made by Zeuxxi",
+                    style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(top = 12.dp),
+                    modifier = Modifier.padding(top = 2.dp),
                 )
             }
         }
