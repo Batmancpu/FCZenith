@@ -1663,6 +1663,18 @@ private fun ZenithApp(
         }
     }
 
+    // Music videos are never played as videos: whenever one becomes the current
+    // track it is swapped for its official audio release. Skipped inside a
+    // listening party (everyone there plays one cut), after an explicit Revert
+    // (keepVideoId), and when no audio version exists (missingVersions).
+    LaunchedEffect(player.song?.videoId, controller, partyState.inParty) {
+        val current = player.song ?: return@LaunchedEffect
+        if (controller == null || partyState.inParty) return@LaunchedEffect
+        if (!current.isVideo) return@LaunchedEffect
+        if (current.videoId == keepVideoId || current.videoId in missingVersions) return@LaunchedEffect
+        switchToMusicOnly(current, pauseWhileResolving = true)
+    }
+
     /**
      * A song picked on its own — off a home card or a search hit — starts a
      * station rather than queueing the list it was shown in. Searching
