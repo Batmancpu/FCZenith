@@ -16,6 +16,7 @@ import com.music.zenith.auth.AuthStore
 import com.music.zenith.data.canvas.SpotifyToken
 import com.music.zenith.data.lyrics.LyricsSource
 import com.music.zenith.data.model.HOME_SLOT_MOODS
+import com.music.zenith.data.model.homeShelfKey
 import com.music.zenith.data.model.HOME_SLOT_TOP_PICKS
 import com.music.zenith.data.model.HomeLayout
 import com.music.zenith.data.sources.SourceKind
@@ -1742,10 +1743,15 @@ object AppSettings {
         // Top Picks and Find Your Mood are hidden from the layout now: keep their
         // flags in step, since the feed and Home still read them. Resetting the
         // layout shows both again.
+        val recentsKey = homeShelfKey("Recents")
         if (!value.isCustom) {
             setHideHomeTopPicks(false)
             setHideHomeMoods(false)
+            setHideHomeRecents(false)
         } else {
+            if (value.slots.any { it.key == recentsKey }) {
+                setHideHomeRecents(value.isHidden(recentsKey))
+            }
             if (value.slots.any { it.key == HOME_SLOT_TOP_PICKS }) {
                 setHideHomeTopPicks(value.isHidden(HOME_SLOT_TOP_PICKS))
             }

@@ -307,7 +307,6 @@ fun SettingsScreen(
     val dontRepeatSuggestions by AppSettings.dontRepeatSuggestions.collectAsStateWithLifecycle()
     val smartVersionAlignment by AppSettings.smartVersionAlignment.collectAsStateWithLifecycle()
     val autoMusicOnly by AppSettings.autoMusicOnly.collectAsStateWithLifecycle()
-    val hideHomeRecents by AppSettings.hideHomeRecents.collectAsStateWithLifecycle()
     val hideHomeVideos by AppSettings.hideHomeVideos.collectAsStateWithLifecycle()
     val squareVideoCovers by AppSettings.squareVideoCovers.collectAsStateWithLifecycle()
     val filterNonMusicAudio by AppSettings.filterNonMusicAudio.collectAsStateWithLifecycle()
@@ -984,21 +983,6 @@ fun SettingsScreen(
                         )
                     },
                     onClick = { AppSettings.setAutoMusicOnly(!autoMusicOnly) },
-                )
-            }
-            val hideHomeRecentsTitle = stringResource(R.string.hide_home_recents)
-            row(hideHomeRecentsTitle, "recents", "recent", "history", "home", "feed") {
-                SettingsRow(
-                    icon = SfIcons.History,
-                    title = hideHomeRecentsTitle,
-                    subtitle = stringResource(R.string.hide_home_recents_subtitle),
-                    trailing = {
-                        IosSwitch(
-                            checked = hideHomeRecents,
-                            onCheckedChange = AppSettings::setHideHomeRecents,
-                        )
-                    },
-                    onClick = { AppSettings.setHideHomeRecents(!hideHomeRecents) },
                 )
             }
             val hideHomeVideosTitle = stringResource(R.string.hide_home_videos)

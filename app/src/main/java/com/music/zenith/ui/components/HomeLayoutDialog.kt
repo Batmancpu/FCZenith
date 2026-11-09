@@ -87,6 +87,8 @@ fun HomeLayoutDialog(
     // reads as hidden here.
     val topPicksHidden by AppSettings.hideHomeTopPicks.collectAsStateWithLifecycle()
     val moodsHidden by AppSettings.hideHomeMoods.collectAsStateWithLifecycle()
+    val recentsHidden by AppSettings.hideHomeRecents.collectAsStateWithLifecycle()
+    val recentsKey = remember { homeShelfKey("Recents") }
     // Home keeps the release row out of the feed only while Top Picks shows.
     val titles = remember(shelves, topPicksHidden) {
         homeFeedShelves(shelves, dropEditorial = !topPicksHidden)
@@ -102,11 +104,12 @@ fun HomeLayoutDialog(
         )
     }
     val order = remember(layout, defaults) { layout.arrange(defaults, dropHidden = false) { it } }
-    val hidden = remember(layout, order, topPicksHidden, moodsHidden) {
+    val hidden = remember(layout, order, topPicksHidden, moodsHidden, recentsHidden) {
         order.filter {
             layout.isHidden(it) ||
                 (it == HOME_SLOT_TOP_PICKS && topPicksHidden) ||
-                (it == HOME_SLOT_MOODS && moodsHidden)
+                (it == HOME_SLOT_MOODS && moodsHidden) ||
+                (it == recentsKey && recentsHidden)
         }.toSet()
     }
 

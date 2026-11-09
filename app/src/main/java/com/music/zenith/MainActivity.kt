@@ -5839,9 +5839,14 @@ private fun ZenithApp(
 
         if (showHomeLayout) {
             BackHandler { showHomeLayout = false }
+            // Recents stays in this list while it is hidden, so it can be shown again.
+            val layoutShelves = remember(homeState, hideHomeVideos) {
+                val loaded = (homeState as? UiState.Success)?.data.orEmpty()
+                if (hideHomeVideos) loaded.withoutVideos() else loaded
+            }
             HomeLayoutDialog(
                 hazeState = hazeState,
-                shelves = (visibleHomeState as? UiState.Success)?.data.orEmpty(),
+                shelves = layoutShelves,
                 onDismiss = { showHomeLayout = false },
             )
         }
