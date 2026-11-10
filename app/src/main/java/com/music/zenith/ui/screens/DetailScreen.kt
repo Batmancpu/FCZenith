@@ -3154,12 +3154,11 @@ private fun LikedFluidBackground(covers: List<String>, modifier: Modifier = Modi
     val top by androidx.compose.animation.animateColorAsState(tint[0], fade, label = "likedTop")
     val mid by androidx.compose.animation.animateColorAsState(tint[1], fade, label = "likedMid")
     val bottom by androidx.compose.animation.animateColorAsState(tint[2], fade, label = "likedBottom")
-    OrganicFluidBackground(
-        modifier = modifier,
-        colors = mixContrastPalette(
-            listOf(mid, top, bottom, top.lighter(0.5f), mid.lighter(0.35f)),
-        ),
-        animationSpeed = if (HeroMotion.frozen) 0f else 1.6f,
+    // Gradasi statis dari warna cover: tanpa shader, tanpa clock, tanpa redraw per frame.
+    Box(
+        modifier = modifier.drawBehind {
+            drawRect(Brush.verticalGradient(listOf(top, mid, bottom)))
+        },
     )
 }
 
