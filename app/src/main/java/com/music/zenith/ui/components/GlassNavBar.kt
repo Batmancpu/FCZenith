@@ -135,7 +135,7 @@ val selectedColor = if (isDarkGlass) {
 } else {
     MaterialTheme.colorScheme.primary
 }
-val unselectedColor = contentColor.copy(alpha = 0.72f)
+val unselectedColor = contentColor.copy(alpha = 0.88f)
 val haptics = rememberHaptics()
     // Goyangan jelly pill now playing, dibagikan ke tab dan Search di sebelahnya.
     val jellyPush = remember { JellyPush() }
