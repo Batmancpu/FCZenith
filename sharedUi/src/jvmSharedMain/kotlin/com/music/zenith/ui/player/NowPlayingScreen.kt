@@ -2488,7 +2488,10 @@ fun NowPlayingScreen(
                             // A clip decoding behind a player on its way to the
                             // bar is work nobody sees — see [dockMoving].
                             pausedForTransition = dockMoving || overlayOpen.value,
-                            presentationAlpha = { if (landscapeStillTakesOver()) 0f else 1f },
+                            // Sama seperti sleeve portrait: klip dipadamkan halus saat
+                            // mix/crossfade supaya dissolve cover di bawahnya terlihat,
+                            // lalu klip lagu baru menyala kembali.
+                            presentationAlpha = { if (landscapeStillTakesOver()) 0f else clipMixFade.value },
                             startPositionMs = landscapeStillStart?.positionMs ?: 0L,
                             revealInstantly = landscapeStillStart != null,
                             captureStill = dockMoving,
