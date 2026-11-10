@@ -2445,6 +2445,13 @@ fun NowPlayingScreen(
                 }
             }
 
+            // Frame klip yang ditahan, seperti di sleeve portrait: TextureView tidak
+            // andal digambar ke dalam layer yang terbang, jadi selama docking klip
+            // disembunyikan dan salinan frame-nya yang digambar.
+            val landscapeStillStart = remember(canvas?.url) { stillAtMount() }
+            fun landscapeStillTakesOver(): Boolean =
+                still() != null && CanvasStills.fresh && (dockMoving || !canvasRendered)
+
             Box(modifier = Modifier.fillMaxSize().then(dockHost)) {
                 LandscapePlayerLayout(
                     pane = when {
@@ -2469,6 +2476,12 @@ fun NowPlayingScreen(
                             // A clip decoding behind a player on its way to the
                             // bar is work nobody sees — see [dockMoving].
                             pausedForTransition = dockMoving || overlayOpen.value,
+                            presentationAlpha = { if (landscapeStillTakesOver()) 0f else 1f },
+                            startPositionMs = landscapeStillStart?.positionMs ?: 0L,
+                            revealInstantly = landscapeStillStart != null,
+                            captureStill = dockMoving,
+                            onStillCaptured = onStillCaptured,
+                            onResumed = onClipResumed,
                             sleeveShape = landscapeArtShape,
                             // Let go of on the way to the mini player, whose
                             // cover sits flat in its bar.
@@ -2525,6 +2538,20 @@ fun NowPlayingScreen(
                                     closeLyrics()
                                 },
                         ) {
+                            // Frame klip yang ditahan, digambar menggantikan klip selagi
+                            // sleeve terbang ke mini player.
+                            Box(
+                                Modifier
+                                    .matchParentSize()
+                                    .graphicsLayer {
+                                        shape = landscapeArtShape()
+                                        clip = true
+                                    }
+                                    .drawBehind {
+                                        val frame = if (landscapeStillTakesOver()) still()?.image else null
+                                        if (frame != null) drawCropped(frame)
+                                    },
+                            )
                             // The stats belong to the player, not to the sleeve, so
                             // they leave it along with the rest of the player.
                             SleeveNerdStats(
