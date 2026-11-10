@@ -13,6 +13,7 @@ import android.widget.Toast
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -152,6 +153,7 @@ import com.music.zenith.ui.components.isGlassSupported
 import com.music.zenith.ui.components.languageDisplayNameRes
 import com.music.zenith.ui.components.MessageState
 import com.music.zenith.ui.components.SearchField
+import com.music.zenith.ui.components.liquidGlassRim
 import com.music.zenith.ui.components.thumbnailBorder
 import com.music.zenith.ui.performance.resolvePerformanceRefreshRate
 import com.music.zenith.ui.performance.supportedPerformanceRefreshRates
@@ -511,6 +513,15 @@ fun SettingsScreen(
                 onSubmit = {},
                 placeholder = stringResource(R.string.settings_search_hint),
                 modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 4.dp),
+                // The recipe the playlist pills wear: a light fill, the glass rim
+                // the floating bars have, and a bright edge. Tinted from the
+                // theme's own text colour so it reads on a light page too.
+                chrome = Modifier
+                    .height(46.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f), CircleShape)
+                    .liquidGlassRim(CircleShape)
+                    .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f), CircleShape),
             )
 
             SearchableSettingsGroup(search, header = stringResource(R.string.settings_header_account)) {

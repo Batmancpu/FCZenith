@@ -68,6 +68,11 @@ fun SearchField(
     /** What the empty field says it is for — the one part that changes per screen. */
     placeholder: String = stringResource(Res.string.search_hint),
     modifier: Modifier = Modifier,
+    /**
+     * Replaces the field's own fill and height when set, for a host that dresses
+     * it its own way (the glass pill on Settings). It must set its own height.
+     */
+    chrome: Modifier? = null,
 ) {
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -91,7 +96,7 @@ fun SearchField(
                     Modifier.fillMaxHeight()
                 } else {
                     // Fixed height prevents the row from growing when text is entered
-                    Modifier
+                    chrome ?: Modifier
                         .height(46.dp)
                         .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(11.dp))
                 },
