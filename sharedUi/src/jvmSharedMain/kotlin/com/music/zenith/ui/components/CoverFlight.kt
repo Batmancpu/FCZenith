@@ -141,6 +141,9 @@ private class Flight(
     var footFade: Boolean = false
     var canvas: CanvasArtwork? = null
 
+    /** Where the destination was last seen, so a card that scrolls away mid-flight does not send the cover elsewhere. */
+    var lastDestination: Rect? = null
+
     /** The frame the clip was showing when the cover took off: it flies instead of the still. */
     var frame: ImageBitmap? = null
 
@@ -239,12 +242,17 @@ private object CoverFlightState {
         else -> 0f
     }
 
-    fun destination(f: Flight): Rect? =
-        if (f.reverse) {
+    fun destination(f: Flight): Rect? {
+        val live = if (f.reverse) {
             f.token?.let { sources[it]?.bounds }?.takeIf { !it.isEmpty }
         } else {
             target
         }
+        // The card can leave composition while the page behind it scrolls; keep
+        // heading for where it was last seen instead of jumping to a stale rect.
+        if (live != null) f.lastDestination = live
+        return live ?: f.lastDestination
+    }
 
     /** Finds the card the page was opened from (the new one, after a back), if it is on screen. */
     fun resolveReturn(f: Flight): Boolean {
@@ -667,6 +675,11 @@ private fun FlightLayer(flight: Flight) {
                         val now = withFrameNanos { it }
                         val dt = (now - last) / 1_000_000_000f
                         last = now
+                        // The card it was heading for scrolled out of composition:
+                        // pick up another on screen for the same page, if there is one.
+                        if (flight.reverse && flight.token?.let { CoverFlightState.sources[it] } == null) {
+                            CoverFlightState.resolveReturn(flight)
+                        }
                         val live = CoverFlightState.destination(flight) ?: continue
                         current = lerpRect(current, live, 1f - exp(-CHASE_RATE * dt))
                         chase.value = current
@@ -693,8 +706,9 @@ private fun FlightLayer(flight: Flight) {
                 // lenyap seketika dan sleeve yang belum tergambar terlihat berkedip.
                 CoverFlightState.holding = true
                 fade.animateTo(0f, tween(durationMillis = LAND_DISSOLVE_MS))
-            } else if (flight.frame != null) {
+            } else if (flight.frame != null || flight.token?.let { CoverFlightState.sources[it] } == null) {
                 // Back on the card with the page's frame: it dissolves into the card's own picture.
+                // Also when the card is gone (scrolled away): fade out instead of vanishing mid-air.
                 fade.animateTo(0f, tween(durationMillis = CLIP_DISSOLVE_MS))
             }
         }
