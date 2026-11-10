@@ -4279,8 +4279,9 @@ private fun ZenithApp(
                             }
                             // Not on a release page, whose pill already carries
                             // three of its own controls — Apple Music leaves the
-                            // profile off its album pages too.
-                            if (!isReleaseDetail) TopBarAccountButton(
+                            // profile off its album pages too. Nor on Listen
+                            // together, where the pill is the server's round trip.
+                            if (!isReleaseDetail && route != AppRoute.ListenTogether) TopBarAccountButton(
                                 // Offline the account request fails and `account` stays null;
                                 // the profile saved on the device (what the popup reads) stands in.
                                 account = account ?: googleAccounts
