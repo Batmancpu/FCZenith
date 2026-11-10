@@ -30,9 +30,6 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
-          # Optional repo-scoped PAT enables upstream workflow-file sync.
-          # The ordinary GITHUB_TOKEN remains the fallback.
-          token: ${{ secrets.FCZENITH_PUSH_TOKEN || github.token }}
 
       - name: Configure git identity
         run: |
@@ -69,6 +66,14 @@ jobs:
 
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Preserve FCZenith-owned GitHub Actions workflows
+        run: |
+          set -euo pipefail
+          # The app source follows upstream stable tags, but CI/CD ownership
+          # stays with FCZenith. Do not import upstream workflow files.
+          git rm -r --ignore-unmatch .github/workflows
+          git checkout HEAD -- .github/workflows
 
       - name: Decide whether a release is needed
         id: decision
