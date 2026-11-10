@@ -3385,7 +3385,7 @@ fun NowPlayingScreen(
                         // theirs. Sizing it off the width alone is what pushed the
                         // credits down across the scrubber on anything but a phone.
                         val wantArt = minOf(
-                            if (heroMode) maxWidth + 48.dp else maxWidth,
+                            if (heroMode) maxWidth + 48.dp else maxWidth + 16.dp,
                             roomy - ART_TITLE_GAP - HEADER_HEIGHT,
                         )
                         // Held to what the box has actually got, for the single frame it
