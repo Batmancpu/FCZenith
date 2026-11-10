@@ -1,5 +1,6 @@
 package com.music.zenith.ui.icons
 
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.SolidColor
@@ -9,6 +10,13 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.unit.dp
+
+/**
+ * The share glyph every share button draws. [ZenithIcons.Share] by default; the
+ * app provides its SF Symbol one, so screens in this module and the app's own
+ * screens show the same Apple Music style glyph.
+ */
+val LocalShareIcon = staticCompositionLocalOf { ZenithIcons.Share }
 
 /**
  * Thick-stroke, round-capped icons in the spirit of Telegram's modern icon set.
@@ -21,6 +29,40 @@ object ZenithIcons {
 
     private const val STROKE = 2.2f
     private val stroke = SolidColor(Color.Black)
+
+    /**
+     * Apple Music's share glyph (SF Symbol "square.and.arrow.up"): an open-topped
+     * box with an arrow rising out of it. Read through [LocalShareIcon].
+     */
+    val Share: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "bc_share", defaultWidth = 24.dp, defaultHeight = 24.dp,
+            viewportWidth = 24f, viewportHeight = 24f,
+        ).apply {
+            path(
+                stroke = stroke, strokeLineWidth = STROKE,
+                strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round,
+            ) {
+                // The box, open where the arrow leaves it.
+                moveTo(8.5f, 9f)
+                lineTo(7f, 9f)
+                quadTo(4.5f, 9f, 4.5f, 11.5f)
+                lineTo(4.5f, 18.5f)
+                quadTo(4.5f, 21f, 7f, 21f)
+                lineTo(17f, 21f)
+                quadTo(19.5f, 21f, 19.5f, 18.5f)
+                lineTo(19.5f, 11.5f)
+                quadTo(19.5f, 9f, 17f, 9f)
+                lineTo(15.5f, 9f)
+                // The arrow: shaft, then head.
+                moveTo(12f, 14.5f)
+                lineTo(12f, 3.5f)
+                moveTo(8.4f, 7f)
+                lineTo(12f, 3.4f)
+                lineTo(15.6f, 7f)
+            }
+        }.build()
+    }
 
     /** Compact list and quotation-bubble shapes used by the player controls. */
     val Queue: ImageVector by lazy {

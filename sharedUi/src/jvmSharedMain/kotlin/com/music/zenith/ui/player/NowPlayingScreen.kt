@@ -67,7 +67,7 @@ import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.material.icons.rounded.FastForward
 import androidx.compose.material.icons.rounded.FastRewind
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.IosShare
+import com.music.zenith.ui.icons.LocalShareIcon
 import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -4679,7 +4679,7 @@ Spacer(Modifier.width(12.dp))
                                 icon = when {
                                     showRevertCue -> Icons.AutoMirrored.Rounded.Undo
                                     lyricsShareGlyphVisible && lyricPicker.picking -> Icons.Rounded.Close
-                                    lyricsShareGlyphVisible -> Icons.Rounded.IosShare
+                                    lyricsShareGlyphVisible -> LocalShareIcon.current
                                     else -> Icons.Rounded.MoreHoriz
                                 },
                                 contentDescription = stringResource(

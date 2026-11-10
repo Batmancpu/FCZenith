@@ -65,7 +65,7 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.History
-import androidx.compose.material.icons.rounded.IosShare
+import com.music.zenith.ui.icons.SfIcons
 import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.Sort
 import androidx.compose.material.icons.rounded.Upgrade
@@ -297,6 +297,7 @@ import com.music.zenith.ui.components.ServerEditorHost
 import com.music.zenith.ui.components.UpdateAvailableDialog
 import com.music.zenith.ui.components.WebDavConflictAlert
 import com.music.zenith.ui.components.FieldConfig
+import com.music.zenith.ui.icons.LocalShareIcon
 import com.music.zenith.ui.icons.ZenithIcons
 import androidx.media3.common.Player
 import com.music.zenith.data.YtMusicRepository
@@ -431,6 +432,7 @@ class MainActivity : AppCompatActivity() {
                     LocalOverscrollFactory provides iosOverscrollFactory,
                     LocalLiquidGlassEnabled provides liquidGlassEnabled,
                     LocalSegmentedControlStyle provides AppSegmentedControlStyle,
+                    LocalShareIcon provides SfIcons.Share,
                     LocalMostPlayedArt provides { covers, motion, modifier ->
                         MostPlayedArt(covers, motion, modifier)
                     },
@@ -4268,7 +4270,7 @@ private fun ZenithApp(
                                     },
                                 ) {
                                     Icon(
-                                        Icons.Rounded.IosShare,
+                                        SfIcons.Share,
                                         contentDescription = stringResource(R.string.share),
                                         tint = MaterialTheme.colorScheme.onSurface,
                                     )

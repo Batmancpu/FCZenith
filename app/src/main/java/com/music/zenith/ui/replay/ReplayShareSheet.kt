@@ -30,7 +30,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Download
-import androidx.compose.material.icons.rounded.IosShare
+import com.music.zenith.ui.icons.SfIcons
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -180,7 +180,7 @@ fun ReplayShareSheet(
             }
             ShareAction(
                 label = stringResource(R.string.share),
-                icon = Icons.Rounded.IosShare,
+                icon = SfIcons.Share,
                 accent = true,
                 enabled = ready,
                 modifier = Modifier.weight(1f),

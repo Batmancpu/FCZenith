@@ -28,7 +28,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.IosShare
+import com.music.zenith.ui.icons.SfIcons
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -250,7 +250,7 @@ fun ReplayScreen(
                     item("habits") { Habits(summary, dark) }
                     item("share") {
                         ReplayActionRow(
-                            Icons.Rounded.IosShare,
+                            SfIcons.Share,
                             stringResource(R.string.share_my_replay),
                             dark,
                             onShare,
