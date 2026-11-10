@@ -5727,7 +5727,7 @@ private fun ZenithApp(
             )
         }
 
-        if (songSortMenuOpen) {
+        PopMenuHost(songSortMenuOpen) {
             BackHandler { songSortMenuOpen = false }
             FrostedSortMenu(
                 hazeState = hazeState,
@@ -5754,7 +5754,7 @@ private fun ZenithApp(
             )
         }
 
-        if (librarySortMenuOpen) {
+        PopMenuHost(librarySortMenuOpen) {
             BackHandler { librarySortMenuOpen = false }
             FrostedMenuPanel(hazeState = hazeState, onDismiss = { librarySortMenuOpen = false }) {
                 LibrarySort.entries.forEach { option ->
@@ -5771,7 +5771,8 @@ private fun ZenithApp(
         }
 
         val menuFolder = detail?.browseId?.takeIf { it.isDeviceFolder() }
-        if (folderMenuOpen && menuFolder != null) {
+        PopMenuHost(folderMenuOpen && menuFolder != null) {
+            if (menuFolder == null) return@PopMenuHost
             BackHandler { folderMenuOpen = false }
             val downloadsFolder = menuFolder == "local:downloads"
             val viewType = folderViewTypeOf(menuFolder)
@@ -6360,6 +6361,37 @@ private fun FrostedFolderMenu(
     }
 }
 
+/** 0 to 1 as a menu pops in and back to 0 as it folds away; 1 where nothing animates it. */
+private val LocalMenuPop = androidx.compose.runtime.staticCompositionLocalOf<() -> Float> { { 1f } }
+
+/**
+ * Keeps a menu composed while it plays its way out. A bare `if (open) Menu()`
+ * removes it the instant the flag drops, so there is never a frame left to
+ * animate. The pop is a spring that overshoots a little on the way in and a
+ * short ease on the way out; the panel reads it through [LocalMenuPop] at draw
+ * time, so a frame of it is a redraw and not a recomposition.
+ */
+@Composable
+private fun PopMenuHost(visible: Boolean, content: @Composable () -> Unit) {
+    val progress = remember { androidx.compose.animation.core.Animatable(0f) }
+    var present by remember { mutableStateOf(visible) }
+    LaunchedEffect(visible) {
+        if (visible) {
+            present = true
+            progress.animateTo(
+                1f,
+                androidx.compose.animation.core.spring(dampingRatio = 0.62f, stiffness = 520f),
+            )
+        } else {
+            progress.animateTo(0f, tween(170))
+            present = false
+        }
+    }
+    if (present) {
+        CompositionLocalProvider(LocalMenuPop provides { progress.value }) { content() }
+    }
+}
+
 /** The scrim and frosted panel both top-bar menus are drawn on. */
 @OptIn(ExperimentalHazeMaterialsApi::class)
 @Composable
@@ -6371,19 +6403,36 @@ private fun FrostedMenuPanel(
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
     val shape = MaterialTheme.shapes.extraLarge
     val touch = rememberJellyMenuTouch()
+    val pop = LocalMenuPop.current
     Box(
         Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.scrim.copy(alpha = .48f))
             .clickable(onClick = onDismiss),
         contentAlignment = Alignment.TopEnd,
     ) {
+        // The scrim fades with the pop rather than cutting in and out.
+        Box(
+            Modifier
+                .matchParentSize()
+                .graphicsLayer { alpha = pop().coerceIn(0f, 1f) }
+                .background(MaterialTheme.colorScheme.scrim.copy(alpha = .48f)),
+        )
         Surface(
             color = Color.Transparent,
             contentColor = MaterialTheme.colorScheme.onSurface,
             shape = shape,
             modifier = Modifier
                 .padding(top = 56.dp, end = 20.dp)
+                // Pops out of the corner the button sits in and, on the way
+                // out, folds back into it.
+                .graphicsLayer {
+                    val p = pop()
+                    val s = 0.78f + 0.22f * p
+                    scaleX = s
+                    scaleY = s
+                    alpha = (p * 1.8f).coerceIn(0f, 1f)
+                    transformOrigin = androidx.compose.ui.graphics.TransformOrigin(1f, 0f)
+                }
                 .iosMenuJelly(touch, 1f, 0f)
                 .width(IntrinsicSize.Max)
                 .clip(shape)
