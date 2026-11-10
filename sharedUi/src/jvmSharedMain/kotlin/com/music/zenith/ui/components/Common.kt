@@ -590,9 +590,14 @@ private fun QueueSwipeBackground(swipeState: SwipeToDismissBoxState, armed: Bool
             )
             .padding(horizontal = PAGE_GUTTER),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
+        // One label, on the side the row is being pulled from: both at once
+        // showed as a doubled icon as soon as the reveal was wide enough.
+        horizontalArrangement = if (swipeState.dismissDirection == SwipeToDismissBoxValue.EndToStart) {
+            Arrangement.End
+        } else {
+            Arrangement.Start
+        },
     ) {
-        QueueSwipeLabel(playNext, swipeState, armed)
         QueueSwipeLabel(playNext, swipeState, armed)
     }
 }
