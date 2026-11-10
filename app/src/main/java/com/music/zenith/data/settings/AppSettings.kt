@@ -15,9 +15,14 @@ import com.music.zenith.BuildConfig
 import com.music.zenith.auth.AuthStore
 import com.music.zenith.data.canvas.SpotifyToken
 import com.music.zenith.data.lyrics.LyricsSource
+import com.music.zenith.data.model.HOME_SLOT_MOODS
+import com.music.zenith.data.model.homeShelfKey
+import com.music.zenith.data.model.HOME_SLOT_TOP_PICKS
+import com.music.zenith.data.model.HomeLayout
 import com.music.zenith.data.sources.SourceKind
 import com.music.zenith.playback.EqLayout
 import com.music.zenith.playback.EqualizerPreset
+import com.music.zenith.ui.components.VideoThumbnails
 import kotlinx.coroutines.flow.MutableStateFlow
 
 
@@ -60,6 +65,48 @@ fun AudioQuality.permits(kind: SourceKind): Boolean = when (this) {
 enum class OutputPcmMode(val label: String) {
     PCM_16("16-bit PCM"),
     FLOAT_32("32-bit float"),
+}
+
+/**
+ * Seberapa jernih Liquid Glass sebagai posisi slider [level] 0..1:
+ * 0 = Clear, 0.5 = Balanced (tampilan bawaan), 1 = Frosted. Posisi di antaranya
+ * diinterpolasi linear antar titik. [tintAlpha] adalah lapisan warna di atas
+ * kaca, [blurScale] pengali radius blur. Lensa, highlight, dan shadow
+ * mengikuti [lensScale] saja.
+ */
+data class GlassClarity(val level: Float) {
+    private val t = level.coerceIn(0f, 1f)
+
+    private fun mix(clear: Float, balanced: Float, frosted: Float): Float =
+        if (t <= 0.5f) {
+            clear + (balanced - clear) * (t / 0.5f)
+        } else {
+            balanced + (frosted - balanced) * ((t - 0.5f) / 0.5f)
+        }
+
+    val tintAlpha: Float = mix(0.12f, 0.30f, 0.46f)
+    val blurScale: Float = mix(0.1f, 1f, 1.35f)
+    val saturation: Float = mix(1.4f, 1.5f, 1.5f)
+    val resolutionScale: Float = mix(0.75f, 0.33f, 0.33f)
+    val lensScale: Float = mix(0.6f, 1f, 1f)
+
+    // Refraksi tepi halus tanpa efek pelangi di sisi jernih.
+    val chromatic: Boolean = t >= 0.25f
+
+    companion object {
+        const val CLEAR_LEVEL = 0f
+        const val BALANCED_LEVEL = 0.5f
+        const val FROSTED_LEVEL = 1f
+
+        val BALANCED = GlassClarity(BALANCED_LEVEL)
+
+        /** Pilihan lama (enum) yang tersimpan sebagai nama, dipetakan ke posisi slider. */
+        fun levelForLegacyName(name: String?): Float = when (name) {
+            "CLEAR" -> CLEAR_LEVEL
+            "FROSTED" -> FROSTED_LEVEL
+            else -> BALANCED_LEVEL
+        }
+    }
 }
 
 /**
@@ -489,6 +536,9 @@ object AppSettings {
     /** Show a Listen Together tab in the bottom navigation bar, before Search. */
     val showListenTogetherTab = MutableStateFlow(true)
 
+    /** Search sebagai lingkaran terpisah di glass nav bar; mati = Search jadi tab keempat di dalam pil. */
+    val searchTabSeparate = MutableStateFlow(false)
+
     /** Freezes the main player's mesh gradient instead of letting it drift/crossfade. */
     val reduceAnimation = MutableStateFlow(false)
 
@@ -524,9 +574,6 @@ object AppSettings {
     /** Hides the volume slider on the main player, leaving the rest of the layout to reflow. */
     val hideVolumeBar = MutableStateFlow(false)
 
-    /** Plays a music video in place of the cover. Off keeps the still thumbnail everywhere. */
-    val showMusicVideo = MutableStateFlow(true)
-
     /** Hides the device status bar (clock, battery, notifications) while the main player is open. */
     val hideStatusBarInPlayer = MutableStateFlow(false)
 
@@ -544,6 +591,33 @@ object AppSettings {
     /** Analyzes audio waveform/envelope to align matching playback moment between versions. */
     val smartVersionAlignment = MutableStateFlow(true)
 
+    /** Music video diputar sebagai versi audionya — lihat [com.music.zenith.playback.MusicOnlyPlayback]. */
+    val autoMusicOnly = MutableStateFlow(false)
+
+    /** Removes the Recents row from Home. */
+    val hideHomeRecents = MutableStateFlow(false)
+
+    /** Replaces the Home logo and wordmark with a plain "Home" title. */
+    val hideHomeBranding = MutableStateFlow(false)
+
+    /** Removes music videos from Home, plus any row left with nothing else in it. */
+    val hideHomeVideos = MutableStateFlow(false)
+
+    /** Removes the Top Picks for You row from Home. */
+    val hideHomeTopPicks = MutableStateFlow(false)
+
+    /** Removes the mood row from Home. The Moods page in Explore stays. */
+    val hideHomeMoods = MutableStateFlow(false)
+
+    /** Shows every music video as a square, see [VideoThumbnails]. */
+    val squareVideoCovers = MutableStateFlow(false)
+
+    /** Never plays the music video in the player: a video track shows its cover instead. */
+    val stillVideoCovers = MutableStateFlow(false)
+
+    /** The listener's own order and hidden rows on Home. Empty keeps the built-in order. */
+    val homeLayout = MutableStateFlow(HomeLayout())
+
     /** Drops haze blur (status bar, mini player, bottom fade, lyrics focus) for a solid-fill look. */
     val reduceDynamicBlur = MutableStateFlow(false)
 
@@ -556,6 +630,9 @@ object AppSettings {
      * ringan di HP spek rendah. Hanya berlaku saat [liquidGlass] aktif.
      */
     val frostedGlass = MutableStateFlow(false)
+
+    /** Kejernihan Liquid Glass sebagai slider (Clear ... Balanced ... Frosted). Hanya berlaku saat [liquidGlass] aktif. */
+    val glassClarity = MutableStateFlow(GlassClarity.BALANCED)
 
     /**
      * Blurs what scrolls under the status bar and the top controls, easing out
@@ -752,6 +829,9 @@ object AppSettings {
 
     /** Empty means every MediaStore folder; otherwise this is a persisted SAF tree URI. */
     val localMusicFolderUri = MutableStateFlow("")
+
+    /** Empty means the default destination; otherwise a persisted SAF tree URI downloads are written into. */
+    val downloadFolderUri = MutableStateFlow("")
 
     // ── WebDAV ────────────────────────────────────────────────────────────
 
@@ -1054,7 +1134,8 @@ object AppSettings {
             .orEmpty()
         prefs.edit()
             .putInt(KEY_CROSSFADE, 10)
-            .putBoolean(KEY_SMART_FADE, capable)
+            // Selalu OFF di instalasi baru: model Automix belum ada dan baru diunduh saat saklar dinyalakan.
+            .putBoolean(KEY_SMART_FADE, false)
             .putString(KEY_AUTOMIX_PERFORMANCE_MODE, if (capable) "PERFORMANCE" else "BALANCED")
             .putBoolean(KEY_SKIP_SILENCE, true)
             .putString(KEY_OUTPUT_PCM_MODE, if (floatOk) "FLOAT_32" else "PCM_16")
@@ -1065,7 +1146,6 @@ object AppSettings {
             .putBoolean(KEY_EXPORT_DOWNLOADS, true)
             .putBoolean(KEY_STOP_ON_TASK_REMOVED, false)
             .putBoolean(KEY_HIDE_VOLUME_BAR, true)
-            .putBoolean(KEY_SHOW_MUSIC_VIDEO, false)
             .putBoolean(KEY_HIDE_SONG_STATUS, true)
             .putBoolean(KEY_SHOW_QUEUE_HISTORY, true)
             .putBoolean(KEY_SWIPE_TO_PLAY_NEXT, true)
@@ -1178,6 +1258,7 @@ object AppSettings {
         showNerdStats.value = prefs.getBoolean(KEY_NERD_STATS, false)
         showListenTogetherButton.value = prefs.getBoolean(KEY_LISTEN_TOGETHER_BUTTON, false)
         showListenTogetherTab.value = prefs.getBoolean(KEY_LISTEN_TOGETHER_TAB, true)
+        searchTabSeparate.value = prefs.getBoolean(KEY_SEARCH_TAB_SEPARATE, false)
         reduceAnimation.value = prefs.getBoolean(KEY_REDUCE_ANIMATION, false)
         coverSlideAnimation.value = prefs.getBoolean(KEY_COVER_SLIDE_ANIMATION, true)
         coverFluidAnimation.value = prefs.getBoolean(KEY_COVER_FLUID_ANIMATION, false)
@@ -1189,16 +1270,32 @@ object AppSettings {
         )
         stopOnTaskRemoved.value = prefs.getBoolean(KEY_STOP_ON_TASK_REMOVED, true)
         hideVolumeBar.value = prefs.getBoolean(KEY_HIDE_VOLUME_BAR, false)
-        showMusicVideo.value = prefs.getBoolean(KEY_SHOW_MUSIC_VIDEO, true)
         hideStatusBarInPlayer.value = prefs.getBoolean(KEY_HIDE_STATUS_BAR_IN_PLAYER, false)
         hideSongStatus.value = prefs.getBoolean(KEY_HIDE_SONG_STATUS, false)
         showQueueHistory.value = prefs.getBoolean(KEY_SHOW_QUEUE_HISTORY, false)
         swipeToPlayNext.value = prefs.getBoolean(KEY_SWIPE_TO_PLAY_NEXT, false)
         dontRepeatSuggestions.value = prefs.getBoolean(KEY_DONT_REPEAT_SUGGESTIONS, false)
         smartVersionAlignment.value = prefs.getBoolean(KEY_SMART_VERSION_ALIGNMENT, true)
+        autoMusicOnly.value = prefs.getBoolean(KEY_AUTO_MUSIC_ONLY, false)
+        hideHomeRecents.value = prefs.getBoolean(KEY_HIDE_HOME_RECENTS, false)
+        hideHomeBranding.value = prefs.getBoolean(KEY_HIDE_HOME_BRANDING, false)
+        hideHomeVideos.value = prefs.getBoolean(KEY_HIDE_HOME_VIDEOS, false)
+        hideHomeTopPicks.value = prefs.getBoolean(KEY_HIDE_HOME_TOP_PICKS, false)
+        hideHomeMoods.value = prefs.getBoolean(KEY_HIDE_HOME_MOODS, false)
+        squareVideoCovers.value = prefs.getBoolean(KEY_SQUARE_VIDEO_COVERS, false)
+        VideoThumbnails.square = squareVideoCovers.value
+        stillVideoCovers.value = prefs.getBoolean(KEY_STILL_VIDEO_COVERS, false)
+        homeLayout.value = HomeLayout.decode(prefs.getString(KEY_HOME_LAYOUT, null))
         reduceDynamicBlur.value = prefs.getBoolean(KEY_REDUCE_BLUR, false)
         liquidGlass.value = prefs.getBoolean(KEY_LIQUID_GLASS, false)
         frostedGlass.value = prefs.getBoolean(KEY_FROSTED_GLASS, false)
+        glassClarity.value = GlassClarity(
+            if (prefs.contains(KEY_GLASS_CLARITY_LEVEL)) {
+                prefs.getFloat(KEY_GLASS_CLARITY_LEVEL, GlassClarity.BALANCED_LEVEL)
+            } else {
+                GlassClarity.levelForLegacyName(prefs.getString(KEY_GLASS_CLARITY, null))
+            },
+        )
         progressiveBlur.value = prefs.getBoolean(KEY_PROGRESSIVE_BLUR, false)
         lyricsBlur.value = prefs.getBoolean(KEY_LYRICS_BLUR, true)
         liquidFlow.value = prefs.getBoolean(KEY_LIQUID_FLOW, true)
@@ -1259,6 +1356,7 @@ object AppSettings {
             ?: LibrarySort.DEFAULT
         detailSongSorts.value = readDetailSongSorts()
         localMusicFolderUri.value = prefs.getString(KEY_LOCAL_MUSIC_FOLDER_URI, "").orEmpty()
+        downloadFolderUri.value = prefs.getString(KEY_DOWNLOAD_FOLDER_URI, "").orEmpty()
         webdavUrl.value = prefs.getString(KEY_WEBDAV_URL, "").orEmpty()
         webdavUsername.value = prefs.getString(KEY_WEBDAV_USERNAME, "").orEmpty()
         webdavPassword.value = authStore.webdavPassword.orEmpty()
@@ -1588,6 +1686,11 @@ object AppSettings {
         prefs.edit().putBoolean(KEY_LISTEN_TOGETHER_TAB, value).apply()
     }
 
+    fun setSearchTabSeparate(value: Boolean) {
+        searchTabSeparate.value = value
+        prefs.edit().putBoolean(KEY_SEARCH_TAB_SEPARATE, value).apply()
+    }
+
     fun setShowListenTogetherButton(value: Boolean) {
         showListenTogetherButton.value = value
         prefs.edit().putBoolean(KEY_LISTEN_TOGETHER_BUTTON, value).apply()
@@ -1646,11 +1749,6 @@ object AppSettings {
         prefs.edit().putBoolean(KEY_HIDE_VOLUME_BAR, value).apply()
     }
 
-    fun setShowMusicVideo(value: Boolean) {
-        showMusicVideo.value = value
-        prefs.edit().putBoolean(KEY_SHOW_MUSIC_VIDEO, value).apply()
-    }
-
     fun setHideStatusBarInPlayer(value: Boolean) {
         hideStatusBarInPlayer.value = value
         prefs.edit().putBoolean(KEY_HIDE_STATUS_BAR_IN_PLAYER, value).apply()
@@ -1681,6 +1779,71 @@ object AppSettings {
         prefs.edit().putBoolean(KEY_SMART_VERSION_ALIGNMENT, value).apply()
     }
 
+    fun setAutoMusicOnly(value: Boolean) {
+        autoMusicOnly.value = value
+        prefs.edit().putBoolean(KEY_AUTO_MUSIC_ONLY, value).apply()
+    }
+
+    fun setHideHomeRecents(value: Boolean) {
+        hideHomeRecents.value = value
+        prefs.edit().putBoolean(KEY_HIDE_HOME_RECENTS, value).apply()
+    }
+
+    fun setHideHomeBranding(value: Boolean) {
+        hideHomeBranding.value = value
+        prefs.edit().putBoolean(KEY_HIDE_HOME_BRANDING, value).apply()
+    }
+
+    fun setHideHomeVideos(value: Boolean) {
+        hideHomeVideos.value = value
+        prefs.edit().putBoolean(KEY_HIDE_HOME_VIDEOS, value).apply()
+    }
+
+    fun setHideHomeTopPicks(value: Boolean) {
+        hideHomeTopPicks.value = value
+        prefs.edit().putBoolean(KEY_HIDE_HOME_TOP_PICKS, value).apply()
+    }
+
+    fun setHideHomeMoods(value: Boolean) {
+        hideHomeMoods.value = value
+        prefs.edit().putBoolean(KEY_HIDE_HOME_MOODS, value).apply()
+    }
+
+    fun setSquareVideoCovers(value: Boolean) {
+        squareVideoCovers.value = value
+        VideoThumbnails.square = value
+        prefs.edit().putBoolean(KEY_SQUARE_VIDEO_COVERS, value).apply()
+    }
+
+    fun setStillVideoCovers(value: Boolean) {
+        stillVideoCovers.value = value
+        prefs.edit().putBoolean(KEY_STILL_VIDEO_COVERS, value).apply()
+    }
+
+    fun setHomeLayout(value: HomeLayout) {
+        homeLayout.value = value
+        prefs.edit().putString(KEY_HOME_LAYOUT, value.encode()).apply()
+        // Top Picks and Find Your Mood are hidden from the layout now: keep their
+        // flags in step, since the feed and Home still read them. Resetting the
+        // layout shows both again.
+        val recentsKey = homeShelfKey("Recents")
+        if (!value.isCustom) {
+            setHideHomeTopPicks(false)
+            setHideHomeMoods(false)
+            setHideHomeRecents(false)
+        } else {
+            if (value.slots.any { it.key == recentsKey }) {
+                setHideHomeRecents(value.isHidden(recentsKey))
+            }
+            if (value.slots.any { it.key == HOME_SLOT_TOP_PICKS }) {
+                setHideHomeTopPicks(value.isHidden(HOME_SLOT_TOP_PICKS))
+            }
+            if (value.slots.any { it.key == HOME_SLOT_MOODS }) {
+                setHideHomeMoods(value.isHidden(HOME_SLOT_MOODS))
+            }
+        }
+    }
+
     fun setReduceDynamicBlur(value: Boolean) {
         reduceDynamicBlur.value = value
         if (value) highPerformanceMode.value = false
@@ -1697,6 +1860,12 @@ object AppSettings {
     fun setFrostedGlass(value: Boolean) {
         frostedGlass.value = value
         prefs.edit().putBoolean(KEY_FROSTED_GLASS, value).apply()
+    }
+
+    fun setGlassClarity(level: Float) {
+        val clamped = level.coerceIn(0f, 1f)
+        glassClarity.value = GlassClarity(clamped)
+        prefs.edit().putFloat(KEY_GLASS_CLARITY_LEVEL, clamped).apply()
     }
 
     fun setProgressiveBlur(value: Boolean) {
@@ -2194,6 +2363,11 @@ object AppSettings {
         prefs.edit().putString(KEY_LOCAL_MUSIC_FOLDER_URI, value).apply()
     }
 
+    fun setDownloadFolderUri(value: String) {
+        downloadFolderUri.value = value
+        prefs.edit().putString(KEY_DOWNLOAD_FOLDER_URI, value).apply()
+    }
+
     fun setWebDavUrl(value: String) {
         val normalized = value.trim().trimEnd('/')
         webdavUrl.value = normalized
@@ -2419,6 +2593,7 @@ object AppSettings {
         "downloaded_tracks_metadata",
         "downloaded_collections",
         KEY_LOCAL_MUSIC_FOLDER_URI,
+        KEY_DOWNLOAD_FOLDER_URI,
         KEY_LAST_VERSION_CODE,
         KEY_ONBOARDING_COMPLETE,
     )
@@ -2488,6 +2663,7 @@ object AppSettings {
     private const val KEY_NERD_STATS = "show_nerd_stats"
     private const val KEY_LISTEN_TOGETHER_BUTTON = "show_listen_together_button"
     private const val KEY_LISTEN_TOGETHER_TAB = "show_listen_together_tab"
+    private const val KEY_SEARCH_TAB_SEPARATE = "search_tab_separate"
     private const val KEY_CACHE_LIMIT = "audio_cache_limit_bytes"
     private const val KEY_CANVAS_CACHE_LIMIT = "canvas_cache_limit_bytes"
     private const val KEY_REDUCE_ANIMATION = "reduce_animation"
@@ -2499,16 +2675,26 @@ object AppSettings {
     private const val KEY_PERFORMANCE_REFRESH_RATE = "performance_refresh_rate"
     private const val KEY_STOP_ON_TASK_REMOVED = "stop_on_task_removed"
     private const val KEY_HIDE_VOLUME_BAR = "hide_volume_bar"
-    private const val KEY_SHOW_MUSIC_VIDEO = "show_music_video"
     private const val KEY_HIDE_STATUS_BAR_IN_PLAYER = "hide_status_bar_in_player"
     private const val KEY_HIDE_SONG_STATUS = "hide_song_status"
     private const val KEY_SHOW_QUEUE_HISTORY = "show_queue_history"
     private const val KEY_SWIPE_TO_PLAY_NEXT = "swipe_to_play_next"
     private const val KEY_DONT_REPEAT_SUGGESTIONS = "dont_repeat_suggestions"
     private const val KEY_SMART_VERSION_ALIGNMENT = "smart_version_alignment"
+    private const val KEY_AUTO_MUSIC_ONLY = "auto_music_only"
+    private const val KEY_HIDE_HOME_RECENTS = "hide_home_recents"
+    private const val KEY_HIDE_HOME_BRANDING = "hide_home_branding"
+    private const val KEY_HIDE_HOME_VIDEOS = "hide_home_videos"
+    private const val KEY_HIDE_HOME_TOP_PICKS = "hide_home_top_picks"
+    private const val KEY_HIDE_HOME_MOODS = "hide_home_moods"
+    private const val KEY_SQUARE_VIDEO_COVERS = "square_video_covers"
+    private const val KEY_STILL_VIDEO_COVERS = "still_video_covers"
+    private const val KEY_HOME_LAYOUT = "home_layout"
     private const val KEY_REDUCE_BLUR = "reduce_dynamic_blur"
     private const val KEY_LIQUID_GLASS = "liquid_glass"
     private const val KEY_FROSTED_GLASS = "frosted_glass"
+    private const val KEY_GLASS_CLARITY = "glass_clarity"
+    private const val KEY_GLASS_CLARITY_LEVEL = "glass_clarity_level"
     private const val KEY_PROGRESSIVE_BLUR = "progressive_blur"
     private const val KEY_LYRICS_BLUR = "lyrics_blur"
     private const val KEY_LIQUID_FLOW = "liquid_flow_motion"
@@ -2541,6 +2727,7 @@ object AppSettings {
     private const val KEY_LOCAL_MUSIC_VIEW_TYPE = "local_music_view_type"
     private const val KEY_DOWNLOADED_MUSIC_VIEW_TYPE = "downloaded_music_view_type"
     private const val KEY_LOCAL_MUSIC_FOLDER_URI = "local_music_folder_uri"
+    private const val KEY_DOWNLOAD_FOLDER_URI = "download_folder_uri"
     private const val KEY_WEBDAV_URL = "webdav_url"
     private const val KEY_WEBDAV_USERNAME = "webdav_username"
     private const val KEY_SMB_HOST = "smb_host"

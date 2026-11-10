@@ -28,6 +28,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.GraphicsLayerScope
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.layout
@@ -35,7 +36,13 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalDensity
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.music.zenith.data.settings.AppSettings
 import com.music.zenith.ui.components.LocalAppBackdrop
+import com.music.zenith.ui.components.isGlassSupported
+import com.music.zenith.ui.components.backdrop.effects.blur
+import com.music.zenith.ui.components.backdrop.effects.colorControls
 import com.music.zenith.ui.components.backdrop.Backdrop
 import com.music.zenith.ui.components.backdrop.backdrops.LayerBackdrop
 import com.music.zenith.ui.components.backdrop.drawBackdrop
@@ -108,6 +115,14 @@ internal class GlassPillMotion(
         private set
 
     /**
+     * How much of the frosted blur is back, `0` while a finger holds the pill
+     * (or a tap carries it) to `1` at rest. It comes back on its own fast
+     * spring from the moment of release, not from the landing.
+     */
+    var blurMix by mutableFloatStateOf(1f)
+        private set
+
+    /**
      * True when there is nothing left in the pill but a flat fill at rest size,
      * where the plain pill draws exactly the same picture.
      */
@@ -145,6 +160,8 @@ internal class GlassPillMotion(
     private var travelSign = 0.0
     private var travelSignEased = 0.0
     private var handover = 1.0
+    private var blur = 1.0
+    private var releasedFromDrag = false
     private var squash = 0.0
     private val squashModel = PillSquashModel()
 
@@ -158,6 +175,7 @@ internal class GlassPillMotion(
             return
         }
         index = next
+        releasedFromDrag = false
         travelActive = true
         lifted = true
         // Retarget from wherever the pill is; the spring keeps its velocity.
@@ -182,6 +200,8 @@ internal class GlassPillMotion(
         liftYPos = 0.0; liftYVel = 0.0
         liftPos = 0.0; liftVel = 0.0
         handover = 1.0
+        blur = 1.0
+        releasedFromDrag = false
         squash = 0.0
         squashModel.stop()
         travelSign = 0.0
@@ -193,6 +213,7 @@ internal class GlassPillMotion(
     /** A finger has picked the pill up where it stands. */
     fun startDrag() {
         dragging = true
+        releasedFromDrag = false
         travelActive = false
         lifted = !reduceMotion
         // The hand takes the deformation back off the travel.
@@ -217,6 +238,7 @@ internal class GlassPillMotion(
         if (!dragging) return
         val from = dragFollow
         dragging = false
+        releasedFromDrag = true
         index = next
         if (reduceMotion) {
             snapTo(next)
@@ -317,8 +339,15 @@ internal class GlassPillMotion(
         handover += (handoverTarget - handover) * (1 - exp(-dt / tau))
         if (abs(handoverTarget - handover) < 0.002) handover = handoverTarget
 
+        // 7) The frosted blur: off while held, back the instant a finger lets
+        // go (a tap's blur returns when its lift is released on landing).
+        val blurTarget = if (dragging || (lifted && !releasedFromDrag)) 0.0 else 1.0
+        val blurTau = if (blurTarget > blur) BLUR_RETURN_TAU else BLUR_OFF_TAU
+        blur += (blurTarget - blur) * (1 - exp(-dt / blurTau))
+        if (abs(blurTarget - blur) < 0.002) blur = blurTarget
+
         val settled = !travelActive && !dragging && liftSettled &&
-            abs(squash) < 0.0005 && handover >= 1.0
+            abs(squash) < 0.0005 && handover >= 1.0 && blur >= 1.0
         if (settled) {
             squashModel.stop()
             squash = 0.0
@@ -337,6 +366,7 @@ internal class GlassPillMotion(
         material = liftPos.coerceIn(0.0, 1.0).toFloat()
         deviation = squash.toFloat()
         glassPresence = (1 - handover).coerceIn(0.0, 1.0).toFloat()
+        blurMix = blur.coerceIn(0.0, 1.0).toFloat()
     }
 
     private fun travelProgress(): Double {
@@ -346,6 +376,20 @@ internal class GlassPillMotion(
     }
 
     private fun signOfTravel(span: Double): Double = if (abs(span) < 1e-6) 0.0 else sign(span)
+
+    /**
+     * [liveSize] for the flat pill, which is drawn inside the bar's clip: it
+     * never exceeds the resting width or height, so a lifted pill cannot be
+     * cut off at the top, bottom, or at the first and last tab while the blur
+     * fades back in.
+     */
+    fun flatSize(rest: Size, lifted: Size): Size {
+        val s = liveSize(rest, lifted)
+        return Size(
+            s.width.coerceAtMost(rest.width),
+            s.height.coerceAtMost(rest.height),
+        )
+    }
 
     /** The size the pill is drawn at this frame, between [rest] and [lifted]. */
     fun liveSize(rest: Size, lifted: Size): Size {
@@ -372,6 +416,10 @@ internal class GlassPillMotion(
         const val GLASS_RETURN_TAU = 0.05
         const val FOLLOW_TAU = 0.05
         const val SIGN_TAU = 0.25
+
+        /** Fast and soft: the blur is back in about a tenth of a second. */
+        const val BLUR_RETURN_TAU = 0.06
+        const val BLUR_OFF_TAU = 0.04
 
         /** Semi-implicit Euler in 1/240 s substeps, so a long frame cannot blow it up. */
         fun springStep(
@@ -500,9 +548,60 @@ internal fun Modifier.pillPlacement(center: () -> Offset, size: () -> Size): Mod
 internal fun FlatSelectionPill(
     color: Color,
     modifier: Modifier,
+    barGlass: LayerBackdrop? = null,
 ) {
     val shape = remember { RoundedCornerShape(percent = 50) }
-    Box(modifier.background(color, shape))
+    val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
+    if (reduceDynamicBlur || !isGlassSupported()) {
+        Box(modifier.background(color, shape))
+        return
+    }
+    val page = LocalAppBackdrop.current
+    val blurPx = with(LocalDensity.current) { INDICATOR_BLUR.toPx() }
+    val backdrop = remember(page, barGlass) { PageAndBarBackdrop(page, barGlass) }
+    // Frosted: halaman dan kaca bar di bawah indikator di-blur, lalu diberi
+    // warna fill indikator di atasnya. Tab digambar di atas pill ini, jadi
+    // ikon dan labelnya tetap tajam.
+    Box(
+        modifier.drawBackdrop(
+            backdrop = backdrop,
+            shape = { shape },
+            effects = {
+                colorControls(brightness = INDICATOR_BRIGHTNESS, saturation = INDICATOR_SATURATION)
+                blur(blurPx)
+            },
+            highlight = null,
+            shadow = null,
+            onDrawSurface = { drawRect(color = color, size = size) },
+        ),
+    )
+}
+
+/** Blur radius of the resting selection indicator. */
+private val INDICATOR_BLUR = 10.dp
+
+/** Saturation of the page and bar glass seen through the resting indicator. */
+private const val INDICATOR_SATURATION = 2.4f
+
+/** A small lift so the blurred backdrop under the indicator reads brighter than the bar. */
+private const val INDICATOR_BRIGHTNESS = 0.05f
+
+/** What the resting indicator blurs: the page, then the bar's own glass over it. */
+private class PageAndBarBackdrop(
+    private val page: Backdrop,
+    private val bar: Backdrop?,
+) : Backdrop {
+
+    override val isCoordinatesDependent: Boolean = true
+
+    override fun DrawScope.drawBackdrop(
+        density: Density,
+        coordinates: LayoutCoordinates?,
+        layerBlock: (GraphicsLayerScope.() -> Unit)?,
+    ) {
+        with(page) { drawBackdrop(density, coordinates, layerBlock) }
+        bar?.let { with(it) { drawBackdrop(density, coordinates, layerBlock) } }
+    }
 }
 
 /**
@@ -531,7 +630,8 @@ internal fun GlassSelectionPill(
         }
     }
     Box(
-        modifier.drawBackdrop(
+        // Cross-fades into the blurred flat pill underneath as the blur returns.
+        modifier.graphicsLayer { alpha = 1f - motion.blurMix }.drawBackdrop(
             backdrop = backdrop,
             shape = { shape },
             effects = {

@@ -13,6 +13,7 @@ import android.widget.Toast
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -152,6 +153,7 @@ import com.music.zenith.ui.components.isGlassSupported
 import com.music.zenith.ui.components.languageDisplayNameRes
 import com.music.zenith.ui.components.MessageState
 import com.music.zenith.ui.components.SearchField
+import com.music.zenith.ui.components.liquidGlassRim
 import com.music.zenith.ui.components.thumbnailBorder
 import com.music.zenith.ui.performance.resolvePerformanceRefreshRate
 import com.music.zenith.ui.performance.supportedPerformanceRefreshRates
@@ -162,6 +164,7 @@ import com.music.zenith.data.scrobbling.LastFM
 import com.music.zenith.data.listentogether.ListenTogether
 import com.music.zenith.data.settings.AppSettings
 import com.music.zenith.data.settings.OutputPcmMode
+import com.music.zenith.data.settings.GlassClarity
 import com.music.zenith.data.settings.BitPerfectMode
 import com.music.zenith.playback.AudioOutputStatus
 import com.music.zenith.playback.audio.bitperfect.BitPerfectOutput
@@ -183,6 +186,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.isActive
+import com.music.zenith.playback.smart.AutomixModels
 import kotlin.math.roundToInt
 import java.util.Locale
 
@@ -231,6 +237,8 @@ fun SettingsScreen(
     onOpenSection: (SettingsCategory) -> Unit = {},
     /** Opens a choice with more options than its row can show, as a page. */
     onOpenChoice: (SettingsChoiceKind) -> Unit = {},
+    /** Opens the dialog that orders and hides Home's rows. */
+    onCustomizeHome: () -> Unit = {},
 ) {
     val context = LocalContext.current
 
@@ -252,12 +260,14 @@ fun SettingsScreen(
     val nerdStats by AppSettings.showNerdStats.collectAsStateWithLifecycle()
     val listenTogetherButton by AppSettings.showListenTogetherButton.collectAsStateWithLifecycle()
     val listenTogetherTab by AppSettings.showListenTogetherTab.collectAsStateWithLifecycle()
+    val searchTabSeparate by AppSettings.searchTabSeparate.collectAsStateWithLifecycle()
     val reduceAnimation by AppSettings.reduceAnimation.collectAsStateWithLifecycle()
     val coverSlideAnimation by AppSettings.coverSlideAnimation.collectAsStateWithLifecycle()
     val coverFluidAnimation by AppSettings.coverFluidAnimation.collectAsStateWithLifecycle()
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
     val liquidGlass by AppSettings.liquidGlass.collectAsStateWithLifecycle()
     val frostedGlass by AppSettings.frostedGlass.collectAsStateWithLifecycle()
+    val glassClarity by AppSettings.glassClarity.collectAsStateWithLifecycle()
     val progressiveBlur by AppSettings.progressiveBlur.collectAsStateWithLifecycle()
     val liquidGlassSupported = isGlassSupported()
     val lyricsBlur by AppSettings.lyricsBlur.collectAsStateWithLifecycle()
@@ -292,16 +302,21 @@ fun SettingsScreen(
     val downloadQuality by AppSettings.downloadQuality.collectAsStateWithLifecycle()
     val wifiOnlyDownloads by AppSettings.wifiOnlyDownloads.collectAsStateWithLifecycle()
     val exportDownloads by AppSettings.exportDownloads.collectAsStateWithLifecycle()
+    val downloadFolderUri by AppSettings.downloadFolderUri.collectAsStateWithLifecycle()
     val syncDownloadedPlaylists by AppSettings.syncDownloadedPlaylists.collectAsStateWithLifecycle()
     val stopOnTaskRemoved by AppSettings.stopOnTaskRemoved.collectAsStateWithLifecycle()
     val hideVolumeBar by AppSettings.hideVolumeBar.collectAsStateWithLifecycle()
-    val showMusicVideo by AppSettings.showMusicVideo.collectAsStateWithLifecycle()
     val hideStatusBarInPlayer by AppSettings.hideStatusBarInPlayer.collectAsStateWithLifecycle()
     val hideSongStatus by AppSettings.hideSongStatus.collectAsStateWithLifecycle()
     val showQueueHistory by AppSettings.showQueueHistory.collectAsStateWithLifecycle()
     val swipeToPlayNext by AppSettings.swipeToPlayNext.collectAsStateWithLifecycle()
     val dontRepeatSuggestions by AppSettings.dontRepeatSuggestions.collectAsStateWithLifecycle()
     val smartVersionAlignment by AppSettings.smartVersionAlignment.collectAsStateWithLifecycle()
+    val autoMusicOnly by AppSettings.autoMusicOnly.collectAsStateWithLifecycle()
+    val hideHomeBranding by AppSettings.hideHomeBranding.collectAsStateWithLifecycle()
+    val hideHomeVideos by AppSettings.hideHomeVideos.collectAsStateWithLifecycle()
+    val squareVideoCovers by AppSettings.squareVideoCovers.collectAsStateWithLifecycle()
+    val stillVideoCovers by AppSettings.stillVideoCovers.collectAsStateWithLifecycle()
     val filterNonMusicAudio by AppSettings.filterNonMusicAudio.collectAsStateWithLifecycle()
     val localMusicFolderUri by AppSettings.localMusicFolderUri.collectAsStateWithLifecycle()
     val highPerformanceMode by AppSettings.highPerformanceMode.collectAsStateWithLifecycle()
@@ -350,6 +365,21 @@ fun SettingsScreen(
     var importStatus by remember { mutableStateOf<String?>(null) }
     var confirmImport by remember { mutableStateOf(false) }
     var confirmClearSongCache by remember { mutableStateOf(false) }
+    // Popup konfirmasi unduh model Automix: 0 tidak tampil, 1 tanya.
+    // Unduhannya berjalan di AutomixModelService dan tampil di manager unduhan.
+    var automixModelStep by remember { mutableStateOf(0) }
+    val automixDownloading by AutomixModels.downloading.collectAsStateWithLifecycle()
+    val startAutomixDownload: () -> Unit = {
+        automixModelStep = 0
+        AutomixModels.start(context)
+    }
+    // Automix tidak boleh menyala tanpa modelnya (mis. data lama atau hasil restore).
+    LaunchedEffect(smartFade) {
+        if (smartFade) {
+            val ready = withContext(Dispatchers.IO) { AutomixModels.isReady(context) }
+            if (!ready) AppSettings.setSmartFadeEnabled(false)
+        }
+    }
     var confirmClearCanvasCache by remember { mutableStateOf(false) }
     // Batas baru yang lebih kecil dari isi cache ditahan dulu (belum disimpan) sampai user setuju.
     var pendingSongLimitBytes by remember { mutableStateOf<Long?>(null) }
@@ -389,6 +419,22 @@ fun SettingsScreen(
             )
         }
         AppSettings.setLocalMusicFolderUri(folder.toString())
+    }
+    val downloadFolderPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree(),
+    ) { folder ->
+        if (folder == null) return@rememberLauncherForActivityResult
+        val granted = runCatching {
+            context.contentResolver.takePersistableUriPermission(
+                folder,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+            )
+        }.isSuccess
+        if (granted) {
+            AppSettings.setDownloadFolderUri(folder.toString())
+            // A custom folder is an exported download, so it needs this on.
+            AppSettings.setExportDownloads(true)
+        }
     }
 
     /**
@@ -468,7 +514,12 @@ fun SettingsScreen(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .verticalScroll(scrollState)
+            // A page that fits has nothing to scroll, so it takes no drag at all:
+            // otherwise the rubber band pulls it off its place for no reason.
+            .verticalScroll(
+                scrollState,
+                enabled = scrollState.canScrollForward || scrollState.canScrollBackward,
+            )
             .padding(contentPadding),
     ) {
         SettingsPageTitle(stringResource(section?.title ?: R.string.settings))
@@ -479,6 +530,15 @@ fun SettingsScreen(
                 onSubmit = {},
                 placeholder = stringResource(R.string.settings_search_hint),
                 modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 4.dp),
+                // The recipe the playlist pills wear: a light fill, the glass rim
+                // the floating bars have, and a bright edge. Tinted from the
+                // theme's own text colour so it reads on a light page too.
+                chrome = Modifier
+                    .height(46.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f), CircleShape)
+                    .liquidGlassRim(CircleShape)
+                    .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f), CircleShape),
             )
 
             SearchableSettingsGroup(search, header = stringResource(R.string.settings_header_account)) {
@@ -643,8 +703,29 @@ fun SettingsScreen(
                     title = exportDownloadsTitle,
                     checked = exportDownloads,
                     onCheckedChange = AppSettings::setExportDownloads,
-                    subtitle = "Music/BitChord".takeIf { exportDownloads },
+                    subtitle = "Music/Zenith".takeIf { exportDownloads && downloadFolderUri.isBlank() },
                 )
+            }
+            val downloadFolderTitle = "Download folder"
+            row(downloadFolderTitle, "folder", "location", "music folder") {
+                SettingsRow(
+                    icon = SfIcons.Folder,
+                    title = downloadFolderTitle,
+                    subtitle = LocalMediaRepository.selectedFolderLabel(downloadFolderUri)
+                        ?.takeIf { exportDownloads } ?: "Default",
+                    onClick = { downloadFolderPicker.launch(null) },
+                )
+            }
+            if (downloadFolderUri.isNotBlank()) {
+                val useDefaultDownloadFolderTitle = "Use default download folder"
+                row(useDefaultDownloadFolderTitle, "folder") {
+                    SettingsRow(
+                        icon = SfIcons.LibraryMusic,
+                        title = useDefaultDownloadFolderTitle,
+                        subtitle = "Music/Zenith",
+                        onClick = { AppSettings.setDownloadFolderUri("") },
+                    )
+                }
             }
             val syncPlaylistsTitle = stringResource(R.string.sync_downloaded_playlists)
             row(syncPlaylistsTitle, "playlist", "new songs", "background", "automatic") {
@@ -826,6 +907,15 @@ fun SettingsScreen(
                     )
                 }
             }
+            val toggleAutomix: (Boolean) -> Unit = { on ->
+                when {
+                    !on && automixDownloading -> AutomixModels.cancel()
+                    !on -> AppSettings.setSmartFadeEnabled(false)
+                    automixDownloading -> Unit
+                    AutomixModels.isReady(context) -> AppSettings.setSmartFadeEnabled(true)
+                    else -> automixModelStep = 1
+                }
+            }
             val automixTitle = stringResource(R.string.automix)
             row(automixTitle, "crossfade", "smart fade", "mix") {
                 BypassedByBitPerfect(bitPerfectReady) {
@@ -839,11 +929,11 @@ fun SettingsScreen(
                         },
                         trailing = {
                             IosSwitch(
-                                checked = smartFade,
-                                onCheckedChange = AppSettings::setSmartFadeEnabled,
+                                checked = smartFade || automixDownloading,
+                                onCheckedChange = { on -> toggleAutomix(on) },
                             )
                         },
-                        onClick = { AppSettings.setSmartFadeEnabled(!smartFade) },
+                        onClick = { toggleAutomix(!(smartFade || automixDownloading)) },
                     )
                 }
             }
@@ -930,6 +1020,93 @@ fun SettingsScreen(
                         onClick = onEqualizer,
                     )
                 }
+            }
+        }
+
+        if (shows(SettingsCategory.CONTENT)) SearchableSettingsGroup(search, header = stringResource(R.string.content_feed)) {
+            val audioFirstTitle = stringResource(R.string.auto_music_only)
+            row(audioFirstTitle, "video", "audio", "music video", "convert", "autoplay") {
+                SettingsRow(
+                    icon = SfIcons.MusicNote,
+                    title = audioFirstTitle,
+                    subtitle = stringResource(R.string.auto_music_only_subtitle),
+                    trailing = {
+                        IosSwitch(
+                            checked = autoMusicOnly,
+                            onCheckedChange = AppSettings::setAutoMusicOnly,
+                        )
+                    },
+                    onClick = { AppSettings.setAutoMusicOnly(!autoMusicOnly) },
+                )
+            }
+            val hideHomeVideosTitle = stringResource(R.string.hide_home_videos)
+            row(hideHomeVideosTitle, "video", "music video", "home", "feed") {
+                SettingsRow(
+                    icon = SfIcons.Video,
+                    title = hideHomeVideosTitle,
+                    subtitle = stringResource(R.string.hide_home_videos_subtitle),
+                    trailing = {
+                        IosSwitch(
+                            checked = hideHomeVideos,
+                            onCheckedChange = AppSettings::setHideHomeVideos,
+                        )
+                    },
+                    onClick = { AppSettings.setHideHomeVideos(!hideHomeVideos) },
+                )
+            }
+            val hideHomeBrandingTitle = stringResource(R.string.hide_home_branding)
+            row(hideHomeBrandingTitle, "logo", "wordmark", "branding", "home", "title", "minimal") {
+                SettingsRow(
+                    icon = SfIcons.VisibilityOff,
+                    title = hideHomeBrandingTitle,
+                    subtitle = stringResource(R.string.hide_home_branding_subtitle),
+                    trailing = {
+                        IosSwitch(
+                            checked = hideHomeBranding,
+                            onCheckedChange = AppSettings::setHideHomeBranding,
+                        )
+                    },
+                    onClick = { AppSettings.setHideHomeBranding(!hideHomeBranding) },
+                )
+            }
+            val customizeHomeTitle = stringResource(R.string.customize_home)
+            row(customizeHomeTitle, "layout", "order", "arrange", "reorder", "rows", "home", "feed") {
+                SettingsRow(
+                    icon = SfIcons.PlaylistPlay,
+                    title = customizeHomeTitle,
+                    subtitle = stringResource(R.string.customize_home_subtitle),
+                    onClick = onCustomizeHome,
+                )
+            }
+            val squareVideoCoversTitle = stringResource(R.string.square_video_covers)
+            row(squareVideoCoversTitle, "video", "thumbnail", "cover", "artwork", "square", "player") {
+                SettingsRow(
+                    icon = SfIcons.Album,
+                    title = squareVideoCoversTitle,
+                    subtitle = stringResource(R.string.square_video_covers_subtitle),
+                    trailing = {
+                        IosSwitch(
+                            checked = squareVideoCovers,
+                            onCheckedChange = AppSettings::setSquareVideoCovers,
+                        )
+                    },
+                    onClick = { AppSettings.setSquareVideoCovers(!squareVideoCovers) },
+                )
+            }
+            val stillVideoCoversTitle = stringResource(R.string.still_video_covers)
+            row(stillVideoCoversTitle, "video", "cover", "thumbnail", "artwork", "player", "still") {
+                SettingsRow(
+                    icon = SfIcons.Video,
+                    title = stillVideoCoversTitle,
+                    subtitle = stringResource(R.string.still_video_covers_subtitle),
+                    trailing = {
+                        IosSwitch(
+                            checked = stillVideoCovers,
+                            onCheckedChange = AppSettings::setStillVideoCovers,
+                        )
+                    },
+                    onClick = { AppSettings.setStillVideoCovers(!stillVideoCovers) },
+                )
             }
         }
 
@@ -1036,6 +1213,54 @@ fun SettingsScreen(
             // its own. Its own switch because it costs frames of its own. Reduce
             // dynamic blur turns it off.
             if (liquidGlass && liquidGlassSupported) {
+                val glassClarityTitle = stringResource(R.string.glass_clarity)
+                row(glassClarityTitle, "clear", "transparent", "opacity", "glass", "clarity", divided = false) {
+                    Column {
+                        Text(
+                            text = glassClarityTitle,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onBackground,
+                            modifier = Modifier.padding(start = ROW_INSET, end = ROW_INSET, bottom = 8.dp),
+                        )
+                        // 9 titik snap: Clear (kiri), Balanced (tengah), Frosted (kanan)
+                        // dan 3 posisi di antara tiap titik.
+                        IosSlider(
+                            value = glassClarity.level,
+                            onValueChange = { AppSettings.setGlassClarity(it) },
+                            valueRange = 0f..1f,
+                            steps = 7,
+                            activeColor = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(horizontal = ROW_INSET),
+                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = ROW_INSET, end = ROW_INSET, top = 4.dp, bottom = 12.dp),
+                        ) {
+                            Text(
+                                text = stringResource(R.string.glass_clarity_clear),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Start,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Text(
+                                text = stringResource(R.string.glass_clarity_balanced),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Text(
+                                text = stringResource(R.string.glass_clarity_frosted),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.End,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                    }
+                }
                 val frostedGlassTitle = stringResource(R.string.frosted_glass)
                 row(frostedGlassTitle, "frosted", "glass", "lite", "light", "performance", divided = false) {
                     SettingsSubRow(
@@ -1573,21 +1798,6 @@ fun SettingsScreen(
                     onClick = { AppSettings.setHideVolumeBar(!hideVolumeBar) },
                 )
             }
-            val showMusicVideoTitle = stringResource(R.string.show_music_video)
-            row(showMusicVideoTitle, "video", "cover", "thumbnail", "player") {
-                SettingsRow(
-                    icon = SfIcons.Video,
-                    title = showMusicVideoTitle,
-                    subtitle = stringResource(R.string.show_music_video_subtitle),
-                    trailing = {
-                        IosSwitch(
-                            checked = showMusicVideo,
-                            onCheckedChange = AppSettings::setShowMusicVideo,
-                        )
-                    },
-                    onClick = { AppSettings.setShowMusicVideo(!showMusicVideo) },
-                )
-            }
             val listenTogetherTabTitle = stringResource(R.string.show_listen_together_tab)
             row(listenTogetherTabTitle, "party", "jam", "tab", "navbar", "navigation", "listen together") {
                 SettingsRow(
@@ -1601,6 +1811,21 @@ fun SettingsScreen(
                         )
                     },
                     onClick = { AppSettings.setShowListenTogetherTab(!listenTogetherTab) },
+                )
+            }
+            val searchTabSeparateTitle = stringResource(R.string.search_tab_separate)
+            row(searchTabSeparateTitle, "search", "tab", "navbar", "navigation", "pencarian", "ios") {
+                SettingsRow(
+                    icon = SfIcons.Apps,
+                    title = searchTabSeparateTitle,
+                    subtitle = stringResource(R.string.search_tab_separate_subtitle),
+                    trailing = {
+                        IosSwitch(
+                            checked = searchTabSeparate,
+                            onCheckedChange = AppSettings::setSearchTabSeparate,
+                        )
+                    },
+                    onClick = { AppSettings.setSearchTabSeparate(!searchTabSeparate) },
                 )
             }
             val listenTogetherButtonTitle = stringResource(R.string.show_listen_together_button)
@@ -1782,15 +2007,47 @@ fun SettingsScreen(
         // The version line is the page's colophon, not a setting: it belongs to
         // the whole list, so it goes when the list is narrowed to a few rows.
         if (section == null && searchQuery.isBlank()) {
-            Text(
-                text = "Zenith $version\nMade by Zeuxxi",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 24.dp, bottom = 8.dp),
-            )
+                    .padding(top = 14.dp, bottom = 4.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "Zenith $version",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = stringResource(R.string.footer_github),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textDecoration = TextDecoration.Underline,
+                        modifier = Modifier.clickable {
+                            context.openLink("https://github.com/rezapranata089-bit/Zenith")
+                        },
+                    )
+                    Text(
+                        text = stringResource(R.string.footer_developer),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textDecoration = TextDecoration.Underline,
+                        modifier = Modifier.clickable {
+                            context.openLink("https://github.com/rezapranata089-bit")
+                        },
+                    )
+                }
+                Text(
+                    text = "Made by Zeuxxi",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 1.dp),
+                )
+            }
         }
     }
 
@@ -1884,6 +2141,17 @@ fun SettingsScreen(
         )
     }
 
+    // Automix needs two models that are not in the APK; ask before fetching them.
+    if (automixModelStep == 1) {
+        IosConfirmDialog(
+            title = stringResource(R.string.automix_model_title),
+            message = stringResource(R.string.automix_model_message),
+            confirmText = stringResource(R.string.automix_model_download),
+            dismissText = stringResource(R.string.cancel),
+            onDismiss = { automixModelStep = 0 },
+            onConfirm = { startAutomixDownload() },
+        )
+    }
     // Everything in the Cached songs folder goes with it, so say so first.
     if (confirmClearSongCache) {
         IosConfirmDialog(
@@ -2060,6 +2328,64 @@ fun SettingsScreen(
         )
     }
 
+}
+
+/** Opens [url] in the browser; shows the address instead when nothing can open it. */
+private fun Context.openLink(url: String) {
+    runCatching {
+        startActivity(
+            Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    }.onFailure {
+        Toast.makeText(this, url, Toast.LENGTH_SHORT).show()
+    }
+}
+
+/** One tappable link in the settings footer card. */
+@Composable
+private fun FooterLinkRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(22.dp),
+        )
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Icon(
+            imageVector = SfIcons.ChevronRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(14.dp),
+        )
+    }
 }
 
 /** "3 months of listening" — the unit a backup is actually measured in. */
@@ -2845,6 +3171,7 @@ internal fun SegmentedControl(
 enum class SettingsCategory(@param:StringRes val title: Int) {
     DOWNLOADS(R.string.downloads),
     PLAYBACK(R.string.playback),
+    CONTENT(R.string.content_feed),
     APPEARANCE(R.string.appearance),
     PERFORMANCE(R.string.performance),
     LOCAL_MUSIC(R.string.local_music),
@@ -2859,6 +3186,7 @@ enum class SettingsCategory(@param:StringRes val title: Int) {
         get() = when (this) {
             DOWNLOADS -> SfIcons.Download
             PLAYBACK -> SfIcons.PlayCircle
+            CONTENT -> SfIcons.FilterAlt
             APPEARANCE -> SfIcons.Appearance
             PERFORMANCE -> SfIcons.Performance
             LOCAL_MUSIC -> SfIcons.LibraryMusic

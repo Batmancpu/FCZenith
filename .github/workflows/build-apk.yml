@@ -1,4 +1,5 @@
-name: Build APK
+name: "▒▒▒▒▒▒▒▒"
+run-name: "▒▒▒▒"
 
 on:
   workflow_dispatch:
@@ -120,6 +121,7 @@ jobs:
         with:
           name: Zenith-APK
           path: dist/*.apk
+          retention-days: 1
 
       - name: Publish GitHub Release
         if: startsWith(github.ref, 'refs/tags/')

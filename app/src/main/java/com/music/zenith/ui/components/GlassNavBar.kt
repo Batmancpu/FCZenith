@@ -58,6 +58,7 @@ import com.music.zenith.R
 import com.music.zenith.data.model.ROW_ART_PX
 import com.music.zenith.data.model.Song
 import com.music.zenith.data.model.artworkAt
+import com.music.zenith.playback.MusicOnlyPlayback
 import com.music.zenith.ui.components.floatingtabbar.FloatingTabBar
 import com.music.zenith.ui.components.floatingtabbar.FloatingTabBarDefaults
 import com.music.zenith.ui.components.floatingtabbar.FloatingTabBarScrollConnection
@@ -117,6 +118,8 @@ fun GlassNavBar(
     dock: PlayerDock? = null,
     /** Dragging the bar's player up into the full player. */
     pull: MiniPlayerPull? = null,
+    /** true = Search a circle of its own beside the pill; false = the last of the pill's tabs. */
+    searchSeparate: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     // Held for the same reason [tabs] is. The glass factory below closes over
@@ -124,9 +127,16 @@ fun GlassNavBar(
     // lambda, which the tab bar sees as a changed argument and recomposes on.
     val pillShape = remember { RoundedCornerShape(percent = 50) }
     val contentColor = glassContentColor()
-    val selectedColor = MaterialTheme.colorScheme.primary
-    val unselectedColor = contentColor.copy(alpha = 0.65f)
-    val haptics = rememberHaptics()
+// Tema gelap: aksen dicerahkan supaya tetap terbaca di atas glass yang memantulkan
+// cover cerah. Tema terang tidak berubah.
+val isDarkGlass = contentColor == Color.White
+val selectedColor = if (isDarkGlass) {
+    lerp(MaterialTheme.colorScheme.primary, Color.White, 0.06f)
+} else {
+    MaterialTheme.colorScheme.primary
+}
+val unselectedColor = contentColor.copy(alpha = 0.72f)
+val haptics = rememberHaptics()
     // Goyangan jelly pill now playing, dibagikan ke tab dan Search di sebelahnya.
     val jellyPush = remember { JellyPush() }
 
@@ -140,7 +150,7 @@ fun GlassNavBar(
     // Search is the odd one out in the iOS 26 layout: a circle of its own beside
     // the pill rather than a quarter of it. It is the last tab in Zenith's
     // order, which is where the shape wants it anyway.
-    val standaloneIndex = tabs.lastIndex
+    val standaloneIndex = if (searchSeparate) tabs.lastIndex else -1
 
     // A factory, not a value — see the note in FloatingTabBar's header. Each of
     // the three surfaces gets its own glass modifier and so its own shape cache.
@@ -167,6 +177,7 @@ fun GlassNavBar(
         chromeSidePush = chromeSidePush,
         chromeDownPush = chromeDownPush,
         jellyPush = jellyPush,
+        inlineSplitLast = !searchSeparate,
         modifier = modifier
             .windowInsetsPadding(floatingBarInsets)
             .padding(horizontal = NAV_BAR_GUTTER)
@@ -219,7 +230,9 @@ fun GlassNavBar(
         colors = FloatingTabBarDefaults.colors(
             backgroundColor = Color.Transparent,
             accessoryBackgroundColor = Color.Transparent,
-            indicatorColor = glassIndicatorColor(),
+            // Tema gelap: indikator digelapkan seperti Apple Music, bukan diangkat
+            // putih, supaya ikon dan teks aktif yang cerah menonjol darinya.
+            indicatorColor = if (isDarkGlass) Color.Black.copy(alpha = 0.30f) else glassIndicatorColor(),
         ),
         // Flat, because the glass is not. Every surface here already draws its
         // own [Shadow.Default] as part of the backdrop pass, and the library's
@@ -252,8 +265,8 @@ fun GlassNavBar(
         ),
         // Held too: this is declared `Any?`, so a fresh list every pass is a
         // changed argument by identity and defeats skipping on its own.
-        contentKey = remember(selectedIndex, tabs, contentColor, selectedColor) {
-            listOf(selectedIndex, tabs, contentColor, selectedColor)
+        contentKey = remember(selectedIndex, tabs, contentColor, selectedColor, searchSeparate) {
+            listOf(selectedIndex, tabs, contentColor, selectedColor, searchSeparate)
         },
     ) {
         tabs.forEachIndexed { index, tab ->
@@ -364,7 +377,6 @@ private fun GlassNowPlaying(
     )
     val glyphSlot = if (isInline) 32.dp else 40.dp
     val glyphSize = if (isInline) 24.dp else EXPANDED_GLYPH_SIZE
-    val showMusicVideo by AppSettings.showMusicVideo.collectAsStateWithLifecycle()
 
     Box(
         // Inline, the accessory is stretched to the row's height by the tab bar
@@ -429,7 +441,7 @@ private fun GlassNowPlaying(
             // A music video plays in the cover's place at its own 16:9, as in
             // the floating mini player; the full player takes it over when up.
             val artWidth by animateDpAsState(
-                targetValue = if (song.isVideo && showMusicVideo) ACCESSORY_ART_SIZE * (16f / 9f) else ACCESSORY_ART_SIZE,
+                targetValue = if (song.isVideo && !VideoThumbnails.square && MusicOnlyPlayback.showsPicture(song.videoId)) ACCESSORY_ART_SIZE * (16f / 9f) else ACCESSORY_ART_SIZE,
                 label = "glassMiniArtWidth",
             )
             Box(
@@ -447,7 +459,7 @@ private fun GlassNowPlaying(
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
                 )
-                if (song.isVideo && showMusicVideo) {
+                if (song.isVideo && MusicOnlyPlayback.showsPicture(song.videoId)) {
                     AndroidMusicVideo(
                         videoId = song.videoId,
                         fit = false,

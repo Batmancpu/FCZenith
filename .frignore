@@ -27,3 +27,16 @@ internal object CanvasStills {
 var current by mutableStateOf<CanvasStill?>(null)
 ** Lagu pemilik [current]: dipakai selagi klip lagu itu belum selesai dicari di player yang baru dibuka. *
 var songKey: String? = null
+te_download">다운로드 삭제</string>
+<string name="delete_playlist_confirmation">“%1$s” 삭제할까요? 확인하려면 다시 탭하세요.</string>
+<string name="delete_download_confirmation">이 기기에서 “%1$s” 삭제할까요? 확인하려면 다시 탭하세요.</string>
+<string name="running">실행 중</string>
+<string name="version_cut_not_fetched">가져오지 않음</string>
+<string name="version_cut_fetching">가져오는 중</string>
+<string name="version_cut_measuring">분석 중</string>
+<string name="automix_enabled_subtitle">곡 자체를 분석해 모든 전환의 타이밍과 블렌딩을 맞춰요. 기기가 뜨거워지거나 재생이 끊기면 꺼 주세요.</string>
+<string name="advanced_automix_subtitle">DJ처럼 믹스해요: 비트를 맞추고, 비트에 맞춰 전환하며, 어울리지 않는 곡 사이는 컷으로 이어요. 추가 처리는 없어요.</string>
+<string name="no_lyrics_sources_enabled">없음. 가사를 가져오지 않아요.</string>
+<string name="song_cache_large_subtitle">다운로드한 오디오를 디스크에 최대 %1$s까지 보관해요. 여유 공간을 상당히 차지할 수 있어요.</string>
+<string name="replay_genres_enabled_subtitle">Last.fm에 아티스트의 장르를 요청해요. 아티스트 이름만 전송돼요.</string>
+<string name="swipe_plays_next">곡을 스와이프하면 다음에 재생</string>

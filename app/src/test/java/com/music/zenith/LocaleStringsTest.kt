@@ -62,6 +62,8 @@ class LocaleStringsTest(private val tag: String) {
         internal fun tagToQualifier(tag: String): String = when (tag) {
             "zh-CN" -> "zh"
             "zh-TW" -> "zh-rTW"
+            // Android's legacy code for Indonesian: values-id may not match at runtime.
+            "id" -> "in"
             else -> tag
         }
     }

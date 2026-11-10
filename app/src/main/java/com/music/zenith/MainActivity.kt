@@ -80,7 +80,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
+import com.music.zenith.ui.components.rememberElasticRefreshState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -136,6 +136,7 @@ import com.music.zenith.data.model.ShelfItem
 import com.music.zenith.data.model.Song
 import com.music.zenith.data.model.isUnresolvedSpotify
 import com.music.zenith.data.model.UiState
+import com.music.zenith.data.model.withoutVideos
 import com.music.zenith.data.model.UserPlaylist
 import com.music.zenith.data.model.EntityType
 import com.music.zenith.data.model.SearchHistoryEntity
@@ -250,6 +251,7 @@ import com.music.zenith.ui.components.FLOATING_BAR_MAX_WIDTH
 import com.music.zenith.ui.components.FloatingBottomBar
 import com.music.zenith.ui.components.GlassNavBar
 import com.music.zenith.ui.components.floatingtabbar.rememberFloatingTabBarScrollConnection
+import kotlinx.coroutines.flow.collectLatest
 import com.music.zenith.ui.components.FrostedTopBar
 import com.music.zenith.ui.components.LastfmLoginAlert
 import com.music.zenith.ui.components.LocalAppBackdrop
@@ -288,6 +290,7 @@ import com.music.zenith.ui.components.optimizedHazeEffect
 import com.music.zenith.ui.components.topBarContentPadding
 import com.music.zenith.ui.components.topBarHeight
 import com.music.zenith.ui.components.AppLanguageDialog
+import com.music.zenith.ui.components.HomeLayoutDialog
 import com.music.zenith.ui.components.TranslationLanguageDialog
 import com.music.zenith.ui.components.LyricsSourcesDialog
 import com.music.zenith.ui.components.ServerEditorHost
@@ -559,7 +562,7 @@ private fun ZenithApp(
     // What folds [GlassNavBar] between its expanded and inline shapes. Held here
     // rather than inside the bar because the page's scroll is what drives it,
     // and the page is a sibling of the bar rather than a child.
-    val navBarScroll = rememberFloatingTabBarScrollConnection()
+    val navBarScroll = rememberFloatingTabBarScrollConnection(expandThreshold = 250.dp)
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     // Explore loads the first time it's shown, not at launch beside Home.
     LaunchedEffect(selectedTab) {
@@ -675,6 +678,7 @@ private fun ZenithApp(
     var librarySortMenuOpen by remember { mutableStateOf(false) }
     var showLyricsSources by remember { mutableStateOf(false) }
     var showAppLanguage by remember { mutableStateOf(false) }
+    var showHomeLayout by remember { mutableStateOf(false) }
     var showTranslationLanguage by remember { mutableStateOf(false) }
     var showAccountSelector by remember { mutableStateOf(false) }
     // The popup has started leaving: the header's profile button returns with it.
@@ -854,6 +858,24 @@ private fun ZenithApp(
     )
 
     val homeState by viewModel.home.collectAsStateWithLifecycle()
+    val hideHomeRecents by AppSettings.hideHomeRecents.collectAsStateWithLifecycle()
+    val hideHomeBranding by AppSettings.hideHomeBranding.collectAsStateWithLifecycle()
+    val hideHomeVideos by AppSettings.hideHomeVideos.collectAsStateWithLifecycle()
+    val hideHomeTopPicks by AppSettings.hideHomeTopPicks.collectAsStateWithLifecycle()
+    val hideHomeMoods by AppSettings.hideHomeMoods.collectAsStateWithLifecycle()
+    val homeLayout by AppSettings.homeLayout.collectAsStateWithLifecycle()
+    // Only what Home draws: Top Picks and Explore keep reading the full feed.
+    val visibleHomeState = remember(homeState, hideHomeVideos, hideHomeRecents) {
+        val loaded = homeState as? UiState.Success
+        if (loaded != null && (hideHomeVideos || hideHomeRecents)) {
+            var shelves = loaded.data
+            if (hideHomeRecents) shelves = shelves.filterNot { it.title == YtMusicRepository.RECENT_TITLE }
+            if (hideHomeVideos) shelves = shelves.withoutVideos()
+            UiState.Success(shelves)
+        } else {
+            homeState
+        }
+    }
     val homeLoadingMore by viewModel.homeLoadingMore.collectAsStateWithLifecycle()
     val homeRecentlyPlayedLoading by viewModel.homeRecentlyPlayedLoading.collectAsStateWithLifecycle()
     val topPicks by viewModel.topPicks.collectAsStateWithLifecycle()
@@ -1224,11 +1246,12 @@ private fun ZenithApp(
         else -> searchListState
     }
 
-    // Pull-to-refresh: the drag lives with the feed, but the indicator is the
-    // line under the top bar, so the state has to be visible to both.
-    val homePull = rememberPullToRefreshState()
-    val explorePull = rememberPullToRefreshState()
-    val libraryPull = rememberPullToRefreshState()
+
+    // Pull-to-refresh: the whole feed follows the finger, so the state lives
+    // here to survive tab switches while a pull or a refresh is in flight.
+    val homePull = rememberElasticRefreshState()
+    val explorePull = rememberElasticRefreshState()
+    val libraryPull = rememberElasticRefreshState()
     val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
     val currentFeed = when {
         route != null || detail != null -> null
@@ -1249,21 +1272,9 @@ private fun ZenithApp(
     // atau hilang, jadi penerbangan dihentikan, bukan dibiarkan mengikuti.
     LaunchedEffect(selectedTab) { cancelCoverFlight() }
 
-    val currentPull = when (currentFeed) {
-        MainViewModel.Feed.HOME -> homePull
-        MainViewModel.Feed.EXPLORE -> explorePull
-        MainViewModel.Feed.LIBRARY -> libraryPull
-        null -> null
-    }
-    // Kotak pull yang dilepas dari layar saat refresh berjalan (pindah tab,
-    // halaman mood dibuka di atas Explore) tidak melihat refresh selesai, dan
-    // state-nya tertinggal di threshold sehingga puck di bar membeku. Rapikan
-    // setiap kali feed yang tampil tidak sedang refresh.
-    val currentFeedRefreshing = currentFeed != null && currentFeed in refreshing
-    LaunchedEffect(currentFeed, currentFeedRefreshing) {
-        val pull = currentPull ?: return@LaunchedEffect
-        if (!currentFeedRefreshing && pull.distanceFraction > 0f) pull.animateToHidden()
-    }
+    // State pull yang tertinggal saat feed keluar layar (pindah tab, halaman
+    // mood dibuka di atas Explore) dirapikan oleh PullToRefresh sendiri begitu
+    // feed tampil lagi, jadi tidak perlu dibersihkan dari sini.
     val scrolled by remember(currentListState) {
         derivedStateOf {
             currentListState.firstVisibleItemIndex > 0 ||
@@ -1384,6 +1395,7 @@ private fun ZenithApp(
     // in right after Explore. Search still has to stay last: GlassNavBar
     // draws the final tab as its standalone circle.
     val listenTogetherTab by AppSettings.showListenTogetherTab.collectAsStateWithLifecycle()
+    val searchTabSeparate by AppSettings.searchTabSeparate.collectAsStateWithLifecycle()
     val listenTogetherTabLabel = stringResource(R.string.listen_together_tab)
     val barTabs = remember(tabs, listenTogetherTab, listenTogetherTabLabel) {
         if (!listenTogetherTab) {
@@ -1454,9 +1466,11 @@ private fun ZenithApp(
             // to release the loading state and resume it immediately.
             if (audio == null || audio.videoId == song.videoId) {
                 TrackLog.w("Player", "audio switch found no distinct official song", song.videoId)
-                // The switch is always offered now, so say when there was nothing to switch to.
-                if (song.videoId !in missingVersions) missingVersions += song.videoId
-                if (stillCurrent) showQueueNotice(versionContext.getString(R.string.no_audio_version))
+                // Hanya dianggap "tidak ada versi audio" bila pencarian benar-benar selesai tanpa hasil;
+                // gagal jaringan tidak boleh mengunci tombol sebagai tidak tersedia.
+                val confirmedMissing = audio != null && YtMusicRepository.hasNoAudioVersion(song.videoId)
+                if (confirmedMissing && song.videoId !in missingVersions) missingVersions += song.videoId
+                if (stillCurrent && confirmedMissing) showQueueNotice(versionContext.getString(R.string.no_audio_version))
                 if (stillCurrent && resumeAfterResolution) c.play()
                 return
             }
@@ -1662,6 +1676,9 @@ private fun ZenithApp(
             switchingAudioVersion = false
         }
     }
+
+    // Konversi music video ke audio dilakukan PlaybackService sebelum lagu diputar
+    // (lihat MusicOnlyPlayback); di sini hanya tombol manual di menu pemutar.
 
     /**
      * A song picked on its own — off a home card or a search hit — starts a
@@ -2286,7 +2303,7 @@ private fun ZenithApp(
     // The Search tab's Library source reads the Local Music folder, so it asks
     // for the same permission opening that folder does.
     val onSearchSourceChange: (SearchSource) -> Unit = { source ->
-        if (source == SearchSource.LIBRARY && !LocalMediaRepository.hasStoragePermission(context)) {
+        if (source == SearchSource.LIBRARY && !LocalMediaRepository.canReadLocalMusic(context)) {
             mediaPermissionLauncher.launch(mediaPermission)
         }
         viewModel.setSearchSource(source)
@@ -2299,7 +2316,7 @@ private fun ZenithApp(
                 navigator.push(AppRoute.Spotify)
                 return@let
             }
-            if ((id == "local:all" || id == "local:downloads") && !LocalMediaRepository.hasStoragePermission(context)) {
+            if ((id == "local:all" || id == "local:downloads") && !LocalMediaRepository.canReadLocalMusic(context)) {
                 mediaPermissionLauncher.launch(mediaPermission)
             }
             // Opened from a shelf's "Show all" page, it stacks over the grid
@@ -2515,7 +2532,12 @@ private fun ZenithApp(
             ?.let { AppleArtistArtRepository.cached(it.browseId) }
     }
     val detailPalette = rememberArtworkPalette(
-        imageUrl = detailApple?.heroUrl ?: topDetail?.thumbnailUrl,
+        imageUrl = detailApple?.heroUrl ?: topDetail?.thumbnailUrl
+            ?: topDetail?.takeIf {
+                it.browseId == "local:downloads" || it.browseId == "local:all" || it.browseId == "local:cache"
+            }?.let { folderPage ->
+                (folderPage.songs as? UiState.Success)?.data?.firstOrNull { it.thumbnailUrl != null }?.thumbnailUrl
+            },
         keyColors = detailApple?.keyColors(),
     )
 
@@ -3200,6 +3222,7 @@ private fun ZenithApp(
                                 onListenTogether = { navigator.push(AppRoute.ListenTogether) },
                                 onSpotifyCanvasAuth = { showSpotifyCanvasAuth = true },
                                 onAppLanguage = { showAppLanguage = true },
+                                onCustomizeHome = { showHomeLayout = true },
                                 onEditSignatureApi = { editingSignatureApi = true },
                                 onConfirmBitPerfect = { confirmBitPerfect = it },
                                 onConfirmFixedVolume = { confirmFixedVolume = true },
@@ -3458,11 +3481,12 @@ private fun ZenithApp(
                             )
                         } else when ((destination as? AppDestination.Tab)?.index ?: selectedTab) {
                             TAB_HOME -> HomeScreen(
-                                state = homeState,
+                                state = visibleHomeState,
                                 listState = homeListState,
                                 currentSong = player.song,
                                 isPlaying = player.isPlaying,
-                                title = stringResource(R.string.listen_now),
+                                title = stringResource(if (hideHomeBranding) R.string.home else R.string.listen_now),
+                                hideBranding = hideHomeBranding,
                                 signedIn = signedIn,
                                 onSignIn = { webSession = WebSessionMode.SIGN_IN },
                                 onItemClick = { item, shelfTitle ->
@@ -3492,19 +3516,21 @@ private fun ZenithApp(
                                 contentPadding = listPadding,
                                 onLoadMore = viewModel::loadMoreHome,
                                 loadingMore = homeLoadingMore,
-                                recentlyPlayedLoading = homeRecentlyPlayedLoading,
+                                recentlyPlayedLoading = homeRecentlyPlayedLoading && !hideHomeRecents,
                                 topPicks = topPicks,
                                 topPicksLoading = topPicksLoading,
                                 listenerName = account?.name,
-                                onTopPickClick = { pick, label ->
+                                onTopPickClick = { pick: TopPick, label: String ->
                                     if (pick.kind == TopPickKind.MOOD) {
                                         navigator.push(AppRoute.Moods)
                                     } else {
                                         openTopPick(pick, label)
                                     }
-                                },
-                                onMoodClick = playMood,
+                                    Unit
+                                }.takeUnless { hideHomeTopPicks },
+                                onMoodClick = playMood.takeUnless { hideHomeMoods },
                                 onMoodsShowAll = { navigator.push(AppRoute.Moods) },
+                                homeLayout = homeLayout,
                                 onPlaySongs = { songs -> play(songs, 0) },
                                 artworkMotion = artworkMotion,
                                 onTopPickLongPress = { pick ->
@@ -3979,7 +4005,6 @@ private fun ZenithApp(
                         }
                     },
                     refreshing = currentFeed != null && currentFeed in refreshing,
-                    pullFraction = { currentPull?.distanceFraction ?: 0f },
                     // The same step the back gesture takes — see [goBack] —
                     // offered on anything pushed over a tab.
                     onBack = when {
@@ -4259,8 +4284,9 @@ private fun ZenithApp(
                             }
                             // Not on a release page, whose pill already carries
                             // three of its own controls — Apple Music leaves the
-                            // profile off its album pages too.
-                            if (!isReleaseDetail) TopBarAccountButton(
+                            // profile off its album pages too. Nor on Listen
+                            // together, where the pill is the server's round trip.
+                            if (!isReleaseDetail && route != AppRoute.ListenTogether) TopBarAccountButton(
                                 // Offline the account request fails and `account` stays null;
                                 // the profile saved on the device (what the popup reads) stands in.
                                 account = account ?: googleAccounts
@@ -4356,6 +4382,7 @@ private fun ZenithApp(
                         tabs = barTabs,
                         selectedIndex = selectedBarIndex,
                         onTabSelected = onTabSelected,
+                        searchSeparate = searchTabSeparate,
                         scrollConnection = navBarScroll,
                         song = player.song,
                         isPlaying = player.isPlaying,
@@ -4790,7 +4817,8 @@ private fun ZenithApp(
                 upgradeQualityInProgress = fromPlayer && song.videoId in qualityUpgradesInFlight,
                 onToggleAudioVersion = onToggleVersion,
                 isAudioVersion = menuIsAudioVersion,
-                audioVersionMissing = song.videoId in missingVersions,
+                audioVersionMissing = song.videoId in missingVersions ||
+                    (song.isVideo && YtMusicRepository.hasNoAudioVersion(song.videoId)),
                 // Hidden outright when there's no real YouTube id behind
                 // this row to build a link from — SongActionsMenu already
                 // drops it for a local file via `isOffline`, this catches
@@ -5705,7 +5733,7 @@ private fun ZenithApp(
             )
         }
 
-        if (songSortMenuOpen) {
+        PopMenuHost(songSortMenuOpen) {
             BackHandler { songSortMenuOpen = false }
             FrostedSortMenu(
                 hazeState = hazeState,
@@ -5732,7 +5760,7 @@ private fun ZenithApp(
             )
         }
 
-        if (librarySortMenuOpen) {
+        PopMenuHost(librarySortMenuOpen) {
             BackHandler { librarySortMenuOpen = false }
             FrostedMenuPanel(hazeState = hazeState, onDismiss = { librarySortMenuOpen = false }) {
                 LibrarySort.entries.forEach { option ->
@@ -5749,7 +5777,8 @@ private fun ZenithApp(
         }
 
         val menuFolder = detail?.browseId?.takeIf { it.isDeviceFolder() }
-        if (folderMenuOpen && menuFolder != null) {
+        PopMenuHost(folderMenuOpen && menuFolder != null) {
+            if (menuFolder == null) return@PopMenuHost
             BackHandler { folderMenuOpen = false }
             val downloadsFolder = menuFolder == "local:downloads"
             val viewType = folderViewTypeOf(menuFolder)
@@ -5805,6 +5834,20 @@ private fun ZenithApp(
             AppLanguageDialog(
                 hazeState = hazeState,
                 onDismiss = { showAppLanguage = false },
+            )
+        }
+
+        if (showHomeLayout) {
+            BackHandler { showHomeLayout = false }
+            // Recents stays in this list while it is hidden, so it can be shown again.
+            val layoutShelves = remember(homeState, hideHomeVideos) {
+                val loaded = (homeState as? UiState.Success)?.data.orEmpty()
+                if (hideHomeVideos) loaded.withoutVideos() else loaded
+            }
+            HomeLayoutDialog(
+                hazeState = hazeState,
+                shelves = layoutShelves,
+                onDismiss = { showHomeLayout = false },
             )
         }
 
@@ -6324,6 +6367,37 @@ private fun FrostedFolderMenu(
     }
 }
 
+/** 0 to 1 as a menu pops in and back to 0 as it folds away; 1 where nothing animates it. */
+private val LocalMenuPop = androidx.compose.runtime.staticCompositionLocalOf<() -> Float> { { 1f } }
+
+/**
+ * Keeps a menu composed while it plays its way out. A bare `if (open) Menu()`
+ * removes it the instant the flag drops, so there is never a frame left to
+ * animate. The pop is a spring that overshoots a little on the way in and a
+ * short ease on the way out; the panel reads it through [LocalMenuPop] at draw
+ * time, so a frame of it is a redraw and not a recomposition.
+ */
+@Composable
+private fun PopMenuHost(visible: Boolean, content: @Composable () -> Unit) {
+    val progress = remember { androidx.compose.animation.core.Animatable(0f) }
+    var present by remember { mutableStateOf(visible) }
+    LaunchedEffect(visible) {
+        if (visible) {
+            present = true
+            progress.animateTo(
+                1f,
+                androidx.compose.animation.core.spring(dampingRatio = 0.62f, stiffness = 520f),
+            )
+        } else {
+            progress.animateTo(0f, tween(170))
+            present = false
+        }
+    }
+    if (present) {
+        CompositionLocalProvider(LocalMenuPop provides { progress.value }) { content() }
+    }
+}
+
 /** The scrim and frosted panel both top-bar menus are drawn on. */
 @OptIn(ExperimentalHazeMaterialsApi::class)
 @Composable
@@ -6335,19 +6409,36 @@ private fun FrostedMenuPanel(
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
     val shape = MaterialTheme.shapes.extraLarge
     val touch = rememberJellyMenuTouch()
+    val pop = LocalMenuPop.current
     Box(
         Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.scrim.copy(alpha = .48f))
             .clickable(onClick = onDismiss),
         contentAlignment = Alignment.TopEnd,
     ) {
+        // The scrim fades with the pop rather than cutting in and out.
+        Box(
+            Modifier
+                .matchParentSize()
+                .graphicsLayer { alpha = pop().coerceIn(0f, 1f) }
+                .background(MaterialTheme.colorScheme.scrim.copy(alpha = .48f)),
+        )
         Surface(
             color = Color.Transparent,
             contentColor = MaterialTheme.colorScheme.onSurface,
             shape = shape,
             modifier = Modifier
                 .padding(top = 56.dp, end = 20.dp)
+                // Pops out of the corner the button sits in and, on the way
+                // out, folds back into it.
+                .graphicsLayer {
+                    val p = pop()
+                    val s = 0.78f + 0.22f * p
+                    scaleX = s
+                    scaleY = s
+                    alpha = (p * 1.8f).coerceIn(0f, 1f)
+                    transformOrigin = androidx.compose.ui.graphics.TransformOrigin(1f, 0f)
+                }
                 .iosMenuJelly(touch, 1f, 0f)
                 .width(IntrinsicSize.Max)
                 .clip(shape)

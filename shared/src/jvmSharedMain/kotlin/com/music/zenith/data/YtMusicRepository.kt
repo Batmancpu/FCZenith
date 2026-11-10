@@ -56,7 +56,15 @@ object YtMusicRepository {
     private val versionTimeMaps = ConcurrentHashMap<Pair<String, String>, VersionTimeMap>()
 
     fun cachedAudioVersion(videoId: String): Song? = audioVersionCache[videoId]
+
+    /** True bila pencarian versi audio untuk [videoId] sudah selesai dan memang tidak ada hasilnya. */
+    fun hasNoAudioVersion(videoId: String): Boolean = audioVersionCache[videoId]?.videoId == videoId
     fun cachedVideoVersion(videoId: String): Song? = videoVersionCache[videoId]
+
+    /** Kembali dari [audioId] ke video berarti ke [video], baris asal konversinya. */
+    fun rememberVideoVersion(audioId: String, video: Song) {
+        videoVersionCache[audioId] = video
+    }
 
     /**
      * How a position in [fromId] maps into [toId], when YouTube Music paired
@@ -286,7 +294,7 @@ object YtMusicRepository {
     }
 
     private const val HISTORY = "FEmusic_history"
-    private const val RECENT_TITLE = "Recents"
+    const val RECENT_TITLE = "Recents"
 
     /** Enough to scroll through, short of turning the shelf into the history page. */
     private const val RECENT_LIMIT = 20
@@ -474,8 +482,11 @@ object YtMusicRepository {
             return audio
         }
         val target = TrackMatcher.targetOf(song)
+        var lookupFailed = false
         for (query in TrackMatcher.queries(target)) {
-            val candidates = search(query, SearchFilter.SONGS)
+            val searched = search(query, SearchFilter.SONGS)
+            if (searched.isFailure) lookupFailed = true
+            val candidates = searched
                 .getOrNull()
                 ?.filterIsInstance<SearchResult.Track>()
                 ?.map { it.song }
@@ -495,7 +506,9 @@ object YtMusicRepository {
             }
         }
         Log.w(TAG, "audio switch: no official song match for '${song.title}' by '${song.artist}'")
-        audioVersionCache[song.videoId] = song
+        // Jawaban "tidak ada" hanya disimpan bila semua pencarian berhasil dijalankan;
+        // kalau ada yang gagal (mis. jaringan), biarkan bisa dicoba lagi.
+        if (!lookupFailed) audioVersionCache[song.videoId] = song
         return song
     }
 

@@ -122,13 +122,16 @@ fun glassContentColor(): Color =
 @Composable
 fun glassIndicatorColor(): Color =
     if (MaterialTheme.colorScheme.surface.luminance() > 0.5f) {
-        Color.White.copy(alpha = 0.5f)
+        Color.White.copy(alpha = LIGHT_INDICATOR_OPACITY)
     } else {
         Color.White.copy(alpha = DARK_INDICATOR_OPACITY)
     }
 
 /** The selected tab's pill in dark theme, a step whiter than the bar. */
-private const val DARK_INDICATOR_OPACITY = 0.14f
+private const val DARK_INDICATOR_OPACITY = 0.30f
+
+/** The selected tab's pill in light theme. */
+private const val LIGHT_INDICATOR_OPACITY = 0.65f
 
 /**
  * A lightweight visual match for liquid glass over a stable background.
@@ -215,6 +218,7 @@ fun Modifier.liquidGlass(
     if (!isGlassSupported()) return this
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
     val frosted by AppSettings.frostedGlass.collectAsStateWithLifecycle()
+    val clarity by AppSettings.glassClarity.collectAsStateWithLifecycle()
     if (reduceDynamicBlur) {
         return background(MaterialTheme.colorScheme.surface, shape)
             .border(GLASS_EDGE_WIDTH, GLASS_EDGE_COLOR, shape)
@@ -222,29 +226,36 @@ fun Modifier.liquidGlass(
     val backdrop = LocalAppBackdrop.current
     val exportedBackdrop = LocalGlassExport.current
     val density = LocalDensity.current
-    val blurPx = with(density) { BLUR_RADIUS_DP.dp.toPx() } * GLASS_RESOLUTION_SCALE
-    val lensHeightPx = with(density) { (LENS_HEIGHT * LENS_MAX_DP).dp.toPx() } * GLASS_RESOLUTION_SCALE
-    val lensAmountPx = with(density) { (LENS_AMOUNT * LENS_MAX_DP).dp.toPx() } * GLASS_RESOLUTION_SCALE
+    val resolution = clarity.resolutionScale
+    val blurPx = with(density) { BLUR_RADIUS_DP.dp.toPx() } * resolution * clarity.blurScale
+    val lensHeightPx = with(density) { (LENS_HEIGHT * LENS_MAX_DP).dp.toPx() } * resolution
+    val lensAmountPx = with(density) { (LENS_AMOUNT * LENS_MAX_DP).dp.toPx() } * resolution * clarity.lensScale
     val themeTint = if (MaterialTheme.colorScheme.surface.luminance() > 0.5f) {
         Color(0xFFFAFAFA)
     } else {
         Color(0xFF121212)
     }
-    val surfaceTintColor = surfaceTint ?: themeTint.copy(alpha = SURFACE_OPACITY)
+    val surfaceTintColor = surfaceTint ?: themeTint.copy(alpha = clarity.tintAlpha)
+    // White 10% vanishes against a light page; use a dark hairline there.
+    val edgeColor = if (MaterialTheme.colorScheme.surface.luminance() > 0.5f) {
+        Color.Black.copy(alpha = 0.10f)
+    } else {
+        GLASS_EDGE_COLOR
+    }
 
     return drawBackdrop(
         backdrop = backdrop,
         shape = { shape },
         effects = {
             // Frosted: hanya saturasi ringan + blur, tanpa lensa (bagian terberat di GPU).
-            colorControls(saturation = if (frosted) 1.15f else 1f + 0.5f * VIBRANCY)
+            colorControls(saturation = if (frosted) 1.15f else clarity.saturation)
             blur(if (frosted) blurPx * 1.4f else blurPx)
             if (!frosted && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 lens(
                     refractionHeight = lensHeightPx,
                     refractionAmount = lensAmountPx,
                     depthEffect = true,
-                    chromaticAberration = true,
+                    chromaticAberration = clarity.chromatic,
                 )
             }
         },
@@ -254,6 +265,6 @@ fun Modifier.liquidGlass(
             drawRect(color = surfaceTintColor, size = size)
         },
         exportedBackdrop = exportedBackdrop,
-        backdropScale = GLASS_RESOLUTION_SCALE,
-    )
+        backdropScale = resolution,
+    ).border(GLASS_EDGE_WIDTH, edgeColor, shape)
 }

@@ -24,11 +24,24 @@ import com.music.zenith.R
 import com.music.zenith.data.SongInfo
 import com.music.zenith.data.SongInfoRepository
 import com.music.zenith.data.compactCount
+import com.music.zenith.data.innertube.Innertube
 import com.music.zenith.data.model.Song
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Refresh
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
+import java.util.Locale
 
 private val INFO_BODY_MAX_HEIGHT = 360.dp
+
+/** The release date in the app's language ("3 Mei 2021"), not the raw ISO form. */
+private fun localizedReleaseDate(raw: String): String = runCatching {
+    LocalDate.parse(raw).format(
+        DateTimeFormatter.ofLocalizedDate(FormatStyle.LONG)
+            .withLocale(Locale.forLanguageTag(Innertube.currentLocaleTag)),
+    )
+}.getOrDefault(raw)
 
 /**
  * Drawn as the same UIAlertController-style card as [AlertScaffold] — centred
@@ -139,7 +152,7 @@ private fun SongInfoDialogContent(song: Song, onDismiss: () -> Unit) {
                 val unavailable = stringResource(R.string.song_info_unavailable)
                 val rows = listOf(
                     R.string.song_info_album to (info?.album ?: song.albumName),
-                    R.string.song_info_release_date to (info?.releaseDate ?: info?.releaseYear),
+                    R.string.song_info_release_date to (info?.releaseDate?.let(::localizedReleaseDate) ?: info?.releaseYear),
                     R.string.song_info_views to info?.views?.let(::compactCount),
                     R.string.song_info_likes to info?.likes,
                     R.string.song_info_comments to info?.comments,

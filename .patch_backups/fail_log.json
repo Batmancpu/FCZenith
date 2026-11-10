@@ -46,5 +46,11 @@
     "block": 8,
     "layer": "not_found_in_project",
     "file": "app/src/main/java/com/music/zenith/playback/CrossfadeController.kt"
+  },
+  {
+    "timestamp": "2026-11-09 19:50:05",
+    "block": 2,
+    "layer": "not_found_in_project",
+    "file": "app/src/main/java/com/music/zenith/ui/components/floatingtabbar/FloatingTabBar.kt"
   }
 ]

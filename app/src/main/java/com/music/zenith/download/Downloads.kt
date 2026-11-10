@@ -17,6 +17,7 @@ import com.music.zenith.data.sources.SourceStream
 import com.music.zenith.data.sources.StreamFormat
 import com.music.zenith.data.sources.TrackMatcher
 import com.music.zenith.playback.AudioCache
+import com.music.zenith.playback.smart.AutomixModels
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
@@ -252,6 +253,11 @@ object Downloads {
      * told to run is no longer wanted, and stops it on arrival.
      */
     fun cancel(videoId: String) {
+        // Baris unduhan model Automix ikut tampil di manager; batalnya lewat sini juga.
+        if (videoId == AutomixModels.SESSION_ID) {
+            AutomixModels.cancel()
+            return
+        }
         val job = synchronized(lock) {
             pending.remove(videoId)
             if (videoId !in running) return@synchronized null

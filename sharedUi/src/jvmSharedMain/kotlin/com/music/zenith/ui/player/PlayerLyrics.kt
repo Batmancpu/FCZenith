@@ -632,7 +632,7 @@ internal fun CurrentLyricStrip(
     var stripRtl by remember { mutableStateOf(false) }
     var activeText by remember { mutableStateOf("") }
     if (isSynced) {
-        val clock = rememberLyricClock(trackKey, playhead, isPlaying)
+        val clock = rememberLyricClock(trackKey, playhead, isPlaying, STRIP_INDEX_FRAME_GAP_MS)
         val index by remember(lines) {
             derivedStateOf { lines.indexOfLast { it.timeMs <= clock.longValue } }
         }
@@ -751,6 +751,7 @@ private fun rememberLyricClock(
     trackKey: Any,
     playhead: LyricPlayhead,
     isPlaying: Boolean,
+    frameGapMs: Long = 0L,
 ): MutableLongState {
     val clock = remember(trackKey) {
         mutableLongStateOf(Snapshot.withoutReadObservation { playhead.positionMs })
@@ -801,6 +802,9 @@ private fun rememberLyricClock(
                     discontinuity = playhead.discontinuity,
                 )
             }
+            // Jeda antar frame untuk pemakai yang tidak butuh tiap vsync (strip satu baris).
+            // 0 = tiap vsync, seperti panel lirik penuh.
+            if (frameGapMs > 0L) delay(frameGapMs)
         }
     }
     return clock
@@ -808,6 +812,18 @@ private fun rememberLyricClock(
 
 /** A frame time this close to [System.nanoTime] is on the same clock. */
 private const val SAME_CLOCK_NANOS = 250_000_000L
+
+/**
+ * Strip satu baris di atas scrubber: sapuannya cukup 60 fps, jadi di layar
+ * 120Hz setiap frame kedua dilewati. Tidak berpengaruh di 60Hz dan 90Hz.
+ */
+private const val STRIP_SWEEP_FRAME_GAP_MS = 10L
+
+/**
+ * Jam di tingkat strip hanya dipakai untuk memilih baris aktif (teks dan arah
+ * RTL). Pergantian baris tidak butuh presisi per frame.
+ */
+private const val STRIP_INDEX_FRAME_GAP_MS = 50L
 
 /**
  * A lyric line with the sung part of it lit, the rest dimmed, and the boundary
@@ -3052,7 +3068,7 @@ private fun CurrentLyricLine(
         return
     }
 
-    val clock = rememberLyricClock(trackKey, playhead, isPlaying)
+    val clock = rememberLyricClock(trackKey, playhead, isPlaying, STRIP_SWEEP_FRAME_GAP_MS)
 
     val index by remember(lines) {
         derivedStateOf { lines.indexOfLast { it.timeMs <= clock.longValue } }

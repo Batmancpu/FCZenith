@@ -13,6 +13,7 @@ import com.music.zenith.sharedui.resources.*
 
 import androidx.compose.ui.graphics.ImageBitmap
 import com.music.zenith.ui.components.TrackTextSwitch
+import com.music.zenith.ui.components.VideoThumbnails
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -525,6 +526,21 @@ private fun dockEaseThumb(t: Float): Float {
 private const val DOCK_COVER_START_AT = 0.05f
 
 /**
+ * Di awal drag cover kartu ditahan di tengah tinggi panel (jarak atas dan bawah
+ * sama). Penuh sejak drag sejauh [DOCK_CENTRE_RISE_AT], bertahan sampai
+ * [DOCK_CENTRE_HOLD_TO], lalu lepas bertahap sampai [DOCK_CENTRE_END_AT] ke
+ * jalur terbang biasa. Di 0 pengaruhnya 0, jadi cover tidak melompat dari mini.
+ */
+private const val DOCK_CENTRE_RISE_AT = 0.06f
+private const val DOCK_CENTRE_HOLD_TO = 0.30f
+private const val DOCK_CENTRE_END_AT = 0.70f
+
+private fun dockSmooth(x: Float): Float {
+    val t = x.coerceIn(0f, 1f)
+    return t * t * (3f - 2f * t)
+}
+
+/**
  * Smoothstep: 0 di mini player dan sampai [DOCK_COVER_START_AT], 1 begitu drag melewati
  * [DOCK_COVER_FULL_AT]. Tertunda di awal supaya cover tidak lebih besar dari panelnya.
  */
@@ -652,6 +668,25 @@ private class DockFrame {
  * drawn in the player, and how small. See `landscapeDockPose`.
  */
 private class LandscapeDockPose(val left: Float, val top: Float, val scale: Float)
+
+/**
+ * Isi panel lirik lagu yang sedang tampil. Hanya ditulis dari SideEffect saat
+ * [trackId] masih sama dengan lagu yang diputar, jadi saat lagu berganti ia
+ * masih memegang lirik lagu lama sampai panel selesai memudar.
+ */
+private class LyricsHold(var trackId: String) {
+    var lines: List<LyricLine> = emptyList()
+    var subLines: List<LyricLine>? = null
+    var looking: Boolean = true
+}
+
+/** Salinan [LyricsHold] yang dipakai panel selama memudar keluar. */
+private class LyricsExit(
+    val trackId: String,
+    val lines: List<LyricLine>,
+    val subLines: List<LyricLine>?,
+    val looking: Boolean,
+)
 
 /** The placeholder tile's corners — one shape, not a new one every frame it moves. */
 private val TileShape = RoundedCornerShape(8.dp)
@@ -1054,8 +1089,10 @@ fun NowPlayingScreen(
     val clipDimmed by remember { derivedStateOf { clipMixFade.value < 0.999f } }
     // A music video plays its own picture where the sleeve is — see
     // [MusicVideoSurface] — and takes the place of any animated cover.
-    val showMusicVideo by PlayerSettings.showMusicVideo.collectAsStateWithLifecycle()
-    val videoMode = showMusicVideo && showsMusicVideo(song)
+    val videoMode = showsMusicVideo(song)
+    // Square video covers: the picture takes the sleeve's own slot, cropped to
+    // it, instead of the full-width box at the video's shape.
+    val squareVideo = videoMode && VideoThumbnails.square
     val canvas = rememberCanvasArtwork(song)?.takeUnless { videoMode }?.let {
         // Apple's 3:4 rendition runs under the whole phone screen, the way its
         // own player shows it; the square one stays the fallback.
@@ -1170,6 +1207,8 @@ fun NowPlayingScreen(
     // buka/tutup biasa dari layar utama tidak berubah sama sekali.
     var leavingQueue by remember { mutableStateOf(false) }
     var leavingLyrics by remember { mutableStateOf(false) }
+    val lyricsHold = remember { LyricsHold(song.videoId) }
+    var lyricsExit by remember { mutableStateOf<LyricsExit?>(null) }
     val paneSwap = remember { mutableFloatStateOf(1f) }
     var paneSwapTick by remember { mutableIntStateOf(0) }
     LaunchedEffect(paneSwapTick) {
@@ -1181,6 +1220,7 @@ fun NowPlayingScreen(
         ) { value, _ -> paneSwap.floatValue = value }
         leavingQueue = false
         leavingLyrics = false
+        lyricsExit = null
     }
     // Shared with Spotify's title placement below. The deck and credits must
     // read one clock: the weighted region changes size as this value moves, so
@@ -1281,12 +1321,41 @@ fun NowPlayingScreen(
         haptics = haptics,
         onCard = { lyricsShare = it },
     )
-    // Nothing here resets [lyricsOpen] on a track change, deliberately. The
-    // panel is a place, not a property of the track: someone reading along who
-    // skips — or who simply lets the queue run on — means to carry on reading,
-    // so the words change underneath them and the panel stays. Closing it
-    // dropped them back onto the artwork every few minutes with no gesture of
-    // their own behind it.
+    // Ganti lagu saat panel lirik terbuka mengembalikan pemain ke Now Playing:
+    // cover, judul, dan artis lagu baru tampil lebih dulu, sedangkan lirik
+    // dimuat di belakang layar oleh loadLyrics (yang sudah membatalkan job dan
+    // mengabaikan hasil lagu lama lewat generation, serta memakai cache disk).
+    // Dipicu oleh videoId, jadi next, previous, queue, playlist, otomatis, dan
+    // Auto Mix semuanya lewat jalur yang sama. Panel memudar lewat crossfade
+    // [paneSwap] milik Queue <-> Lirik dengan isi lagu lama ditahan, supaya
+    // tidak sempat berkedip menjadi skeleton lagu baru.
+    SideEffect {
+        if (lyricsHold.trackId == song.videoId) {
+            if (!lyrics.isNullOrEmpty()) lyricsHold.lines = lyrics
+            lyricsHold.subLines = lyricsTranslation.subLines
+            lyricsHold.looking = !lyricsUnavailable
+        }
+    }
+    LaunchedEffect(song.videoId) {
+        val previousId = lyricsHold.trackId
+        if (previousId == song.videoId) return@LaunchedEffect
+        // Layout landscape menaruh lirik di samping pemain, jadi tidak ada
+        // layar yang perlu dikembalikan.
+        if (lyricsOpen && !landscapePlayerAvailable(windowWidth, windowHeight)) {
+            lyricsExit = LyricsExit(
+                previousId, lyricsHold.lines, lyricsHold.subLines, lyricsHold.looking,
+            )
+            paneSwap.floatValue = 0f
+            leavingLyrics = true
+            leavingQueue = false
+            paneSwapTick++
+            closeLyrics()
+        }
+        lyricsHold.trackId = song.videoId
+        lyricsHold.lines = emptyList()
+        lyricsHold.subLines = null
+        lyricsHold.looking = true
+    }
     // A brief, non-modal confirmation that the three-dot menu now contains a
     // way back to the original YouTube rendition. The control keeps its usual
     // action — opening the menu — so the cue teaches rather than surprises.
@@ -3391,7 +3460,7 @@ fun NowPlayingScreen(
                         // Collapsed, the thumbnail is a music video's own shape at
                         // the header's height, as every list shows one — see
                         // [trackArtSize] — and the credits start past it.
-                        val thumbWidth = if (videoMode) THUMB_SIZE * (16f / 9f) else THUMB_SIZE
+                        val thumbWidth = if (videoMode && !squareVideo) THUMB_SIZE * (16f / 9f) else THUMB_SIZE
                         fun titleStart(): Dp = lerp(0.dp, thumbWidth + 12.dp, p())
 
                         // How far down the *screen* the sleeve's bottom edge sits, which
@@ -3468,7 +3537,7 @@ fun NowPlayingScreen(
                                 ),
                                 size = Size(side, side),
                             )
-                            if (!videoMode) return@with square
+                            if (!videoMode || squareVideo) return@with square
                             // A music video's card is its picture box: the
                             // player's full width at the video's shape, centred
                             // on the square's slot — the frame the sleeve flies
@@ -3548,8 +3617,32 @@ fun NowPlayingScreen(
                         // player: tidak lewat tepi atas panel (yang memotong bagian atas
                         // cover) dan tidak keluar dari kiri/kanan. Tepi atas panel di
                         // koordinat kotak ini adalah bannerTopPx.
-                        fun fitToPanel(source: Rect, active: Boolean): Rect {
-                            if (!active) return source
+                        fun fitToPanel(rawSource: Rect, active: Boolean): Rect {
+                            if (!active) return rawSource
+                            // Cover kartu (bukan banner full-bleed) diletakkan di tengah tinggi
+                            // panel selagi panel masih tumbuh dari pill, supaya jarak atas dan
+                            // bawahnya sama dan ia naik bersama panel, tidak menempel ke atas.
+                            val source = if (heroMode || dock == null || playerBounds.height <= 0) {
+                                rawSource
+                            } else {
+                                val open = dock.openFraction()
+                                val rise = dockSmooth(open / DOCK_CENTRE_RISE_AT)
+                                val fall = dockSmooth(
+                                    (open - DOCK_CENTRE_HOLD_TO) / (DOCK_CENTRE_END_AT - DOCK_CENTRE_HOLD_TO),
+                                )
+                                val share = rise * (1f - fall)
+                                if (share <= 0f) {
+                                    rawSource
+                                } else {
+                                    val panel = dock.panelBounds(
+                                        Size(playerBounds.width.toFloat(), playerBounds.height.toFloat()),
+                                    )
+                                    val panelTop = bannerTopPx.toFloat()
+                                    val panelHeight = panel.bottom - panel.top
+                                    val centredTop = panelTop + (panelHeight - rawSource.height) / 2f
+                                    rawSource.translate(0f, (centredTop - rawSource.top) * share)
+                                }
+                            }
                             // Tepi bawah panel di koordinat kotak ini: cover diangkat supaya
                             // bagian bawahnya tidak tertutup panel yang masih setinggi pill.
                             val panelBottom = if (dock != null && playerBounds.height > 0) {
@@ -3605,7 +3698,17 @@ fun NowPlayingScreen(
                             // Di menu lirik/queue (p = 1) cover adalah thumbnail header:
                             // ia ikut panel dulu, tidak lebih dulu terbang ke mini player.
                             val ease = base + (dockEaseThumb(dockT()) - base) * p()
-                            return lerp(mini, rect.translate(0f, -unridden), ease)
+                            val flown = lerp(mini, rect.translate(0f, -unridden), ease)
+                            // Di awal drag target cover (sleeve di atas sheet) masih lebih
+                            // rendah dari mini player, jadi kurva lebar panel yang cepat
+                            // menyeret cover turun lebih dulu dari panelnya. Kaki cover
+                            // ditahan di kaki cover mini: ia hanya tumbuh ke atas dan ke
+                            // kanan, lalu naik bersama panel. Banner full-bleed tidak berubah.
+                            return if (heroMode || flown.bottom <= mini.bottom) {
+                                flown
+                            } else {
+                                flown.translate(0f, mini.bottom - flown.bottom)
+                            }
                         }
                         // The banner's dissolve, firmed up into the cover's hard edge as
                         // it docks.
@@ -4247,14 +4350,22 @@ fun NowPlayingScreen(
                                 Box(
                                     modifier = Modifier
                                         .offset {
+                                            if (squareVideo) {
+                                                val side = artSize().roundToPx()
+                                                return@offset IntOffset(
+                                                    fromStart(artStart().roundToPx().toFloat(), side.toFloat()).roundToInt(),
+                                                    artTop().roundToPx(),
+                                                )
+                                            }
                                             val height = (boxWidthPx / aspect).roundToInt()
                                             val centre = (artTop() + artSize() / 2).roundToPx()
                                             IntOffset(0, centre - height / 2)
                                         }
                                         .layout { measurable, _ ->
-                                            val height = (boxWidthPx / aspect).roundToInt()
-                                            val placeable = measurable.measure(Constraints.fixed(boxWidthPx, height))
-                                            layout(boxWidthPx, height) { placeable.placeRelative(0, 0) }
+                                            val width = if (squareVideo) artSize().roundToPx() else boxWidthPx
+                                            val height = if (squareVideo) width else (boxWidthPx / aspect).roundToInt()
+                                            val placeable = measurable.measure(Constraints.fixed(width, height))
+                                            layout(width, height) { placeable.placeRelative(0, 0) }
                                         }
                                         .graphicsLayer {
                                             alpha = (1f - p() * 2f).coerceIn(0f, 1f)
@@ -4272,6 +4383,7 @@ fun NowPlayingScreen(
                                     }
                                     MusicVideoSurface(
                                         videoId = song.videoId,
+                                        fit = !squareVideo,
                                         onRenderedChanged = { videoRendered = it },
                                         modifier = Modifier
                                             .fillMaxSize()
@@ -4495,11 +4607,11 @@ fun NowPlayingScreen(
                                     ),
                                     onClick = onToggleLike,
                                     active = liked,
-                                    haptic = if (liked) Haptic.ToggleOff else Haptic.ToggleOn,
-                                    size = 28.dp,
-                                    popOnActive = true,
-                                )
-                                Spacer(Modifier.width(16.dp))
+    haptic = if (liked) Haptic.ToggleOff else Haptic.ToggleOn,
+    size = 28.dp,
+    popOnActive = true,
+)
+Spacer(Modifier.width(12.dp))
                             }
                             // While the lyrics are up the menu glyph becomes the share
                             // entry: the same pick mode a long-press on a line opens,
@@ -4588,12 +4700,27 @@ fun NowPlayingScreen(
                                             }
                                         },
                                 ) { particleProgress ->
+                                    // Selama memudar keluar (atau satu frame saat lagu baru
+                                    // tiba), panel memegang isi lagu lama, bukan skeleton baru.
+                                    val lyricsLeaving = lyricsExit?.takeIf { !lyricsOpen }
+                                        ?: lyricsHold
+                                            .takeIf {
+                                                lyricsOpen && lyricsExit == null &&
+                                                    it.trackId != song.videoId
+                                            }
+                                            ?.let {
+                                                LyricsExit(it.trackId, it.lines, it.subLines, it.looking)
+                                            }
                                     LyricsPanel(
-                                        lines = lyrics.orEmpty(),
-                                        subLines = lyricsTranslation.subLines,
-                                        trackKey = song.videoId,
+                                        lines = lyricsLeaving?.lines ?: lyrics.orEmpty(),
+                                        subLines = if (lyricsLeaving != null) {
+                                            lyricsLeaving.subLines
+                                        } else {
+                                            lyricsTranslation.subLines
+                                        },
+                                        trackKey = lyricsLeaving?.trackId ?: song.videoId,
                                         playhead = lyricsPlayhead,
-                                        looking = !lyricsUnavailable,
+                                        looking = lyricsLeaving?.looking ?: !lyricsUnavailable,
                                         isPlaying = isPlaying && position.advancing,
                                         active = lyricsPanelVisible,
                                         onSeekToLine = seekToLyric,

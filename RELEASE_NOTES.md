@@ -1,59 +1,49 @@
-## Zenith by Zeuxxi
+## What's new
 
-Fork of [BitChord](https://github.com/kushagrasinghx/BitChord) with a new identity, an Apple Music–inspired interface and a reworked player.
+### Home
+- Arrange Home your way: reorder or hide rows (Top Picks, Moods, Recents and more) from the new Home layout dialog.
+- Hidden rows are no longer fetched, so Home loads faster.
+- Rows stay in place while Home loads or refreshes.
+- Option to hide the Home screen branding.
+- New Content & Feed settings page.
 
-### Identity & build
-- Renamed from BitChord to Zenith; package is now `com.zeux.zenith`.
-- New "Z" logo for the launcher and inside the app, with Default (monochrome) and red Liquid Glass launcher icons.
-- Downloads go to `Music/Zenith`.
-- Android only: TV, web, backend, docs, desktop and Wear OS removed; `arm64-v8a` build only.
-- GitHub Actions builds a signed release APK (ccache, SDK/NDK cache, retry on failed downloads) and the build stops if the keystore is missing, so updates install without uninstalling.
-- Settings footer shows the Zenith version and creator credit.
+### Library
+- Redesigned Spotify page with a featured Liked Songs card and a two-column playlist grid.
+- Smaller, more minimal Replay cards.
+- Downloads, Local and Cached pages get a full-bleed cover header, with the page colour taken from the cover art.
 
-### Look & feel
-- Apple Music style: full color scheme, squircle shapes, no Material ripple, 10 accent colors to choose from.
-- Liquid Glass toggles and sliders, glass segmented controls (scrollable, used in Search filters), glass nav bar whose icon colors follow the pill.
-- New Frosted Glass setting, lighter than Liquid Glass; glass effects switch off cleanly when Liquid Glass is off.
-- Jelly spring animation on popups and menus; iOS-style confirm dialogs and toasts.
-- Floating Settings headers and a redesigned Edit profile.
+### Storage
+- Choose a custom download folder (via SAF).
+- Read Local Music from a folder you pick, with no audio permission needed.
 
 ### Player
-- Apple Music layout; mini player and big player are one morphing panel with a flying cover.
-- Animated canvas stays alive during cover flights, with a full-screen mode and a switch to turn video covers off.
-- Cover transitions between songs: slide, wipe, dissolve and a Fluid (AGSL) effect, with a setting to keep them light.
-- Song title slides in the direction of Next/Previous.
-- Double-tap the cover to Like, with a star effect and animated like button.
-- Playback Speed & Tempo popup, AirPlay-style output icon, Dolby Atmos icon under the progress bar.
-- Crossfade also on Next/Previous (can be switched off in Settings).
+- Option to show the cover instead of playing the music video.
+- Tapping a new track in the lyrics panel returns you to Now Playing.
+- Press and kick animation on the skip buttons.
+- Faster player open and close, and smoother docking cover.
 
-### Lyrics
-- New MOTION lyrics engine with the LiquidFlow effect, Apple Music–style glow, swell and particles.
-- Back-to-active-line button, spring scrolling, smoother stagger, read mode without sync.
-- Smooth crossfade between the Queue and Lyrics panels.
+### Liquid Glass and navigation
+- Glass clarity setting: Clear, Balanced or Frosted.
+- Option to show Search as a separate tab or inline in the nav bar.
+- Rubber-band stretch when the glass bar changes between pill and full bar.
+- Frosted blur on the selection indicator, and brighter navbar icons.
 
-### Queue & playlists
-- Apple Music–style queue with shuffle, repeat and autoplay buttons under the song.
-- "Add Songs to Queue" popup with live search, All/Songs/Videos filters and recommendations.
-- Swipe to add to queue from search suggestions.
-- Redesigned New Playlist, Edit playlist and Add to playlist pages, with gallery cover pick and an Add songs button.
+### Gestures
+- Apple Music style swipe to Play Next.
+- New elastic pull-to-refresh that follows the page.
 
-### Home, Library & Explore
-- Home in Apple Music style: Top Picks cards, Made for You Mix, Most Played, Listen again, playlist cards with a 3-song preview.
-- Liked Music hero with animated album collage; Most Played card with fluid-blob background.
-- Library redesigned with a Replay card and a 2-column Artists grid; up to 6 pinned playlists.
-- Covers fly from cards to album, artist and mix pages.
-- New "Together" tab for Listen Together, switchable in Settings.
-- Local profile name and photo editing.
+### Audio
+- Music videos switch to their audio version automatically, with an option to turn this off, and a per-addon audio quality picker driven by the addon manifest. Thanks to kushagrasinghx.
 
-### Automix
-- Closed-loop beat-phase correction, least-squares tempo, cue on downbeat, longer overlaps.
-- Speed-up of the next song capped at 10%.
-- Autoplay suggestions ordered to suit Automix; analysis retries when a download fails.
-- Shine effect on the Mixing bar; blend details in Copy log.
+### Artist page
+- The artist hero fades in together with its colour tint and crossfades when a higher quality photo arrives.
 
-### Offline, cache & speed
-- Disk cache for browse, lyrics, artist lookups and search suggestions, with offline fallback.
-- Animated covers cached and replayed offline; adjustable cache size with a confirmation before shrinking.
-- Cached lossless copy plays even when quality is set low.
-- First-run presets with a low-RAM fallback; mobile audio quality defaults to Lossless.
-- Lighter hero animations (30 fps, paused when hidden) and many fixes for jank, flicker and blur glitches.
+### Languages
+- Added Korean, and completed the Indonesian translations.
+
+### App size
+- Smaller APK: down from 70 MB to 50 MB.
+
+### Fixes and performance
+- Smoother list scrolling with less work per row.
+- Many small fixes to glass, swipe and layout behaviour.

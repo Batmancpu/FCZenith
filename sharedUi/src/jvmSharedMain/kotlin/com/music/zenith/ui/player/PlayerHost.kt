@@ -244,8 +244,6 @@ interface PlayerSettingsSource {
     val hideSongStatus: StateFlow<Boolean>
     val showQueueHistory: StateFlow<Boolean>
     val hideVolumeBar: StateFlow<Boolean>
-    /** Whether a music video plays in place of the cover; off keeps the still thumbnail. */
-    val showMusicVideo: StateFlow<Boolean>
     /** Hide the device status bar while the player is up. Always false where there is none. */
     val hideStatusBar: StateFlow<Boolean>
     val lastPlayerScreen: StateFlow<LastPlayerScreen>

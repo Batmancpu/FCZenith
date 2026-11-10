@@ -37,7 +37,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.pulltorefresh.PullToRefreshState
+import com.music.zenith.ui.components.ElasticRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -104,7 +104,7 @@ fun LibraryScreen(
     onRetry: () -> Unit,
     refreshing: Boolean,
     onRefresh: () -> Unit,
-    pullState: PullToRefreshState,
+    pullState: ElasticRefreshState,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues,
     /**
@@ -139,12 +139,22 @@ fun LibraryScreen(
         refreshing = refreshing,
         onRefresh = onRefresh,
         state = pullState,
+        topInset = contentPadding.calculateTopPadding(),
         modifier = modifier,
     ) {
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
-            contentPadding = contentPadding,
+            // The heading sits where Home's does: the whole page is lifted by
+            // the same amount, not just the title.
+            contentPadding = if (showTitle) {
+                PaddingValues(
+                    top = (contentPadding.calculateTopPadding() - HOME_TITLE_LIFT).coerceAtLeast(0.dp),
+                    bottom = contentPadding.calculateBottomPadding(),
+                )
+            } else {
+                contentPadding
+            },
         ) {
             if (showTitle) {
                 item {
@@ -309,7 +319,7 @@ private fun LibraryLinkList(links: List<LibraryLink>, onClick: (ShelfItem) -> Un
                 Spacer(Modifier.width(LINK_ICON_GAP))
                 Text(
                     text = link.item.title,
-                    style = MaterialTheme.typography.bodyLarge.copy(fontSize = 20.sp),
+                    style = MaterialTheme.typography.bodyLarge.copy(fontSize = 17.sp),
                     color = MaterialTheme.colorScheme.onBackground,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,

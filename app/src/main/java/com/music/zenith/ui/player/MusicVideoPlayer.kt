@@ -36,6 +36,7 @@ import com.metrolist.innertubex.extraction.StreamResolveException
 import com.music.zenith.data.Http
 import com.music.zenith.data.TrackLog
 import com.music.zenith.data.innertube.InnerTubeXResolver
+import com.music.zenith.playback.MusicOnlyPlayback
 import com.music.zenith.data.model.Song
 import com.music.zenith.data.settings.AppSettings
 import com.music.zenith.playback.ChunkedDataSource
@@ -320,7 +321,9 @@ object MusicVideoEngine {
     /** The track the picture should be of: the controller's, when it is a music video. */
     private fun wanted(): Song? {
         val song = controller?.currentMediaItem?.toSong() ?: return null
-        return song.takeIf { it.isVideo && it.videoId !in noPicture }
+        return song.takeIf {
+            it.isVideo && it.videoId !in noPicture && MusicOnlyPlayback.showsPicture(it.videoId)
+        }
     }
 
     private fun refresh() {

@@ -6,6 +6,7 @@ import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
+import android.provider.DocumentsContract
 import android.provider.MediaStore
 import com.music.zenith.data.DebugLog as Log
 import com.music.zenith.data.settings.AppSettings
@@ -154,7 +155,9 @@ object DownloadStore {
      * have one.
      */
     fun existing(context: Context, name: String): Uri? =
-        if (!AppSettings.exportDownloads.value) {
+        if (customTree(context) != null) {
+            treeChild(context, customTree(context)!!, name)
+        } else if (!AppSettings.exportDownloads.value) {
             privateFile(context, name).takeIf { it.exists() }?.let(Uri::fromFile)
         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             mediaStoreEntry(context, name)
@@ -194,7 +197,9 @@ object DownloadStore {
     }.getOrDefault(false)
 
     fun delete(context: Context, uri: Uri): Boolean = runCatching {
-        if (uri.scheme == "file") {
+        if (uri.scheme == "content" && DocumentsContract.isDocumentUri(context, uri)) {
+            DocumentsContract.deleteDocument(context.contentResolver, uri)
+        } else if (uri.scheme == "file") {
             uri.path?.let { path ->
                 val file = File(path)
                 if (file.name == "playlist.m3u8" && file.parentFile?.parentFile?.name == "offline-hls") {
@@ -246,6 +251,8 @@ object DownloadStore {
                 )
                 return Uri.fromFile(target)
             }
+            // A file made in a folder the person chose has no pending row to clear.
+            if (DocumentsContract.isDocumentUri(context, uri)) return uri
             context.contentResolver.update(
                 uri,
                 ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) },
@@ -257,7 +264,7 @@ object DownloadStore {
 
         fun abort() {
             part?.delete()
-            if (part == null) runCatching { context.contentResolver.delete(uri, null, null) }
+            if (part == null) DownloadStore.delete(context, uri)
         }
     }
 
@@ -269,6 +276,12 @@ object DownloadStore {
      *   download cannot start rather than that it might not finish.
      */
     fun begin(context: Context, name: String, mimeType: String): Pending {
+        customTree(context)?.let { tree ->
+            val created = runCatching {
+                DocumentsContract.createDocument(context.contentResolver, treeRoot(tree), mimeType, name)
+            }.getOrNull() ?: error("Could not create $name in the chosen download folder")
+            return Pending(context, created, name, part = null, target = null)
+        }
         if (!AppSettings.exportDownloads.value) {
             val target = privateFile(context, name)
             val folder = target.parentFile ?: error("No download folder")
@@ -307,6 +320,51 @@ object DownloadStore {
         part.delete()
         return Pending(context, Uri.fromFile(target), name, part = part, target = target)
     }
+
+    /**
+     * The folder the person chose for downloads, when exporting is on and its
+     * read/write grant is still held; null means the default destination.
+     */
+    private fun customTree(context: Context): Uri? {
+        if (!AppSettings.exportDownloads.value) return null
+        val raw = AppSettings.downloadFolderUri.value
+        if (raw.isBlank()) return null
+        val tree = Uri.parse(raw)
+        val granted = runCatching {
+            context.contentResolver.persistedUriPermissions.any {
+                it.uri == tree && it.isReadPermission && it.isWritePermission
+            }
+        }.getOrDefault(false)
+        return tree.takeIf { granted }
+    }
+
+    private fun treeRoot(tree: Uri): Uri =
+        DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
+
+    /** The file named [name] directly inside the chosen folder, or null. */
+    private fun treeChild(context: Context, tree: Uri, name: String): Uri? = runCatching {
+        val children = DocumentsContract.buildChildDocumentsUriUsingTree(
+            tree,
+            DocumentsContract.getTreeDocumentId(tree),
+        )
+        context.contentResolver.query(
+            children,
+            arrayOf(
+                DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+            ),
+            null,
+            null,
+            null,
+        )?.use { cursor ->
+            while (cursor.moveToNext()) {
+                if (cursor.getString(1) == name) {
+                    return@use DocumentsContract.buildDocumentUriUsingTree(tree, cursor.getString(0))
+                }
+            }
+            null
+        }
+    }.onFailure { Log.w(TAG, "folder lookup failed for $name: ${it.message}") }.getOrNull()
 
     @Suppress("DEPRECATION")
     private fun legacyFile(name: String) = File(

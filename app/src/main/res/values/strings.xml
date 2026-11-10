@@ -286,6 +286,28 @@
     <string name="skip_silence_float_subtitle">Unavailable on 32-bit float output</string>
     <string name="smart_version_alignment">Smart audio alignment</string>
     <string name="smart_version_alignment_subtitle">Analyze audio waveforms to match the exact corresponding playback moment</string>
+    <string name="auto_music_only">Audio over video</string>
+    <string name="auto_music_only_subtitle">Music videos play as audio automatically</string>
+    <string name="content_feed">Content &amp; Feed</string>
+    <string name="hide_home_recents">Hide recently played</string>
+    <string name="hide_home_recents_subtitle">Removes the Recents row from Home. Your history stays as it is</string>
+    <string name="hide_home_videos">Hide videos on Home</string>
+    <string name="hide_home_videos_subtitle">Rows made only of videos go too. Search, artists and playlists still list them</string>
+    <string name="hide_home_branding">Hide Home branding</string>
+    <string name="hide_home_branding_subtitle">Shows only the Home title, without the logo</string>
+    <string name="hide_home_top_picks">Hide Top Picks</string>
+    <string name="hide_home_top_picks_subtitle">Removes the Top Picks for You row from Home</string>
+    <string name="hide_home_moods">Hide Moods</string>
+    <string name="hide_home_moods_subtitle">Removes the mood row from Home. Moods in Explore stay available</string>
+    <string name="customize_home">Customize Home</string>
+    <string name="customize_home_subtitle">Reorder rows and choose which ones show</string>
+    <string name="home_layout_description">Drag a row by its handle to move it. Untick a row to hide it from Home.</string>
+    <string name="home_layout_empty">Home is still loading. Open this again once the rows have appeared.</string>
+    <string name="home_row_top_picks">Top Picks for You</string>
+    <string name="still_video_covers">Cover instead of video</string>
+    <string name="still_video_covers_subtitle">Never plays the video in the player. Songs with no audio version show their cover</string>
+    <string name="square_video_covers">Square video covers</string>
+    <string name="square_video_covers_subtitle">Shows every music video as a square, in lists, cards and the player</string>
     <string name="equalizer">Equalizer</string>
     <string name="equalizer_subtitle">Tone, seven bands and balance</string>
     <string name="equalizer_footer">Shapes the sound inside Zenith, before it reaches the system.</string>
@@ -344,6 +366,8 @@
     <string name="clear_image_cache_warning">All stored album artwork will be deleted. It will be downloaded again when needed.</string>
     <string name="show_listen_together_tab">Show Listen Together tab</string>
     <string name="show_listen_together_tab_subtitle">Adds a Together tab to the navigation bar, right of Explore</string>
+    <string name="search_tab_separate">Separate Search tab</string>
+    <string name="search_tab_separate_subtitle">On, Search is a separate circle beside the tab bar. Off, it is one of the four tabs in the bar, like iOS</string>
     <string name="show_listen_together_button_subtitle">Off, the player shows only the audio output button between lyrics and the queue</string>
     <string name="app_icon">App icon</string>
     <string name="app_icon_default">Default</string>
@@ -376,18 +400,18 @@
     <string name="font_default_subtitle">SF Pro Display · Apple Music weights</string>
     <string name="font_legacy_subtitle">SF Pro Display · Original heavy weights</string>
     <string name="font_footer">Legacy brings back the heavier, tighter type the app used before it was matched to Apple Music.</string>
-    <string name="accent_color" translatable="false">Accent color</string>
-    <string name="accent_color_footer" translatable="false">Sets the highlight color of the tab bar, buttons, sliders and selections. Hearts and Replay badges stay red.</string>
-    <string name="accent_red" translatable="false">Red</string>
-    <string name="accent_orange" translatable="false">Orange</string>
-    <string name="accent_yellow" translatable="false">Yellow</string>
-    <string name="accent_green" translatable="false">Green</string>
-    <string name="accent_teal" translatable="false">Teal</string>
-    <string name="accent_blue" translatable="false">Blue</string>
-    <string name="accent_indigo" translatable="false">Indigo</string>
-    <string name="accent_purple" translatable="false">Purple</string>
-    <string name="accent_pink" translatable="false">Pink</string>
-    <string name="accent_gray" translatable="false">Gray</string>
+    <string name="accent_color">Accent color</string>
+    <string name="accent_color_footer">Sets the highlight color of the tab bar, buttons, sliders and selections. Hearts and Replay badges stay red.</string>
+    <string name="accent_red">Red</string>
+    <string name="accent_orange">Orange</string>
+    <string name="accent_yellow">Yellow</string>
+    <string name="accent_green">Green</string>
+    <string name="accent_teal">Teal</string>
+    <string name="accent_blue">Blue</string>
+    <string name="accent_indigo">Indigo</string>
+    <string name="accent_purple">Purple</string>
+    <string name="accent_pink">Pink</string>
+    <string name="accent_gray">Gray</string>
     <string name="reduce_animation">Reduce animation</string>
     <string name="reduce_animation_subtitle">Freezes the main player\'s gradient instead of drifting</string>
     <string name="cover_slide_animation">Cover animation</string>
@@ -409,7 +433,11 @@
     <string name="liquid_glass">Liquid Glass</string>
     <string name="liquid_glass_subtitle">Real refracting glass on the floating nav bar. Android 12+ only; uses more GPU.</string>
     <string name="progressive_blur">Progressive Blur</string>
-    <string name="frosted_glass">Frosted Glass (lighter)</string>
+    <string name="frosted_glass">Lightweight Glass</string>
+    <string name="glass_clarity">Glass clarity</string>
+    <string name="glass_clarity_clear">Clear</string>
+    <string name="glass_clarity_balanced">Balanced</string>
+    <string name="glass_clarity_frosted">Frosted</string>
     <string name="liquid_glass_unavailable">Requires Android 12 or newer</string>
     <string name="full_screen_cover_art">Full-screen cover art</string>
     <string name="legacy_mesh_gradient">Legacy mesh gradient</string>
@@ -447,8 +475,6 @@
     <string name="stop_music_on_close_subtitle">Stops playback when swiped away from recent apps</string>
     <string name="hide_volume_bar">Hide volume bar</string>
     <string name="hide_volume_bar_subtitle">Removes the volume slider from the main player</string>
-    <string name="show_music_video">Show music video</string>
-    <string name="show_music_video_subtitle">Plays the music video in place of the cover. Turn off to always show the thumbnail</string>
     <string name="hide_status_bar_in_player">Hide status bar in player</string>
     <string name="hide_status_bar_in_player_subtitle">Hides the clock, battery and notification icons while the main player is open</string>
     <string name="hide_song_status">Hide Song Status</string>
@@ -564,7 +590,7 @@
     <string name="pipeline_bit_depth">Bit Depth</string>
     <string name="pipeline_sample_rate">Sample Rate</string>
     <string name="pipeline_bitrate">Bitrate</string>
-    <string name="pipeline_pcm_data_rate" translatable="false">PCM Data Rate</string>
+    <string name="pipeline_pcm_data_rate">PCM Data Rate</string>
     <string name="pipeline_channels">Channels</string>
     <string name="pipeline_decoder_name">Decoder Name</string>
     <string name="pipeline_io_rate">I/O Rate</string>
@@ -596,7 +622,7 @@
     <string name="shared_link">Shared link</string>
     <string name="opened_file">Opened file</string>
     <string name="radio_started">%1$s radio started</string>
-    <string name="saved_to_zenith_folder">Saved to Music/BitChord</string>
+    <string name="saved_to_zenith_folder">Saved to Music/Zenith</string>
     <string name="nothing_downloading">Nothing downloading</string>
     <string name="nothing_to_explore">Nothing to explore right now</string>
     <string name="no_youtube_music_results">No results from YouTube Music</string>
@@ -947,6 +973,15 @@
     <string name="version_cut_measuring">analyzing</string>
     <string name="version_cut_aligned">aligned</string>
     <string name="automix_enabled_subtitle">Times and blends every transition from the tracks themselves. Turn it off if the phone gets hot or playback stutters.</string>
+    <string name="automix_model_title">Download Automix models</string>
+    <string name="automix_model_message">Automix needs two small analysis models (about 30 MB). They download once and stay on this device.</string>
+    <string name="automix_model_download">Download</string>
+    <string name="automix_model_downloading_title">Downloading models…</string>
+    <string name="automix_model_downloading_message">%1$d%% complete</string>
+    <string name="automix_model_hide">Hide</string>
+    <string name="automix_model_failed_title">Download failed</string>
+    <string name="automix_model_failed_message">Couldn\'t download the Automix models. Check your connection and try again.</string>
+    <string name="automix_model_retry">Retry</string>
     <string name="automix_disabled_subtitle">Times and blends transitions automatically, without a slider. Performance may vary on slower devices.</string>
     <string name="advanced_automix">Advanced Automix</string>
     <string name="advanced_automix_subtitle">Mixes like a DJ: keeps the beats locked, makes each move on the beat, and cuts between songs that won\'t blend. No extra processing.</string>
@@ -1321,8 +1356,8 @@
     <string name="offline_liked_empty">Songs you like on this device show up here</string>
     <string name="saved_on_this_device">Saved on this device</string>
     <string name="spotify_import_empty_playlist">No songs in this playlist</string>
-    <string name="spotify_import_language_preference" translatable="false">Language preference</string>
-    <string name="spotify_import_language_hint" translatable="false">e.g. Punjabi, Marathi, Korean…</string>
+    <string name="spotify_import_language_preference">Language preference</string>
+    <string name="spotify_import_language_hint">e.g. Punjabi, Marathi, Korean…</string>
     <string name="spotify_library_subtitle">Your Spotify playlists</string>
     <string name="onboarding_title">Millions of songs, stream on Zenith</string>
     <string name="onboarding_name_prompt">What should we call you?</string>
@@ -1344,6 +1379,8 @@
     <string name="song_info_error">Some information could not be loaded.</string>
     <string name="song_info_retry">Retry</string>
     <!-- Settings: Zenith for Wear OS -->
+    <string name="footer_github">GitHub</string>
+    <string name="footer_developer">Developer</string>
     <string name="wear_os_section">Zenith for Wear OS</string>
     <string name="wear_os_page_title">Wear OS</string>
     <string name="wear_os_your_watches">Your watches</string>

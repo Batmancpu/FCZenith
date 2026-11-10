@@ -58,6 +58,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.music.zenith.ui.haptics.Haptic
 import com.music.zenith.ui.haptics.rememberHaptics
 import kotlin.math.abs
+import kotlin.math.roundToInt
+import kotlin.math.tanh
+import androidx.compose.animation.core.Animatable
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import com.music.zenith.ui.icons.ZenithIcons
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -70,8 +77,28 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.pulltorefresh.PullToRefreshState
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Velocity
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -165,10 +192,20 @@ val SHELF_CARD_WIDTH = 150.dp
 /**
  * A track's thumbnail box at [height]: square for a song, 16:9 at the same
  * height for a music video — its picture's own shape, as YouTube Music lists
- * one, rather than a still cropped into a square.
+ * one, rather than a still cropped into a square. Square when the listener
+ * picked square video covers, see [VideoThumbnails].
  */
 fun Modifier.trackArtSize(height: Dp, isVideo: Boolean): Modifier =
-    if (isVideo) size(width = height * (16f / 9f), height = height) else size(height)
+    if (isVideo && !VideoThumbnails.square) size(width = height * (16f / 9f), height = height) else size(height)
+
+/**
+ * The "Square video covers" setting as every surface that sizes a music video
+ * reads it. Compose state, so a plain read in composition follows it without
+ * each caller collecting a flow.
+ */
+object VideoThumbnails {
+    var square by mutableStateOf(false)
+}
 
 /** Share of the row a lead-shelf card takes, so the next one peeks in past it. */
 private const val HERO_CARD_FRACTION = 0.70f
@@ -400,6 +437,11 @@ fun SwipeToQueueBox(
     val haptics = rememberHaptics()
     val swipeStateHolder = remember { mutableStateOf<SwipeToDismissBoxState?>(null) }
     var boxWidth by remember { mutableFloatStateOf(0f) }
+    // Where this row sits (top, height) in the root, read by the rubber pull,
+    // and whether this row is the one that was dragged.
+    val rowBounds = remember { floatArrayOf(0f, 0f) }
+    val dragFlag = remember { booleanArrayOf(false) }
+    var armedState by remember { mutableStateOf(false) }
 
     val currentOnSwipeToQueue by rememberUpdatedState(onSwipeToQueue)
 
@@ -423,30 +465,90 @@ fun SwipeToQueueBox(
     // *commits* past 45% of the width — so without this the label is a promise
     // the finger can't check. One light tick at the crossing is the whole point:
     // let go now and it queues.
-    LaunchedEffect(swipeState, boxWidth) {
-        if (boxWidth <= 0f) return@LaunchedEffect
+    // Only a row being dragged watches its offset; idle rows run no collector.
+    val dragging = swipeState.dismissDirection != SwipeToDismissBoxValue.Settled
+    LaunchedEffect(swipeState, boxWidth, dragging) {
+        // Let go: the rows that were pulled along spring back past rest. Only
+        // the row that was dragged settles them, so an idle row scrolling into
+        // view can't cut a pull short.
+        if (!dragging && dragFlag[0]) {
+            dragFlag[0] = false
+            armedState = false
+            launch { SwipeRubber.near.animateTo(0f, spring(dampingRatio = 0.4f, stiffness = 260f)) }
+            launch { SwipeRubber.far.animateTo(0f, spring(dampingRatio = 0.4f, stiffness = 200f)) }
+            return@LaunchedEffect
+        }
+        if (!dragging || boxWidth <= 0f) return@LaunchedEffect
+        dragFlag[0] = true
+        SwipeRubber.sourceTop = rowBounds[0]
+        SwipeRubber.sourceHeight = rowBounds[1]
+        // A light beat as the row is picked up.
+        haptics.play(Haptic.Tick)
         val armAt = boxWidth * 0.45f
         var armed = false
         snapshotFlow { try { swipeState.requireOffset() } catch (e: Exception) { 0f } }
             .collect { offset ->
+                // Rubber: the rows around the dragged one are drawn along by a
+                // damped share of the pull, the nearest most and the next one
+                // less, and never past two rows away. The pull saturates
+                // instead of growing with the finger.
+                val pull = tanh(offset / (boxWidth * 0.4f))
+                launch {
+                    SwipeRubber.near.animateTo(
+                        pull * boxWidth * 0.085f,
+                        spring(dampingRatio = 0.55f, stiffness = 380f),
+                    )
+                }
+                launch {
+                    SwipeRubber.far.animateTo(
+                        pull * boxWidth * 0.035f,
+                        spring(dampingRatio = 0.55f, stiffness = 220f),
+                    )
+                }
                 val travelled = abs(offset)
                 when {
                     !armed && travelled >= armAt -> {
                         armed = true
+                        armedState = true
                         haptics.play(Haptic.Tick)
                     }
                     // Silent, and with hysteresis: dragging back under the line
                     // re-arms, but so does the spring-back after a successful
                     // queue, and that must not buzz the same gesture twice.
-                    armed && travelled < armAt * 0.8f -> armed = false
+                    armed && travelled < armAt * 0.8f -> {
+                        armed = false
+                        armedState = false
+                    }
                 }
             }
     }
 
     SwipeToDismissBox(
         state = swipeState,
-        modifier = modifier.onSizeChanged { boxWidth = it.width.toFloat() },
-        backgroundContent = { QueueSwipeBackground(swipeState) },
+        modifier = modifier
+            .onSizeChanged { boxWidth = it.width.toFloat() }
+            .onGloballyPositioned {
+                rowBounds[0] = it.positionInRoot().y
+                rowBounds[1] = it.size.height.toFloat()
+            }
+            // Only drawn, never a swipe: the rows beside a dragged one are moved
+            // by this layer alone, so their own swipe state is never touched and
+            // being pulled can never queue them.
+            .graphicsLayer {
+                val near = SwipeRubber.near.value
+                val far = SwipeRubber.far.value
+                val sourceHeight = SwipeRubber.sourceHeight
+                translationX = if (sourceHeight > 0f) {
+                    when (abs(((rowBounds[0] - SwipeRubber.sourceTop) / sourceHeight).roundToInt())) {
+                        1 -> near
+                        2 -> far
+                        else -> 0f
+                    }
+                } else {
+                    0f
+                }
+            },
+        backgroundContent = { QueueSwipeBackground(swipeState, armedState) },
     ) {
         content()
     }
@@ -454,8 +556,15 @@ fun SwipeToQueueBox(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun QueueSwipeBackground(swipeState: SwipeToDismissBoxState) {
+private fun QueueSwipeBackground(swipeState: SwipeToDismissBoxState, armed: Boolean) {
     val playNext by AppUi.host.swipeToPlayNext.collectAsStateWithLifecycle()
+    val primary = MaterialTheme.colorScheme.primary
+    // The panel brightens as the swipe arms, so it says "let go now" itself.
+    val glow by animateFloatAsState(
+        targetValue = if (armed) 1f else 0f,
+        animationSpec = spring(dampingRatio = 0.6f, stiffness = 400f),
+        label = "queueSwipeGlow",
+    )
     Row(
         modifier = Modifier
             .fillMaxSize()
@@ -471,32 +580,95 @@ private fun QueueSwipeBackground(swipeState: SwipeToDismissBoxState) {
                     }
                 }
             }
-            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.18f))
+            .background(
+                Brush.horizontalGradient(
+                    listOf(
+                        primary.copy(alpha = 0.16f + 0.14f * glow),
+                        primary.copy(alpha = 0.28f + 0.18f * glow),
+                    ),
+                ),
+            )
             .padding(horizontal = PAGE_GUTTER),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
+        // One label, on the side the row is being pulled from: both at once
+        // showed as a doubled icon as soon as the reveal was wide enough.
+        horizontalArrangement = if (swipeState.dismissDirection == SwipeToDismissBoxValue.EndToStart) {
+            Arrangement.End
+        } else {
+            Arrangement.Start
+        },
     ) {
-        QueueSwipeLabel(playNext)
-        QueueSwipeLabel(playNext)
+        QueueSwipeLabel(playNext, swipeState, armed)
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun QueueSwipeLabel(playNext: Boolean) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(
-            if (playNext) Icons.Rounded.PlaylistPlay else Icons.Rounded.PlaylistAdd,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(20.dp),
-        )
-        Spacer(Modifier.width(6.dp))
+private fun QueueSwipeLabel(playNext: Boolean, swipeState: SwipeToDismissBoxState, armed: Boolean) {
+    val primary = MaterialTheme.colorScheme.primary
+    // The badge pops when the swipe arms and fills solid, like a button
+    // pressed in.
+    val pop by animateFloatAsState(
+        targetValue = if (armed) 1f else 0f,
+        animationSpec = spring(dampingRatio = 0.35f, stiffness = 500f),
+        label = "queueSwipePop",
+    )
+    val iconTint by animateColorAsState(
+        targetValue = if (armed) MaterialTheme.colorScheme.onPrimary else primary,
+        label = "queueSwipeIconTint",
+    )
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        // Grows and fades in with the reveal instead of sitting there from the
+        // first pixel.
+        modifier = Modifier.graphicsLayer {
+            val offset = try { swipeState.requireOffset() } catch (e: Exception) { 0f }
+            val reach = (abs(offset) / 160.dp.toPx()).coerceIn(0f, 1f)
+            alpha = reach
+            scaleX = 0.7f + 0.3f * reach
+            scaleY = 0.7f + 0.3f * reach
+        },
+    ) {
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .padding(5.dp)
+                .graphicsLayer {
+                    val s = 1f + 0.16f * pop
+                    scaleX = s
+                    scaleY = s
+                }
+                .clip(CircleShape)
+                .background(primary.copy(alpha = 0.18f + 0.77f * pop)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = if (playNext) ZenithIcons.PlayNext else ZenithIcons.PlayLast,
+                contentDescription = null,
+                tint = iconTint,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+        Spacer(Modifier.width(10.dp))
         Text(
             text = stringResource(if (playNext) Res.string.play_next else Res.string.queue),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = primary,
         )
     }
+}
+
+/**
+ * The pull shared by every swipeable row on screen: where the dragged row is,
+ * and how far the row beside it and the one after that are drawn along. The
+ * two are springs, so they trail the finger and overshoot on release.
+ */
+private object SwipeRubber {
+    var sourceTop = 0f
+    var sourceHeight = 0f
+    val near = Animatable(0f)
+    val far = Animatable(0f)
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -522,7 +694,7 @@ private fun SongRowContent(
         targetValue = if (isCurrent && !searchPlayingStyle) activeTint else MaterialTheme.colorScheme.onBackground,
         label = "song row title",
     )
-    val activeBackground by animateColorAsState(
+    val activeBackground = animateColorAsState(
         targetValue = if ((isCurrent && !searchPlayingStyle) || selected) activeTint.copy(alpha = 0.14f) else Color.Transparent,
         label = "song row background",
     )
@@ -534,7 +706,11 @@ private fun SongRowContent(
         modifier = modifier
             .fillMaxWidth()
             .alpha(if (unavailable) 0.45f else 1f)
-            .background(activeBackground)
+            // Read in draw only, so the fade redraws the row instead of recomposing it.
+            .drawWithContent {
+                drawRect(activeBackground.value)
+                drawContent()
+            }
             .longPressMenuClickable(
                 onClick = onClick,
                 onLongClick = onLongPress,
@@ -572,8 +748,9 @@ private fun SongRowContent(
             }
         } else {
             Box(Modifier.trackArtSize(52.dp, song.isVideo)) {
+                val remoteArtwork = com.music.zenith.ui.player.rememberRemoteArtworkUrl(song)
                 AsyncImage(
-                    model = com.music.zenith.ui.player.rememberRemoteArtworkUrl(song)?.artworkAt(ROW_ART_PX),
+                    model = remember(remoteArtwork) { remoteArtwork?.artworkAt(ROW_ART_PX) },
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
@@ -598,10 +775,12 @@ private fun SongRowContent(
                 color = titleColor,
             )
             Spacer(Modifier.height(2.dp))
-            val subtitle = listOfNotNull(
-                song.artist.takeIf { it.isNotBlank() },
-                song.downloadFormat,
-            ).joinToString(" · ")
+            val subtitle = remember(song.artist, song.downloadFormat) {
+                listOfNotNull(
+                    song.artist.takeIf { it.isNotBlank() },
+                    song.downloadFormat,
+                ).joinToString(" · ")
+            }
             val quality = if (showSourceQuality) song.sourceQualityBadge() else null
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (quality != null) {
@@ -827,36 +1006,348 @@ fun DownloadedBadge(videoId: String, tint: Color, modifier: Modifier = Modifier)
     )
 }
 
+/** Finger-to-offset distance at which a pull counts as a refresh request. */
+private val ELASTIC_PULL_THRESHOLD = 80.dp
+
+/** Where the page rests while a refresh is running. */
+private val ELASTIC_PULL_HOLD = 56.dp
+
+/** The rubber-band's asymptote: the page can never be pushed this far. */
+private val ELASTIC_PULL_RANGE = 600.dp
+
+/** iOS's UIScrollView rubber-band coefficient. */
+private const val ELASTIC_PULL_RUBBER = 0.6f
+
+/** How long a release waits for the refresh to actually start before assuming it already ended. */
+private const val ELASTIC_PULL_START_GRACE_MS = 600L
+
 /**
- * Pull-to-refresh for the tab feeds, with the usual circular puck suppressed.
- *
- * The feeds sit under a frosted bar that already occupies the top 96dp, so a
- * puck drawn here would be blurred out by the glass it lands behind. The bar
- * draws its own puck instead, sliding out from under its bottom edge — which
- * is why [state] is hoisted: the bar lives beside this content, not inside it,
- * and has to follow the same drag.
+ * The least time the page stays held once a refresh fires. A feed that answers
+ * from cache finishes in a few milliseconds; without this the page would drop
+ * back before the loading animation had been seen.
  */
-@OptIn(ExperimentalMaterial3Api::class)
+private const val ELASTIC_PULL_MIN_HOLD_MS = 900L
+
+/** Unit vectors of the indicator's 12 spokes, clockwise from twelve o'clock. */
+private val ELASTIC_SPOKE_COS = FloatArray(12) { cos((-90.0 + it * 30.0) * PI / 180.0).toFloat() }
+private val ELASTIC_SPOKE_SIN = FloatArray(12) { sin((-90.0 + it * 30.0) * PI / 180.0).toFloat() }
+
+/**
+ * State of the elastic pull-to-refresh: the whole page follows the finger with
+ * an iOS-style rubber-band, is held at a rest distance while a refresh runs and
+ * springs back when it ends.
+ *
+ * Hoisted by the caller and bound to the caller's scope, so a pull released on
+ * a page that then leaves composition still finishes its spring-back.
+ */
+@Stable
+class ElasticRefreshState internal constructor(private val scope: CoroutineScope) {
+    /** How far the page is pushed down, in px. Read in layer/draw blocks only. */
+    var offset by mutableFloatStateOf(0f)
+        private set
+
+    /** True while the pull is past the refresh threshold. */
+    var armed by mutableStateOf(false)
+        private set
+
+    /** True from a releasing pull that started a refresh until the refresh is over. */
+    var holding by mutableStateOf(false)
+        private set
+
+    /** True while a finger is pulling the page (as opposed to it settling on its own). */
+    var pulling by mutableStateOf(false)
+        private set
+
+    internal var thresholdPx = 0f
+        private set
+    private var holdPx = 0f
+    private var rangePx = 1f
+    private var rawDrag = 0f
+    private var dragging = false
+    private var started = false
+    private var finishing = false
+    private var holdStartNs = 0L
+    private var anim: Job? = null
+
+    internal fun configure(thresholdPx: Float, holdPx: Float, rangePx: Float) {
+        this.thresholdPx = thresholdPx
+        this.holdPx = holdPx
+        this.rangePx = rangePx
+    }
+
+    private fun resist(x: Float): Float =
+        rangePx * (1f - 1f / (x * ELASTIC_PULL_RUBBER / rangePx + 1f))
+
+    private fun unresist(y: Float): Float {
+        val p = (y / rangePx).coerceIn(0f, 0.98f)
+        return rangePx * (1f / (1f - p) - 1f) / ELASTIC_PULL_RUBBER
+    }
+
+    /** Moves the page by [delta] finger px (down is positive); returns what was used. */
+    internal fun dragBy(delta: Float): Float {
+        if (!dragging) {
+            anim?.cancel()
+            anim = null
+            rawDrag = unresist(offset)
+            dragging = true
+            pulling = true
+        }
+        val next = (rawDrag + delta).coerceAtLeast(0f)
+        val used = next - rawDrag
+        rawDrag = next
+        offset = resist(next)
+        if (!armed && offset >= thresholdPx) {
+            armed = true
+        } else if (armed && offset < thresholdPx * 0.92f) {
+            armed = false
+        }
+        return used
+    }
+
+    /** The finger lifted. True if the page was pulled and the release was handled here. */
+    internal fun release(refreshingNow: Boolean, onRefresh: () -> Unit): Boolean {
+        if (!dragging) return false
+        dragging = false
+        pulling = false
+        rawDrag = 0f
+        if (offset <= 0f) {
+            armed = false
+            return false
+        }
+        val fire = armed && !holding
+        armed = false
+        if (fire) {
+            holding = true
+            finishing = false
+            started = refreshingNow
+            holdStartNs = System.nanoTime()
+            settleTo(holdPx)
+            onRefresh()
+            scope.launch {
+                delay(ELASTIC_PULL_START_GRACE_MS)
+                if (holding && !started) finish()
+            }
+        } else {
+            settleTo(0f)
+        }
+        return true
+    }
+
+    internal fun onRefreshingChanged(refreshing: Boolean) {
+        if (refreshing) {
+            started = true
+        } else if (holding && started) {
+            finish()
+        }
+    }
+
+    /** The page is back on screen: drop anything a previous visit left half-done. */
+    internal fun onAttach() {
+        dragging = false
+        pulling = false
+        rawDrag = 0f
+        armed = false
+        if (!holding && offset > 0f) settleTo(0f)
+    }
+
+    private fun finish() {
+        if (finishing) return
+        finishing = true
+        scope.launch {
+            val elapsedMs = (System.nanoTime() - holdStartNs) / 1_000_000L
+            val remaining = ELASTIC_PULL_MIN_HOLD_MS - elapsedMs
+            if (remaining > 0L) delay(remaining)
+            holding = false
+            started = false
+            finishing = false
+            if (!dragging) settleTo(0f)
+        }
+    }
+
+    private fun settleTo(target: Float) {
+        anim?.cancel()
+        anim = scope.launch {
+            animate(
+                initialValue = offset,
+                targetValue = target,
+                animationSpec = spring(dampingRatio = 0.9f, stiffness = 260f),
+            ) { value, _ -> offset = value.coerceAtLeast(0f) }
+        }
+    }
+}
+
+@Composable
+fun rememberElasticRefreshState(): ElasticRefreshState {
+    val scope = rememberCoroutineScope()
+    return remember(scope) { ElasticRefreshState(scope) }
+}
+
+private class ElasticRefreshConnection(
+    private val state: ElasticRefreshState,
+    private val isRefreshing: () -> Boolean,
+    private val onRefresh: () -> Unit,
+) : NestedScrollConnection {
+    override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+        if (source != NestedScrollSource.UserInput || state.holding) return Offset.Zero
+        // Pushing back up: the page gives its offset back before the list scrolls.
+        if (available.y < 0f && state.offset > 0f) return Offset(0f, state.dragBy(available.y))
+        return Offset.Zero
+    }
+
+    override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+        if (source != NestedScrollSource.UserInput || state.holding) return Offset.Zero
+        // What the list could not take is the pull past its top edge.
+        if (available.y > 0f) return Offset(0f, state.dragBy(available.y))
+        return Offset.Zero
+    }
+
+    override suspend fun onPreFling(available: Velocity): Velocity =
+        if (state.release(isRefreshing(), onRefresh)) available else Velocity.Zero
+}
+
+/**
+ * Pull-to-refresh for the tab feeds: the whole page follows the finger with an
+ * iOS-style rubber-band instead of a puck drawn over it.
+ *
+ * Past the threshold a release holds the page at a rest distance and calls
+ * [onRefresh] once; when [refreshing] goes back to false the page springs home.
+ * [topInset] is the frosted bar's height, so the small hint in the gap sits
+ * below the bar. [state] is hoisted so a feed that leaves the screen mid-pull
+ * keeps its place.
+ */
 @Composable
 fun PullToRefresh(
     refreshing: Boolean,
     onRefresh: () -> Unit,
-    state: PullToRefreshState,
+    state: ElasticRefreshState,
     modifier: Modifier = Modifier,
+    topInset: Dp = 0.dp,
     content: @Composable () -> Unit,
 ) {
     if (!LocalPullToRefreshEnabled.current) {
         Box(modifier.fillMaxSize()) { content() }
         return
     }
-    PullToRefreshBox(
-        isRefreshing = refreshing,
-        onRefresh = onRefresh,
-        state = state,
-        modifier = modifier.fillMaxSize(),
-        indicator = {},
-    ) {
-        content()
+    val density = LocalDensity.current
+    remember(density.density) {
+        state.configure(
+            thresholdPx = with(density) { ELASTIC_PULL_THRESHOLD.toPx() },
+            holdPx = with(density) { ELASTIC_PULL_HOLD.toPx() },
+            rangePx = with(density) { ELASTIC_PULL_RANGE.toPx() },
+        )
+    }
+    val haptics = rememberHaptics()
+    val latestRefreshing by rememberUpdatedState(refreshing)
+    val latestOnRefresh by rememberUpdatedState(onRefresh)
+    val connection = remember(state) {
+        ElasticRefreshConnection(state, { latestRefreshing }, { latestOnRefresh() })
+    }
+    LaunchedEffect(state) { state.onAttach() }
+    LaunchedEffect(refreshing) { state.onRefreshingChanged(refreshing) }
+    LaunchedEffect(state) {
+        snapshotFlow { state.armed }.collect { if (it) haptics.play(Haptic.Tick) }
+    }
+    Box(modifier.fillMaxSize().nestedScroll(connection)) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .graphicsLayer { translationY = state.offset },
+        ) {
+            content()
+        }
+        ElasticRefreshHint(state = state, topInset = topInset)
+    }
+}
+
+/**
+ * An iOS-style spoke indicator in the gap the pull opens, with a short label
+ * under it. The spokes appear one by one with the drag, then a bright head
+ * steps around them, trailing a fade, while the refresh runs. It lives in the
+ * page, so it
+ * goes where the page goes. Composed only while the page is displaced, so
+ * nothing animates at rest.
+ */
+@Composable
+private fun ElasticRefreshHint(state: ElasticRefreshState, topInset: Dp) {
+    val visible by remember(state) { derivedStateOf { state.offset > 0f } }
+    if (!visible) return
+    val color = MaterialTheme.colorScheme.onSurfaceVariant
+    val spin = rememberInfiniteTransition(label = "elasticRefreshSpin")
+    val angle by spin.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(960, easing = LinearEasing)),
+        label = "elasticRefreshAngle",
+    )
+    val blend by animateFloatAsState(
+        targetValue = if (state.holding) 1f else 0f,
+        animationSpec = tween(280),
+        label = "elasticRefreshBlend",
+    )
+    // 0 = pull, 1 = release, 2 = refreshing. Kept through the spring-back so the
+    // label does not flip back to "pull" while the page is going home.
+    var mode by remember { mutableStateOf(0) }
+    val target = when {
+        state.holding -> 2
+        state.pulling && state.armed -> 1
+        state.pulling -> 0
+        else -> -1
+    }
+    LaunchedEffect(target) { if (target >= 0) mode = target }
+    val label = stringResource(
+        when (mode) {
+            2 -> Res.string.pull_refreshing
+            1 -> Res.string.pull_release
+            else -> Res.string.pull_to_refresh
+        },
+    )
+    val density = LocalDensity.current
+    val insetPx = with(density) { topInset.toPx() }
+    val halfPx = with(density) { 21.dp.toPx() }
+    val fadeStartPx = with(density) { 18.dp.toPx() }
+    val fadeSpanPx = with(density) { 36.dp.toPx() }
+    Box(Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .graphicsLayer {
+                    translationY = insetPx + state.offset / 2f - halfPx
+                    alpha = ((state.offset - fadeStartPx) / fadeSpanPx).coerceIn(0f, 1f)
+                },
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Canvas(Modifier.size(22.dp)) {
+                val progress = (state.offset / state.thresholdPx.coerceAtLeast(1f)).coerceIn(0f, 1f)
+                val center = Offset(size.width / 2f, size.height / 2f)
+                val inner = 5.5.dp.toPx()
+                val outer = 10.dp.toPx()
+                val strokeWidth = 2.2.dp.toPx()
+                // Like iOS's activity indicator, the head steps from spoke to spoke.
+                val head = (angle / 30f).toInt() % 12
+                for (i in 0 until 12) {
+                    val pullAlpha = (progress * 12f - i).coerceIn(0f, 1f) * 0.5f
+                    val behind = (head - i + 12) % 12
+                    val spinAlpha = 1f - behind * 0.075f
+                    val a = pullAlpha + (spinAlpha - pullAlpha) * blend
+                    if (a <= 0.01f) continue
+                    val dx = ELASTIC_SPOKE_COS[i]
+                    val dy = ELASTIC_SPOKE_SIN[i]
+                    drawLine(
+                        color = color.copy(alpha = a),
+                        start = Offset(center.x + dx * inner, center.y + dy * inner),
+                        end = Offset(center.x + dx * outer, center.y + dy * outer),
+                        strokeWidth = strokeWidth,
+                        cap = StrokeCap.Round,
+                    )
+                }
+            }
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = color,
+            )
+        }
     }
 }
 

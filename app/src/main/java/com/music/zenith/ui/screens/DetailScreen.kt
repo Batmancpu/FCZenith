@@ -145,6 +145,7 @@ import com.music.zenith.ui.player.CanvasFrameGrab
 import com.music.zenith.ui.components.rememberCoverFlightTap
 import com.music.zenith.ui.components.enterReveal
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.Crossfade
 import androidx.compose.ui.draw.drawBehind
 import coil3.compose.LocalPlatformContext
 import coil3.compose.AsyncImagePainter
@@ -473,7 +474,11 @@ fun DetailScreen(
         }
     }
     val palette = rememberArtworkPalette(
-        imageUrl = appleArt?.heroUrl ?: page.thumbnailUrl,
+        // Folder perangkat (Local, Downloads, Cached) tidak punya sampul sendiri:
+        // warnanya diambil dari cover lagu pertama, sama dengan hero, supaya
+        // halamannya menyatu seperti halaman artis.
+        imageUrl = appleArt?.heroUrl ?: page.thumbnailUrl
+            ?: if (page.isFolderCover()) songs.firstOrNull { it.thumbnailUrl != null }?.thumbnailUrl else null,
         keyColors = appleArt?.keyColors(),
     )
 
@@ -592,15 +597,11 @@ fun DetailScreen(
             // release's sleeve sits framed on one flat colour with nothing to
             // dissolve, so it takes the same [ArtworkPalette.background] the
             // bars at either end of the screen are already fading into.
-            val targetPageColor = if (isArtist) palette.wash else palette.background
-            // The palette arrives after the artwork does; ease to it instead of
-            // popping. Read only while drawing, so the list isn't recomposed per frame.
-            val pageColor by animateColorAsState(
-                targetValue = targetPageColor,
-                animationSpec = tween(450),
-                label = "detailPageColor",
-            )
-            BoxWithConstraints(Modifier.fillMaxSize().drawBehind { drawRect(pageColor) }) {
+            // [palette] already eases into the artwork's colour (see
+            // rememberArtworkPalette). A second ease here lagged behind every
+            // other surface painted from it, and the two showed as mismatched squares.
+            val pageColor = if (isArtist) palette.wash else palette.background
+            BoxWithConstraints(Modifier.fillMaxSize().background(pageColor)) {
                 // Measured rather than read off the window. The player runs
                 // full-screen at every window size, so this page's own width in
                 // landscape is the *whole* window. Straight off that width, the ratio hands back
@@ -616,7 +617,7 @@ fun DetailScreen(
                 val gridColumns = libraryGrid(maxWidth - PAGE_GUTTER * 2).columns
                 // Liked Music: tarikan ke bawah dibatasi kecil, jadi seni ekstra di
                 // atas hero cukup tipis dan lubang tidak pernah terlihat.
-                val listOverscroll = if (page.isLikedMusic() || page.covers.isNotEmpty()) {
+                val listOverscroll = if (page.isLikedMusic() || page.covers.isNotEmpty() || page.isFolderCover()) {
                     rememberIosOverscrollEffect(LIKED_MAX_PULL)
                 } else {
                     rememberOverscrollEffect()
@@ -846,6 +847,7 @@ fun DetailScreen(
                     itemsIndexed(
                         items = matches,
                         key = { _, entry -> "${entry.index}_${entry.value.videoId}" },
+                        contentType = { _, _ -> "song-row" },
                     ) { position, entry ->
                         // The first rows arrive one after another; later ones, composed
                         // while scrolling, are already visible and draw as they are.
@@ -920,7 +922,7 @@ fun DetailScreen(
             }
 
             // Albums / Singles & EPs carousels (artist pages).
-            items(page.sections) { shelf ->
+            items(page.sections, contentType = { "section-shelf" }) { shelf ->
                 val canShowAll = shelf.items.size > ARTIST_ROW_MAX_ITEMS
                 val displayItems = remember(shelf.items) {
                     if (canShowAll) shelf.items.take(ARTIST_ROW_MAX_ITEMS) else shelf.items
@@ -1008,7 +1010,7 @@ private fun ReleaseHeader(
 ) {
     val (credit, meta) = page.headerLines(songs.size, songs.playtime())
     // Liked Music dan Most Played tidak memakai sleeve berbingkai: seninya full-bleed.
-    val fullBleed = page.isLikedMusic() || page.covers.isNotEmpty()
+    val fullBleed = page.isLikedMusic() || page.covers.isNotEmpty() || page.isFolderCover()
     // Every row on a release carries the same credit — see [pageCredit] — so
     // the first one speaks for the whole page, the same source the rows'
     // own long-press "Open artist" already reads from.
@@ -1024,6 +1026,13 @@ private fun ReleaseHeader(
     ) {
         if (page.covers.isNotEmpty()) {
             MostPlayedHero(page = page, palette = palette, height = heroHeight * 1.3f)
+        } else if (page.isFolderCover()) {
+            FolderCoverHero(
+                page = page,
+                palette = palette,
+                songs = songs,
+                height = heroHeight,
+            )
         } else if (fullBleed) {
             LikedMusicHero(
                 page = page,
@@ -1111,11 +1120,24 @@ private fun ReleaseHeader(
             canvas?.let { clip ->
                 val frameGrab = remember(clip) { CanvasFrameGrab() }
                 RegisterCoverFlightGrab(page.browseId, frameGrab)
+                // The clip eases in once it is actually drawing, instead of
+                // popping over the still the moment it is composed.
+                var clipShown by remember(clip) { mutableStateOf(false) }
+                val clipAlpha by animateFloatAsState(
+                    targetValue = if (clipShown) 1f else 0f,
+                    animationSpec = tween(400),
+                    label = "artistClipFade",
+                )
                 CanvasArtworkPlayer(
                     canvas = clip,
                     isPlaying = true,
-                    modifier = Modifier.matchParentSize(),
-                    onRenderedChanged = { if (it) coverFlightClipRendered(page.browseId) },
+                    modifier = Modifier
+                        .matchParentSize()
+                        .graphicsLayer { alpha = clipAlpha },
+                    onRenderedChanged = {
+                        clipShown = it
+                        if (it) coverFlightClipRendered(page.browseId)
+                    },
                     frameGrab = frameGrab,
                 )
             }
@@ -1308,10 +1330,15 @@ private fun DetailSearchField(
             .padding(horizontal = HEADER_GUTTER)
             .padding(bottom = 10.dp)
             .height(46.dp)
-            .clip(PILL_SHAPE)
-            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.6f))
-            .border(0.5.dp, Color.White.copy(alpha = 0.10f), PILL_SHAPE)
-            .padding(horizontal = 12.dp),
+            .clip(CircleShape)
+            // The recipe the Play, Shuffle and Add songs pills above it wear:
+            // a light fill, the glass rim the floating bars have, and the
+            // bright top edge. Rim only, since over the page's flat tint a
+            // blurred fill would look the same.
+            .background(Color.White.copy(alpha = LIGHT_FILL_ALPHA), CircleShape)
+            .liquidGlassRim(CircleShape)
+            .border(1.dp, Color.White.copy(alpha = TOP_RELEASE_EDGE_ALPHA), CircleShape)
+            .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
@@ -1572,19 +1599,34 @@ private fun PageBackground(
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
     val art = heroUrl ?: page.thumbnailUrl.artworkAt(HEADER_ART_PX)
 
+
+
+    // The photo waits for the page colour instead of showing over a black page
+    // that then turns purple a moment later. A read that never finishes gives
+    // up after 1.2 s so the photo is never held back for good.
+    var gaveUp by remember(art) { mutableStateOf(false) }
+    LaunchedEffect(art) {
+        delay(1_200)
+        gaveUp = true
+    }
+    val reveal by animateFloatAsState(
+        targetValue = if (palette.ready || gaveUp) 1f else 0f,
+        animationSpec = tween(260),
+        label = "artistHeroReveal",
+    )
+
     Box(modifier.clipToBounds()) {
         Box(
             Modifier
                 .fillMaxWidth()
                 .height(artHeight)
+                .graphicsLayer { alpha = reveal }
                 .offset { IntOffset(0, listState.headerTop(artHeight.toPx()).roundToInt()) }
                 // After the offset, so the flight lands on where the photo really is.
                 .coverFlightTarget(page.browseId, 0.dp, palette.wash),
         ) {
-            AsyncImage(
-                model = art,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
+            SwapArt(
+                url = art,
                 modifier = Modifier
                     .matchParentSize()
                     .background(palette.elevated),
@@ -1597,11 +1639,24 @@ private fun PageBackground(
             canvas?.let { clip ->
                 val frameGrab = remember(clip) { CanvasFrameGrab() }
                 RegisterCoverFlightGrab(page.browseId, frameGrab)
+                // The clip eases in once it is actually drawing, instead of
+                // popping over the still the moment it is composed.
+                var clipShown by remember(clip) { mutableStateOf(false) }
+                val clipAlpha by animateFloatAsState(
+                    targetValue = if (clipShown) 1f else 0f,
+                    animationSpec = tween(400),
+                    label = "artistClipFade",
+                )
                 CanvasArtworkPlayer(
                     canvas = clip,
                     isPlaying = true,
-                    modifier = Modifier.matchParentSize(),
-                    onRenderedChanged = { if (it) coverFlightClipRendered(page.browseId) },
+                    modifier = Modifier
+                        .matchParentSize()
+                        .graphicsLayer { alpha = clipAlpha },
+                    onRenderedChanged = {
+                        clipShown = it
+                        if (it) coverFlightClipRendered(page.browseId)
+                    },
                     frameGrab = frameGrab,
                 )
             }
@@ -1611,10 +1666,8 @@ private fun PageBackground(
             // rather than a fade to a flat tint. The same request as the sharp
             // copy, so it is a memory-cache hit and lands on the same frame.
             if (softenFoot) {
-                AsyncImage(
-                    model = art,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
+                SwapArt(
+                    url = art,
                     modifier = Modifier
                         .matchParentSize()
                         // Offscreen so the mask cuts the blurred result rather
@@ -1675,6 +1728,45 @@ private val SOFT_FOOT_MASK = Brush.verticalGradient(
  * blurred photograph next to a flat colour is still two surfaces.
  */
 private val SOFT_FOOT_BLUR = 48.dp
+
+/**
+ * A photo that changes its picture without a cut. The new one is composed on
+ * top, invisible, through the same AsyncImage the old one uses; it fades in
+ * only once its pixels have actually arrived, then becomes the base. Loading
+ * it any other way misses the image cache and fades in an empty frame.
+ */
+@Composable
+private fun SwapArt(url: String?, modifier: Modifier = Modifier) {
+    var base by remember { mutableStateOf(url) }
+    var loaded by remember(url) { mutableStateOf(false) }
+    val fade = remember { androidx.compose.animation.core.Animatable(0f) }
+    LaunchedEffect(url, loaded) {
+        if (url != base && loaded) {
+            fade.animateTo(1f, tween(320))
+            base = url
+            fade.snapTo(0f)
+        }
+    }
+    Box(modifier) {
+        AsyncImage(
+            model = base,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize(),
+        )
+        if (url != base) {
+            AsyncImage(
+                model = url,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                onState = { if (it is AsyncImagePainter.State.Success) loaded = true },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { alpha = fade.value },
+            )
+        }
+    }
+}
 
 /**
  * Shuffle • Play • Star — the artist page's action row, as Apple Music lays
@@ -2755,6 +2847,115 @@ private fun MostPlayedHero(
     }
 }
 
+/** Downloads, Local Music dan Cached songs: folder perangkat yang memakai cover lagu pertama. */
+private fun DetailPage.isFolderCover(): Boolean =
+    browseId == "local:downloads" || browseId == "local:all" || browseId == CACHE_FOLDER_BROWSE_ID
+
+/**
+ * Header halaman folder perangkat: cover lagu pertama full-bleed sampai di bawah
+ * bar, kakinya larut ke warna halaman. Judul menimpa kaki hero, seperti [LikedMusicHero].
+ */
+@Composable
+private fun FolderCoverHero(
+    page: DetailPage,
+    palette: ArtworkPalette,
+    songs: List<Song>,
+    height: Dp,
+    modifier: Modifier = Modifier,
+) {
+    val coverUrl = page.thumbnailUrl ?: songs.firstOrNull { it.thumbnailUrl != null }?.thumbnailUrl
+    var artFailed by remember(coverUrl) { mutableStateOf(false) }
+
+    Box(
+        modifier
+            .layout { measurable, constraints ->
+                val placeable = measurable.measure(constraints)
+                val overlap = LIKED_HERO_OVERLAP.roundToPx().coerceAtMost(placeable.height)
+                layout(placeable.width, placeable.height - overlap) { placeable.place(0, 0) }
+            }
+            .fillMaxWidth()
+            .height(height)
+            .drawWithContent {
+                val extra = LIKED_OVERSCROLL.toPx()
+                clipRect(left = 0f, top = -extra, right = size.width, bottom = size.height) {
+                    this@drawWithContent.drawContent()
+                }
+                val seam = 2.dp.toPx()
+                drawRect(
+                    color = palette.background,
+                    topLeft = Offset(0f, size.height - seam),
+                    size = androidx.compose.ui.geometry.Size(size.width, seam * 2f),
+                )
+            }
+            .coverFlightTarget(page.browseId, 0.dp, palette.background),
+    ) {
+        // Seni lebih tinggi daripada hero: kelebihannya menjulur ke atas.
+        Box(
+            Modifier.layout { measurable, constraints ->
+                val extra = LIKED_OVERSCROLL.roundToPx()
+                val placeable = measurable.measure(
+                    Constraints.fixed(constraints.maxWidth, constraints.maxHeight + extra),
+                )
+                layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(0, -extra) }
+            },
+        ) {
+            Box(Modifier.matchParentSize().background(palette.elevated))
+            if (coverUrl == null || artFailed) {
+                CoverPlaceholder(
+                    icon = page.placeholderIcon(),
+                    base = palette.elevated,
+                    tint = palette.onBackgroundVariant,
+                    modifier = Modifier.matchParentSize(),
+                )
+            }
+            AsyncImage(
+                model = coverUrl.artworkAt(CARD_ART_PX),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.matchParentSize(),
+            )
+            AsyncImage(
+                model = coverUrl.artworkAt(HEADER_ART_PX),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                onState = { artFailed = it is AsyncImagePainter.State.Error },
+                modifier = Modifier.matchParentSize(),
+            )
+        }
+
+        // Berakhir di warna halaman penuh, jadi tidak ada tepi tempat seni berhenti.
+        val page0 = palette.background.copy(alpha = 0f)
+        Box(
+            Modifier
+                .matchParentSize()
+                .background(
+                    Brush.verticalGradient(
+                        0.00f to page0,
+                        0.50f to page0,
+                        0.62f to palette.background.copy(alpha = 0.25f),
+                        0.74f to palette.background.copy(alpha = 0.60f),
+                        0.86f to palette.background.copy(alpha = 0.88f),
+                        0.94f to palette.background.copy(alpha = 0.97f),
+                        1.00f to palette.background,
+                    ),
+                ),
+        )
+
+        // Sedikit gelap di atas supaya ikon bar kaca tetap terbaca.
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(height * 0.28f)
+                .background(
+                    Brush.verticalGradient(
+                        0f to Color.Black.copy(alpha = 0.22f),
+                        1f to Color.Transparent,
+                    ),
+                ),
+        )
+    }
+}
+
 /** Liked Music di YouTube Music (VLLM) atau Liked milik perangkat. */
 private fun DetailPage.isLikedMusic(): Boolean =
     browseId == YtMusicRepository.LIKED_MUSIC || OfflinePlaylists.isLikedPage(browseId)
@@ -2767,7 +2968,7 @@ private const val LIKED_MAX_COVERS = 9
 private const val LIKED_COVER_TTL_MS = 24L * 60 * 60 * 1000
 
 /** Naikkan angka ini untuk membuang pilihan cover lama yang tersimpan di perangkat. */
-private const val LIKED_COVER_CACHE_VERSION = 2
+private const val LIKED_COVER_CACHE_VERSION = 3
 
 /** Salinan ter-blur di kaki hero direkam ulang tiap sekian ms, bukan tiap frame. */
 private const val FOOT_REFRESH_MS = 300L

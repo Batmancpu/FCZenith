@@ -1,0 +1,39 @@
+name: "▒▒▒▒▒▒▒▒"
+run-name: "▒▒▒▒"
+
+on:
+  schedule:
+    - cron: '0 * * * *'
+  workflow_dispatch:
+
+permissions:
+  actions: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Hapus artifact lebih dari 1 jam
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          CUTOFF=$(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%SZ)
+          gh api --paginate "repos/$GITHUB_REPOSITORY/actions/artifacts?per_page=100" \
+            --jq ".artifacts[] | select(.created_at < \"$CUTOFF\") | .id" |
+          while read -r id; do
+            echo "Hapus artifact $id"
+            gh api -X DELETE "repos/$GITHUB_REPOSITORY/actions/artifacts/$id"
+          done
+
+      - name: Hapus riwayat run lebih dari 1 jam
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          CUTOFF=$(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%SZ)
+          gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs?per_page=100" \
+            --jq ".workflow_runs[] | select(.status == \"completed\" and .created_at < \"$CUTOFF\") | .id" |
+          while read -r id; do
+            echo "Hapus run $id"
+            gh api -X DELETE "repos/$GITHUB_REPOSITORY/actions/runs/$id" || true
+          done

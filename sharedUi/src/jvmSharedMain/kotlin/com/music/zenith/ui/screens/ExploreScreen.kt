@@ -23,7 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.pulltorefresh.PullToRefreshState
+import com.music.zenith.ui.components.ElasticRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -72,7 +72,7 @@ fun ExploreScreen(
     onRetry: () -> Unit,
     refreshing: Boolean,
     onRefresh: () -> Unit,
-    pullState: PullToRefreshState,
+    pullState: ElasticRefreshState,
     contentPadding: PaddingValues,
     modifier: Modifier = Modifier,
     /** The big "Explore" heading; the desktop's pages carry none. */
@@ -96,6 +96,7 @@ fun ExploreScreen(
         refreshing = refreshing,
         onRefresh = onRefresh,
         state = pullState,
+        topInset = contentPadding.calculateTopPadding(),
         modifier = modifier,
     ) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -110,7 +111,16 @@ fun ExploreScreen(
             }
             LazyColumn(
                 state = listState,
-                contentPadding = contentPadding,
+                // The heading sits where Home's does: the whole page is lifted
+                // by the same amount, not just the title.
+                contentPadding = if (showTitle) {
+                    PaddingValues(
+                        top = (contentPadding.calculateTopPadding() - HOME_TITLE_LIFT).coerceAtLeast(0.dp),
+                        bottom = contentPadding.calculateBottomPadding(),
+                    )
+                } else {
+                    contentPadding
+                },
                 modifier = Modifier.fillMaxSize(),
             ) {
                 if (showTitle) {

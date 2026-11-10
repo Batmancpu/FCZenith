@@ -295,6 +295,8 @@ fun FloatingTabBar(
     chromeDownPush: (() -> Float)? = null,
     /** Goyangan jelly pill accessory inline; tab dan Search terdorong olehnya. */
     jellyPush: JellyPush? = null,
+    /** true = tab terakhir (Search) dipisah jadi lingkaran sendiri hanya saat bar inline. */
+    inlineSplitLast: Boolean = false,
     tabBarContentModifier: @Composable () -> Modifier = DefaultTabBarContentModifier,
     inlineAccessory: (@Composable SharedTransitionScope.(Modifier, AnimatedVisibilityScope) -> Unit)? = null,
     expandedAccessory: (@Composable SharedTransitionScope.(Modifier, AnimatedVisibilityScope) -> Unit)? = null,
@@ -305,13 +307,64 @@ fun FloatingTabBar(
     contentKey: Any? = null,
     content: FloatingTabBarScope.() -> Unit
 ) {
-    val scope = remember(contentKey) { FloatingTabBarScopeImpl().apply { content() } }
+    val scope = remember(contentKey, inlineSplitLast) {
+        FloatingTabBarScopeImpl(inlineSplitLast).apply { content() }
+    }
 
     val isAccessoryShared = inlineAccessory != null && expandedAccessory != null
 
+    // Saat mengecil, bar ditarik sedikit ke atas seolah terseret halaman, lalu
+    // mengendap ke bentuk inline dengan pegas. Dibaca di graphicsLayer saja.
+    val pull = remember { androidx.compose.animation.core.Animatable(0f) }
+    val pullPx = with(LocalDensity.current) { 28.dp.toPx() }
+    // Bentuk yang ditampilkan menyusul scrollConnection: mini player ditarik dulu,
+    // baru saat dilepas bentuknya berganti dan memantul masuk ke pil tengah.
+    var shownInline by remember { mutableStateOf(scrollConnection.isInline) }
+    LaunchedEffect(scrollConnection.isInline) {
+        val target = scrollConnection.isInline
+        if (target == shownInline) {
+            // Berbalik sebelum sempat dilepas: karet kembali diam, tidak tertahan tegang.
+            pull.animateTo(
+                0f,
+                androidx.compose.animation.core.spring(dampingRatio = 0.6f, stiffness = 300f),
+            )
+            return@LaunchedEffect
+        }
+        // Mengecil: player penuh ditarik ke atas. Membesar: pil ditarik ke bawah.
+        val amplitude = if (target) 1f else -0.7f
+        pull.animateTo(
+            amplitude,
+            androidx.compose.animation.core.tween(190, easing = FastOutSlowInEasing),
+        )
+        // Dilepas: berganti bentuk, lalu memantul lewat titik awal dan mengendap.
+        shownInline = target
+        pull.animateTo(
+            0f,
+            androidx.compose.animation.core.spring(dampingRatio = 0.42f, stiffness = 210f),
+        )
+    }
+
+    // Hanya accessory (mini player) yang tertarik; tab dan Search tetap diam.
+    val inlineWithPull: (@Composable SharedTransitionScope.(Modifier, AnimatedVisibilityScope) -> Unit)? =
+        remember(inlineAccessory, pullPx) {
+            inlineAccessory?.let { acc ->
+                val wrapped: @Composable SharedTransitionScope.(Modifier, AnimatedVisibilityScope) -> Unit =
+                    { m, s -> acc(Modifier.rubberStretch(pullPx) { pull.value }.then(m), s) }
+                wrapped
+            }
+        }
+    val expandedWithPull: (@Composable SharedTransitionScope.(Modifier, AnimatedVisibilityScope) -> Unit)? =
+        remember(expandedAccessory, pullPx) {
+            expandedAccessory?.let { acc ->
+                val wrapped: @Composable SharedTransitionScope.(Modifier, AnimatedVisibilityScope) -> Unit =
+                    { m, s -> acc(Modifier.rubberStretch(pullPx) { pull.value }.then(m), s) }
+                wrapped
+            }
+        }
+
     SharedTransitionLayout(modifier = modifier) {
         AnimatedContent(
-            targetState = scrollConnection.isInline,
+            targetState = shownInline,
             transitionSpec = {
                 // The container's own size follows the same spring, so the bar
                 // grows and shrinks with the pieces inside it.
@@ -334,9 +387,10 @@ fun FloatingTabBar(
                     chromeSidePush = chromeSidePush,
                     jellyPush = jellyPush,
                     selectedTabKey = selectedTabKey,
-                    accessory = inlineAccessory,
+                    accessory = inlineWithPull,
                     isAccessoryShared = isAccessoryShared,
                     onInlineTabClick = { scrollConnection.expand() },
+                    neighbourPull = { pull.value },
                     colors = colors,
                     shapes = shapes,
                     sizes = sizes,
@@ -350,7 +404,7 @@ fun FloatingTabBar(
                     chromeProgress = chromeProgress,
                     chromeDownPush = chromeDownPush,
                     selectedTabKey = selectedTabKey,
-                    accessory = expandedAccessory,
+                    accessory = expandedWithPull,
                     isAccessoryShared = isAccessoryShared,
                     colors = colors,
                     shapes = shapes,
@@ -387,9 +441,15 @@ private val LiquidBounds = androidx.compose.animation.BoundsTransform { _, _ ->
 class FloatingTabBarScrollConnection(
     initialIsInline: Boolean = false,
     private val scrollThresholdPx: Float,
-    private val inlineBehavior: FloatingTabBarInlineBehavior = FloatingTabBarInlineBehavior.OnScrollDown
+    private val inlineBehavior: FloatingTabBarInlineBehavior = FloatingTabBarInlineBehavior.OnScrollDown,
+    private val expandOnlyAtTop: Boolean = false,
+    private val expandThresholdPx: Float = scrollThresholdPx
 ) : NestedScrollConnection {
     var isInline by mutableStateOf(initialIsInline)
+        private set
+
+    /** Naik setiap kali halaman menyentuh batas atas saat bar masih inline; dibaca untuk menunda expand. */
+    var topSignal by mutableIntStateOf(0)
         private set
 
     private var accumulatedScroll = 0f
@@ -427,7 +487,7 @@ class FloatingTabBarScrollConnection(
                     // Scrolling down enough - transition to inline mode
                     isInline = true
                     accumulatedScroll = 0f // Reset after state change
-                } else if (accumulatedScroll >= scrollThresholdPx && isInline) {
+                } else if (accumulatedScroll >= expandThresholdPx && isInline && !expandOnlyAtTop) {
                     // Scrolling up enough - transition to expanded mode
                     isInline = false
                     accumulatedScroll = 0f // Reset after state change
@@ -454,6 +514,18 @@ class FloatingTabBarScrollConnection(
 
         return Offset.Zero // Don't consume the scroll, let it pass through
     }
+
+    override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+        // Scrolling up with nothing left to scroll: the page has reached its top.
+        if (expandOnlyAtTop &&
+            inlineBehavior == FloatingTabBarInlineBehavior.OnScrollDown &&
+            isInline &&
+            available.y > 0f
+        ) {
+            topSignal++
+        }
+        return Offset.Zero
+    }
 }
 
 /**
@@ -468,11 +540,20 @@ class FloatingTabBarScrollConnection(
 fun rememberFloatingTabBarScrollConnection(
     initialIsInline: Boolean = false,
     scrollThreshold: Dp = 50.dp,
-    inlineBehavior: FloatingTabBarInlineBehavior = FloatingTabBarInlineBehavior.OnScrollDown
+    inlineBehavior: FloatingTabBarInlineBehavior = FloatingTabBarInlineBehavior.OnScrollDown,
+    expandOnlyAtTop: Boolean = false,
+    expandThreshold: Dp = scrollThreshold
 ): FloatingTabBarScrollConnection = with(LocalDensity.current) {
     val scrollThresholdPx = scrollThreshold.toPx()
-    remember(scrollThresholdPx, inlineBehavior, initialIsInline) {
-        FloatingTabBarScrollConnection(initialIsInline, scrollThresholdPx, inlineBehavior)
+    val expandThresholdPx = expandThreshold.toPx()
+    remember(scrollThresholdPx, expandThresholdPx, inlineBehavior, initialIsInline, expandOnlyAtTop) {
+        FloatingTabBarScrollConnection(
+            initialIsInline,
+            scrollThresholdPx,
+            inlineBehavior,
+            expandOnlyAtTop,
+            expandThresholdPx,
+        )
     }
 }
 
@@ -541,10 +622,11 @@ private fun SharedTransitionScope.InlineBar(
     sizes: FloatingTabBarSizes,
     elevations: FloatingTabBarElevations,
     tabBarContentModifier: @Composable () -> Modifier,
-    animatedVisibilityScope: AnimatedVisibilityScope
+    animatedVisibilityScope: AnimatedVisibilityScope,
+    neighbourPull: () -> Float = { 0f }
 ) {
     val inlineTab = scope.getInlineTab(selectedTabKey)
-    val standaloneTab = scope.standaloneTab
+    val standaloneTab = scope.inlineStandaloneTab
     val hasInlineTab = inlineTab != null
     // Tab menyingkir ke sisi awalnya, Search ke sisi akhirnya.
     val startSign = if (LocalLayoutDirection.current == LayoutDirection.Rtl) 1f else -1f
@@ -573,6 +655,7 @@ private fun SharedTransitionScope.InlineBar(
                 modifier = Modifier
                     .chromePushSide(chromeProgress, startSign, chromeSidePush)
                     .jellyPushSide(jellyPush, startSign, sizes.inlineComponentSpacing)
+                    .neighbourPull(neighbourPull, startSign)
             )
         }
 
@@ -603,6 +686,7 @@ private fun SharedTransitionScope.InlineBar(
                     .aspectRatio(1f)
                     .chromePushSide(chromeProgress, -startSign, chromeSidePush)
                     .jellyPushSide(jellyPush, -startSign, sizes.inlineComponentSpacing)
+                    .neighbourPull(neighbourPull, -startSign)
             )
         }
     }
@@ -981,20 +1065,20 @@ private fun SharedTransitionScope.ExpandedTabs(
                 modifier = Modifier
                     .shadow(
                         shape = shapes.tabBarShape,
-                        elevation = elevations.expandedElevation
+                        elevation = elevations.expandedElevation,
+                        clip = false
                     )
                     .background(
                         color = colors.backgroundColor,
                         shape = shapes.tabBarShape
                     )
-                    .clip(shapes.tabBarShape)
                     .then(tabBarContentModifier())
                     .padding(contentPadding)
-                    .animateContentSize()
             ) {
-                if (showPill && (!glassPill || pill.isFlat)) {
+                if (showPill && (!glassPill || pill.isFlat || pill.blurMix > 0f)) {
                     FlatSelectionPill(
                         color = colors.indicatorColor,
+                        barGlass = barGlass,
                         modifier = Modifier
                             .matchParentSize()
                             .pillPlacement(
@@ -1007,6 +1091,7 @@ private fun SharedTransitionScope.ExpandedTabs(
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(sizes.tabSpacing),
                     modifier = Modifier
+                        .animateContentSize()
                         .fillMaxWidth()
                         .onSizeChanged { rowSize = it }
                         .layerBackdrop(tabRow)
@@ -1326,14 +1411,36 @@ private fun Modifier.animateEnterExitTab(
     }
 }
 
-private class FloatingTabBarScopeImpl : FloatingTabBarScope {
+private class FloatingTabBarScopeImpl(
+    private val inlineSplitLast: Boolean = false,
+) : FloatingTabBarScope {
     val tabs = mutableStateListOf<FloatingTabBarTab>()
     var standaloneTab: FloatingTabBarTab? by mutableStateOf(null)
         private set
     private var inlineTab: FloatingTabBarTab? = null
 
+    /**
+     * Standalone tab untuk bentuk inline. Jika tidak ada standalone asli,
+     * tab terakhir dipisah jadi lingkaran (ikon saja) saat [inlineSplitLast] aktif.
+     * Bentuk expanded tetap memakai [standaloneTab] (satu pil).
+     */
+    val inlineStandaloneTab: FloatingTabBarTab?
+        get() = standaloneTab ?: if (inlineSplitLast && tabs.size > 1) {
+            tabs.last().let { t ->
+                FloatingTabBarTab(
+                    key = t.key,
+                    title = {},
+                    icon = t.icon,
+                    onClick = t.onClick,
+                    indication = t.indication
+                )
+            }
+        } else {
+            null
+        }
+
     fun getInlineTab(selectedTabKey: Any?): FloatingTabBarTab? {
-        return if (selectedTabKey != standaloneTab?.key) {
+        return if (selectedTabKey != inlineStandaloneTab?.key) {
             val selectedTab = tabs.find { it.key == selectedTabKey }
             if (selectedTab != null) {
                 inlineTab = selectedTab

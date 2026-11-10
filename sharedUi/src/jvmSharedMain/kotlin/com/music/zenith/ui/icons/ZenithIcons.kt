@@ -45,6 +45,58 @@ object ZenithIcons {
         }.build()
     }
 
+    /** Apple Music's "Play Next": a play mark leading the first row of a short list. */
+    val PlayNext: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "bc_play_next", defaultWidth = 24.dp, defaultHeight = 24.dp,
+            viewportWidth = 24f, viewportHeight = 24f,
+        ).apply {
+            path(stroke = stroke, strokeLineWidth = 2f, strokeLineCap = StrokeCap.Round) {
+                moveTo(12.5f, 6f)
+                lineTo(21f, 6f)
+                moveTo(3f, 12f)
+                lineTo(21f, 12f)
+                moveTo(3f, 18f)
+                lineTo(21f, 18f)
+            }
+            path(
+                fill = stroke, stroke = stroke, strokeLineWidth = 1.4f,
+                strokeLineJoin = StrokeJoin.Round,
+            ) {
+                moveTo(3.5f, 3.3f)
+                lineTo(9.2f, 6f)
+                lineTo(3.5f, 8.7f)
+                close()
+            }
+        }.build()
+    }
+
+    /** "Play Last": the same list with the play mark closing the final row. */
+    val PlayLast: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "bc_play_last", defaultWidth = 24.dp, defaultHeight = 24.dp,
+            viewportWidth = 24f, viewportHeight = 24f,
+        ).apply {
+            path(stroke = stroke, strokeLineWidth = 2f, strokeLineCap = StrokeCap.Round) {
+                moveTo(3f, 6f)
+                lineTo(21f, 6f)
+                moveTo(3f, 12f)
+                lineTo(21f, 12f)
+                moveTo(3f, 18f)
+                lineTo(12.5f, 18f)
+            }
+            path(
+                fill = stroke, stroke = stroke, strokeLineWidth = 1.4f,
+                strokeLineJoin = StrokeJoin.Round,
+            ) {
+                moveTo(15.5f, 15.3f)
+                lineTo(21.2f, 18f)
+                lineTo(15.5f, 20.7f)
+                close()
+            }
+        }.build()
+    }
+
     val LyricsQuote: ImageVector by lazy {
         ImageVector.Builder(
             name = "bc_lyrics_quote", defaultWidth = 24.dp, defaultHeight = 24.dp,
