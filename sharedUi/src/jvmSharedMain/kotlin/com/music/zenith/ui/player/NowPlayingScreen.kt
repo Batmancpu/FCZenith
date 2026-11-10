@@ -1661,8 +1661,12 @@ fun NowPlayingScreen(
         // Klip hero (Apple dsb.): frame ditahan di lapisan seukuran player, lapisan yang
         // sama dengan tempat klipnya, jadi posisi dan ukurannya persis sama. Di kotak
         // sleeve ia di-crop atau meloncat ukuran saat klip dilepas.
-        val heroGrab = if (panelsUp || !heroMode) null else canvasFrameGrab.grab?.invoke()
-        dissolve.holdFrame(if (panelsUp || heroMode) null else canvasFrameGrab.grab?.invoke())
+        // Landscape tidak punya banner hero; sleeve-nya tetap tampil walau panel terbuka.
+        val inLandscape = landscapePlayerAvailable(windowWidth, windowHeight)
+        val heroGrab = if (inLandscape || panelsUp || !heroMode) null else canvasFrameGrab.grab?.invoke()
+        dissolve.holdFrame(
+            if (!inLandscape && (panelsUp || heroMode)) null else canvasFrameGrab.grab?.invoke(),
+        )
         if (heroGrab != null) {
             dissolve.holdFullFrame(
                 heroGrab,
@@ -2474,6 +2478,7 @@ fun NowPlayingScreen(
                             canvasRendered = canvasRendered,
                             isPlaying = isPlaying,
                             onCanvasRenderedChange = { canvasRendered = it },
+                            frameGrab = canvasFrameGrab,
                             // A clip decoding behind a player on its way to the
                             // bar is work nobody sees — see [dockMoving].
                             pausedForTransition = dockMoving || overlayOpen.value,

@@ -60,6 +60,10 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.TileMode
 import com.music.zenith.ui.graphics.FADE_CURVE_STOPS
 import com.music.zenith.ui.graphics.smootherStep
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
+import kotlin.math.roundToInt
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
@@ -111,6 +115,20 @@ private val LANDSCAPE_GUTTER_COMPACT = 20.dp
 private const val LANDSCAPE_PANE_FADE_IN_MS = 220
 private const val LANDSCAPE_PANE_FADE_IN_DELAY_MS = 90
 private const val LANDSCAPE_PANE_FADE_OUT_MS = 140
+
+/** [image] mengisi scope ini, di tengah dan di-crop seperti ContentScale.Crop. */
+private fun DrawScope.drawLandscapeCropped(image: ImageBitmap) {
+    if (size.width <= 0f || size.height <= 0f) return
+    val scale = maxOf(size.width / image.width, size.height / image.height)
+    val srcWidth = (size.width / scale).roundToInt().coerceIn(1, image.width)
+    val srcHeight = (size.height / scale).roundToInt().coerceIn(1, image.height)
+    drawImage(
+        image = image,
+        srcOffset = IntOffset((image.width - srcWidth) / 2, (image.height - srcHeight) / 2),
+        srcSize = IntSize(srcWidth, srcHeight),
+        dstSize = IntSize(size.width.roundToInt(), size.height.roundToInt()),
+    )
+}
 
 /** Which of its three things the player's content column is showing. */
 internal enum class PlayerPane { Main, Lyrics, Queue }
@@ -303,6 +321,8 @@ internal fun LandscapeArtwork(
     onResumed: () -> Unit = {},
     /** Cover lama + efek transisi (slide / fluid shader), sama seperti sleeve portrait. */
     dissolve: ArtworkDissolve? = null,
+    /** Diisi klip dengan pembaca frame hidupnya, diambil sesaat sebelum skip. */
+    frameGrab: CanvasFrameGrab? = null,
     /**
      * The sleeve's shape, asked for each frame: its corner rounds off into the
      * mini player's cover's as the player docks into it.
@@ -357,22 +377,25 @@ internal fun LandscapeArtwork(
                     .graphicsLayer {
                         val d = dissolve ?: return@graphicsLayer
                         val ease = (1f - d.progress) * (1f - d.progress)
-                        val fluid = d.fluid && d.outgoing != null
+                        val framed = d.frame != null
+                        val fluid = d.fluid && d.outgoing != null && !framed
                         val settle = if (d.light) {
                             1f + 0.02f * ease
                         } else if (fluid) {
                             1f + 0.045f * d.punch * ease
                         } else {
-                            1f + 0.12f * d.punch * ease
+                            1f + (if (framed) 0.07f else 0.12f) * d.punch * ease
                         }
                         scaleX = settle
                         scaleY = settle
-                        translationX = if (fluid || d.light) {
+                        translationX = if (framed || fluid || d.light) {
                             0f
                         } else {
                             d.direction * d.punch * size.width * 0.05f * ease
                         }
-                        renderEffect = if (fluid) {
+                        renderEffect = if (framed && renderEffectBlurSupported && ease > 0.01f) {
+                            BlurEffect(24f * d.punch * ease, 24f * d.punch * ease, TileMode.Clamp)
+                        } else if (fluid) {
                             d.shaderIn.effect(
                                 incoming = true,
                                 progress = d.progress,
@@ -399,18 +422,22 @@ internal fun LandscapeArtwork(
                         .fillMaxSize()
                         .graphicsLayer {
                             val sweeping = dissolve.outgoing != null
+                            val framed = dissolve.frame != null
                             val t = dissolve.progress
                             alpha = when {
+                                framed && sweeping -> 1f - t
+                                framed -> 1f
                                 sweeping && dissolve.fluid -> 1f
                                 sweeping && dissolve.light -> 1f - smootherStep(t)
                                 sweeping -> 1f - smootherStep(((t - 0.62f) / 0.38f).coerceIn(0f, 1f))
                                 dissolve.cutHold -> 1f
                                 else -> 0f
                             }
-                            val plain = sweeping && !dissolve.fluid && !dissolve.light
+                            val plain = sweeping && !framed && !dissolve.fluid && !dissolve.light
                             val move = dissolve.direction * dissolve.punch
                             translationX = if (plain) -move * size.width * 0.30f * t else 0f
                             val shrink = when {
+                                sweeping && framed -> 1f + 0.09f * dissolve.punch * t
                                 sweeping && dissolve.fluid -> 1f + 0.035f * dissolve.punch * smootherStep(t)
                                 sweeping && dissolve.light -> 1f - 0.02f * t
                                 sweeping -> 1f - 0.08f * dissolve.punch * t
@@ -419,7 +446,7 @@ internal fun LandscapeArtwork(
                             scaleX = shrink
                             scaleY = shrink
                             rotationY = if (plain) move * 9f * t else 0f
-                            renderEffect = if (sweeping && dissolve.fluid) {
+                            renderEffect = if (sweeping && !framed && dissolve.fluid) {
                                 dissolve.shaderOut.effect(
                                     incoming = false,
                                     progress = t,
@@ -430,19 +457,28 @@ internal fun LandscapeArtwork(
                                     height = size.height,
                                 )
                             } else if (sweeping && !dissolve.light && renderEffectBlurSupported) {
-                                val radius = 12f * dissolve.punch * 4f * t * (1f - t)
+                                val radius = if (framed) {
+                                    30f * dissolve.punch * smootherStep((t * 1.4f).coerceIn(0f, 1f))
+                                } else {
+                                    12f * dissolve.punch * 4f * t * (1f - t)
+                                }
                                 if (radius > 0.5f) BlurEffect(radius, radius, TileMode.Clamp) else null
                             } else {
                                 null
                             }
                             cameraDistance = 14f * this.density
-                            compositingStrategy = if (sweeping) {
+                            compositingStrategy = if (sweeping || framed) {
                                 CompositingStrategy.Offscreen
                             } else {
                                 CompositingStrategy.Auto
                             }
                         }
                         .drawWithContent {
+                            val grabbed = dissolve.frame
+                            if (grabbed != null) {
+                                drawLandscapeCropped(grabbed)
+                                return@drawWithContent
+                            }
                             drawContent()
                             if (dissolve.outgoing == null) return@drawWithContent
                             // Efek cair memakai mask shader, bukan sapuan.
@@ -482,6 +518,7 @@ internal fun LandscapeArtwork(
                     onStillCaptured = onStillCaptured,
                     onResumed = onResumed,
                     onRenderedChanged = onCanvasRenderedChange,
+                    frameGrab = frameGrab,
                     modifier = Modifier.fillMaxSize(),
                 )
             }
