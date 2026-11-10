@@ -91,6 +91,8 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Velocity
 import kotlin.math.PI
@@ -1255,8 +1257,30 @@ fun PullToRefresh(
         ) {
             content()
         }
+        RefreshInputBlocker(state = state)
         ElasticRefreshHint(state = state, topInset = topInset)
     }
+}
+
+/**
+ * Menelan semua sentuhan di atas halaman selama refresh berjalan, supaya kartu
+ * tidak bisa diketuk dan daftar tidak bisa digeser sementara halaman ditahan.
+ * Dibaca di composable sendiri agar hanya ia yang recompose saat status berganti.
+ */
+@Composable
+private fun RefreshInputBlocker(state: ElasticRefreshState) {
+    if (!state.holding) return
+    Box(
+        Modifier
+            .fillMaxSize()
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
+                    }
+                }
+            },
+    )
 }
 
 /**
