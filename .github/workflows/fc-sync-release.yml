@@ -30,6 +30,9 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
+          # Optional repo-scoped PAT enables upstream workflow-file sync.
+          # The ordinary GITHUB_TOKEN remains the fallback.
+          token: ${{ secrets.FCZENITH_PUSH_TOKEN || github.token }}
 
       - name: Configure git identity
         run: |
