@@ -319,7 +319,7 @@ private fun LibraryLinkList(links: List<LibraryLink>, onClick: (ShelfItem) -> Un
                 Spacer(Modifier.width(LINK_ICON_GAP))
                 Text(
                     text = link.item.title,
-                    style = MaterialTheme.typography.bodyLarge.copy(fontSize = 20.sp),
+                    style = MaterialTheme.typography.bodyLarge.copy(fontSize = 17.sp),
                     color = MaterialTheme.colorScheme.onBackground,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
