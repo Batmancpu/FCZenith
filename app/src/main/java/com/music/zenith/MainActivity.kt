@@ -146,6 +146,7 @@ import com.music.zenith.data.model.durationMillis
 import com.music.zenith.data.scrobbling.LastFM
 import com.music.zenith.data.settings.AppSettings
 import com.music.zenith.data.settings.BitPerfectMode
+import com.music.zenith.data.settings.LastPlayerScreen
 import com.music.zenith.ui.AddonBlockedAlert
 import com.music.zenith.data.settings.LibrarySort
 import com.music.zenith.data.settings.ThemeMode
@@ -1658,6 +1659,23 @@ private fun ZenithApp(
             id = first?.playbackSourceId,
         )
         playFrom(songs, index, source)
+    }
+    // A new track always opens the player on its main screen, never on the
+    // lyrics left over from the previous one. Done here, where the player is
+    // always composed, so it holds whichever way the track changed (Search,
+    // album, queue, next/previous) and also while the player is closed to the
+    // mini player. The first track seen is skipped so a restart still restores
+    // the last screen.
+    var lastTrackId by remember { mutableStateOf(player.song?.videoId) }
+    LaunchedEffect(player.song?.videoId) {
+        val id = player.song?.videoId ?: return@LaunchedEffect
+        val previous = lastTrackId
+        lastTrackId = id
+        if (previous != null && previous != id &&
+            AppSettings.lastPlayerScreen.value == LastPlayerScreen.LYRICS
+        ) {
+            AppSettings.setLastPlayerScreen(LastPlayerScreen.MAIN)
+        }
     }
     LaunchedEffect(player.song?.videoId) {
         if (optimisticVersionSong?.videoId == player.song?.videoId ||
