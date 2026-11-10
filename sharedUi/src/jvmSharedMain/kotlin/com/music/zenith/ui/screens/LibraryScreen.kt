@@ -145,7 +145,16 @@ fun LibraryScreen(
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
-            contentPadding = contentPadding,
+            // The heading sits where Home's does: the whole page is lifted by
+            // the same amount, not just the title.
+            contentPadding = if (showTitle) {
+                PaddingValues(
+                    top = (contentPadding.calculateTopPadding() - HOME_TITLE_LIFT).coerceAtLeast(0.dp),
+                    bottom = contentPadding.calculateBottomPadding(),
+                )
+            } else {
+                contentPadding
+            },
         ) {
             if (showTitle) {
                 item {

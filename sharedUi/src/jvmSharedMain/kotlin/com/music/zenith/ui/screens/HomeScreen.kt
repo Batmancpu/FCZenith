@@ -112,7 +112,7 @@ import com.music.zenith.ui.player.MeshGradientBackground
 import com.music.zenith.ui.player.MeshPalette
 
 /** How far the Listen now heading and feed sit above the shared top inset. */
-private val HOME_TITLE_LIFT = 28.dp
+internal val HOME_TITLE_LIFT = 28.dp
 
 private const val RECENTS_TITLE = "Recents"
 private const val RECENT_TRACKS_PER_COLUMN = 4
