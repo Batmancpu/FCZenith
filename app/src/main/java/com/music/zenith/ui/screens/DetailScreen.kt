@@ -617,7 +617,7 @@ fun DetailScreen(
                 val gridColumns = libraryGrid(maxWidth - PAGE_GUTTER * 2).columns
                 // Liked Music: tarikan ke bawah dibatasi kecil, jadi seni ekstra di
                 // atas hero cukup tipis dan lubang tidak pernah terlihat.
-                val listOverscroll = if (page.isLikedMusic() || page.covers.isNotEmpty() || page.isFolderCover()) {
+                val listOverscroll = if (page.isLikedMusic() || page.covers.isNotEmpty() || page.isFolderCover() || page.isAlbumHero()) {
                     rememberIosOverscrollEffect(LIKED_MAX_PULL)
                 } else {
                     rememberOverscrollEffect()
@@ -1010,7 +1010,8 @@ private fun ReleaseHeader(
 ) {
     val (credit, meta) = page.headerLines(songs.size, songs.playtime())
     // Liked Music dan Most Played tidak memakai sleeve berbingkai: seninya full-bleed.
-    val fullBleed = page.isLikedMusic() || page.covers.isNotEmpty() || page.isFolderCover()
+    val albumHero = page.isAlbumHero()
+    val fullBleed = page.isLikedMusic() || page.covers.isNotEmpty() || page.isFolderCover() || albumHero
     // Every row on a release carries the same credit — see [pageCredit] — so
     // the first one speaks for the whole page, the same source the rows'
     // own long-press "Open artist" already reads from.
@@ -1032,6 +1033,13 @@ private fun ReleaseHeader(
                 palette = palette,
                 songs = songs,
                 height = heroHeight,
+            )
+        } else if (albumHero) {
+            AlbumHero(
+                page = page,
+                palette = palette,
+                canvas = canvas,
+                height = heroHeight * ALBUM_HERO_HEIGHT_SCALE,
             )
         } else if (fullBleed) {
             LikedMusicHero(
@@ -2936,6 +2944,151 @@ private fun FolderCoverHero(
                         0.74f to palette.background.copy(alpha = 0.60f),
                         0.86f to palette.background.copy(alpha = 0.88f),
                         0.94f to palette.background.copy(alpha = 0.97f),
+                        1.00f to palette.background,
+                    ),
+                ),
+        )
+
+        // Sedikit gelap di atas supaya ikon bar kaca tetap terbaca.
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(height * 0.28f)
+                .background(
+                    Brush.verticalGradient(
+                        0f to Color.Black.copy(alpha = 0.22f),
+                        1f to Color.Transparent,
+                    ),
+                ),
+        )
+    }
+}
+
+/** Album: cover full-bleed sampai di bawah bar, seperti halaman folder perangkat. */
+private fun DetailPage.isAlbumHero(): Boolean =
+    type == BrowseType.ALBUM && mix == null && covers.isEmpty() &&
+        !isFolderCover() && !isLikedMusic()
+
+/** Hero album sedikit lebih tinggi dari hero folder, supaya cover persegi tidak banyak terpotong. */
+private const val ALBUM_HERO_HEIGHT_SCALE = 1.13f
+
+/**
+ * Header album: cover full-bleed sampai di bawah bar, kakinya larut ke warna
+ * halaman. Kerangkanya sama dengan [FolderCoverHero] (kotak target terbang yang
+ * sama, sudut 0, wash warna halaman), jadi cover terbang dari kartu mendarat di
+ * kotak ini dan pulang dari sini lagi. Klip cover animasi, kalau ada, berjalan
+ * di kotak yang persis sama dengan target terbang, bukan di seni yang menjulur
+ * ke atas, supaya frame yang ditahan selama terbang tidak bergeser.
+ */
+@Composable
+private fun AlbumHero(
+    page: DetailPage,
+    palette: ArtworkPalette,
+    canvas: CanvasArtwork?,
+    height: Dp,
+    modifier: Modifier = Modifier,
+) {
+    val coverUrl = page.thumbnailUrl
+    var artFailed by remember(coverUrl) { mutableStateOf(false) }
+
+    Box(
+        modifier
+            .layout { measurable, constraints ->
+                val placeable = measurable.measure(constraints)
+                val overlap = LIKED_HERO_OVERLAP.roundToPx().coerceAtMost(placeable.height)
+                layout(placeable.width, placeable.height - overlap) { placeable.place(0, 0) }
+            }
+            .fillMaxWidth()
+            .height(height)
+            .drawWithContent {
+                val extra = LIKED_OVERSCROLL.toPx()
+                clipRect(left = 0f, top = -extra, right = size.width, bottom = size.height) {
+                    this@drawWithContent.drawContent()
+                }
+                val seam = 2.dp.toPx()
+                drawRect(
+                    color = palette.background,
+                    topLeft = Offset(0f, size.height - seam),
+                    size = androidx.compose.ui.geometry.Size(size.width, seam * 2f),
+                )
+            }
+            .coverFlightTarget(page.browseId, 0.dp, palette.background),
+    ) {
+        // Seni lebih tinggi daripada hero: kelebihannya menjulur ke atas.
+        Box(
+            Modifier.layout { measurable, constraints ->
+                val extra = LIKED_OVERSCROLL.roundToPx()
+                val placeable = measurable.measure(
+                    Constraints.fixed(constraints.maxWidth, constraints.maxHeight + extra),
+                )
+                layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(0, -extra) }
+            },
+        ) {
+            Box(Modifier.matchParentSize().background(palette.elevated))
+            if (coverUrl == null || artFailed) {
+                CoverPlaceholder(
+                    icon = page.placeholderIcon(),
+                    base = palette.elevated,
+                    tint = palette.onBackgroundVariant,
+                    modifier = Modifier.matchParentSize(),
+                )
+            }
+            AsyncImage(
+                model = coverUrl.artworkAt(CARD_ART_PX),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.matchParentSize(),
+            )
+            AsyncImage(
+                model = coverUrl.artworkAt(HEADER_ART_PX),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                onState = { artFailed = it is AsyncImagePainter.State.Error },
+                modifier = Modifier.matchParentSize(),
+            )
+        }
+
+        // Cover animasi di atas gambar diam dan di bawah gradien kaki, di kotak
+        // yang sama dengan target terbang. Selalu berjalan: halaman ini hanya
+        // hidup selagi dibaca.
+        canvas?.let { clip ->
+            val frameGrab = remember(clip) { CanvasFrameGrab() }
+            RegisterCoverFlightGrab(page.browseId, frameGrab)
+            var clipShown by remember(clip) { mutableStateOf(false) }
+            val clipAlpha by animateFloatAsState(
+                targetValue = if (clipShown) 1f else 0f,
+                animationSpec = tween(400),
+                label = "albumHeroClipFade",
+            )
+            CanvasArtworkPlayer(
+                canvas = clip,
+                isPlaying = true,
+                modifier = Modifier
+                    .matchParentSize()
+                    .graphicsLayer { alpha = clipAlpha },
+                onRenderedChanged = {
+                    clipShown = it
+                    if (it) coverFlightClipRendered(page.browseId)
+                },
+                frameGrab = frameGrab,
+            )
+        }
+
+        // Berakhir di warna halaman penuh, jadi tidak ada tepi tempat seni berhenti.
+        // Mulai agak lebih bawah daripada hero folder: sampul album lebih banyak
+        // yang perlu terbaca.
+        val page0 = palette.background.copy(alpha = 0f)
+        Box(
+            Modifier
+                .matchParentSize()
+                .background(
+                    Brush.verticalGradient(
+                        0.00f to page0,
+                        0.58f to page0,
+                        0.68f to palette.background.copy(alpha = 0.25f),
+                        0.78f to palette.background.copy(alpha = 0.60f),
+                        0.88f to palette.background.copy(alpha = 0.88f),
+                        0.95f to palette.background.copy(alpha = 0.97f),
                         1.00f to palette.background,
                     ),
                 ),
