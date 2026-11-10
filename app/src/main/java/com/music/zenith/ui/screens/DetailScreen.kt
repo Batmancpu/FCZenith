@@ -1319,10 +1319,15 @@ private fun DetailSearchField(
             .padding(horizontal = HEADER_GUTTER)
             .padding(bottom = 10.dp)
             .height(46.dp)
-            .clip(PILL_SHAPE)
-            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.6f))
-            .border(0.5.dp, Color.White.copy(alpha = 0.10f), PILL_SHAPE)
-            .padding(horizontal = 12.dp),
+            .clip(CircleShape)
+            // The recipe the Play, Shuffle and Add songs pills above it wear:
+            // a light fill, the glass rim the floating bars have, and the
+            // bright top edge. Rim only, since over the page's flat tint a
+            // blurred fill would look the same.
+            .background(Color.White.copy(alpha = LIGHT_FILL_ALPHA), CircleShape)
+            .liquidGlassRim(CircleShape)
+            .border(1.dp, Color.White.copy(alpha = TOP_RELEASE_EDGE_ALPHA), CircleShape)
+            .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
