@@ -600,7 +600,9 @@ fun DetailScreen(
             // [palette] already eases into the artwork's colour (see
             // rememberArtworkPalette). A second ease here lagged behind every
             // other surface painted from it, and the two showed as mismatched squares.
-            val pageColor = if (isArtist) palette.wash else palette.background
+            // Album full-bleed seperti foto artis: halamannya memakai wash yang
+            // sama dengan tempat kaki cover larut, bukan latar bingkai polos.
+            val pageColor = if (isArtist || page.isAlbumHero()) palette.wash else palette.background
             BoxWithConstraints(Modifier.fillMaxSize().background(pageColor)) {
                 // Measured rather than read off the window. The player runs
                 // full-screen at every window size, so this page's own width in
@@ -1037,7 +1039,10 @@ private fun ReleaseHeader(
         } else if (albumHero) {
             AlbumHero(
                 page = page,
-                palette = palette,
+                // Kaki hero, jahitan, dan wash target terbang semuanya membaca
+                // palette.background di dalam AlbumHero; diganti wash di sini
+                // supaya ketiganya sama dengan warna halaman di atas.
+                palette = palette.copy(background = palette.wash),
                 canvas = canvas,
                 height = heroHeight * ALBUM_HERO_HEIGHT_SCALE,
             )
