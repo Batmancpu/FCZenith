@@ -31,6 +31,9 @@
 > [!IMPORTANT]
 > Zenith is not affiliated with, endorsed by, or connected to YouTube or Google in any way. Use it at your own discretion.
 
+> [!NOTE]
+> **A note from the developer:** Zenith is built entirely on my phone. I don't have a laptop or PC of my own, so every line of code, every build and every release is done from mobile. It's slow and sometimes painful, so please bear with me if you run into bugs or rough edges. If something is broken or missing, please [open an issue](../../issues). Thank you for using Zenith!
+
 ---
 
 ## Screenshots
