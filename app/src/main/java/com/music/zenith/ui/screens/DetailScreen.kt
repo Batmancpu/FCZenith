@@ -474,7 +474,11 @@ fun DetailScreen(
         }
     }
     val palette = rememberArtworkPalette(
-        imageUrl = appleArt?.heroUrl ?: page.thumbnailUrl,
+        // Folder perangkat (Local, Downloads, Cached) tidak punya sampul sendiri:
+        // warnanya diambil dari cover lagu pertama, sama dengan hero, supaya
+        // halamannya menyatu seperti halaman artis.
+        imageUrl = appleArt?.heroUrl ?: page.thumbnailUrl
+            ?: if (page.isFolderCover()) songs.firstOrNull { it.thumbnailUrl != null }?.thumbnailUrl else null,
         keyColors = appleArt?.keyColors(),
     )
 

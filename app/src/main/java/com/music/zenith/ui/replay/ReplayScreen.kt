@@ -350,7 +350,7 @@ internal fun ReplayCardRow(
                 holder = holder,
                 memberSince = memberSince,
                 onClick = { onCardClick(card.page) },
-                modifier = Modifier.width(300.dp),
+                modifier = Modifier.width(190.dp),
             )
         }
     }

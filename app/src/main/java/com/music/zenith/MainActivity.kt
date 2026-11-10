@@ -2532,7 +2532,12 @@ private fun ZenithApp(
             ?.let { AppleArtistArtRepository.cached(it.browseId) }
     }
     val detailPalette = rememberArtworkPalette(
-        imageUrl = detailApple?.heroUrl ?: topDetail?.thumbnailUrl,
+        imageUrl = detailApple?.heroUrl ?: topDetail?.thumbnailUrl
+            ?: topDetail?.takeIf {
+                it.browseId == "local:downloads" || it.browseId == "local:all" || it.browseId == "local:cache"
+            }?.let { folderPage ->
+                (folderPage.songs as? UiState.Success)?.data?.firstOrNull { it.thumbnailUrl != null }?.thumbnailUrl
+            },
         keyColors = detailApple?.keyColors(),
     )
 

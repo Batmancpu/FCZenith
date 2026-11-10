@@ -103,12 +103,12 @@ fun ReplayCreditCard(
                 ),
         )
 
-        Column(Modifier.fillMaxSize().padding(20.dp)) {
+        Column(Modifier.fillMaxSize().padding(14.dp)) {
             Row(verticalAlignment = Alignment.Top) {
                 Text(
                     text = label,
                     style = MaterialTheme.typography.labelLarge,
-                    fontSize = 15.sp,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.W600,
                     color = Color.White.copy(alpha = 0.92f),
                     maxLines = 2,
@@ -122,9 +122,9 @@ fun ReplayCreditCard(
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
-                            .size(52.dp)
-                            .shadow(6.dp, RoundedCornerShape(12.dp), clip = false)
-                            .clip(RoundedCornerShape(12.dp))
+                            .size(32.dp)
+                            .shadow(4.dp, RoundedCornerShape(8.dp), clip = false)
+                            .clip(RoundedCornerShape(8.dp))
                             .background(Color.White.copy(alpha = 0.12f)),
                     )
                 }
@@ -134,10 +134,10 @@ fun ReplayCreditCard(
             Text(
                 text = value,
                 style = MaterialTheme.typography.headlineLarge.copy(
-                    fontSize = if (short) 64.sp else 28.sp,
-                    lineHeight = if (short) 66.sp else 32.sp,
-                    fontWeight = FontWeight.W800,
-                    letterSpacing = if (short) (-1.5).sp else (-0.4).sp,
+                    fontSize = if (short) 34.sp else 20.sp,
+                    lineHeight = if (short) 36.sp else 24.sp,
+                    fontWeight = FontWeight.W700,
+                    letterSpacing = if (short) (-0.8).sp else (-0.2).sp,
                 ),
                 color = Color.White,
                 maxLines = 2,
@@ -147,7 +147,7 @@ fun ReplayCreditCard(
                 Text(
                     text = detail,
                     style = MaterialTheme.typography.bodyMedium,
-                    fontSize = 15.sp,
+                    fontSize = 11.sp,
                     fontWeight = FontWeight.W500,
                     color = Color.White.copy(alpha = 0.80f),
                     maxLines = 1,
@@ -203,7 +203,7 @@ fun InitialTile(text: String, size: Dp, shape: Shape) {
     }
 }
 
-private val CardShape = RoundedCornerShape(22.dp)
+private val CardShape = RoundedCornerShape(16.dp)
 
 /**
  * Gambar utama card: artwork top 1 penuh satu card, apa adanya. Keterbacaan
@@ -221,5 +221,5 @@ private fun CardArtwork(url: String) {
 
 /** Whose card it is when there is no signed-in account to name. */
 
-/** A square tile, the way Apple Music lays out its Replay figures. */
-private const val CARD_RATIO = 1f
+/** A compact, slightly wide tile: minimal footprint on the Library page. */
+private const val CARD_RATIO = 1.35f

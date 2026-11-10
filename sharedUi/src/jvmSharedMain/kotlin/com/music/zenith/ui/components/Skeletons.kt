@@ -308,8 +308,8 @@ fun ReplayCardRowSkeleton(modifier: Modifier = Modifier) {
     ) {
         items(2) {
             ShimmerBox(
-                modifier = Modifier.width(300.dp).aspectRatio(1f),
-                shape = RoundedCornerShape(22.dp),
+                modifier = Modifier.width(190.dp).aspectRatio(1.35f),
+                shape = RoundedCornerShape(16.dp),
             )
         }
     }
