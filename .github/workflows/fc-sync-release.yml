@@ -44,6 +44,8 @@ jobs:
         run: |
           set -euo pipefail
           git remote add upstream https://github.com/rezapranata089-bit/Zenith.git
+          BASE_SHA="$(git rev-parse HEAD)"
+          echo "base_sha=$BASE_SHA" >> "$GITHUB_OUTPUT"
 
           TAG="$(gh api repos/rezapranata089-bit/Zenith/releases/latest --jq '.tag_name')"
           VERSION="${TAG#v}"
@@ -73,7 +75,7 @@ jobs:
           # The app source follows upstream stable tags, but CI/CD ownership
           # stays with FCZenith. Do not import upstream workflow files.
           git rm -r --ignore-unmatch .github/workflows
-          git checkout HEAD -- .github/workflows
+          git checkout "${{ steps.upstream.outputs.base_sha }}" -- .github/workflows
 
       - name: Decide whether a release is needed
         id: decision
