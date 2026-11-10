@@ -63,6 +63,67 @@ object LocalMediaRepository {
         }
     }
 
+    /** True when a Local Music folder is chosen and its persisted read grant is still held. */
+    fun hasFolderAccess(context: Context): Boolean {
+        val tree = AppSettings.localMusicFolderUri.value
+        if (tree.isBlank()) return false
+        return runCatching {
+            context.contentResolver.persistedUriPermissions.any {
+                it.isReadPermission && it.uri.toString() == tree
+            }
+        }.getOrDefault(false)
+    }
+
+    /**
+     * Whether Local Music can be read at all: the audio permission, or just the
+     * one folder the person picked. The folder alone is the privacy-friendly
+     * path — nothing outside it (recordings, call recordings) is ever visible.
+     */
+    fun canReadLocalMusic(context: Context): Boolean =
+        hasStoragePermission(context) || hasFolderAccess(context)
+
+    /**
+     * Lists the audio files under the chosen folder through the Storage Access
+     * Framework, so no media permission is needed and nothing outside the
+     * granted tree can be reached.
+     */
+    private fun scanChosenFolder(context: Context): List<Song> {
+        val tree = Uri.parse(AppSettings.localMusicFolderUri.value)
+        val filterNonMusic = AppSettings.filterNonMusicAudio.value
+        val songs = mutableListOf<Song>()
+
+        fun walk(documentId: String, depth: Int) {
+            if (depth > 12) return
+            val children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, documentId)
+            val projection = arrayOf(
+                DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                DocumentsContract.Document.COLUMN_MIME_TYPE,
+                DocumentsContract.Document.COLUMN_LAST_MODIFIED,
+            )
+            context.contentResolver.query(children, projection, null, null, null)?.use { cursor ->
+                while (cursor.moveToNext()) {
+                    val childId = cursor.getString(0) ?: continue
+                    val name = cursor.getString(1).orEmpty()
+                    val mime = cursor.getString(2).orEmpty()
+                    val modified = cursor.getLong(3).takeIf { it > 0 }?.div(1_000)
+                    if (mime == DocumentsContract.Document.MIME_TYPE_DIR) {
+                        val segment = "/${name.lowercase(Locale.ROOT)}/"
+                        if (filterNonMusic && nonMusicPathSegments.contains(segment)) continue
+                        walk(childId, depth + 1)
+                    } else if (isAudioFileName(name) || mime.startsWith("audio/")) {
+                        val uri = DocumentsContract.buildDocumentUriUsingTree(tree, childId).toString()
+                        songs.add(buildSongFromUri(context, uri, name, ScannedTags(null, null, modified, modified)))
+                    }
+                }
+            }
+        }
+
+        runCatching { walk(DocumentsContract.getTreeDocumentId(tree), 0) }
+            .onFailure { Log.w(TAG, "Failed scanning chosen music folder: ${it.message}") }
+        return songs.sortedBy { it.title.lowercase(Locale.ROOT) }
+    }
+
     /**
      * Retrieves all songs in the `Music/BitChord` directory, combining app downloads
      * with any local audio files present in that folder.
@@ -203,7 +264,8 @@ object LocalMediaRepository {
      */
     suspend fun getLocalMusic(context: Context): List<Song> = withContext(Dispatchers.IO) {
         if (!hasStoragePermission(context)) {
-            return@withContext extraLocalMusic?.invoke(context, emptyList()) ?: emptyList()
+            val fromFolder = if (hasFolderAccess(context)) scanChosenFolder(context) else emptyList()
+            return@withContext extraLocalMusic?.invoke(context, fromFolder) ?: fromFolder
         }
 
         val songs = mutableListOf<Song>()

@@ -2303,7 +2303,7 @@ private fun ZenithApp(
     // The Search tab's Library source reads the Local Music folder, so it asks
     // for the same permission opening that folder does.
     val onSearchSourceChange: (SearchSource) -> Unit = { source ->
-        if (source == SearchSource.LIBRARY && !LocalMediaRepository.hasStoragePermission(context)) {
+        if (source == SearchSource.LIBRARY && !LocalMediaRepository.canReadLocalMusic(context)) {
             mediaPermissionLauncher.launch(mediaPermission)
         }
         viewModel.setSearchSource(source)
@@ -2316,7 +2316,7 @@ private fun ZenithApp(
                 navigator.push(AppRoute.Spotify)
                 return@let
             }
-            if ((id == "local:all" || id == "local:downloads") && !LocalMediaRepository.hasStoragePermission(context)) {
+            if ((id == "local:all" || id == "local:downloads") && !LocalMediaRepository.canReadLocalMusic(context)) {
                 mediaPermissionLauncher.launch(mediaPermission)
             }
             // Opened from a shelf's "Show all" page, it stacks over the grid

@@ -2428,7 +2428,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun loadLibrarySongs() {
         viewModelScope.launch {
             val context = getApplication<Application>()
-            _librarySongs.value = if (!LocalMediaRepository.hasStoragePermission(context)) {
+            _librarySongs.value = if (!LocalMediaRepository.canReadLocalMusic(context)) {
                 UiState.Error(text(R.string.storage_required_read))
             } else {
                 runCatching { LocalMediaRepository.getLocalMusic(context) }.fold(
@@ -3312,7 +3312,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             browseId == "local:downloads" ->
                 nonEmpty(Downloads.getDownloadedSongs(context)) { "No downloaded tracks" }
             browseId == CACHE_FOLDER_BROWSE_ID -> cachedSongsState()
-            browseId == "local:all" -> if (!LocalMediaRepository.hasStoragePermission(context)) {
+            browseId == "local:all" -> if (!LocalMediaRepository.canReadLocalMusic(context)) {
                 UiState.Error(text(R.string.storage_required_read))
             } else {
                 nonEmpty(LocalMediaRepository.getLocalMusic(context)) { text(R.string.no_local_audio_found) }
