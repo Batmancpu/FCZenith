@@ -2469,6 +2469,7 @@ fun NowPlayingScreen(
                             artRequest = art.request,
                             artLoaded = art.loaded,
                             onArtState = art::onState,
+                            dissolve = dissolve,
                             canvas = canvas,
                             canvasRendered = canvasRendered,
                             isPlaying = isPlaying,

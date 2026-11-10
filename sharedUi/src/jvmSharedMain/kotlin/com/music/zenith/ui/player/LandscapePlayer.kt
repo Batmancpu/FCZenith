@@ -51,8 +51,15 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.BlurEffect
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.TileMode
+import com.music.zenith.ui.graphics.FADE_CURVE_STOPS
+import com.music.zenith.ui.graphics.smootherStep
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
@@ -294,6 +301,8 @@ internal fun LandscapeArtwork(
     captureStill: Boolean = false,
     onStillCaptured: (ImageBitmap?, Long) -> Unit = { _, _ -> },
     onResumed: () -> Unit = {},
+    /** Cover lama + efek transisi (slide / fluid shader), sama seperti sleeve portrait. */
+    dissolve: ArtworkDissolve? = null,
     /**
      * The sleeve's shape, asked for each frame: its corner rounds off into the
      * mini player's cover's as the player docks into it.
@@ -303,7 +312,8 @@ internal fun LandscapeArtwork(
     shadowFraction: () -> Float = { 1f },
     overlay: @Composable BoxScope.() -> Unit = {},
 ) {
-    val casts = artLoaded || canvasRendered
+    val casts = artLoaded || canvasRendered ||
+        dissolve?.outgoing != null || dissolve?.cutHold == true
     Box(modifier = modifier) {
         Box(
             modifier = Modifier
@@ -327,7 +337,7 @@ internal fun LandscapeArtwork(
                 .background(Color.Black.copy(alpha = 0.18f)),
             contentAlignment = Alignment.Center,
         ) {
-            if (!artLoaded && !canvasRendered) {
+            if (!artLoaded && !canvasRendered && dissolve?.outgoing == null && dissolve?.cutHold != true) {
                 Icon(
                     imageVector = ZenithIcons.MusicNote,
                     contentDescription = null,
@@ -344,8 +354,122 @@ internal fun LandscapeArtwork(
                 // portrait sleeve's note on TextureView stacking order.
                 modifier = Modifier
                     .fillMaxSize()
+                    .graphicsLayer {
+                        val d = dissolve ?: return@graphicsLayer
+                        val ease = (1f - d.progress) * (1f - d.progress)
+                        val fluid = d.fluid && d.outgoing != null
+                        val settle = if (d.light) {
+                            1f + 0.02f * ease
+                        } else if (fluid) {
+                            1f + 0.045f * d.punch * ease
+                        } else {
+                            1f + 0.12f * d.punch * ease
+                        }
+                        scaleX = settle
+                        scaleY = settle
+                        translationX = if (fluid || d.light) {
+                            0f
+                        } else {
+                            d.direction * d.punch * size.width * 0.05f * ease
+                        }
+                        renderEffect = if (fluid) {
+                            d.shaderIn.effect(
+                                incoming = true,
+                                progress = d.progress,
+                                direction = d.direction,
+                                punch = d.punch,
+                                seed = d.seed,
+                                width = size.width,
+                                height = size.height,
+                            )
+                        } else {
+                            null
+                        }
+                    }
                     .drawWithContent { if (artLoaded || !canvasRendered) drawContent() },
             )
+            // Cover lama, selalu ter-mount (alpha 0 saat tidak ada transisi) supaya
+            // tidak dimuat ulang: menutup frame kosong saat lagu berganti.
+            if (dissolve != null) {
+                AsyncImage(
+                    model = dissolve.held.request,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            val sweeping = dissolve.outgoing != null
+                            val t = dissolve.progress
+                            alpha = when {
+                                sweeping && dissolve.fluid -> 1f
+                                sweeping && dissolve.light -> 1f - smootherStep(t)
+                                sweeping -> 1f - smootherStep(((t - 0.62f) / 0.38f).coerceIn(0f, 1f))
+                                dissolve.cutHold -> 1f
+                                else -> 0f
+                            }
+                            val plain = sweeping && !dissolve.fluid && !dissolve.light
+                            val move = dissolve.direction * dissolve.punch
+                            translationX = if (plain) -move * size.width * 0.30f * t else 0f
+                            val shrink = when {
+                                sweeping && dissolve.fluid -> 1f + 0.035f * dissolve.punch * smootherStep(t)
+                                sweeping && dissolve.light -> 1f - 0.02f * t
+                                sweeping -> 1f - 0.08f * dissolve.punch * t
+                                else -> 1f
+                            }
+                            scaleX = shrink
+                            scaleY = shrink
+                            rotationY = if (plain) move * 9f * t else 0f
+                            renderEffect = if (sweeping && dissolve.fluid) {
+                                dissolve.shaderOut.effect(
+                                    incoming = false,
+                                    progress = t,
+                                    direction = dissolve.direction,
+                                    punch = dissolve.punch,
+                                    seed = dissolve.seed,
+                                    width = size.width,
+                                    height = size.height,
+                                )
+                            } else if (sweeping && !dissolve.light && renderEffectBlurSupported) {
+                                val radius = 12f * dissolve.punch * 4f * t * (1f - t)
+                                if (radius > 0.5f) BlurEffect(radius, radius, TileMode.Clamp) else null
+                            } else {
+                                null
+                            }
+                            cameraDistance = 14f * this.density
+                            compositingStrategy = if (sweeping) {
+                                CompositingStrategy.Offscreen
+                            } else {
+                                CompositingStrategy.Auto
+                            }
+                        }
+                        .drawWithContent {
+                            drawContent()
+                            if (dissolve.outgoing == null) return@drawWithContent
+                            // Efek cair memakai mask shader, bukan sapuan.
+                            if (dissolve.fluid || dissolve.light) return@drawWithContent
+                            val feather = size.width * 0.75f
+                            val forward = dissolve.direction >= 0f
+                            val lead = feather * 0.6f
+                            val ramp = smootherStep((dissolve.progress / 0.22f).coerceIn(0f, 1f))
+                            val startEdge = if (forward) size.width - lead else -feather + lead
+                            val endEdge = if (forward) -feather else size.width
+                            val start = startEdge + (endEdge - startEdge) * dissolve.progress
+                            drawRect(
+                                brush = Brush.horizontalGradient(
+                                    colorStops = Array(FADE_CURVE_STOPS + 1) { i ->
+                                        val s = i / FADE_CURVE_STOPS.toFloat()
+                                        val base = if (forward) 1f - smootherStep(s) else smootherStep(s)
+                                        val keep = 1f - (1f - base) * ramp
+                                        s to Color.Black.copy(alpha = keep)
+                                    },
+                                    startX = start,
+                                    endX = start + feather,
+                                ),
+                                blendMode = BlendMode.DstIn,
+                            )
+                        },
+                )
+            }
             canvas?.let { clip ->
                 CanvasArtworkPlayer(
                     canvas = clip,
