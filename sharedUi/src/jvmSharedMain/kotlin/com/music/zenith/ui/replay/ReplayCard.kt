@@ -54,14 +54,13 @@ import com.music.zenith.ui.player.rememberArtworkColors
 import java.util.Locale
 
 /**
- * One headline number, set the way Apple Music sets a Replay: the artwork
- * edge to edge, a small label at the top and the figure large at the foot,
- * with nothing else on the card. Tapping it opens Replay at the chart it
- * summarises.
+ * One headline number, set the way Apple Music sets a Replay tile: a square
+ * on a soft gradient taken from the artwork, the label small at the top, the
+ * artwork as a rounded thumbnail opposite it, and the figure very large at
+ * the foot. Tapping it opens Replay at the chart it summarises.
  *
- * Legibility comes from a single gradient scrim over the artwork rather than
- * a blurred second layer. Without artwork the player's own mesh is drawn once
- * and held still.
+ * The gradient is the player's own mesh, drawn once and held still, so a row
+ * of these costs one blurred layer each rather than a redraw per frame.
  */
 @Composable
 @Suppress("UNUSED_PARAMETER")
@@ -78,55 +77,67 @@ fun ReplayCreditCard(
     modifier: Modifier = Modifier,
 ) {
     val artUrl = artworkUrl.artworkAt(CARD_ART_PX)
+    val palette = rememberArtworkColors(artworkUrl)
     Box(
         modifier = modifier
             .aspectRatio(CARD_RATIO)
-            .shadow(6.dp, CardShape, clip = false)
             .clip(CardShape)
             .clickable(onClick = onClick),
     ) {
-        if (artUrl != null) {
-            CardArtwork(url = artUrl)
-        } else {
-            val palette = rememberArtworkColors(artworkUrl)
-            MeshGradientBackground(
-                palette = palette,
-                trackKey = artworkUrl ?: label,
-                blurRadius = 34.dp,
-                animated = false,
-            )
-        }
-        // One scrim: a little dark at the top for the label, more at the foot for the figure.
+        MeshGradientBackground(
+            palette = palette,
+            trackKey = artworkUrl ?: label,
+            blurRadius = 34.dp,
+            animated = false,
+        )
+        // A light veil so white type holds on any colour, a little deeper at the foot.
         Box(
             Modifier
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
-                        0.0f to Color.Black.copy(alpha = 0.28f),
-                        0.40f to Color.Black.copy(alpha = 0.04f),
-                        1.0f to Color.Black.copy(alpha = 0.66f),
+                        0.0f to Color.Black.copy(alpha = 0.10f),
+                        0.55f to Color.Black.copy(alpha = 0.14f),
+                        1.0f to Color.Black.copy(alpha = 0.38f),
                     ),
                 ),
         )
 
-        Column(Modifier.fillMaxSize().padding(18.dp)) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.W600,
-                color = Color.White.copy(alpha = 0.90f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+        Column(Modifier.fillMaxSize().padding(20.dp)) {
+            Row(verticalAlignment = Alignment.Top) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.W600,
+                    color = Color.White.copy(alpha = 0.92f),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                if (artUrl != null) {
+                    Spacer(Modifier.width(12.dp))
+                    AsyncImage(
+                        model = artUrl,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(52.dp)
+                            .shadow(6.dp, RoundedCornerShape(12.dp), clip = false)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color.White.copy(alpha = 0.12f)),
+                    )
+                }
+            }
             Spacer(Modifier.weight(1f))
             val short = value.length <= 6
             Text(
                 text = value,
-                style = MaterialTheme.typography.headlineMedium.copy(
-                    fontSize = if (short) 44.sp else 20.sp,
-                    lineHeight = if (short) 46.sp else 24.sp,
-                    fontWeight = FontWeight.W700,
+                style = MaterialTheme.typography.headlineLarge.copy(
+                    fontSize = if (short) 64.sp else 28.sp,
+                    lineHeight = if (short) 66.sp else 32.sp,
+                    fontWeight = FontWeight.W800,
+                    letterSpacing = if (short) (-1.5).sp else (-0.4).sp,
                 ),
                 color = Color.White,
                 maxLines = 2,
@@ -135,12 +146,13 @@ fun ReplayCreditCard(
             if (detail != null) {
                 Text(
                     text = detail,
-                    style = MaterialTheme.typography.labelMedium,
-                    fontSize = 13.sp,
-                    color = Color.White.copy(alpha = 0.75f),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.W500,
+                    color = Color.White.copy(alpha = 0.80f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 2.dp),
+                    modifier = Modifier.padding(top = 4.dp),
                 )
             }
         }
@@ -191,7 +203,7 @@ fun InitialTile(text: String, size: Dp, shape: Shape) {
     }
 }
 
-private val CardShape = RoundedCornerShape(20.dp)
+private val CardShape = RoundedCornerShape(22.dp)
 
 /**
  * Gambar utama card: artwork top 1 penuh satu card, apa adanya. Keterbacaan
@@ -209,5 +221,5 @@ private fun CardArtwork(url: String) {
 
 /** Whose card it is when there is no signed-in account to name. */
 
-/** 85.6mm × 54mm, which is what makes the shape read as a card. */
-private const val CARD_RATIO = 1.586f
+/** A square tile, the way Apple Music lays out its Replay figures. */
+private const val CARD_RATIO = 1f
