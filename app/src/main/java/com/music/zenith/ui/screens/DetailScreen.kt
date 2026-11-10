@@ -613,7 +613,7 @@ fun DetailScreen(
                 val gridColumns = libraryGrid(maxWidth - PAGE_GUTTER * 2).columns
                 // Liked Music: tarikan ke bawah dibatasi kecil, jadi seni ekstra di
                 // atas hero cukup tipis dan lubang tidak pernah terlihat.
-                val listOverscroll = if (page.isLikedMusic() || page.covers.isNotEmpty()) {
+                val listOverscroll = if (page.isLikedMusic() || page.covers.isNotEmpty() || page.isFolderCover()) {
                     rememberIosOverscrollEffect(LIKED_MAX_PULL)
                 } else {
                     rememberOverscrollEffect()
@@ -1006,7 +1006,7 @@ private fun ReleaseHeader(
 ) {
     val (credit, meta) = page.headerLines(songs.size, songs.playtime())
     // Liked Music dan Most Played tidak memakai sleeve berbingkai: seninya full-bleed.
-    val fullBleed = page.isLikedMusic() || page.covers.isNotEmpty()
+    val fullBleed = page.isLikedMusic() || page.covers.isNotEmpty() || page.isFolderCover()
     // Every row on a release carries the same credit — see [pageCredit] — so
     // the first one speaks for the whole page, the same source the rows'
     // own long-press "Open artist" already reads from.
@@ -1022,6 +1022,13 @@ private fun ReleaseHeader(
     ) {
         if (page.covers.isNotEmpty()) {
             MostPlayedHero(page = page, palette = palette, height = heroHeight * 1.3f)
+        } else if (page.isFolderCover()) {
+            FolderCoverHero(
+                page = page,
+                palette = palette,
+                songs = songs,
+                height = heroHeight,
+            )
         } else if (fullBleed) {
             LikedMusicHero(
                 page = page,
@@ -2826,6 +2833,115 @@ private fun MostPlayedHero(
             Modifier
                 .fillMaxWidth()
                 .fillMaxHeight(0.28f)
+                .background(
+                    Brush.verticalGradient(
+                        0f to Color.Black.copy(alpha = 0.22f),
+                        1f to Color.Transparent,
+                    ),
+                ),
+        )
+    }
+}
+
+/** Downloads, Local Music dan Cached songs: folder perangkat yang memakai cover lagu pertama. */
+private fun DetailPage.isFolderCover(): Boolean =
+    browseId == "local:downloads" || browseId == "local:all" || browseId == CACHE_FOLDER_BROWSE_ID
+
+/**
+ * Header halaman folder perangkat: cover lagu pertama full-bleed sampai di bawah
+ * bar, kakinya larut ke warna halaman. Judul menimpa kaki hero, seperti [LikedMusicHero].
+ */
+@Composable
+private fun FolderCoverHero(
+    page: DetailPage,
+    palette: ArtworkPalette,
+    songs: List<Song>,
+    height: Dp,
+    modifier: Modifier = Modifier,
+) {
+    val coverUrl = page.thumbnailUrl ?: songs.firstOrNull { it.thumbnailUrl != null }?.thumbnailUrl
+    var artFailed by remember(coverUrl) { mutableStateOf(false) }
+
+    Box(
+        modifier
+            .layout { measurable, constraints ->
+                val placeable = measurable.measure(constraints)
+                val overlap = LIKED_HERO_OVERLAP.roundToPx().coerceAtMost(placeable.height)
+                layout(placeable.width, placeable.height - overlap) { placeable.place(0, 0) }
+            }
+            .fillMaxWidth()
+            .height(height)
+            .drawWithContent {
+                val extra = LIKED_OVERSCROLL.toPx()
+                clipRect(left = 0f, top = -extra, right = size.width, bottom = size.height) {
+                    this@drawWithContent.drawContent()
+                }
+                val seam = 2.dp.toPx()
+                drawRect(
+                    color = palette.background,
+                    topLeft = Offset(0f, size.height - seam),
+                    size = androidx.compose.ui.geometry.Size(size.width, seam * 2f),
+                )
+            }
+            .coverFlightTarget(page.browseId, 0.dp, palette.background),
+    ) {
+        // Seni lebih tinggi daripada hero: kelebihannya menjulur ke atas.
+        Box(
+            Modifier.layout { measurable, constraints ->
+                val extra = LIKED_OVERSCROLL.roundToPx()
+                val placeable = measurable.measure(
+                    Constraints.fixed(constraints.maxWidth, constraints.maxHeight + extra),
+                )
+                layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(0, -extra) }
+            },
+        ) {
+            Box(Modifier.matchParentSize().background(palette.elevated))
+            if (coverUrl == null || artFailed) {
+                CoverPlaceholder(
+                    icon = page.placeholderIcon(),
+                    base = palette.elevated,
+                    tint = palette.onBackgroundVariant,
+                    modifier = Modifier.matchParentSize(),
+                )
+            }
+            AsyncImage(
+                model = coverUrl.artworkAt(CARD_ART_PX),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.matchParentSize(),
+            )
+            AsyncImage(
+                model = coverUrl.artworkAt(HEADER_ART_PX),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                onState = { artFailed = it is AsyncImagePainter.State.Error },
+                modifier = Modifier.matchParentSize(),
+            )
+        }
+
+        // Berakhir di warna halaman penuh, jadi tidak ada tepi tempat seni berhenti.
+        val page0 = palette.background.copy(alpha = 0f)
+        Box(
+            Modifier
+                .matchParentSize()
+                .background(
+                    Brush.verticalGradient(
+                        0.00f to page0,
+                        0.50f to page0,
+                        0.62f to palette.background.copy(alpha = 0.25f),
+                        0.74f to palette.background.copy(alpha = 0.60f),
+                        0.86f to palette.background.copy(alpha = 0.88f),
+                        0.94f to palette.background.copy(alpha = 0.97f),
+                        1.00f to palette.background,
+                    ),
+                ),
+        )
+
+        // Sedikit gelap di atas supaya ikon bar kaca tetap terbaca.
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(height * 0.28f)
                 .background(
                     Brush.verticalGradient(
                         0f to Color.Black.copy(alpha = 0.22f),
