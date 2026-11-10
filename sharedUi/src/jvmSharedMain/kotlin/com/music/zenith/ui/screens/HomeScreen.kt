@@ -1098,6 +1098,19 @@ internal fun localizeCardSubtitle(subtitle: String): String {
     return localizedParts.joinToString(delimiter)
 }
 
+/**
+ * Kunci stabil untuk tiap kartu rak: videoId, lalu browseId, lalu judul.
+ * Kembaran dalam satu rak diberi akhiran, karena LazyList menolak kunci ganda.
+ */
+private fun shelfItemKeys(items: List<ShelfItem>): List<String> {
+    val seen = HashMap<String, Int>(items.size)
+    return items.map { item ->
+        val base = "i:" + (item.videoId ?: item.browseId ?: "${item.title}|${item.subtitle}")
+        val n = seen.merge(base, 1, Int::plus)!!
+        if (n == 1) base else "$base#$n"
+    }
+}
+
 @Composable
 private fun HeroShelf(
     shelf: HomeShelf,
@@ -1109,6 +1122,7 @@ private fun HeroShelf(
     Column(Modifier.padding(bottom = 26.dp)) {
         SectionHeader(shelf.title, shelf.subtitle)
         val isCurrentItem = shelf.items.playingItemMatcher(currentSong)
+        val itemKeys = remember(shelf.items) { shelfItemKeys(shelf.items) }
         // Measured rather than taken as a share of the parent, because the card
         // has a ceiling as well as a fraction — see [heroCardWidth]. A fixed
         // width is also the only one of the two the aspect ratio below can turn
@@ -1120,7 +1134,11 @@ private fun HeroShelf(
                 contentPadding = PaddingValues(horizontal = PAGE_GUTTER),
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                itemsIndexed(shelf.items, contentType = { _, _ -> "hero-card" }) { index, item ->
+                itemsIndexed(
+                    shelf.items,
+                    key = { index, _ -> itemKeys[index] },
+                    contentType = { _, _ -> "hero-card" },
+                ) { index, item ->
                     HeroCard(
                         item = item,
                         onClick = { onItemClick(item) },
@@ -1223,13 +1241,18 @@ internal fun Shelf(
     Column(Modifier.padding(bottom = 26.dp)) {
         SectionHeader(shelf.title, shelf.subtitle)
         val isCurrentItem = shelf.items.playingItemMatcher(currentSong)
+        val itemKeys = remember(shelf.items) { shelfItemKeys(shelf.items) }
         ShelfRow(
             state = rememberShelfListState("shelf:${shelf.title}"),
             contentPadding = PaddingValues(horizontal = PAGE_GUTTER),
             horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             leadingCard?.let { card -> item(key = "leading") { card() } }
-            itemsIndexed(shelf.items, contentType = { _, _ -> "shelf-card" }) { index, item ->
+            itemsIndexed(
+                shelf.items,
+                key = { index, _ -> itemKeys[index] },
+                contentType = { _, _ -> "shelf-card" },
+            ) { index, item ->
                 Box(Modifier.shelfStagger(index)) {
                     if (shelf.layout == ShelfLayout.VIDEO) {
                         VideoShelfCard(
