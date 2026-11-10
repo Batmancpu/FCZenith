@@ -108,6 +108,15 @@ private val LANDSCAPE_COMPACT_HEIGHT = 440.dp
 private val LANDSCAPE_GUTTER_COMPACT = 20.dp
 
 /**
+ * Width of the full-bleed cover as a share of the window. Half the window is
+ * exactly where the left column ends, whatever the window's width.
+ */
+private const val LANDSCAPE_FULL_BLEED_WIDTH_FRACTION = 0.5f
+
+/** Where, across the full-bleed cover, the fade into the blurred backdrop begins. */
+private const val LANDSCAPE_FULL_BLEED_FADE_START = 0.55f
+
+/**
  * How the right column hands over between the player, the lyrics and the
  * queue. The left column never moves, so a crossfade is the whole transition —
  * the same page being turned, not a panel being opened.
@@ -176,9 +185,24 @@ internal fun LandscapePlayerLayout(
     lyricsPane: @Composable () -> Unit,
     queuePane: @Composable () -> Unit,
     modifier: Modifier = Modifier,
+    /**
+     * The cover runs edge to edge down the left half, up behind the status
+     * bar and the navigation bar, and fades out to the right into the blurred
+     * backdrop. [artwork] is then handed that area rather than a square.
+     */
+    fullBleed: Boolean = false,
 ) {
     Box(modifier = modifier.fillMaxSize()) {
         background(Modifier.fillMaxSize())
+
+        if (fullBleed) {
+            artwork(
+                Modifier
+                    .align(Alignment.TopStart)
+                    .fillMaxHeight()
+                    .fillMaxWidth(LANDSCAPE_FULL_BLEED_WIDTH_FRACTION),
+            )
+        }
 
         BoxWithConstraints(
             modifier = Modifier
@@ -212,13 +236,19 @@ internal fun LandscapePlayerLayout(
                     // the column's width on a big tablet, the height on
                     // anything shorter. Measured here rather than estimated,
                     // so the row under it can never be pushed off the bottom.
-                    BoxWithConstraints(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth(),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        artwork(Modifier.size(minOf(maxWidth, maxHeight)))
+                    if (fullBleed) {
+                        // The cover is drawn behind the columns; this only
+                        // keeps the row below at the foot of the column.
+                        Spacer(Modifier.weight(1f))
+                    } else {
+                        BoxWithConstraints(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth(),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            artwork(Modifier.size(minOf(maxWidth, maxHeight)))
+                        }
                     }
                     Spacer(Modifier.height(if (compact) 12.dp else 24.dp))
                     actions()
@@ -330,6 +360,8 @@ internal fun LandscapeArtwork(
     sleeveShape: () -> Shape = { LandscapeArtShape },
     /** How much of the sleeve's shadow is cast, 1 at rest. */
     shadowFraction: () -> Float = { 1f },
+    /** Full-bleed cover: dissolves its right edge into the backdrop and darkens its foot for the row over it. */
+    fadeRightEdge: Boolean = false,
     overlay: @Composable BoxScope.() -> Unit = {},
 ) {
     val casts = artLoaded || canvasRendered ||
@@ -353,7 +385,40 @@ internal fun LandscapeArtwork(
                 .graphicsLayer {
                     shape = sleeveShape()
                     clip = true
+                    compositingStrategy = if (fadeRightEdge) {
+                        CompositingStrategy.Offscreen
+                    } else {
+                        CompositingStrategy.Auto
+                    }
                 }
+                .then(
+                    if (fadeRightEdge) {
+                        Modifier.drawWithContent {
+                            drawContent()
+                            // Foot scrim, so the row over the cover stays legible.
+                            drawRect(
+                                brush = Brush.verticalGradient(
+                                    colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.45f)),
+                                    startY = size.height * 0.6f,
+                                    endY = size.height,
+                                ),
+                            )
+                            drawRect(
+                                brush = Brush.horizontalGradient(
+                                    colorStops = Array(FADE_CURVE_STOPS + 1) { i ->
+                                        val t = i / FADE_CURVE_STOPS.toFloat()
+                                        t to Color.Black.copy(alpha = 1f - smootherStep(t))
+                                    },
+                                    startX = size.width * LANDSCAPE_FULL_BLEED_FADE_START,
+                                    endX = size.width,
+                                ),
+                                blendMode = BlendMode.DstIn,
+                            )
+                        }
+                    } else {
+                        Modifier
+                    },
+                )
                 .background(Color.Black.copy(alpha = 0.18f)),
             contentAlignment = Alignment.Center,
         ) {

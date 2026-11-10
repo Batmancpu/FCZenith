@@ -2403,6 +2403,9 @@ fun NowPlayingScreen(
             val versionAligning by PlayerSettings.versionAlignmentInProgress.collectAsStateWithLifecycle()
             val transitionWindow by PlayerSettings.smartTransitionWindow.collectAsStateWithLifecycle()
             val panelOpen = lyricsOpen || queueOpen
+            // Still cover only: a running clip is a TextureView, which the
+            // right-edge fade mask cannot reach, so it keeps the square sleeve.
+            val landscapeFullBleed = fullBleedArt && canvas == null
 
             // Where the sleeve is drawn this frame on its way to or from the mini
             // player's cover, or null when it can't be worked out.
@@ -2414,7 +2417,9 @@ fun NowPlayingScreen(
             // cover — the same share, for the same reason, as the portrait
             // sleeve's `dockRide`.
             fun landscapeDockPose(): LandscapeDockPose? {
-                if (dock == null) return null
+                // The full-bleed cover is not square, so it is not carried onto
+                // the mini player's cover; it fades with the player instead.
+                if (dock == null || landscapeFullBleed) return null
                 val t = dockT()
                 val mini = dock.miniArtOnScreen() ?: return null
                 val anchor = dockFrame.anchor ?: return null
@@ -2463,6 +2468,7 @@ fun NowPlayingScreen(
                         queueOpen -> PlayerPane.Queue
                         else -> PlayerPane.Main
                     },
+                    fullBleed = landscapeFullBleed,
                     background = { backgroundModifier ->
                         // The whole screen is the sheets' frost source: there is
                         // no full-bleed banner here to be it instead.
@@ -2488,10 +2494,11 @@ fun NowPlayingScreen(
                             captureStill = dockMoving,
                             onStillCaptured = onStillCaptured,
                             onResumed = onClipResumed,
-                            sleeveShape = landscapeArtShape,
+                            sleeveShape = if (landscapeFullBleed) ({ RectangleShape }) else landscapeArtShape,
+                            fadeRightEdge = landscapeFullBleed,
                             // Let go of on the way to the mini player, whose
                             // cover sits flat in its bar.
-                            shadowFraction = dockT,
+                            shadowFraction = if (landscapeFullBleed) ({ 0f }) else dockT,
                             modifier = artworkModifier
                                 .then(
                                     if (dock != null) {
@@ -2528,7 +2535,13 @@ fun NowPlayingScreen(
                                     // let go of on the way, as the portrait
                                     // sleeve's are: the cover does neither.
                                     val t = dockT()
-                                    val scale = if (t >= 1f) landscapeArtScale else 1f + (landscapeArtScale - 1f) * t
+                                    val scale = if (landscapeFullBleed) {
+                                        1f
+                                    } else if (t >= 1f) {
+                                        landscapeArtScale
+                                    } else {
+                                        1f + (landscapeArtScale - 1f) * t
+                                    }
                                     scaleX = scale
                                     scaleY = scale
                                     translationX = if (t >= 1f) swipeSettle.value else swipeSettle.value * t
@@ -2550,7 +2563,7 @@ fun NowPlayingScreen(
                                 Modifier
                                     .matchParentSize()
                                     .graphicsLayer {
-                                        shape = landscapeArtShape()
+                                        shape = if (landscapeFullBleed) RectangleShape else landscapeArtShape()
                                         clip = true
                                     }
                                     .drawBehind {
@@ -2567,7 +2580,7 @@ fun NowPlayingScreen(
                                     .padding(horizontal = 10.dp, vertical = 8.dp)
                                     // Faded with the player rather than flown with
                                     // the sleeve: the cover in the bar has none.
-                                    .graphicsLayer { alpha = if (panelOpen) 0f else dockFade() },
+                                    .graphicsLayer { alpha = if (panelOpen || landscapeFullBleed) 0f else dockFade() },
                             )
                         }
                     },
