@@ -302,6 +302,7 @@ fun SettingsScreen(
     val downloadQuality by AppSettings.downloadQuality.collectAsStateWithLifecycle()
     val wifiOnlyDownloads by AppSettings.wifiOnlyDownloads.collectAsStateWithLifecycle()
     val exportDownloads by AppSettings.exportDownloads.collectAsStateWithLifecycle()
+    val downloadFolderUri by AppSettings.downloadFolderUri.collectAsStateWithLifecycle()
     val syncDownloadedPlaylists by AppSettings.syncDownloadedPlaylists.collectAsStateWithLifecycle()
     val stopOnTaskRemoved by AppSettings.stopOnTaskRemoved.collectAsStateWithLifecycle()
     val hideVolumeBar by AppSettings.hideVolumeBar.collectAsStateWithLifecycle()
@@ -418,6 +419,22 @@ fun SettingsScreen(
             )
         }
         AppSettings.setLocalMusicFolderUri(folder.toString())
+    }
+    val downloadFolderPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree(),
+    ) { folder ->
+        if (folder == null) return@rememberLauncherForActivityResult
+        val granted = runCatching {
+            context.contentResolver.takePersistableUriPermission(
+                folder,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+            )
+        }.isSuccess
+        if (granted) {
+            AppSettings.setDownloadFolderUri(folder.toString())
+            // A custom folder is an exported download, so it needs this on.
+            AppSettings.setExportDownloads(true)
+        }
     }
 
     /**
@@ -686,8 +703,29 @@ fun SettingsScreen(
                     title = exportDownloadsTitle,
                     checked = exportDownloads,
                     onCheckedChange = AppSettings::setExportDownloads,
-                    subtitle = "Music/Zenith".takeIf { exportDownloads },
+                    subtitle = "Music/Zenith".takeIf { exportDownloads && downloadFolderUri.isBlank() },
                 )
+            }
+            val downloadFolderTitle = "Download folder"
+            row(downloadFolderTitle, "folder", "location", "music folder") {
+                SettingsRow(
+                    icon = SfIcons.Folder,
+                    title = downloadFolderTitle,
+                    subtitle = LocalMediaRepository.selectedFolderLabel(downloadFolderUri)
+                        ?.takeIf { exportDownloads } ?: "Default",
+                    onClick = { downloadFolderPicker.launch(null) },
+                )
+            }
+            if (downloadFolderUri.isNotBlank()) {
+                val useDefaultDownloadFolderTitle = "Use default download folder"
+                row(useDefaultDownloadFolderTitle, "folder") {
+                    SettingsRow(
+                        icon = SfIcons.LibraryMusic,
+                        title = useDefaultDownloadFolderTitle,
+                        subtitle = "Music/Zenith",
+                        onClick = { AppSettings.setDownloadFolderUri("") },
+                    )
+                }
             }
             val syncPlaylistsTitle = stringResource(R.string.sync_downloaded_playlists)
             row(syncPlaylistsTitle, "playlist", "new songs", "background", "automatic") {
