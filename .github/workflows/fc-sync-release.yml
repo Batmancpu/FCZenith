@@ -275,7 +275,7 @@ jobs:
       - name: Remove temporary identity overlay from source checkout
         if: steps.decision.outputs.should_release == 'true' && always()
         run: |
-          git restore --worktree -- app/build.gradle.kts build.gradle.kts app/src/main/res/drawable/ic_launcher_background.xml app/src/main/res/drawable/ic_launcher_foreground.xml \
+          git restore --worktree -- app/build.gradle.kts build.gradle.kts app/src/main/res/drawable/ic_notification_logo.xml app/src/main/res/drawable/ic_launcher_background.xml app/src/main/res/drawable/ic_launcher_foreground.xml \
             app/src/main/res/mipmap-mdpi/ic_launcher.webp app/src/main/res/mipmap-mdpi/ic_launcher_round.webp \
             app/src/main/res/mipmap-hdpi/ic_launcher.webp app/src/main/res/mipmap-hdpi/ic_launcher_round.webp \
             app/src/main/res/mipmap-xhdpi/ic_launcher.webp app/src/main/res/mipmap-xhdpi/ic_launcher_round.webp \

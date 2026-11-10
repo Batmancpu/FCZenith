@@ -131,6 +131,27 @@ def main() -> None:
             resized.save(folder / "ic_launcher.webp", "WEBP", quality=94, method=6)
             resized.save(folder / "ic_launcher_round.webp", "WEBP", quality=94, method=6)
 
+    # Android notification small icons are monochrome alpha masks. Use a
+    # Music-note silhouette, not the upstream Zenith Z mark or the full-color
+    # launcher artwork. Every notification builder shares this one resource.
+    notification_logo = APP / "src/main/res/drawable/ic_notification_logo.xml"
+    if not notification_logo.is_file():
+        raise SystemExit("FC overlay requires the shared notification icon resource")
+    notification_logo.write_text(
+        '''<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
+</vector>
+''',
+        encoding="utf-8",
+    )
+
     print(
         f"FC overlay applied: com.spotify.music / Music / "
         f"{version_name} / {repository}"
