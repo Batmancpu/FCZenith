@@ -45,6 +45,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.material3.Text
 import com.music.zenith.ui.components.ElasticRefreshState
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -1386,7 +1387,13 @@ internal fun NewShelfCard(
  * copies of the same box.
  */
 @Composable
-private fun ServiceCard(colors: List<Color>, trackKey: String, icon: ImageVector) {
+private fun ServiceCard(
+    colors: List<Color>,
+    trackKey: String,
+    icon: ImageVector,
+    /** How much of the card's own colours is laid back over the mesh on a light theme. */
+    lightLift: Float = 0f,
+) {
     val palette = remember { MeshPalette(colors) }
     Box(
         modifier = Modifier
@@ -1401,6 +1408,16 @@ private fun ServiceCard(colors: List<Color>, trackKey: String, icon: ImageVector
             continuous = true,
             blurRadius = 24.dp,
         )
+        // Light theme only: the mesh clamps every colour it is given into a
+        // dark band, which on a white page reads heavy. Laying the card's own
+        // colours back over it restores the tile's intended brightness.
+        if (lightLift > 0f && MaterialTheme.colorScheme.surface.luminance() > 0.5f) {
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .background(Brush.linearGradient(colors.map { it.copy(alpha = lightLift) })),
+            )
+        }
         Icon(
             imageVector = icon,
             contentDescription = null,
@@ -1465,6 +1482,7 @@ internal fun ShelfCard(
                 colors = listOf(Color(0xFFFF7AB8), Color(0xFF9B6CFF)),
                 trackKey = YtMusicRepository.LIKED_MUSIC,
                 icon = Icons.Rounded.Favorite,
+                lightLift = 0.6f,
             )
             "local:cache" -> ServiceCard(
                 colors = listOf(Color(0xFF42275A), Color(0xFF734B6D)),
