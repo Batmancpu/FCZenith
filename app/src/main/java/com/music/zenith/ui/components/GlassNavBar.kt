@@ -131,11 +131,11 @@ fun GlassNavBar(
 // cover cerah. Tema terang tidak berubah.
 val isDarkGlass = contentColor == Color.White
 val selectedColor = if (isDarkGlass) {
-    lerp(MaterialTheme.colorScheme.primary, Color.White, 0.35f)
+    lerp(MaterialTheme.colorScheme.primary, Color.White, 0.06f)
 } else {
     MaterialTheme.colorScheme.primary
 }
-val unselectedColor = contentColor.copy(alpha = 0.90f)
+val unselectedColor = contentColor
 val haptics = rememberHaptics()
     // Goyangan jelly pill now playing, dibagikan ke tab dan Search di sebelahnya.
     val jellyPush = remember { JellyPush() }
