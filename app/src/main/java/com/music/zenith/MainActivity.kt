@@ -453,6 +453,7 @@ class MainActivity : AppCompatActivity() {
                     LocalAppBackdrop provides appBackdrop,
                     LocalMotionLyricLine provides { line, position, style, inactive, active, modifier ->
                         val motionWords = remember(line) { line.toMotionWords() }
+                        val sparkle by AppSettings.lyricsSparkle.collectAsStateWithLifecycle()
                         MotionLyricLine(
                             text = line.text,
                             words = motionWords,
@@ -461,6 +462,7 @@ class MainActivity : AppCompatActivity() {
                             inactiveColor = inactive,
                             activeColor = active,
                             modifier = modifier,
+                            sparkle = sparkle,
                         )
                     },
                 ) {

@@ -58,6 +58,7 @@ internal class MotionRuntime {
     var words: List<MotionWord> = emptyList()
     var maxSwell = 0f
     var timeSec = 0f
+    var sparkle = true
     var headX = 0f; var headY = 0f; var headRtl = false
     var lastPos = Long.MIN_VALUE
     var idle = -1
@@ -137,7 +138,8 @@ fun MotionLyricLine(
     style: TextStyle,
     inactiveColor: Color,
     activeColor: Color,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    sparkle: Boolean = true
 ) {
     if (words.isEmpty() || text.isEmpty()) {
         BasicText(text = text, modifier = modifier, style = style.copy(color = inactiveColor))
@@ -155,6 +157,7 @@ fun MotionLyricLine(
         )
     }
     val rt = remember(text, words, motionStyle) { MotionRuntime() }
+    rt.sparkle = sparkle
     // Bloom kini digambar langsung per huruf (tanpa RenderEffect) agar tidak ada ghosting.
 
     LaunchedEffect(rt, words) {
@@ -330,7 +333,7 @@ private fun DrawScope.drawMotion(
                 drawText(g, brush = sweepBrush, topLeft = tl, shadow = shadow)
             }
         }
-        if (sw > 0.01f) {
+        if (sw > 0.01f && rt.sparkle) {
             drawParticles(i, l + w / 2f, lay.top[i] + dy, w, rt, active, smoothstep(sw / 0.35f))
         }
     }

@@ -1138,6 +1138,8 @@
     <string name="blur_unfocused_lyrics">비활성 가사 흐리게</string>
     <string name="blur_unfocused_lyrics_subtitle">현재 줄에 집중할 수 있게 해요</string>
     <string name="liquid_flow_subtitle">모션 가사 효과와 함께 부드럽게 단어가 흐르듯 표시돼요. 끄면 기본 가사 효과를 사용해요</string>
+    <string name="lyrics_sparkle">가사 반짝임</string>
+    <string name="lyrics_sparkle_subtitle">LiquidFlow에서 길게 끄는 글자 주변에 작은 반짝임을 표시해요</string>
     <string name="advanced_options">고급 및 실험 옵션</string>
     <string name="lyrics_debug_logs">가사 디버그 로그</string>
     <string name="lyrics_debug_logs_subtitle">가사 패널에 실시간 API 쿼리와 스크레이퍼 활동을 표시해요</string>

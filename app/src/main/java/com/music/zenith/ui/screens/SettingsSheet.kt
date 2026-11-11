@@ -270,6 +270,7 @@ fun SettingsScreen(
     val liquidGlassSupported = isGlassSupported()
     val lyricsBlur by AppSettings.lyricsBlur.collectAsStateWithLifecycle()
     val liquidFlow by AppSettings.liquidFlow.collectAsStateWithLifecycle()
+    val lyricsSparkle by AppSettings.lyricsSparkle.collectAsStateWithLifecycle()
     val signatureApiEnabled by AppSettings.signatureApiEnabled.collectAsStateWithLifecycle()
     val signatureApiUrl by AppSettings.signatureApiUrl.collectAsStateWithLifecycle()
     val fullBleedArtwork by AppSettings.fullBleedArtwork.collectAsStateWithLifecycle()
@@ -1384,6 +1385,25 @@ fun SettingsScreen(
                         },
                         onClick = { AppSettings.setLiquidFlow(!liquidFlow) },
                     )
+                }
+                // Sparkle adalah bagian dari efek LiquidFlow, jadi pengaturannya
+                // hanya muncul saat LiquidFlow nyala.
+                if (liquidFlow) {
+                    val lyricsSparkleTitle = stringResource(R.string.lyrics_sparkle)
+                    row(lyricsSparkleTitle, "lyrics", "sparkle", "particles", "liquidflow") {
+                        SettingsRow(
+                            icon = SfIcons.AutoAwesome,
+                            title = lyricsSparkleTitle,
+                            subtitle = stringResource(R.string.lyrics_sparkle_subtitle),
+                            trailing = {
+                                IosSwitch(
+                                    checked = lyricsSparkle,
+                                    onCheckedChange = AppSettings::setLyricsSparkle,
+                                )
+                            },
+                            onClick = { AppSettings.setLyricsSparkle(!lyricsSparkle) },
+                        )
+                    }
                 }
                 val lyricsSourcesTitle = stringResource(R.string.lyrics_sources)
                 row(lyricsSourcesTitle, "lyrics", "lrclib", "musixmatch") {

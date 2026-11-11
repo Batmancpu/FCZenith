@@ -892,6 +892,8 @@
     <string name="liquid_flow">LiquidFlow</string>
 
     <string name="liquid_flow_subtitle">Sapuan kata yang halus dengan efek Motion. Saat mati, memakai efek lirik bawaan</string>
+    <string name="lyrics_sparkle">Kilauan lirik</string>
+    <string name="lyrics_sparkle_subtitle">Partikel kecil berkilau di sekitar huruf yang ditahan pada LiquidFlow</string>
 
     <string name="brand_account">Akun merek</string>
 
