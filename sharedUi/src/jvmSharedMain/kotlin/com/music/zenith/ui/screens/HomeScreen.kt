@@ -23,8 +23,18 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.border
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextAlign
@@ -258,7 +268,7 @@ private fun SpeedDialShelf(
                 items(pages, contentType = { "speed-dial-page" }) { page ->
                     Column(
                         modifier = Modifier.width(pageWidth),
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(SPEED_DIAL_GAP),
                     ) {
                         repeat(SPEED_DIAL_ROWS) { rowIndex ->
                             Row(horizontalArrangement = Arrangement.spacedBy(SPEED_DIAL_GAP)) {
@@ -298,42 +308,77 @@ private fun SpeedDialShuffleTile(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val shape = RoundedCornerShape(14.dp)
-    val accent = MaterialTheme.colorScheme.primary
-    Column(modifier = modifier.longPressMenuClickable(onClick = onClick, onLongClick = null)) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(1f)
-                .shadow(4.dp, shape, ambientColor = Color.Black.copy(alpha = 0.25f), spotColor = Color.Black.copy(alpha = 0.25f))
-                .clip(shape)
-                .background(Brush.linearGradient(listOf(accent.copy(alpha = 0.9f), accent.copy(alpha = 0.5f))))
-                .background(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.18f), Color.Transparent)))
-                .border(0.5.dp, Color.White.copy(alpha = 0.25f), shape),
-            contentAlignment = Alignment.Center,
+    val shape = RoundedCornerShape(12.dp)
+    val phase = remember { Animatable(0f) }
+    var searching by remember { mutableStateOf(false) }
+    val latestClick by rememberUpdatedState(onClick)
+    // One full swirl, as if looking for a song, then the shuffle starts.
+    LaunchedEffect(searching) {
+        if (searching) {
+            phase.snapTo(0f)
+            phase.animateTo(1f, tween(durationMillis = 1100, easing = LinearEasing))
+            latestClick()
+            phase.snapTo(0f)
+            searching = false
+        }
+    }
+    val dotColor = MaterialTheme.colorScheme.primary
+    Box(
+        modifier = modifier
+            .aspectRatio(1f)
+            .clip(shape)
+            .thumbnailBorder(shape)
+            .background(
+                Brush.linearGradient(
+                    listOf(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.surface),
+                ),
+            )
+            .longPressMenuClickable(onClick = { if (!searching) searching = true }, onLongClick = null),
+    ) {
+        Canvas(
+            Modifier
+                .align(Alignment.Center)
+                .size(56.dp),
         ) {
-            Icon(
-                imageVector = ZenithIcons.Shuffle,
-                contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier.size(30.dp),
+            val p = phase.value
+            val eased = p * p * (3f - 2f * p)
+            val envelope = sin(PI.toFloat() * p)
+            val turn = 2f * PI.toFloat() * eased
+            val unit = size.minDimension
+            val orbit = unit * 0.19f * 1.4142f * (1f - 0.45f * envelope)
+            val base = unit * 0.085f
+            for (i in 0 until 4) {
+                val angle = (PI.toFloat() / 4f + i * PI.toFloat() / 2f) + turn
+                val radius = base * (1f + 0.5f * envelope * sin(4f * PI.toFloat() * p + i * PI.toFloat() / 2f))
+                drawCircle(
+                    color = dotColor,
+                    radius = radius,
+                    center = Offset(center.x + cos(angle) * orbit, center.y + sin(angle) * orbit),
+                )
+            }
+        }
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .fillMaxWidth()
+                .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.72f))))
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+        ) {
+            Text(
+                text = stringResource(Res.string.shuffle),
+                style = MaterialTheme.typography.labelLarge,
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = stringResource(Res.string.speed_dial_shuffle_hint),
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White.copy(alpha = 0.75f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
-        Spacer(Modifier.height(6.dp))
-        Text(
-            text = stringResource(Res.string.shuffle),
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onBackground,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-            text = stringResource(Res.string.speed_dial_shuffle_hint),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
     }
 }
 
@@ -405,56 +450,53 @@ private fun SpeedDialTile(
     modifier: Modifier = Modifier,
 ) {
     val isBrowse = item.browseId != null && item.videoId == null
-    val isArtist = isBrowse && item.browseId?.startsWith("UC") == true
-    val shape = if (isArtist) CircleShape else RoundedCornerShape(14.dp)
-    val align = if (isArtist) TextAlign.Center else TextAlign.Start
-    Column(
+    val shape = RoundedCornerShape(12.dp)
+    Box(
         modifier = modifier
+            .aspectRatio(1f)
+            .clip(shape)
+            .thumbnailBorder(shape)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
             .longPressMenuClickable(onClick = onClick, onLongClick = onLongPress)
             .contextClick(onLongPress),
     ) {
-        Box(
+        AsyncImage(
+            model = item.thumbnailUrl.artworkAt(CARD_ART_PX),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize(),
+        )
+        Column(
             modifier = Modifier
+                .align(Alignment.BottomStart)
                 .fillMaxWidth()
-                .aspectRatio(1f)
-                .shadow(4.dp, shape, ambientColor = Color.Black.copy(alpha = 0.25f), spotColor = Color.Black.copy(alpha = 0.25f))
-                .clip(shape)
-                .thumbnailBorder(shape)
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+                .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.72f))))
+                .padding(
+                    start = 8.dp,
+                    end = if (isBrowse) 32.dp else 8.dp,
+                    top = 6.dp,
+                    bottom = 6.dp,
+                ),
         ) {
-            AsyncImage(
-                model = item.thumbnailUrl.artworkAt(CARD_ART_PX),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
+            Text(
+                text = item.title,
+                style = MaterialTheme.typography.labelLarge,
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
-            if (isCurrent && isPlaying) {
-                Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.3f)))
-                SearchPlayingBars(Modifier.align(Alignment.Center))
-            }
-            if (isBrowse && !isArtist) {
-                SpeedDialBadge(Modifier.align(Alignment.BottomEnd).padding(6.dp))
-            }
+            Text(
+                text = localizeCardSubtitle(item.subtitle),
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White.copy(alpha = 0.75f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
-        Spacer(Modifier.height(6.dp))
-        Text(
-            text = item.title,
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onBackground,
-            textAlign = align,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Text(
-            text = localizeCardSubtitle(item.subtitle),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = align,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.fillMaxWidth(),
-        )
+        if (isCurrent && isPlaying) SearchPlayingBars(Modifier.align(Alignment.Center))
+        if (isBrowse) {
+            SpeedDialBadge(Modifier.align(Alignment.BottomEnd).padding(6.dp))
+        }
     }
 }
 
