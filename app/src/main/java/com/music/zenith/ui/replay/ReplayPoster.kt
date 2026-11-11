@@ -957,47 +957,6 @@ private fun drawAlbumCard(
     }
 }
 
-/** Genres: the biggest word, over bars sized by listening time. */
-private fun drawGenreCard(
-    canvas: Canvas,
-    context: Context,
-    type: Fonts,
-    rows: List<ReplayRow>,
-    top: Float,
-) {
-    val lead = rows.firstOrNull() ?: return
-    val word = type.heading(168f, Color.WHITE).apply { letterSpacing = -0.02f }
-    canvas.drawText(ellipsised(lead.title, word, CONTENT_W), MARGIN, top + 150f, word)
-    canvas.drawText(
-        formatListening(context, lead.ms),
-        MARGIN,
-        top + 224f,
-        type.body(46f, 0xE6EBD9A8.toInt()),
-    )
-    val colW = CONTENT_W / rows.size.coerceAtLeast(1)
-    val baseline = top + 300f + 560f
-    rows.forEachIndexed { index, row ->
-        val fraction = (row.ms.toFloat() / lead.ms.toFloat().coerceAtLeast(1f)).coerceIn(0.14f, 1f)
-        val barH = 560f * fraction
-        val mid = MARGIN + colW * index + colW / 2f
-        val bar = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            shader = LinearGradient(
-                0f,
-                baseline - barH,
-                0f,
-                baseline,
-                ColorUtils.setAlphaComponent(Color.WHITE, if (index == 0) 255 else 199),
-                ColorUtils.setAlphaComponent(CHAMPAGNE, if (index == 0) 140 else 72),
-                Shader.TileMode.CLAMP,
-            )
-        }
-        canvas.drawRoundRect(RectF(mid - 39f, baseline - barH, mid + 39f, baseline), 27f, 27f, bar)
-        val label = type.body(34f, ColorUtils.setAlphaComponent(Color.WHITE, if (index == 0) 242 else 179))
-            .apply { textAlign = Paint.Align.CENTER }
-        drawWrapped(canvas, row.title, label, mid, baseline + 64f, colW - 12f, 40f, 2)
-    }
-}
-
 /** Habits: each number on a paper ticket stub. */
 private fun drawHabitCards(
     canvas: Canvas,

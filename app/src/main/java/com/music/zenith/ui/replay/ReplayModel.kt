@@ -125,7 +125,7 @@ fun ReplaySummary.storyHeadline(context: Context, page: ReplayStoryPage): List<H
     ReplayStoryPage.ALBUMS -> context.twoPart(R.string.replay_story_albums_a, R.string.replay_story_albums_b)
     ReplayStoryPage.GENRES -> context.twoPart(R.string.replay_story_personality_a, R.string.replay_story_personality_b)
     ReplayStoryPage.SUMMARY -> context.twoPart(R.string.replay_story_final_a, R.string.replay_story_final_b)
-    else -> legacyStoryHeadline(context, page)
+    ReplayStoryPage.HABITS -> habitsHeadline(context)
 }
 
 private fun Context.twoPart(first: Int, second: Int): List<HeadlineRun> {
@@ -136,70 +136,16 @@ private fun Context.twoPart(first: Int, second: Int): List<HeadlineRun> {
     return listOf(HeadlineRun(lead, false), HeadlineRun(getString(second), true))
 }
 
-private fun ReplaySummary.legacyStoryHeadline(context: Context, page: ReplayStoryPage): List<HeadlineRun> = when (page) {
-    ReplayStoryPage.INTRO -> runs(
-        context.getString(R.string.replay_intro_start) to false,
-        " " to false,
-        "Replay" to true,
-        " " to false,
-        context.getString(R.string.replay_intro_end) to false,
-    )
-    ReplayStoryPage.MINUTES -> runs(
-        context.getString(R.string.replay_minutes_start) to false,
-        " " to false,
-        context.resources.getQuantityString(
-            R.plurals.replay_minutes_unit,
-            formatMinutes(totalMs).replace(",", "").toIntOrNull() ?: 0,
-            formatMinutes(totalMs),
-        ) to true,
-        " " to false,
-        context.getString(R.string.replay_minutes_end) to false,
-    )
-    ReplayStoryPage.SONGS -> runs(
-        context.getString(R.string.replay_songs_start) to false,
-        " " to false,
-        context.replayCount(totalPlays, R.plurals.replay_song_count) to true,
-        " " to false,
-        (if (period == ReplayPeriod.THIS_WEEK) context.getString(R.string.replay_songs_end_week) else context.getString(R.string.replay_songs_end)) to false,
-    )
-    ReplayStoryPage.ARTISTS -> runs(
-        (if (period == ReplayPeriod.THIS_WEEK) context.getString(R.string.replay_artist_start_week) else context.getString(R.string.replay_artist_start)) to false,
-        " " to false,
-        context.getString(R.string.replay_artist_focus) to true,
-        " " to false,
-        context.getString(R.string.replay_artist_end) to false,
-    )
-    ReplayStoryPage.ALBUMS -> runs(
-        context.getString(R.string.replay_album_start) to false,
-        " " to false,
-        context.getString(R.string.replay_album_focus) to true,
-        " " to false,
-        context.getString(R.string.replay_album_end) to false,
-    )
-    ReplayStoryPage.GENRES -> runs(
-        context.getString(R.string.replay_genre_start) to false,
-        " " to false,
-        context.getString(R.string.replay_genre_focus) to true,
-        " " to false,
-        context.getString(R.string.replay_genre_end) to false,
-    )
-    ReplayStoryPage.HABITS -> runs(
-        context.getString(R.string.replay_habits_start) to false,
-        " " to false,
-        context.replayCount(distinctSongs, R.plurals.replay_song_count) to true,
-        " " to false,
-        context.getString(R.string.replay_habits_middle) to false,
-        " " to false,
-        context.replayCount(distinctArtists, R.plurals.replay_artist_count) to true,
-        "." to false,
-    )
-    ReplayStoryPage.SUMMARY -> runs(
-        context.getString(R.string.replay_summary_start) to false,
-        " " to false,
-        if (period == ReplayPeriod.THIS_WEEK) context.getString(R.string.replay_summary_end_week) to true else label to true,
-        if (period == ReplayPeriod.THIS_WEEK) " in music." to false else " in music." to false,
-    )
-}
+private fun ReplaySummary.habitsHeadline(context: Context): List<HeadlineRun> = runs(
+    context.getString(R.string.replay_habits_start) to false,
+    " " to false,
+    context.replayCount(distinctSongs, R.plurals.replay_song_count) to true,
+    " " to false,
+    context.getString(R.string.replay_habits_middle) to false,
+    " " to false,
+    context.replayCount(distinctArtists, R.plurals.replay_artist_count) to true,
+    "." to false,
+)
 
 fun ReplayPeriod.localizedChip(context: Context): String = when (this) {
     ReplayPeriod.THIS_WEEK -> context.getString(R.string.replay_this_week)

@@ -3,7 +3,6 @@ package com.music.zenith
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.content.res.Configuration
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -70,8 +69,6 @@ import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.Sort
 import androidx.compose.material.icons.rounded.Upgrade
 import com.music.zenith.data.listentogether.ServerConnectionState
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -97,7 +94,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.graphicsLayer
@@ -156,7 +152,6 @@ import com.music.zenith.ui.components.iosMenuJelly
 import com.music.zenith.ui.components.jellyMenuRow
 import com.music.zenith.ui.components.rememberJellyMenuTouch
 import com.music.zenith.ui.components.DacVolumeHud
-import com.music.zenith.ui.components.DacVolumeKeys
 import com.music.zenith.ui.components.LocalPlayingBarsMotion
 import com.music.zenith.ui.components.handleDacVolumeKey
 import com.music.zenith.ui.components.VolumeHud
@@ -254,7 +249,6 @@ import com.music.zenith.ui.components.FLOATING_BAR_MAX_WIDTH
 import com.music.zenith.ui.components.FloatingBottomBar
 import com.music.zenith.ui.components.GlassNavBar
 import com.music.zenith.ui.components.floatingtabbar.rememberFloatingTabBarScrollConnection
-import kotlinx.coroutines.flow.collectLatest
 import com.music.zenith.ui.components.FrostedTopBar
 import com.music.zenith.ui.components.LastfmLoginAlert
 import com.music.zenith.ui.components.LocalAppBackdrop
@@ -320,8 +314,6 @@ import com.music.zenith.ui.components.AddSongsDialog
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.foundation.layout.offset
-import com.music.zenith.ui.components.MiniPlayerPull
 import com.music.zenith.ui.player.PlayerPanel
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.mutableStateListOf
@@ -3129,7 +3121,6 @@ private fun ZenithApp(
                         } else if (pageRoute == AppRoute.Replay) {
                             ReplayScreen(
                                 state = replay,
-                                holder = account?.name.orEmpty(),
                                 onPeriodChange = setReplayPeriod,
                                 onOpenStory = { replayStory = it },
                                 // A track tapped on a chart is one the user already
@@ -3879,8 +3870,6 @@ private fun ZenithApp(
                                     LibraryReplayEntry(
                                         cards = replayCards,
                                         loading = replay.loading,
-                                        holder = account?.name.orEmpty(),
-                                        memberSince = replay.memberSince,
                                         onOpenReplay = { page ->
                                             replayLandingPage = page
                                             navigator.push(AppRoute.Replay)

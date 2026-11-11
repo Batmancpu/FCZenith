@@ -8,12 +8,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -21,34 +19,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.draw.blur
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.foundation.layout.fillMaxWidth
 import coil3.compose.AsyncImage
 import com.music.zenith.data.model.CARD_ART_PX
 import com.music.zenith.data.model.artworkAt
-import com.music.zenith.ui.player.renderEffectBlurSupported
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
 import com.music.zenith.sharedui.resources.*
-import org.jetbrains.compose.resources.painterResource
-import org.jetbrains.compose.resources.stringResource
 import com.music.zenith.ui.player.MeshGradientBackground
 import com.music.zenith.ui.player.rememberArtworkColors
 import java.util.Locale
@@ -63,16 +46,11 @@ import java.util.Locale
  * of these costs one blurred layer each rather than a redraw per frame.
  */
 @Composable
-@Suppress("UNUSED_PARAMETER")
 fun ReplayCreditCard(
     label: String,
     value: String,
     detail: String?,
     artworkUrl: String?,
-    /** Kept so callers stay as they are; the card no longer prints a cardholder line. */
-    holder: String,
-    /** Kept so callers stay as they are; the card no longer prints a date. */
-    memberSince: String?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -204,22 +182,6 @@ fun InitialTile(text: String, size: Dp, shape: Shape) {
 }
 
 private val CardShape = RoundedCornerShape(16.dp)
-
-/**
- * Gambar utama card: artwork top 1 penuh satu card, apa adanya. Keterbacaan
- * teks dijaga satu scrim gradien di [ReplayCreditCard], bukan blur berlapis.
- */
-@Composable
-private fun CardArtwork(url: String) {
-    AsyncImage(
-        model = url,
-        contentDescription = null,
-        contentScale = ContentScale.Crop,
-        modifier = Modifier.fillMaxSize().background(Color(0xFF1C1C1E)),
-    )
-}
-
-/** Whose card it is when there is no signed-in account to name. */
 
 /** A compact, slightly wide tile: minimal footprint on the Library page. */
 private const val CARD_RATIO = 1.35f
