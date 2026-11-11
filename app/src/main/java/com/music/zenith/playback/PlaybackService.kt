@@ -6542,6 +6542,10 @@ class PlaybackService : MediaLibraryService() {
      * sampling has to come from here.
      */
     private fun reportProgress() {
+        // Whether the last tick was counted from a remote speaker, so its
+        // pause can close the recorder's clock once (the phone's own player
+        // stays paused throughout and never reports it).
+        var recordingRemote = false
         scope.launch {
             while (isActive) {
                 // Re-read every tick rather than captured once: the session
@@ -6576,6 +6580,20 @@ class PlaybackService : MediaLibraryService() {
                     // repeat: it returns immediately unless the track is
                     // pending and nothing is already looking.
                     lookForBetterCopy(player)
+                } else if (player != null && speakers.active && speakers.isPlaying) {
+                    // A remote speaker owns the clock and the phone's player is
+                    // held paused, so the branch above never runs. The phone
+                    // still owns the queue, so its current item is the track
+                    // the receiver is playing.
+                    recordingRemote = true
+                    player.currentMediaItem?.toSong()?.let {
+                        ListeningRecorder.onSample(it, speakers.durationMs)
+                    }
+                } else if (recordingRemote) {
+                    // The speaker paused, stopped or handed back to the phone:
+                    // the next tick must anchor rather than contribute the gap.
+                    recordingRemote = false
+                    ListeningRecorder.onStopped()
                 }
                 delay(PROGRESS_SAMPLE_MS)
             }
