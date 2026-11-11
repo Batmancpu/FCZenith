@@ -115,6 +115,13 @@ import com.music.zenith.ui.player.MeshPalette
 internal val HOME_TITLE_LIFT = 28.dp
 
 private const val RECENTS_TITLE = "Recents"
+
+/** Speed dial leads Home, above Listen again and Recents, wherever the feed put it. */
+private fun List<HomeShelf>.withSpeedDialFirst(): List<HomeShelf> {
+    val at = indexOfFirst { shelf -> SPEED_DIAL_TITLES.any { shelf.title.trim().equals(it, ignoreCase = true) } }
+    if (at <= 0) return this
+    return toMutableList().also { it.add(0, it.removeAt(at)) }
+}
 private const val RECENT_TRACKS_PER_COLUMN = 4
 
 private val LISTEN_AGAIN_TITLES = listOf("Listen again", "Nghe lại", "もう一度聴く", "Dengarkan lagi", "Putar ulang", "다시 듣기")
@@ -448,7 +455,7 @@ fun HomeScreen(
 fun homeFeedShelves(shelves: List<HomeShelf>, dropEditorial: Boolean = true): List<HomeShelf> {
     val editorial = if (dropEditorial) editorialShelfIndex(shelves) else null
     val kept = if (editorial != null) shelves.filterIndexed { index, _ -> index != editorial } else shelves
-    return kept.withListenAgainFirst().withQuickPicksInListenAgainSlot().withOtherModelBelowListenAgain()
+    return kept.withListenAgainFirst().withQuickPicksInListenAgainSlot().withOtherModelBelowListenAgain().withSpeedDialFirst()
 }
 
 /**
@@ -509,7 +516,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.itemsIndexedShelves(
     } else {
         shelves
     }
-    val ordered = withRecentsSlot.withListenAgainFirst().withQuickPicksInListenAgainSlot().withOtherModelBelowListenAgain()
+    val ordered = withRecentsSlot.withListenAgainFirst().withQuickPicksInListenAgainSlot().withOtherModelBelowListenAgain().withSpeedDialFirst()
     // Find Your Mood sits right after Recents, so it never follows another
     // row of cards directly. Without Recents (a guest) it goes after the second shelf.
     val moodAt = (ordered.indexOfFirst { it.title.trim().equals(RECENTS_TITLE, ignoreCase = true) }

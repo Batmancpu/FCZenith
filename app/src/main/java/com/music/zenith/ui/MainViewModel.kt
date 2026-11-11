@@ -1878,6 +1878,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                             if (!isCurrentHomeLoad(identity, generation)) return@onSuccess
                             homeContinuation = feed.continuation
                             publishHomeShelves(feed.shelves)
+                            localSpeedDialShelf()?.let { speedDial ->
+                                if (isCurrentHomeLoad(identity, generation)) {
+                                    publishHomeShelves(listOf(speedDial), prepend = true)
+                                }
+                            }
                         }
                         .onFailure { failure ->
                             if (isCurrentHomeLoad(identity, generation) && _home.value !is UiState.Success) {
@@ -2019,6 +2024,33 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
+     * Speed dial built from what this device has played most, best first. Needs
+     * a few songs with a YouTube id and a cover to fill a grid; null before that.
+     */
+    private suspend fun localSpeedDialShelf(): HomeShelf? {
+        val youtubeId = Regex("^[A-Za-z0-9_-]{11}$")
+        val songs = runCatching { ListeningStats.summary(ReplayPeriod.ALL_TIME) }
+            .getOrNull()?.songs.orEmpty()
+            .map { it.song }
+            .filter { !it.thumbnailUrl.isNullOrBlank() && youtubeId.matches(it.videoId) }
+            .distinctBy { it.videoId }
+            .take(18)
+        if (songs.size < 3) return null
+        return HomeShelf(
+            title = "Speed dial",
+            items = songs.map { song ->
+                com.music.zenith.data.model.ShelfItem(
+                    title = song.title,
+                    subtitle = song.artist,
+                    thumbnailUrl = song.thumbnailUrl,
+                    videoId = song.videoId,
+                    browseId = null,
+                )
+            },
+        )
+    }
+
+    /**
      * One of the parallel first-page requests has finished. Ignored once a newer
      * load has taken over, which has already reset the count for its own fan-out.
      */
@@ -2059,6 +2091,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         if (!AppSettings.hideHomeTopPicks.value && topPicksJob?.isActive != true) loadTopPicks(identity, rebuild = false)
         val feedResult = YtMusicRepository.home()
         val recentShelf = recent?.await()?.getOrNull()
+        val speedDialShelf = localSpeedDialShelf()
         feedResult.onSuccess { feed ->
             if (identity != listenerKey()) return@onSuccess
             homeContinuation = feed.continuation
@@ -2068,10 +2101,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             if (shelves.isNotEmpty()) {
                 // Recents goes in with the feed in one update. Applied a moment
                 // later it swapped places with Listen again and shoved every row.
-                val replacing = recentShelf?.let { setOf(it.title.lowercase(Locale.ROOT)) }.orEmpty()
+                val replacing = listOfNotNull(recentShelf, speedDialShelf).map { it.title.lowercase(Locale.ROOT) }.toSet()
                 homeSeenTitles.addAll(replacing)
                 _home.value = UiState.Success(
-                    listOfNotNull(recentShelf) + shelves.filterNot { it.title.lowercase(Locale.ROOT) in replacing },
+                    listOfNotNull(speedDialShelf, recentShelf) + shelves.filterNot { it.title.lowercase(Locale.ROOT) in replacing },
                 )
             }
         }
