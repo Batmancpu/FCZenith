@@ -16,18 +16,15 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
-import androidx.media3.datasource.DefaultDataSource
-import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
-import com.music.zenith.data.Http
-import com.music.zenith.data.innertube.StreamResolver
 import com.music.zenith.data.model.Song
 import com.music.zenith.data.stats.ReplaySummary
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -76,13 +73,10 @@ private fun BacksoundPlayer(
     // fade in and out, [duck] is the hold/share silence over the top of it.
     val level = remember { Animatable(0f) }
     val duck = remember { Animatable(1f) }
+    val session = remember { ReplayClipCache.openSession() }
     val player = remember {
         ExoPlayer.Builder(context)
-            .setMediaSourceFactory(
-                DefaultMediaSourceFactory(
-                    DefaultDataSource.Factory(context, OkHttpDataSource.Factory(Http.client)),
-                ),
-            )
+            .setMediaSourceFactory(DefaultMediaSourceFactory(ReplayClipCache.playbackFactory(context)))
             // Focus is not taken: the main player is paused by hand below, and
             // a second focus request would only make the system fight over it.
             .setAudioAttributes(
@@ -114,6 +108,8 @@ private fun BacksoundPlayer(
                 }
                 player.release()
                 resume?.play()
+                // The clips were only ever for this Replay: none of them stays on disk.
+                withContext(Dispatchers.IO) { ReplayClipCache.closeSession(session) }
             }
         }
     }
@@ -134,21 +130,46 @@ private fun BacksoundPlayer(
     }
 
     LaunchedEffect(tracks) {
+        // Each clip is resolved and stored on disk ahead of its turn, so it is
+        // already there when it is due instead of being fetched live while the
+        // story waits in silence.
+        val prepared = HashMap<String, Deferred<String?>>()
+        fun prepare(song: Song): Deferred<String?> =
+            prepared.getOrPut(song.clipKey()) {
+                async(Dispatchers.IO) { ReplayClipCache.prepare(context, song) }
+            }
+
         var index = 0
         var failures = 0
+        var rounds = 0
         while (isActive) {
             val song = tracks[index % tracks.size]
+            val next = tracks[(index + 1) % tracks.size]
             index++
-            val played = playSegment(player, level, { silencedNow }, song)
+            val source = withTimeoutOrNull(PREPARE_TIMEOUT_MS) { prepare(song).await() }
+            // The next song is made ready while this one plays.
+            if (next.clipKey() != song.clipKey()) prepare(next)
+            val played = source != null &&
+                playSegment(player, level, { silencedNow }, song, source)
+            // This song is done with: its copy goes now, not when the Replay closes.
+            prepared.remove(song.clipKey())?.cancel()
+            withContext(Dispatchers.IO) { ReplayClipCache.evict(song) }
             if (played) {
                 failures = 0
+                rounds = 0
             } else if (++failures >= tracks.size) {
-                // Nothing here can be played: stay quiet rather than spin.
-                return@LaunchedEffect
+                // A whole round with nothing playable: wait and try again a few
+                // times rather than staying silent for the rest of the Replay.
+                failures = 0
+                if (++rounds >= MAX_RETRY_ROUNDS) return@LaunchedEffect
+                delay(RETRY_PAUSE_MS)
             }
         }
     }
 }
+
+/** Identifies a song's clip: the local file, or else the videoId. */
+private fun Song.clipKey(): String = localUri?.takeIf { it.isNotBlank() } ?: videoId
 
 /** One clip, faded in, held and faded out. False when the track could not be played. */
 private suspend fun playSegment(
@@ -156,18 +177,8 @@ private suspend fun playSegment(
     level: Animatable<Float, *>,
     silenced: () -> Boolean,
     song: Song,
+    source: String,
 ): Boolean {
-    val url = withTimeoutOrNull(RESOLVE_TIMEOUT_MS) {
-        withContext(Dispatchers.IO) {
-            try {
-                song.localUri?.takeIf { it.isNotBlank() } ?: StreamResolver.resolve(song.videoId)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                null
-            }
-        }
-    } ?: return false
 
     val ready = CompletableDeferred<Boolean>()
     val listener = object : Player.Listener {
@@ -183,7 +194,13 @@ private suspend fun playSegment(
     try {
         level.snapTo(0f)
         player.playWhenReady = false
-        player.setMediaItem(MediaItem.fromUri(url))
+        player.setMediaItem(
+            MediaItem.Builder()
+                .setUri(source)
+                // The key the clip was stored under, so it plays from disk.
+                .apply { if (song.localUri.isNullOrBlank()) setCustomCacheKey(song.videoId) }
+                .build(),
+        )
         player.prepare()
         if (withTimeoutOrNull(READY_TIMEOUT_MS) { ready.await() } != true) return false
 
@@ -231,5 +248,11 @@ private const val FADE_STEPS = 28
 private const val MAX_VOLUME = 0.85f
 
 private const val POLL_MS = 200L
-private const val RESOLVE_TIMEOUT_MS = 15_000L
+
+/** Resolving a track and storing it on disk, before it is given up on. */
+private const val PREPARE_TIMEOUT_MS = 25_000L
 private const val READY_TIMEOUT_MS = 12_000L
+
+/** A whole round of tracks that would not play is retried this many times, this far apart. */
+private const val MAX_RETRY_ROUNDS = 3
+private const val RETRY_PAUSE_MS = 4_000L
