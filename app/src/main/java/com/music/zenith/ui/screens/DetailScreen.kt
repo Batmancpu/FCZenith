@@ -681,6 +681,7 @@ fun DetailScreen(
                         palette = palette,
                         sleeveSize = sleeveSize,
                         heroHeight = artHeight * 0.92f,
+                        albumGenre = albumInfo?.genre,
                         canvas = canvas,
                         songs = songs,
                         onPlay = { onSongClick(songs, 0) },
@@ -770,6 +771,7 @@ fun DetailScreen(
                         text = description?.takeIf { it.isNotBlank() },
                         palette = palette,
                         horizontalPadding = if (isArtist) ARTIST_CONTENT_GUTTER else ABOUT_GUTTER,
+                        compact = !isArtist,
                         stats = if (hasStats) {
                             {
                                 ArtistStatsRow(
@@ -893,6 +895,10 @@ fun DetailScreen(
                             // what the filter — or a sort — left standing.
                             trackNumber = originalTrackNumbers[song.videoId].takeIf { numbered },
                             subtitleColor = palette.onBackgroundVariant,
+                            // Apple Music: no artist line when it is the album's own
+                            // artist, and no per-row duration on an album.
+                            hideArtistOf = credit.takeIf { numbered && it.isNotBlank() },
+                            showDuration = !numbered,
                             downloadedTint = downloadedTint,
                             isCurrent = isCurrent,
                             isPlaying = isCurrent && isPlaying,
@@ -1046,8 +1052,16 @@ private fun ReleaseHeader(
     onAddSongs: (() -> Unit)? = null,
     /** Tinggi hero full-bleed, hanya dipakai halaman Liked Music. */
     heroHeight: Dp = sleeveSize * 1.2f,
+    /** Genre yang Apple catat untuk album ini; tampil menggantikan label "Album". */
+    albumGenre: String? = null,
 ) {
-    val (credit, meta) = page.headerLines(songs.size, songs.playtime())
+    val (credit, listMeta) = page.headerLines(songs.size, songs.playtime())
+    // Apple Music: "Jazz • 2023". Jumlah lagu dan durasi pindah ke kaki halaman.
+    val meta = if (page.type == BrowseType.ALBUM && !page.browseId.startsWith("local:")) {
+        page.albumMeta(albumGenre)
+    } else {
+        listMeta
+    }
     // Liked Music dan Most Played tidak memakai sleeve berbingkai: seninya full-bleed.
     val albumHero = page.isAlbumHero()
     val fullBleed = page.isLikedMusic() || page.covers.isNotEmpty() || page.isFolderCover() || albumHero
@@ -2227,6 +2241,8 @@ private fun AboutSection(
     text: String?,
     palette: ArtworkPalette,
     horizontalPadding: Dp = ABOUT_GUTTER,
+    /** Ala Apple Music: tanpa judul, dengan MORE di ujung baris kedua. */
+    compact: Boolean = false,
     /** Drawn under the text. */
     stats: (@Composable () -> Unit)? = null,
     /** Drawn last, under the stats. */
@@ -2235,7 +2251,7 @@ private fun AboutSection(
     var expanded by remember(text) { mutableStateOf(false) }
     var clipped by remember(text) { mutableStateOf(false) }
     Column {
-        Text(
+        if (!compact) Text(
             text = title,
             style = MaterialTheme.typography.titleMedium,
             color = palette.onBackground,
@@ -2246,7 +2262,37 @@ private fun AboutSection(
                 bottom = 6.dp,
             ),
         )
-        if (text != null) Text(
+        if (text != null && compact) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .animateContentSize()
+                    .padding(horizontal = horizontalPadding, vertical = 4.dp)
+                    .let { m -> if (clipped || expanded) m.clickable { expanded = !expanded } else m },
+                verticalAlignment = Alignment.Bottom,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    text = text,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = palette.onBackgroundVariant,
+                    maxLines = if (expanded) Int.MAX_VALUE else 2,
+                    overflow = TextOverflow.Ellipsis,
+                    onTextLayout = { result -> if (!expanded) clipped = result.hasVisualOverflow },
+                    modifier = Modifier.weight(1f),
+                )
+                if (clipped && !expanded) {
+                    Text(
+                        text = stringResource(R.string.more).uppercase(),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = palette.onBackground,
+                    )
+                }
+            }
+        }
+        if (text != null && !compact) Text(
             text = text,
             style = MaterialTheme.typography.bodyLarge,
             fontWeight = FontWeight.Medium,
@@ -2260,7 +2306,7 @@ private fun AboutSection(
                 .padding(horizontal = horizontalPadding)
                 .let { m -> if (clipped || expanded) m.clickable { expanded = !expanded } else m },
         )
-        if (clipped || expanded) {
+        if (!compact && (clipped || expanded)) {
             Text(
                 text = stringResource(if (expanded) R.string.less else R.string.more),
                 style = MaterialTheme.typography.labelLarge,
@@ -2757,6 +2803,18 @@ private fun DetailPage.headerLines(trackCount: Int, playtime: String? = null): P
         playtime,
     ).joinToString(" · ")
     return credit to meta
+}
+
+/** Baris info header album ala Apple Music: genre (atau jenis rilisan) • tahun. */
+@Composable
+private fun DetailPage.albumMeta(genre: String?): String {
+    val parts = subtitle.split("•", "·").map { it.trim() }.filter { it.isNotEmpty() }
+    val year = parts.lastOrNull { it.length == 4 && it.all(Char::isDigit) }
+    val kind = parts.firstOrNull { it.lowercase(Locale.ROOT) in KIND_WORDS }
+    return listOfNotNull(
+        genre ?: (kind ?: type.localizedLabel())?.capitalizeWords(),
+        year,
+    ).joinToString(" • ")
 }
 
 /**

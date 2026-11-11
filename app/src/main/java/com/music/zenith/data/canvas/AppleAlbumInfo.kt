@@ -18,6 +18,7 @@ import java.time.format.FormatStyle
 data class AppleAlbumInfo(
     val releaseDate: LocalDate?,
     val copyright: String?,
+    val genre: String?,
 )
 
 /** Tanggal rilis dalam format lokal pengguna, mis. "March 3, 1988". */
@@ -103,8 +104,9 @@ object AppleAlbumInfoRepository {
 
         val date = runCatching { LocalDate.parse(best.optString("releaseDate").take(10)) }.getOrNull()
         val copyright = best.optString("copyright").trim().takeIf { it.isNotEmpty() }
-        if (date == null && copyright == null) return Entry(null)
-        return Entry(AppleAlbumInfo(date, copyright))
+        val genre = best.optString("primaryGenreName").trim().takeIf { it.isNotEmpty() }
+        if (date == null && copyright == null && genre == null) return Entry(null)
+        return Entry(AppleAlbumInfo(date, copyright, genre))
     }
 
     /** Judul tanpa akhiran " - Single" / " - EP" milik Apple, dinormalkan. */

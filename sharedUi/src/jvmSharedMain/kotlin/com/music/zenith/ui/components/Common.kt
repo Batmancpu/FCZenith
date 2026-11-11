@@ -394,6 +394,13 @@ fun SongRow(
      * songs folder's per-track download button. Null on every other list.
      */
     trailing: (@Composable () -> Unit)? = null,
+    /**
+     * The album's artist: a row by this same artist leaves its artist line off,
+     * as Apple Music's album listings do. Null keeps the line on every row.
+     */
+    hideArtistOf: String? = null,
+    /** False drops the trailing duration, which Apple Music's album listings omit. */
+    showDuration: Boolean = true,
 ) {
     SwipeToQueueBox(
         onSwipeToQueue = onSwipeToQueue,
@@ -415,6 +422,8 @@ fun SongRow(
             selected = selected,
             showSourceQuality = showSourceQuality,
             trailing = trailing,
+            hideArtistOf = hideArtistOf,
+            showDuration = showDuration,
         )
     }
 }
@@ -691,6 +700,8 @@ private fun SongRowContent(
     selected: Boolean = false,
     showSourceQuality: Boolean = false,
     trailing: (@Composable () -> Unit)? = null,
+    hideArtistOf: String? = null,
+    showDuration: Boolean = true,
 ) {
     val titleColor by animateColorAsState(
         targetValue = if (isCurrent && !searchPlayingStyle) activeTint else MaterialTheme.colorScheme.onBackground,
@@ -777,14 +788,18 @@ private fun SongRowContent(
                 color = titleColor,
             )
             Spacer(Modifier.height(2.dp))
-            val subtitle = remember(song.artist, song.downloadFormat) {
+            val hideArtist = hideArtistOf != null &&
+                song.artist.trim().equals(hideArtistOf.trim(), ignoreCase = true)
+            val subtitle = remember(song.artist, song.downloadFormat, hideArtist) {
                 listOfNotNull(
-                    song.artist.takeIf { it.isNotBlank() },
+                    song.artist.takeIf { it.isNotBlank() && !hideArtist },
                     song.downloadFormat,
                 ).joinToString(" · ")
             }
             val quality = if (showSourceQuality) song.sourceQualityBadge() else null
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            // Apple Music leaves the line off when it would only repeat the album's artist.
+            val showSubtitleLine = hideArtistOf == null || subtitle.isNotEmpty() || quality != null
+            if (showSubtitleLine) Row(verticalAlignment = Alignment.CenterVertically) {
                 if (quality != null) {
                     SourceQualityBadge(
                         quality = quality,
@@ -830,7 +845,7 @@ private fun SongRowContent(
                 color = subtitleColor,
             )
         } else {
-            song.durationText?.let {
+            song.durationText?.takeIf { showDuration }?.let {
                 Spacer(Modifier.width(8.dp))
                 Text(
                     text = it,
