@@ -612,7 +612,7 @@ object LocalMediaRepository {
             videoId = uriStr,
             title = title,
             artist = artist,
-            thumbnailUrl = scanned?.artworkUrl,
+            thumbnailUrl = scanned?.artworkUrl ?: LocalArtFetcher.trackArtUrl(uriStr),
             durationText = durationText,
             albumName = albumName ?: scanned?.albumName,
             localUri = uriStr,
