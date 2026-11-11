@@ -165,6 +165,7 @@ import com.music.zenith.data.listentogether.ListenTogether
 import com.music.zenith.data.settings.AppSettings
 import com.music.zenith.data.settings.OutputPcmMode
 import com.music.zenith.data.settings.GlassClarity
+import com.music.zenith.data.settings.GlassCustom
 import com.music.zenith.data.settings.BitPerfectMode
 import com.music.zenith.playback.AudioOutputStatus
 import com.music.zenith.playback.audio.bitperfect.BitPerfectOutput
@@ -266,9 +267,6 @@ fun SettingsScreen(
     val coverFluidAnimation by AppSettings.coverFluidAnimation.collectAsStateWithLifecycle()
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
     val liquidGlass by AppSettings.liquidGlass.collectAsStateWithLifecycle()
-    val frostedGlass by AppSettings.frostedGlass.collectAsStateWithLifecycle()
-    val glassClarity by AppSettings.glassClarity.collectAsStateWithLifecycle()
-    val progressiveBlur by AppSettings.progressiveBlur.collectAsStateWithLifecycle()
     val liquidGlassSupported = isGlassSupported()
     val lyricsBlur by AppSettings.lyricsBlur.collectAsStateWithLifecycle()
     val liquidFlow by AppSettings.liquidFlow.collectAsStateWithLifecycle()
@@ -1213,77 +1211,18 @@ fun SettingsScreen(
             // its own. Its own switch because it costs frames of its own. Reduce
             // dynamic blur turns it off.
             if (liquidGlass && liquidGlassSupported) {
-                val glassClarityTitle = stringResource(R.string.glass_clarity)
-                row(glassClarityTitle, "clear", "transparent", "opacity", "glass", "clarity", divided = false) {
-                    Column {
-                        Text(
-                            text = glassClarityTitle,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onBackground,
-                            modifier = Modifier.padding(start = ROW_INSET, end = ROW_INSET, bottom = 8.dp),
-                        )
-                        // Kontinu: Clear (kiri), Balanced (tengah), Frosted (kanan)
-                        // hanyalah titik acuan, nilai di antaranya bebas dipilih.
-                        IosSlider(
-                            value = glassClarity.level,
-                            onValueChange = { AppSettings.setGlassClarity(it) },
-                            valueRange = 0f..1f,
-                            steps = 0,
-                            activeColor = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(horizontal = ROW_INSET),
-                        )
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(start = ROW_INSET, end = ROW_INSET, top = 4.dp, bottom = 12.dp),
-                        ) {
-                            Text(
-                                text = stringResource(R.string.glass_clarity_clear),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Start,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clickable { AppSettings.setGlassClarity(GlassClarity.CLEAR_LEVEL) }
-                                    .padding(vertical = 4.dp),
-                            )
-                            Text(
-                                text = stringResource(R.string.glass_clarity_balanced),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clickable { AppSettings.setGlassClarity(GlassClarity.BALANCED_LEVEL) }
-                                    .padding(vertical = 4.dp),
-                            )
-                            Text(
-                                text = stringResource(R.string.glass_clarity_frosted),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.End,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clickable { AppSettings.setGlassClarity(GlassClarity.FROSTED_LEVEL) }
-                                    .padding(vertical = 4.dp),
-                            )
-                        }
-                    }
-                }
-                val frostedGlassTitle = stringResource(R.string.frosted_glass)
-                row(frostedGlassTitle, "frosted", "glass", "lite", "light", "performance", divided = false) {
-                    SettingsSubRow(
-                        title = frostedGlassTitle,
-                        checked = frostedGlass,
-                        onCheckedChange = AppSettings::setFrostedGlass,
-                    )
-                }
-                val progressiveBlurTitle = stringResource(R.string.progressive_blur)
-                row(progressiveBlurTitle, "blur", "status bar", "top", divided = false) {
-                    SettingsSubRow(
-                        title = progressiveBlurTitle,
-                        checked = progressiveBlur,
-                        onCheckedChange = AppSettings::setProgressiveBlur,
+                val glassSettingsTitle = stringResource(R.string.glass_settings)
+                row(
+                    glassSettingsTitle,
+                    "glass", "liquid", "kaca", "blur", "refraction", "refraksi", "rainbow", "pelangi",
+                    "chromatic", "clarity", "frosted", "tint", "shadow", "bayangan", "progressive",
+                    divided = false,
+                ) {
+                    SettingsRow(
+                        icon = SfIcons.Tune,
+                        title = glassSettingsTitle,
+                        subtitle = stringResource(R.string.glass_settings_subtitle),
+                        onClick = { onOpenChoice(SettingsChoiceKind.LIQUID_GLASS) },
                     )
                 }
             }
@@ -3226,6 +3165,299 @@ enum class SettingsChoiceKind(@param:StringRes val title: Int) {
     FONT(R.string.font),
     ACCENT(R.string.accent_color),
     COVER_ANIMATION(R.string.cover_slide_animation),
+    LIQUID_GLASS(R.string.glass_settings),
+}
+
+/**
+ * Halaman khusus Liquid Glass: setiap efek yang dipakai kaca (blur, warna,
+ * refraksi, pelangi, tepi, bayangan, kualitas) punya slider sendiri, dikelompokkan
+ * per efek. 100% = tampilan bawaan; slider ditumpuk di atas preset kejernihan.
+ */
+@Composable
+private fun LiquidGlassSettingsContent() {
+    val liquidGlass by AppSettings.liquidGlass.collectAsStateWithLifecycle()
+    val frosted by AppSettings.frostedGlass.collectAsStateWithLifecycle()
+    val clarity by AppSettings.glassClarity.collectAsStateWithLifecycle()
+    val progressiveBlur by AppSettings.progressiveBlur.collectAsStateWithLifecycle()
+    val custom by AppSettings.glassCustom.collectAsStateWithLifecycle()
+    val supported = isGlassSupported()
+    val active = liquidGlass && supported
+    val lensActive = active && !frosted && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+    fun percent(v: Float) = "${(v * 100f).roundToInt()}%"
+
+    SettingsGroup(footer = if (active) null else stringResource(R.string.glass_enable_hint)) {
+        SettingsRow(
+            icon = SfIcons.AutoAwesome,
+            title = stringResource(R.string.liquid_glass),
+            subtitle = stringResource(
+                if (supported) R.string.liquid_glass_subtitle else R.string.liquid_glass_unavailable,
+            ),
+            enabled = supported,
+            trailing = {
+                IosSwitch(
+                    checked = liquidGlass,
+                    onCheckedChange = AppSettings::setLiquidGlass,
+                    enabled = supported,
+                )
+            },
+            onClick = { AppSettings.setLiquidGlass(!liquidGlass) },
+        )
+    }
+
+    SettingsGroup(
+        header = stringResource(R.string.glass_section_preset),
+        footer = stringResource(R.string.glass_footer_preset),
+    ) {
+        GlassSliderRow(
+            title = stringResource(R.string.glass_clarity),
+            valueText = percent(clarity.level),
+            value = clarity.level,
+            range = 0f..1f,
+            enabled = active,
+            onValueChange = { AppSettings.setGlassClarity(it) },
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = ROW_INSET, end = ROW_INSET, top = 4.dp, bottom = 12.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.glass_clarity_clear),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Start,
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable(enabled = active) { AppSettings.setGlassClarity(GlassClarity.CLEAR_LEVEL) }
+                        .padding(vertical = 4.dp),
+                )
+                Text(
+                    text = stringResource(R.string.glass_clarity_balanced),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable(enabled = active) { AppSettings.setGlassClarity(GlassClarity.BALANCED_LEVEL) }
+                        .padding(vertical = 4.dp),
+                )
+                Text(
+                    text = stringResource(R.string.glass_clarity_frosted),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.End,
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable(enabled = active) { AppSettings.setGlassClarity(GlassClarity.FROSTED_LEVEL) }
+                        .padding(vertical = 4.dp),
+                )
+            }
+        }
+    }
+
+    SettingsGroup(header = stringResource(R.string.glass_section_color)) {
+        GlassSliderRow(
+            title = stringResource(R.string.glass_blur),
+            valueText = percent(custom.blur),
+            value = custom.blur,
+            range = 0f..2.5f,
+            enabled = active,
+            onValueChange = { AppSettings.setGlassCustom(custom.copy(blur = it)) },
+        )
+        RowDivider()
+        GlassSliderRow(
+            title = stringResource(R.string.glass_saturation),
+            valueText = percent(custom.saturation),
+            value = custom.saturation,
+            range = 0f..2.5f,
+            enabled = active,
+            onValueChange = { AppSettings.setGlassCustom(custom.copy(saturation = it)) },
+        )
+        RowDivider()
+        GlassSliderRow(
+            title = stringResource(R.string.glass_tint),
+            valueText = percent(custom.tint),
+            value = custom.tint,
+            range = 0f..2.5f,
+            enabled = active,
+            onValueChange = { AppSettings.setGlassCustom(custom.copy(tint = it)) },
+        )
+    }
+
+    SettingsGroup(
+        header = stringResource(R.string.glass_section_refraction),
+        footer = stringResource(R.string.glass_footer_refraction),
+    ) {
+        GlassSliderRow(
+            title = stringResource(R.string.glass_refraction_amount),
+            valueText = percent(custom.refraction),
+            value = custom.refraction,
+            range = 0f..2.5f,
+            enabled = lensActive,
+            onValueChange = { AppSettings.setGlassCustom(custom.copy(refraction = it)) },
+        )
+        RowDivider()
+        GlassSliderRow(
+            title = stringResource(R.string.glass_refraction_width),
+            valueText = percent(custom.refractionWidth),
+            value = custom.refractionWidth,
+            range = 0.2f..2.5f,
+            enabled = lensActive,
+            onValueChange = { AppSettings.setGlassCustom(custom.copy(refractionWidth = it)) },
+        )
+        RowDivider()
+        GlassSliderRow(
+            title = stringResource(R.string.glass_rainbow),
+            valueText = if (custom.rainbow < 0f) {
+                stringResource(R.string.glass_auto)
+            } else {
+                percent(custom.rainbow)
+            },
+            value = custom.rainbowStrength(clarity.chromatic),
+            range = 0f..3f,
+            enabled = lensActive,
+            onValueChange = { AppSettings.setGlassCustom(custom.copy(rainbow = it)) },
+        )
+        RowDivider()
+        SettingsRow(
+            title = stringResource(R.string.glass_depth),
+            subtitle = stringResource(R.string.glass_depth_subtitle),
+            enabled = lensActive,
+            trailing = {
+                IosSwitch(
+                    checked = custom.depth,
+                    onCheckedChange = { AppSettings.setGlassCustom(custom.copy(depth = it)) },
+                    enabled = lensActive,
+                )
+            },
+            onClick = { AppSettings.setGlassCustom(custom.copy(depth = !custom.depth)) },
+        )
+    }
+
+    SettingsGroup(header = stringResource(R.string.glass_section_edge)) {
+        GlassSliderRow(
+            title = stringResource(R.string.glass_rim),
+            valueText = percent(custom.rim),
+            value = custom.rim,
+            range = 0f..1f,
+            enabled = active,
+            onValueChange = { AppSettings.setGlassCustom(custom.copy(rim = it)) },
+        )
+        RowDivider()
+        GlassSliderRow(
+            title = stringResource(R.string.glass_shadow),
+            valueText = percent(custom.shadow),
+            value = custom.shadow,
+            range = 0f..3f,
+            enabled = active && !frosted,
+            onValueChange = { AppSettings.setGlassCustom(custom.copy(shadow = it)) },
+        )
+    }
+
+    SettingsGroup(
+        header = stringResource(R.string.glass_section_performance),
+        footer = stringResource(R.string.glass_footer_performance),
+    ) {
+        GlassSliderRow(
+            title = stringResource(R.string.glass_quality),
+            valueText = percent(custom.quality),
+            value = custom.quality,
+            range = 0.5f..1.5f,
+            enabled = active,
+            onValueChange = { AppSettings.setGlassCustom(custom.copy(quality = it)) },
+        )
+        RowDivider()
+        SettingsRow(
+            title = stringResource(R.string.frosted_glass),
+            subtitle = stringResource(R.string.glass_frosted_subtitle),
+            enabled = active,
+            trailing = {
+                IosSwitch(
+                    checked = frosted,
+                    onCheckedChange = AppSettings::setFrostedGlass,
+                    enabled = active,
+                )
+            },
+            onClick = { AppSettings.setFrostedGlass(!frosted) },
+        )
+        RowDivider()
+        SettingsRow(
+            title = stringResource(R.string.progressive_blur),
+            subtitle = stringResource(R.string.glass_progressive_subtitle),
+            enabled = active,
+            trailing = {
+                IosSwitch(
+                    checked = progressiveBlur,
+                    onCheckedChange = AppSettings::setProgressiveBlur,
+                    enabled = active,
+                )
+            },
+            onClick = { AppSettings.setProgressiveBlur(!progressiveBlur) },
+        )
+    }
+
+    SettingsGroup {
+        SettingsRow(
+            icon = SfIcons.Tune,
+            title = stringResource(R.string.glass_reset),
+            enabled = active && (!custom.isDefault || clarity.level != GlassClarity.BALANCED_LEVEL || frosted),
+            onClick = {
+                AppSettings.setGlassCustom(GlassCustom())
+                AppSettings.setGlassClarity(GlassClarity.BALANCED_LEVEL)
+                AppSettings.setFrostedGlass(false)
+            },
+        )
+    }
+    Spacer(Modifier.height(24.dp))
+}
+
+/** Satu baris slider: judul dan nilai di atas, slider di bawah, [below] opsional di bawah slider. */
+@Composable
+private fun GlassSliderRow(
+    title: String,
+    valueText: String,
+    value: Float,
+    range: ClosedFloatingPointRange<Float>,
+    enabled: Boolean,
+    onValueChange: (Float) -> Unit,
+    below: (@Composable () -> Unit)? = null,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .alpha(if (enabled) 1f else 0.45f)
+            .padding(top = 12.dp, bottom = if (below == null) 14.dp else 0.dp),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = ROW_INSET, end = ROW_INSET, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = valueText,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
+        }
+        IosSlider(
+            value = value.coerceIn(range),
+            onValueChange = onValueChange,
+            valueRange = range,
+            steps = 0,
+            enabled = enabled,
+            activeColor = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(horizontal = ROW_INSET),
+        )
+        below?.invoke()
+    }
 }
 
 /** Judul pendek untuk pil melayang di bar atas; judul asli tetap dipakai di daftar. */
@@ -3498,6 +3730,8 @@ fun SettingsChoicePage(
                     )
                 }
             }
+
+            SettingsChoiceKind.LIQUID_GLASS -> LiquidGlassSettingsContent()
 
             SettingsChoiceKind.FONT -> {
                 val selected by AppSettings.appFont.collectAsStateWithLifecycle()
