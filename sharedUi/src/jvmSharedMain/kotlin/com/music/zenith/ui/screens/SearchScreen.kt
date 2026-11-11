@@ -260,7 +260,15 @@ fun SearchScreen(
                 .clip(RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp))
                 .background(frostFill.copy(alpha = 0.9f))
                 .then(headerModifier)
-                .optimizedHazeEffect(frost, frostStyle)
+                // When the app supplies its own backdrop blur it is the frost;
+                // Haze on top would blur the same list a second time.
+                .then(
+                    if (headerModifier === Modifier) {
+                        Modifier.optimizedHazeEffect(frost, frostStyle)
+                    } else {
+                        Modifier
+                    },
+                )
                 .padding(top = topPadding),
         ) {
             if (showField) {
@@ -308,7 +316,12 @@ fun SearchScreen(
 
         LazyColumn(
             state = listState,
-            modifier = Modifier.fillMaxSize().hazeSource(frost).then(listModifier).onSizeChanged { listWidthPx = it.width },
+            modifier = Modifier
+                .fillMaxSize()
+                // Only recorded while Haze is the one blurring the header.
+                .then(if (headerModifier === Modifier) Modifier.hazeSource(frost) else Modifier)
+                .then(listModifier)
+                .onSizeChanged { listWidthPx = it.width },
             contentPadding = PaddingValues(top = headerHeight, bottom = contentPadding.calculateBottomPadding()),
         ) {
             when {
