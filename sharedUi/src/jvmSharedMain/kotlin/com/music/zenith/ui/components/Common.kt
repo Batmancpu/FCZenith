@@ -1398,6 +1398,7 @@ private fun ElasticRefreshHint(state: ElasticRefreshState, topInset: Dp) {
  * Drawn white-on-colour in either theme, like Replay and the welcome — the
  * mesh is the card, and white type is what sits on colour.
  */
+@Suppress("UNUSED_PARAMETER")
 @Composable
 fun SignInBanner(
     onSignIn: () -> Unit,
@@ -1420,33 +1421,28 @@ fun SignInBanner(
                 scaleX = scale
                 scaleY = scale
             }
-            .clip(RoundedCornerShape(22.dp))
+            .clip(RoundedCornerShape(20.dp))
+            .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.05f))
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.08f),
+                shape = RoundedCornerShape(20.dp),
+            )
             .clickable(interactionSource = interaction, indication = null, onClick = onSignIn),
     ) {
-        // A card is a few hundred dp the reader is looking straight at, which
-        // is the case the mesh lets keep moving — see its `continuous` note.
-        MeshGradientBackground(
-            palette = cyclingMeshPalette(WelcomeMeshPalettes, running = motion),
-            modifier = Modifier.matchParentSize(),
-            continuous = true,
-            paused = !motion,
-            driftMillis = 6_000,
-            blurRadius = 36.dp,
-            colorFadeMillis = MESH_CYCLE_MILLIS,
-        )
-        Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 18.dp)) {
+        Column(Modifier.padding(start = 18.dp, end = 18.dp, top = 16.dp, bottom = 16.dp)) {
             Text(
                 text = stringResource(Res.string.sign_in_youtube_music),
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.W800,
-                color = Color.White,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.W600,
+                color = MaterialTheme.colorScheme.onBackground,
             )
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(12.dp))
             Row(
                 Modifier
                     .clip(CircleShape)
-                    .background(Color.White)
-                    .padding(start = 16.dp, end = 20.dp, top = 10.dp, bottom = 10.dp),
+                    .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.08f))
+                    .padding(start = 12.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Image(
@@ -1458,9 +1454,9 @@ fun SignInBanner(
                 Text(
                     text = stringResource(Res.string.sign_in_with_google),
                     style = MaterialTheme.typography.titleMedium,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.W700,
-                    color = Color.Black,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.W600,
+                    color = MaterialTheme.colorScheme.onBackground,
                 )
             }
         }
