@@ -89,7 +89,7 @@ fun OrganicFluidBackground(
     val speedState = rememberUpdatedState(speed)
     val colorsState = rememberUpdatedState(colors.ifEmpty { OrganicFluidDefaults.Palette })
 
-    val clock = remember { FluidClock(startAt = FluidTimeline.now(speed)) }
+    val clock = remember { FluidClock(startAt = FluidTimeline.phase) }
     val agsl = remember { if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) AgslFluid() else null }
 
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -100,8 +100,8 @@ fun OrganicFluidBackground(
                 // Semua instance (kartu, cover terbang, sleeve halaman) membaca jam yang
                 // sama, jadi fase blob tetap nyambung saat pindah kartu <-> halaman.
                 while (true) {
-                    withFrameNanos { }
-                    clock.seconds = FluidTimeline.now(speedState.value)
+                    val frameNanos = withFrameNanos { it }
+                    clock.seconds = FluidTimeline.tick(frameNanos, speedState.value)
                 }
             }
         }
@@ -127,16 +127,25 @@ fun OrganicFluidBackground(
 }
 
 /**
- * Jam bersama untuk semua latar cairan. Fase dihitung dari waktu proses, bukan
- * dari angka acak per instance, supaya kartu dan halaman yang dibukanya
- * menampilkan frame yang sama. Kecepatan 0 selalu jatuh ke fase dasar yang sama.
+ * Jam bersama untuk semua latar cairan. Fase bertambah hanya saat ada instance
+ * yang berjalan (satu kali per frame, berapa pun jumlah instance), jadi kartu,
+ * cover terbang, dan halaman menampilkan frame yang sama, dan saat semuanya
+ * di-pause fase berhenti lalu lanjut dari frame terakhir.
  */
 private object FluidTimeline {
-    private const val BASE_SECONDS = 30.0
-    private val epochNanos = System.nanoTime()
+    var phase: Double = 30.0
+        private set
+    private var lastFrameNanos = 0L
 
-    fun now(speed: Float): Double =
-        BASE_SECONDS + (System.nanoTime() - epochNanos) / 1_000_000_000.0 * speed
+    fun tick(frameNanos: Long, speed: Float): Double {
+        if (frameNanos > lastFrameNanos) {
+            // Dibatasi supaya jeda (pause / frame drop) tidak jadi lompatan.
+            val dt = if (lastFrameNanos == 0L) 0.0 else ((frameNanos - lastFrameNanos) / 1_000_000_000.0).coerceAtMost(0.1)
+            lastFrameNanos = frameNanos
+            phase += dt * speed
+        }
+        return phase
+    }
 }
 
 private class FluidClock(startAt: Double) {
