@@ -257,6 +257,7 @@ fun SearchScreen(
                 .zIndex(1f)
                 .fillMaxWidth()
                 .onSizeChanged { headerHeightPx = it.height }
+                .clip(RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp))
                 .background(frostFill.copy(alpha = 0.9f))
                 .then(headerModifier)
                 .optimizedHazeEffect(frost, frostStyle)
