@@ -129,6 +129,8 @@ fun LibraryScreen(
     showTitle: Boolean = true,
     /** The listener's own order and hidden rows; empty keeps the built-in order. */
     layout: HomeLayout = HomeLayout(),
+    /** Artists as one row that scrolls sideways instead of the two-across grid. */
+    artistsRow: Boolean = false,
 ) {
     val pinnedPlaylists by AppUi.host.pinnedPlaylists.collectAsStateWithLifecycle()
     val onDevice = stringResource(Res.string.on_device)
@@ -283,6 +285,13 @@ fun LibraryScreen(
                                             onImportSpotifyPlaylist = onImportSpotifyPlaylist,
                                             onShowAll = { onShowAll(pinnedFirst) },
                                             pinnedPlaylists = pinnedPlaylists,
+                                        )
+                                    } else if (shelf.title == ARTISTS_SHELF && artistsRow) {
+                                        LibraryGridShelf(
+                                            shelf = shelf,
+                                            onItemClick = onShelfItemClick,
+                                            onItemLongPress = onShelfItemLongPress,
+                                            onShowAll = { onShowAll(shelf) },
                                         )
                                     } else if (shelf.title == ARTISTS_SHELF) {
                                         LibraryTwoColumnShelf(

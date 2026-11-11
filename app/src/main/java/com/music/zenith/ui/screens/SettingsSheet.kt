@@ -263,6 +263,7 @@ fun SettingsScreen(
     val listenTogetherTab by AppSettings.showListenTogetherTab.collectAsStateWithLifecycle()
     val searchTabSeparate by AppSettings.searchTabSeparate.collectAsStateWithLifecycle()
     val reduceAnimation by AppSettings.reduceAnimation.collectAsStateWithLifecycle()
+    val libraryArtistsRow by AppSettings.libraryArtistsRow.collectAsStateWithLifecycle()
     val coverSlideAnimation by AppSettings.coverSlideAnimation.collectAsStateWithLifecycle()
     val coverFluidAnimation by AppSettings.coverFluidAnimation.collectAsStateWithLifecycle()
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
@@ -1106,6 +1107,23 @@ fun SettingsScreen(
                     title = customizeHomeTitle,
                     subtitle = stringResource(R.string.customize_home_subtitle),
                     onClick = onCustomizeHome,
+                )
+            }
+            val artistsLayoutTitle = stringResource(R.string.artists_layout)
+            row(artistsLayoutTitle, "artists", "artist", "grid", "row", "library", "layout", "scroll") {
+                SettingsRow(
+                    icon = SfIcons.Artist,
+                    title = artistsLayoutTitle,
+                    subtitle = stringResource(R.string.artists_layout_subtitle),
+                )
+                GlassSegmentedControl(
+                    options = listOf(
+                        stringResource(R.string.artists_layout_grid),
+                        stringResource(R.string.artists_layout_row),
+                    ),
+                    selectedIndex = if (libraryArtistsRow) 1 else 0,
+                    onSelect = { AppSettings.setLibraryArtistsRow(it == 1) },
+                    modifier = Modifier.padding(start = ROW_INSET, end = ROW_INSET, bottom = 14.dp),
                 )
             }
             val squareVideoCoversTitle = stringResource(R.string.square_video_covers)
