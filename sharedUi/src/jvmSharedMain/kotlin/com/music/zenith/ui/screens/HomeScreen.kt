@@ -357,28 +357,6 @@ private fun SpeedDialShuffleTile(
                 )
             }
         }
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .fillMaxWidth()
-                .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.72f))))
-                .padding(horizontal = 8.dp, vertical = 6.dp),
-        ) {
-            Text(
-                text = stringResource(Res.string.shuffle),
-                style = MaterialTheme.typography.labelLarge,
-                color = Color.White,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = stringResource(Res.string.speed_dial_shuffle_hint),
-                style = MaterialTheme.typography.labelSmall,
-                color = Color.White.copy(alpha = 0.75f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
     }
 }
 
