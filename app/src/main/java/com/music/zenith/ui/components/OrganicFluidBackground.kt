@@ -90,7 +90,13 @@ fun OrganicFluidBackground(
     val colorsState = rememberUpdatedState(colors.ifEmpty { OrganicFluidDefaults.Palette })
 
     val clock = remember { FluidClock(startAt = FluidTimeline.phase) }
-    val agsl = remember { if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) AgslFluid() else null }
+    val agsl = remember {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && OrganicFluidSupport.shaderSupported) {
+            runCatching { AgslFluid() }.getOrNull()
+        } else {
+            null
+        }
+    }
 
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     LaunchedEffect(lifecycle, clock) {
@@ -161,6 +167,17 @@ private fun LayoutCoordinates.isOnScreen(screenW: Float, screenH: Float): Boolea
 }
 
 private val UNIFORM_NAMES = arrayOf("c0", "c1", "c2", "c3", "c4")
+
+/**
+ * Apakah shader AGSL Organic Fluid bisa dipakai di perangkat ini. False di bawah
+ * API 33, atau bila shader gagal dikompilasi (beberapa GPU/ROM). Dicek sekali, lalu di-cache.
+ */
+object OrganicFluidSupport {
+    val shaderSupported: Boolean by lazy {
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            runCatching { RuntimeShader(FLUID_AGSL) }.isSuccess
+    }
+}
 
 /** Shader dan brush dibuat sekali; per frame hanya uniform yang diubah. */
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)

@@ -99,6 +99,8 @@ import com.music.zenith.data.model.ROW_ART_PX
 import com.music.zenith.data.model.artworkAt
 import com.music.zenith.data.settings.AppSettings
 import com.music.zenith.data.stats.ReplaySummary
+import com.music.zenith.ui.components.OrganicFluidBackground
+import com.music.zenith.ui.components.OrganicFluidSupport
 import com.music.zenith.ui.icons.SfIcons
 import com.music.zenith.ui.player.MeshPalette
 import com.music.zenith.ui.player.rememberArtworkColors
@@ -321,6 +323,15 @@ private fun Stage(
                 position = { pagerState.currentPage + pagerState.currentPageOffsetFraction },
                 drift = drift,
             )
+            FluidBackdrop(
+                pages = pages,
+                colors = hued[shown.coerceIn(0, hued.lastIndex)],
+                position = { pagerState.currentPage + pagerState.currentPageOffsetFraction },
+                active = motion && (
+                    pages[shown.coerceIn(0, pages.lastIndex)] in FluidPages ||
+                        pages[pagerState.targetPage.coerceIn(0, pages.lastIndex)] in FluidPages
+                    ),
+            )
             FilmGrain()
 
             HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { index ->
@@ -416,6 +427,57 @@ private fun StoryBackdrop(
                 )
             },
     )
+}
+
+/** Story yang latarnya memakai blob shader; story lain tetap memakai [StoryBackdrop]. */
+private val FluidPages = setOf(ReplayStoryPage.INTRO, ReplayStoryPage.MINUTES, ReplayStoryPage.GENRES)
+
+/**
+ * Blob shader (OrganicFluidBackground) di atas [StoryBackdrop], hanya terlihat di
+ * [FluidPages] dan memudar mengikuti posisi pager. Bila shader tidak didukung
+ * (API < 33 atau gagal kompilasi) tidak ada yang digambar, sehingga backdrop
+ * gradien yang sekarang tetap tampil.
+ */
+@Composable
+private fun FluidBackdrop(
+    pages: List<ReplayStoryPage>,
+    colors: List<Color>,
+    position: () -> Float,
+    active: Boolean,
+) {
+    if (!OrganicFluidSupport.shaderSupported) return
+    if (pages.none { it in FluidPages }) return
+    val tinted = remember(colors) { colors.map { lerp(it, Color.Black, 0.35f) } }
+    Box(
+        Modifier
+            .fillMaxSize()
+            .graphicsLayer {
+                val last = pages.lastIndex
+                val pos = position().coerceIn(0f, last.toFloat())
+                val i = pos.toInt().coerceIn(0, last)
+                val j = (i + 1).coerceAtMost(last)
+                val a = if (pages[i] in FluidPages) 1f else 0f
+                val b = if (pages[j] in FluidPages) 1f else 0f
+                alpha = a + (b - a) * (pos - i)
+            },
+    ) {
+        OrganicFluidBackground(
+            modifier = Modifier.fillMaxSize(),
+            colors = tinted,
+            animationSpeed = if (active) 0.6f else 0f,
+        )
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        0f to Color.Black.copy(alpha = 0.25f),
+                        0.5f to Color.Transparent,
+                        1f to Color.Black.copy(alpha = 0.40f),
+                    ),
+                ),
+        )
+    }
 }
 
 /** Vignette dan butir film, digambar sekali ke layer sendiri. */
