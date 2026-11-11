@@ -2,11 +2,7 @@
 
 <br/>
 
-<img src=".github/assets/zenith-icon.svg" alt="Zenith icon" width="140" height="140" />
-
-<h1>Zenith</h1>
-
-<p><b>A YouTube Music player for Android with an Apple Music–style interface</b></p>
+<a href="https://github.com/rezapranata089-bit/Zenith/releases/latest"><img src=".github/assets/banner.svg" alt="Zenith – A YouTube Music player for Android with an Apple Music–style interface" width="100%" /></a>
 
 <p>
 <a href="https://github.com/rezapranata089-bit/Zenith/releases/latest"><img src="https://img.shields.io/github/v/release/rezapranata089-bit/Zenith?style=flat-square&amp;labelColor=0d1117&amp;color=ff4d6d" alt="Latest release" /></a>
@@ -117,7 +113,8 @@ Past versions and their changes are listed in [Releases](https://github.com/reza
 <details open>
 <summary><b>Lyrics</b></summary>
 
-- Word-synced lyrics with the MOTION engine and the LiquidFlow effect.
+- Word-synced lyrics with the MOTION engine and the LiquidFlow effect, a smooth word sweep that flows with the music.
+- The LiquidFlow effect is inspired by [Mochy Music](https://github.com/realidkroo/Mochy-Music) by [realidkroo](https://github.com/realidkroo).
 - Apple Music–style lyrics animation, credit to [binimum](https://github.com/binimum/am-lyrics).
 - Providers: [lrc.red](https://lrc.red), [BiniLyrics](https://github.com/binimum), [BetterLyrics](https://github.com/better-lyrics/better-lyrics), [PaxSenix](https://lyrics.paxsenix.org), [LyricsPlus](https://github.com/ibratabian17/YouLyPlus), [SimpMusic](https://github.com/maxrave-dev/SimpMusic), [Unison](https://unison.boidu.dev), [Megalobiz](https://www.megalobiz.com), [KuGou](https://www.kugou.com), [LRCLIB](https://lrclib.net), [Musixmatch](https://www.musixmatch.com) and [Genius](https://genius.com).
 
@@ -160,6 +157,8 @@ Join the discussion, share feedback or ask for help on [r/ZenithMusic](https://w
 ## Credits
 
 Zenith is built on top of [BitChord](https://github.com/kushagrasinghx/BitChord) by [kushagrasinghx](https://github.com/kushagrasinghx) and its contributors. Thank you for the foundation.
+
+- **LiquidFlow** lyric effect: inspired by [Mochy Music](https://github.com/realidkroo/Mochy-Music) by [realidkroo](https://github.com/realidkroo).
 
 ---
 
