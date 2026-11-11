@@ -320,7 +320,6 @@ private fun startFlight(
 
 private fun startReturn(browseId: String, from: Rect, cornerPx: Float, wash: Color) {
     if (CoverFlightState.landed != browseId) return
-    CoverFlightState.landed = null
     // Out again before the cover has landed: it turns round where it is in the
     // air instead of jumping to the sleeve it was heading for.
     val air = CoverFlightState.airFlight?.takeIf {
@@ -332,13 +331,17 @@ private fun startReturn(browseId: String, from: Rect, cornerPx: Float, wash: Col
     // one anyway showed the card in full while its cover was still elsewhere.
     val pending = CoverFlightState.flight?.takeIf { !it.reverse && it.browseId == browseId }
     if (pending != null && !inAir) {
+        CoverFlightState.landed = null
         CoverFlightState.flight = null
         CoverFlightState.target = null
         CoverFlightState.holding = false
         CoverFlightState.clips.remove(browseId)
         return
     }
+    // Sleeve scrolled out of view (its lazy item disposed): not a real exit, so
+    // `landed` stays set for the flight when the page actually closes.
     if (!inAir && visibleShare(from) < MIN_RETURN_VISIBLE) return
+    CoverFlightState.landed = null
     val settled = if (inAir) CoverFlightState.airProgress.coerceIn(0f, 1f) else 1f
     val start = if (inAir) CoverFlightState.airRect else from
     val startCorner = air?.takeIf { inAir }?.let { lerpF(it.fromCornerPx, cornerPx, settled) } ?: cornerPx
