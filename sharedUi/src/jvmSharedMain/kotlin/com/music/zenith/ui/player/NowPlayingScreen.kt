@@ -4306,15 +4306,29 @@ fun NowPlayingScreen(
                                 // recomposes and re-measures this Box once per frame.
                                 // Read at placement instead, the same movement costs a
                                 // placement pass.
-                                .offset { IntOffset(artStart().roundToPx(), artTop().roundToPx()) }
+                                .offset {
+                                    // In full bleed the sleeve is wider than this box, but
+                                    // the node itself is clamped to the box, so it is moved
+                                    // by the half it cannot hold: its centre stays the
+                                    // sleeve's centre and the stats stay centred on screen.
+                                    val side = artSize().roundToPx()
+                                    val nodeWidth = side.coerceAtMost(boxWidthPx)
+                                    IntOffset(
+                                        artStart().roundToPx() + (side - nodeWidth) / 2,
+                                        artTop().roundToPx(),
+                                    )
+                                }
                                 // What `.size(artSize)` measured, asked at measure
-                                // time instead of composition.
+                                // time instead of composition. Measured at the full side,
+                                // not clamped to the box, so the content is centred on the
+                                // sleeve's real width and overhangs the node evenly.
                                 .layout { measurable, constraints ->
                                     val side = artSize().roundToPx()
-                                    val placeable = measurable.measure(
-                                        constraints.constrain(Constraints.fixed(side, side)),
-                                    )
-                                    layout(placeable.width, placeable.height) { placeable.placeRelative(0, 0) }
+                                    val placeable = measurable.measure(Constraints.fixed(side, side))
+                                    val nodeWidth = side.coerceAtMost(constraints.maxWidth)
+                                    layout(nodeWidth, side) {
+                                        placeable.placeRelative(-(side - nodeWidth) / 2, 0)
+                                    }
                                 }
                                 // Where the dismiss band starts. Read here, above the
                                 // paused shrink below, so the band covers the sleeve's
