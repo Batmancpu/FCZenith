@@ -2034,7 +2034,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             .map { it.song }
             .filter { !it.thumbnailUrl.isNullOrBlank() && youtubeId.matches(it.videoId) }
             .distinctBy { it.videoId }
-            .take(18)
+            .take((19..26).random())
         if (songs.size < 3) return null
         return HomeShelf(
             title = com.music.zenith.data.model.LOCAL_SPEED_DIAL_TITLE,
