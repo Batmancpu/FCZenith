@@ -500,20 +500,16 @@ private fun GlassNowPlaying(
                     )
                 }
             } else {
-                IconButton(
+                MiniPlayerPlayPauseButton(
+                    isPlaying = isPlaying,
+                    tint = contentColor,
+                    slot = glyphSlot,
+                    glyphSize = glyphSize,
                     onClick = {
                         haptics.play(if (isPlaying) Haptic.Pause else Haptic.Resume)
                         onPlayPause()
                     },
-                    modifier = Modifier.size(glyphSlot),
-                ) {
-                    Icon(
-                        imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                        contentDescription = stringResource(if (isPlaying) R.string.pause else R.string.play),
-                        tint = contentColor,
-                        modifier = Modifier.size(glyphSize),
-                    )
-                }
+                )
             }
             // Dropped inline: the collapsed row is sharing its width with the
             // tab pill and the Search circle, and the title is what has to
