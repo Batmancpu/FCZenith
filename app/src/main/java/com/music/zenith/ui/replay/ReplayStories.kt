@@ -538,6 +538,7 @@ private fun StoryPage(
             }
             // The share button is on every card: the card somebody wants to
             // send is whichever one surprised them. It sends *this* card.
+            Spacer(Modifier.height(14.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 Box(
                     Modifier
@@ -650,8 +651,17 @@ private fun GlassCard(
 }
 
 @Composable
-private fun Hairline() {
-    Box(Modifier.fillMaxWidth().height(0.6.dp).background(Color.White.copy(alpha = 0.12f)))
+private fun GoldRule() {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(0.8.dp)
+            .background(
+                Brush.horizontalGradient(
+                    listOf(Color.Transparent, Champagne.copy(alpha = 0.55f), Color.Transparent),
+                ),
+            ),
+    )
 }
 
 // ── The cards ───────────────────────────────────────────────────────────────
@@ -691,9 +701,9 @@ private fun ColumnScope.MinutesCard(
         Modifier.weight(1f).fillMaxWidth().staged(reveal, 0.10f, 0.6f, 18.dp),
         contentAlignment = Alignment.Center,
     ) {
-        val d = minOf(maxWidth, maxHeight)
-        ClockDial(d)
-        Vinyl(summary.songs.firstOrNull()?.song?.thumbnailUrl, d * 0.74f)
+        val d = minOf(maxWidth - 24.dp, maxHeight)
+        HourRing(d, summary.peakHour)
+        Vinyl(summary.songs.firstOrNull()?.song?.thumbnailUrl, d * 0.70f)
     }
     GlassCard(Modifier.fillMaxWidth().staged(reveal, 0.45f)) {
         Text(
@@ -740,8 +750,9 @@ private fun ColumnScope.SongsCard(
 ) {
     val context = LocalContext.current
     val lead = rows.firstOrNull() ?: return
+    val frame = RoundedCornerShape(8.dp)
     Headline(headline, Modifier.staged(reveal, 0f))
-    Spacer(Modifier.height(20.dp))
+    Spacer(Modifier.height(22.dp))
     Row(
         Modifier.fillMaxWidth().staged(reveal, 0.12f),
         verticalAlignment = Alignment.CenterVertically,
@@ -759,17 +770,31 @@ private fun ColumnScope.SongsCard(
                 )
             },
         ) {
-            Cover(lead.artworkUrl, lead.title, 124.dp, RoundedCornerShape(6.dp), HEADER_ART_PX, elevated = true)
-        }
-        Spacer(Modifier.width(16.dp))
-        Column(Modifier.weight(1f)) {
-            Text(
-                text = "NO. 1",
-                style = MaterialTheme.typography.labelMedium,
-                fontFamily = FontFamily.Monospace,
-                letterSpacing = 2.sp,
-                color = Champagne,
+            Cover(
+                lead.artworkUrl, lead.title, 132.dp, frame, HEADER_ART_PX,
+                modifier = Modifier.border(1.dp, Champagne.copy(alpha = 0.55f), frame),
+                elevated = true,
             )
+        }
+        Spacer(Modifier.width(18.dp))
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "NO. 1",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontFamily = FontFamily.Monospace,
+                    letterSpacing = 3.sp,
+                    color = Champagne,
+                )
+                Spacer(Modifier.width(10.dp))
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .height(0.8.dp)
+                        .background(Champagne.copy(alpha = 0.45f)),
+                )
+            }
+            Spacer(Modifier.height(6.dp))
             Text(
                 text = lead.title,
                 style = MaterialTheme.typography.headlineMedium,
@@ -790,49 +815,52 @@ private fun ColumnScope.SongsCard(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = "${formatListening(context, lead.ms)} · " + context.resources.getQuantityString(
-                    R.plurals.replay_play_count,
-                    lead.plays,
-                    grouped(lead.plays.toLong()),
-                ),
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color.White.copy(alpha = 0.55f),
-            )
+            Spacer(Modifier.height(10.dp))
+            GlassCard(corner = 50.dp) {
+                Text(
+                    text = "${formatListening(context, lead.ms)} · " + context.resources.getQuantityString(
+                        R.plurals.replay_play_count,
+                        lead.plays,
+                        grouped(lead.plays.toLong()),
+                    ),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = Color.White.copy(alpha = 0.8f),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
+                )
+            }
         }
     }
     Spacer(Modifier.weight(1f))
-    GlassCard(Modifier.fillMaxWidth().staged(reveal, 0.35f, 0.55f)) {
-        Column(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
-            rows.drop(1).forEachIndexed { index, row ->
-                if (index > 0) Hairline()
-                Row(
-                    Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = "%02d".format(row.rank),
-                        style = MaterialTheme.typography.labelLarge,
-                        fontFamily = FontFamily.Monospace,
-                        color = Champagne.copy(alpha = 0.9f),
-                        modifier = Modifier.width(30.dp),
-                    )
-                    Cover(row.artworkUrl, row.title, 34.dp, RoundedCornerShape(5.dp), ROW_ART_PX)
-                    Spacer(Modifier.width(12.dp))
+    Column(Modifier.fillMaxWidth().staged(reveal, 0.35f, 0.55f)) {
+        rows.drop(1).forEachIndexed { index, row ->
+            if (index > 0) GoldRule()
+            Row(
+                Modifier.fillMaxWidth().padding(vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "%02d".format(row.rank),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontFamily = FontFamily.Serif,
+                    fontStyle = FontStyle.Italic,
+                    fontSize = 28.sp,
+                    color = Champagne,
+                    modifier = Modifier.width(44.dp),
+                )
+                Cover(row.artworkUrl, row.title, 44.dp, RoundedCornerShape(6.dp), ROW_ART_PX)
+                Spacer(Modifier.width(14.dp))
+                Column(Modifier.weight(1f)) {
                     Text(
                         text = row.title,
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.W600,
-                        color = Color.White.copy(alpha = 0.94f),
+                        color = Color.White.copy(alpha = 0.95f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
                     )
                     Text(
                         text = formatListening(context, row.ms),
                         style = MaterialTheme.typography.labelMedium,
-                        fontFamily = FontFamily.Monospace,
                         color = Color.White.copy(alpha = 0.5f),
                     )
                 }
@@ -1094,26 +1122,48 @@ private fun ColumnScope.RecapCard(
     Headline(headline, Modifier.staged(reveal, 0f), family = FontFamily.Serif)
     Spacer(Modifier.height(18.dp))
     GlassCard(
-        Modifier.fillMaxWidth().staged(reveal, 0.14f, 0.55f),
+        Modifier.fillMaxWidth().weight(1f).staged(reveal, 0.14f, 0.55f),
+        corner = 26.dp,
         edge = Champagne.copy(alpha = 0.5f),
     ) {
-        Column(Modifier.padding(horizontal = 18.dp, vertical = 16.dp)) {
-            Text(
-                text = "LINER NOTES",
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.W700,
-                letterSpacing = 3.sp,
-                color = Champagne,
-            )
-            Spacer(Modifier.height(6.dp))
-            RecapLine(stringResource(R.string.minutes), formatMinutes(summary.totalMs))
-            summary.songs.firstOrNull()?.let { RecapLine(stringResource(R.string.top_song), it.song.title) }
-            summary.artists.firstOrNull()?.let { RecapLine(stringResource(R.string.top_artist), it.title) }
-            summary.albums.firstOrNull()?.let { RecapLine(stringResource(R.string.top_album), it.title) }
-            summary.genres.firstOrNull()?.let { RecapLine(stringResource(R.string.top_genre), it.title) }
+        Column(
+            Modifier.fillMaxSize().padding(horizontal = 22.dp, vertical = 20.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Column {
+                Text(
+                    text = "LINER NOTES",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.W700,
+                    letterSpacing = 3.sp,
+                    color = Champagne,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = formatMinutes(summary.totalMs),
+                    style = MaterialTheme.typography.displayLarge,
+                    fontFamily = FontFamily.Serif,
+                    fontSize = 64.sp,
+                    lineHeight = 68.sp,
+                    fontWeight = FontWeight.W800,
+                    color = Color.White,
+                    maxLines = 1,
+                )
+                Text(
+                    text = stringResource(R.string.minutes).uppercase(),
+                    style = MaterialTheme.typography.labelMedium,
+                    letterSpacing = 2.sp,
+                    color = Color.White.copy(alpha = 0.6f),
+                )
+            }
+            GoldRule()
+            LinerItem(stringResource(R.string.top_song), summary.songs.firstOrNull()?.song?.title)
+            LinerItem(stringResource(R.string.top_artist), summary.artists.firstOrNull()?.title)
+            LinerItem(stringResource(R.string.top_album), summary.albums.firstOrNull()?.title)
+            LinerItem(stringResource(R.string.top_genre), summary.genres.firstOrNull()?.title)
         }
     }
-    Spacer(Modifier.weight(1f))
+    Spacer(Modifier.height(14.dp))
     Text(
         text = stringResource(R.string.tap_share_for_picture),
         style = MaterialTheme.typography.bodyLarge,
@@ -1126,36 +1176,25 @@ private fun ColumnScope.RecapCard(
 }
 
 @Composable
-private fun RecapLine(label: String, value: String) {
-    Row(
-        Modifier.fillMaxWidth().padding(vertical = 9.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
+private fun LinerItem(label: String, value: String?) {
+    if (value == null) return
+    Column {
         Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = Color.White.copy(alpha = 0.55f),
+            text = label.uppercase(),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.W600,
+            letterSpacing = 2.5.sp,
+            color = Champagne.copy(alpha = 0.85f),
         )
-        Canvas(Modifier.weight(1f).height(1.dp).padding(horizontal = 8.dp)) {
-            drawLine(
-                color = Color.White.copy(alpha = 0.30f),
-                start = Offset(0f, this.size.height / 2f),
-                end = Offset(this.size.width, this.size.height / 2f),
-                strokeWidth = 1.dp.toPx(),
-                cap = StrokeCap.Round,
-                pathEffect = PathEffect.dashPathEffect(floatArrayOf(1f, 6.dp.toPx())),
-            )
-        }
+        Spacer(Modifier.height(2.dp))
         Text(
             text = value,
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.titleLarge,
             fontFamily = FontFamily.Serif,
             fontWeight = FontWeight.W700,
-            textAlign = TextAlign.End,
             color = Color.White,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.widthIn(max = 180.dp),
         )
     }
 }
@@ -1194,36 +1233,44 @@ private fun Polaroid(
 }
 
 @Composable
-private fun ClockDial(diameter: Dp, modifier: Modifier = Modifier) {
-    val sweep by rememberInfiniteTransition(label = "dial").animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(tween(24_000, easing = LinearEasing), RepeatMode.Restart),
-        label = "dialSweep",
+private fun HourRing(diameter: Dp, peakHour: Int?, modifier: Modifier = Modifier) {
+    val pulse by rememberInfiniteTransition(label = "ring").animateFloat(
+        initialValue = 0.55f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(2600, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "ringPulse",
     )
     Canvas(modifier.size(diameter)) {
         val r = this.size.minDimension / 2f
         val c = center
-        for (i in 0 until 60) {
-            val a = (i / 60f) * 2f * PI.toFloat()
-            val major = i % 5 == 0
-            val len = if (major) 14.dp.toPx() else 7.dp.toPx()
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(Champagne.copy(alpha = 0.22f), Color.Transparent),
+                center = c,
+                radius = r,
+            ),
+            radius = r,
+        )
+        // One tick per hour of the day, midnight at the top. The hour the
+        // listening peaks at is the long gold one.
+        for (i in 0 until RING_HOURS) {
+            val a = (i / RING_HOURS.toFloat()) * 2f * PI.toFloat() - PI.toFloat() / 2f
+            val peak = peakHour != null && i == peakHour
+            val major = i % 6 == 0
+            val len = if (peak) 24.dp.toPx() else if (major) 14.dp.toPx() else 8.dp.toPx()
+            val outer = r - 2.dp.toPx()
             drawLine(
-                color = Color.White.copy(alpha = if (major) 0.34f else 0.16f),
-                start = Offset(c.x + cos(a) * (r - len), c.y + sin(a) * (r - len)),
-                end = Offset(c.x + cos(a) * r, c.y + sin(a) * r),
-                strokeWidth = if (major) 1.6.dp.toPx() else 1.dp.toPx(),
+                color = if (peak) {
+                    Champagne.copy(alpha = pulse)
+                } else {
+                    Color.White.copy(alpha = if (major) 0.40f else 0.20f)
+                },
+                start = Offset(c.x + cos(a) * (outer - len), c.y + sin(a) * (outer - len)),
+                end = Offset(c.x + cos(a) * outer, c.y + sin(a) * outer),
+                strokeWidth = if (peak) 3.2.dp.toPx() else 1.4.dp.toPx(),
                 cap = StrokeCap.Round,
             )
         }
-        val hand = (sweep - 90f) / 180f * PI.toFloat()
-        drawLine(
-            color = Champagne.copy(alpha = 0.85f),
-            start = Offset(c.x + cos(hand) * (r - 34.dp.toPx()), c.y + sin(hand) * (r - 34.dp.toPx())),
-            end = Offset(c.x + cos(hand) * r, c.y + sin(hand) * r),
-            strokeWidth = 2.dp.toPx(),
-            cap = StrokeCap.Round,
-        )
     }
 }
 
@@ -1607,14 +1654,8 @@ private val GrainDots: List<Triple<Float, Float, Float>> = run {
     List(420) { Triple(random.nextFloat(), random.nextFloat(), 0.4f + random.nextFloat() * 0.9f) }
 }
 
-/** Out-of-focus lights for the Minutes card: x, y, then radius as fractions of the width. */
-private val Bokeh = listOf(
-    Triple(0.18f, 0.22f, 0.10f),
-    Triple(0.82f, 0.30f, 0.07f),
-    Triple(0.30f, 0.74f, 0.12f),
-    Triple(0.86f, 0.80f, 0.09f),
-    Triple(0.58f, 0.12f, 0.05f),
-)
+/** Ticks on the Minutes card's ring: one per hour of the day. */
+private const val RING_HOURS = 24
 
 /** Each card's own atmosphere, drawn behind its content. Drawn once, never invalidated. */
 private fun DrawScope.drawDecor(page: ReplayStoryPage) {
@@ -1659,26 +1700,27 @@ private fun DrawScope.drawDecor(page: ReplayStoryPage) {
             }
         }
         ReplayStoryPage.MINUTES -> {
-            Bokeh.forEach { (xf, yf, rf) ->
-                val c = Offset(w * xf, h * yf)
-                drawCircle(white.copy(alpha = 0.06f), w * rf, c)
-                drawCircle(white.copy(alpha = 0.10f), w * rf, c, style = Stroke(1.dp.toPx()))
-            }
+            drawRect(
+                brush = Brush.radialGradient(
+                    colors = listOf(white.copy(alpha = 0.14f), Color.Transparent),
+                    center = Offset(w * 0.5f, h * 0.52f),
+                    radius = w * 0.85f,
+                ),
+            )
         }
         ReplayStoryPage.SONGS -> {
-            val cone = Path().apply {
-                moveTo(w * 0.42f, 0f)
-                lineTo(w * 0.58f, 0f)
-                lineTo(w * 1.05f, h * 0.78f)
-                lineTo(-w * 0.05f, h * 0.78f)
-                close()
-            }
-            drawPath(
-                cone,
-                Brush.verticalGradient(
-                    listOf(white.copy(alpha = 0.16f), Color.Transparent),
-                    startY = 0f,
-                    endY = h * 0.78f,
+            drawRect(
+                brush = Brush.radialGradient(
+                    colors = listOf(white.copy(alpha = 0.20f), Color.Transparent),
+                    center = Offset(w * 0.5f, 0f),
+                    radius = w * 0.95f,
+                ),
+            )
+            drawRect(
+                brush = Brush.radialGradient(
+                    colors = listOf(Champagne.copy(alpha = 0.14f), Color.Transparent),
+                    center = Offset(w, h),
+                    radius = w * 0.9f,
                 ),
             )
         }
@@ -1752,21 +1794,12 @@ private fun DrawScope.drawDecor(page: ReplayStoryPage) {
                     radius = w * 0.9f,
                 ),
             )
-            val inset = 12.dp.toPx()
-            drawRoundRect(
-                Champagne.copy(alpha = 0.35f),
-                Offset(inset, inset),
-                Size(w - 2 * inset, h - 2 * inset),
-                CornerRadius(26.dp.toPx()),
-                style = Stroke(1.dp.toPx()),
-            )
-            val inner = inset + 5.dp.toPx()
-            drawRoundRect(
-                Champagne.copy(alpha = 0.16f),
-                Offset(inner, inner),
-                Size(w - 2 * inner, h - 2 * inner),
-                CornerRadius(22.dp.toPx()),
-                style = Stroke(0.7.dp.toPx()),
+            drawRect(
+                brush = Brush.radialGradient(
+                    colors = listOf(Champagne.copy(alpha = 0.12f), Color.Transparent),
+                    center = Offset(w * 0.5f, h),
+                    radius = w,
+                ),
             )
         }
     }
