@@ -1860,6 +1860,8 @@ object AppSettings {
     fun setAutoMusicOnly(value: Boolean) {
         autoMusicOnly.value = value
         prefs.edit().putBoolean(KEY_AUTO_MUSIC_ONLY, value).apply()
+        // Music-only shows covers, not video frames, so squares go with it.
+        if (value) setSquareVideoCovers(true)
     }
 
     fun setHideHomeRecents(value: Boolean) {
