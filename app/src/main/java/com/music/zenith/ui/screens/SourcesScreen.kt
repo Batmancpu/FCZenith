@@ -921,7 +921,10 @@ private fun SourceRowHeader(
                     health is SourceHealth.Rejected -> MaterialTheme.colorScheme.error
                     else -> MaterialTheme.colorScheme.onSurfaceVariant
                 },
-                maxLines = 2,
+                // The lossless-output warning is the longest line a row can
+                // show, and it is the one the user has to read to act on.
+                maxLines = if (awaitingOutput != null) 4 else 2,
+                overflow = TextOverflow.Ellipsis,
             )
             // The addon's own `allowDownloads`, on a line of its own and both
             // ways round, so whether downloads come from it is answered here
