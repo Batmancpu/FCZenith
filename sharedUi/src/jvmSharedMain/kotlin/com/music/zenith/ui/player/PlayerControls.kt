@@ -838,7 +838,6 @@ private fun TransportGlyph(
     // On tap: the glyph is kicked the way it points and rebounds, with a ring.
     val scope = rememberCoroutineScope()
     val kick = remember { Animatable(0f) }
-    val ring = remember { Animatable(0f) }
     Box(
         modifier = Modifier
             .size(touchSize)
@@ -847,14 +846,6 @@ private fun TransportGlyph(
                     drawCircle(
                         color = Color.White.copy(alpha = pressDisc),
                         radius = this.size.minDimension / 2f,
-                    )
-                }
-                val p = ring.value
-                if (p > 0f && p < 1f) {
-                    drawCircle(
-                        color = Color.White.copy(alpha = (1f - p) * 0.45f),
-                        radius = this.size.minDimension / 2f * (0.55f + 0.45f * p),
-                        style = Stroke(width = 2.dp.toPx() * (1f - p) + 0.5f),
                     )
                 }
             }
@@ -869,10 +860,6 @@ private fun TransportGlyph(
                         kick.snapTo(0f)
                         kick.animateTo(direction.toFloat(), tween(durationMillis = 80, easing = FastOutSlowInEasing))
                         kick.animateTo(0f, spring(dampingRatio = 0.4f, stiffness = Spring.StiffnessMediumLow))
-                    }
-                    scope.launch {
-                        ring.snapTo(0f)
-                        ring.animateTo(1f, tween(durationMillis = 420, easing = FastOutSlowInEasing))
                     }
                 }
                 onClick()
