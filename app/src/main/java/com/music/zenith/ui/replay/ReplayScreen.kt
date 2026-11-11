@@ -39,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
@@ -277,6 +278,10 @@ private fun Heading(state: ReplayState, onPeriodChange: (ReplayPeriod) -> Unit, 
         )
         Spacer(Modifier.height(14.dp))
         PeriodPicker(state.period, onPeriodChange, dark)
+        if (state.period == ReplayPeriod.THIS_MONTH || state.period == ReplayPeriod.THIS_YEAR) {
+            Spacer(Modifier.height(10.dp))
+            AnchorStepper(state, textColor)
+        }
         Spacer(Modifier.height(18.dp))
     }
 }
@@ -308,6 +313,52 @@ private fun PeriodPicker(selected: ReplayPeriod, onSelect: (ReplayPeriod) -> Uni
 }
 
 // ── The cards ───────────────────────────────────────────────────────────────
+
+/**
+ * Steps the month or year being shown back and forth, from the first month
+ * anything was recorded up to the current one.
+ */
+@Composable
+private fun AnchorStepper(state: ReplayState, textColor: Color) {
+    val period = state.period
+    val today = java.time.LocalDate.now()
+    val first = state.firstMonth
+    val canPrev = first != null && when (period) {
+        ReplayPeriod.THIS_MONTH -> java.time.YearMonth.from(state.anchor).isAfter(first)
+        else -> state.anchor.year > first.year
+    }
+    val canNext = !period.stepAnchor(state.anchor, 1L).isAfter(today)
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        StepButton(rotated = true, enabled = canPrev, tint = textColor) {
+            state.onAnchorChange(period.stepAnchor(state.anchor, -1L))
+        }
+        Text(
+            text = period.anchorLabel(state.anchor),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.W700,
+            color = textColor,
+            modifier = Modifier.padding(horizontal = 12.dp),
+        )
+        StepButton(rotated = false, enabled = canNext, tint = textColor) {
+            state.onAnchorChange(period.stepAnchor(state.anchor, 1L))
+        }
+    }
+}
+
+@Composable
+private fun StepButton(rotated: Boolean, enabled: Boolean, tint: Color, onClick: () -> Unit) {
+    Icon(
+        imageVector = SfIcons.ChevronRight,
+        contentDescription = null,
+        tint = tint.copy(alpha = if (enabled) 0.9f else 0.25f),
+        modifier = Modifier
+            .size(36.dp)
+            .clip(CircleShape)
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(8.dp)
+            .then(if (rotated) Modifier.rotate(180f) else Modifier),
+    )
+}
 
 /**
  * The wallet of cards, wherever it is drawn.

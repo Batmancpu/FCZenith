@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
+import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -47,6 +48,11 @@ class ReplayState(
      * chips were switched to This month.
      */
     val memberSince: String?,
+    /** The day the open month or year is read around: today, or an earlier one the listener stepped to. */
+    val anchor: LocalDate = LocalDate.now(),
+    val onAnchorChange: (LocalDate) -> Unit = {},
+    /** The first month this device recorded anything, so stepping back knows where to stop. */
+    val firstMonth: YearMonth? = null,
 )
 
 /**
@@ -63,23 +69,24 @@ fun rememberReplayState(active: Boolean): Pair<ReplayState, (ReplayPeriod) -> Un
     var summary by remember { mutableStateOf<ReplaySummary?>(null) }
     var loading by remember { mutableStateOf(true) }
     var memberSince by remember { mutableStateOf<String?>(null) }
+    var anchorDay by rememberSaveable { mutableStateOf<Long?>(null) }
+    var firstMonth by remember { mutableStateOf<YearMonth?>(null) }
+    val anchor = anchorDay?.let { LocalDate.ofEpochDay(it) } ?: LocalDate.now()
 
     LaunchedEffect(active) {
         if (!active) return@LaunchedEffect
         // A directory listing, so off the composition's thread.
-        memberSince = withContext(Dispatchers.IO) {
-            ListeningStats.months().firstOrNull()?.let {
-                "%02d/%02d".format(Locale.ROOT, it.monthValue, it.year % 100)
-            }
-        }
+        val first = withContext(Dispatchers.IO) { ListeningStats.months().firstOrNull() }
+        firstMonth = first
+        memberSince = first?.let { "%02d/%02d".format(Locale.ROOT, it.monthValue, it.year % 100) }
     }
-    LaunchedEffect(period, active) {
+    LaunchedEffect(period, anchor, active) {
         if (!active) return@LaunchedEffect
         // Only the first read shows a spinner. Switching period must not blank
         // the charts for the beat it takes to merge the files — that reads as
         // the page breaking rather than as it answering a different question.
         loading = summary == null
-        summary = ListeningStats.summary(period)
+        summary = ListeningStats.summary(period, anchor)
         loading = false
 
         // Artist pictures and pages arrive after the page has been built — see
@@ -93,10 +100,18 @@ fun rememberReplayState(active: Boolean): Pair<ReplayState, (ReplayPeriod) -> Un
         // gets as far as a rebuild.
         ArtistFacts.revision.drop(1).collectLatest {
             delay(SETTLE_MILLIS)
-            summary = ListeningStats.summary(period)
+            summary = ListeningStats.summary(period, anchor)
         }
     }
-    return ReplayState(period, summary, loading, memberSince) to
+    return ReplayState(
+        period = period,
+        summary = summary,
+        loading = loading,
+        memberSince = memberSince,
+        anchor = anchor,
+        onAnchorChange = { day -> anchorDay = day.toEpochDay() },
+        firstMonth = firstMonth,
+    ) to
         { next: ReplayPeriod -> period = next }
 }
 
@@ -165,9 +180,9 @@ fun ReplayPeriod.localizedTab(context: Context): String = when (this) {
 fun ReplaySummary.localizedLabel(context: Context): String = when (period) {
     ReplayPeriod.THIS_WEEK -> "This week"
     ReplayPeriod.THIS_MONTH -> DateTimeFormatter.ofPattern("MMMM yyyy", Locale.getDefault())
-        .format(LocalDate.now())
+        .format(anchor)
         .replaceFirstChar { it.titlecase(Locale.getDefault()) }
-    ReplayPeriod.THIS_YEAR -> LocalDate.now().year.toString()
+    ReplayPeriod.THIS_YEAR -> anchor.year.toString()
     ReplayPeriod.ALL_TIME -> context.getString(R.string.all_time)
 }
 
@@ -286,13 +301,35 @@ fun ReplaySummary.averageMsPerDay(): Long {
     val today = LocalDate.now()
     val days = when (period) {
         ReplayPeriod.THIS_WEEK -> today.dayOfWeek.value.toLong()
-        ReplayPeriod.THIS_MONTH -> today.dayOfMonth.toLong()
-        ReplayPeriod.THIS_YEAR -> today.dayOfYear.toLong()
+        ReplayPeriod.THIS_MONTH ->
+            if (anchor.year == today.year && anchor.month == today.month) {
+                today.dayOfMonth.toLong()
+            } else {
+                anchor.lengthOfMonth().toLong()
+            }
+        ReplayPeriod.THIS_YEAR ->
+            if (anchor.year == today.year) today.dayOfYear.toLong() else anchor.lengthOfYear().toLong()
         ReplayPeriod.ALL_TIME -> runCatching {
             java.time.temporal.ChronoUnit.DAYS.between(LocalDate.parse("$since-01"), today) + 1
         }.getOrDefault(1L)
     }
     return totalMs / days.coerceAtLeast(1L)
+}
+
+/** The label for the month or year being browsed; empty for periods that are not stepped. */
+fun ReplayPeriod.anchorLabel(anchor: LocalDate): String = when (this) {
+    ReplayPeriod.THIS_MONTH -> DateTimeFormatter.ofPattern("MMMM yyyy", Locale.getDefault())
+        .format(anchor)
+        .replaceFirstChar { it.titlecase(Locale.getDefault()) }
+    ReplayPeriod.THIS_YEAR -> anchor.year.toString()
+    else -> ""
+}
+
+/** [anchor] moved [delta] months or years, landing on the first day of that month or year. */
+fun ReplayPeriod.stepAnchor(anchor: LocalDate, delta: Long): LocalDate = when (this) {
+    ReplayPeriod.THIS_MONTH -> anchor.withDayOfMonth(1).plusMonths(delta)
+    ReplayPeriod.THIS_YEAR -> anchor.withDayOfYear(1).plusYears(delta)
+    else -> anchor
 }
 
 /** Which page of the story view something opens onto. */
