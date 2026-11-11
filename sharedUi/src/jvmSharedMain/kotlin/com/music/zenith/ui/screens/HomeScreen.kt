@@ -22,7 +22,12 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.style.TextAlign
 import com.music.zenith.ui.components.longPressMenuClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -190,7 +195,7 @@ private const val HOME_SKELETON_SLOTS = 4
 
 private const val SPEED_DIAL_COLUMNS = 3
 private const val SPEED_DIAL_ROWS = 3
-private val SPEED_DIAL_GAP = 8.dp
+private val SPEED_DIAL_GAP = 12.dp
 
 /**
  * Speed dial: a grid of square covers, three across and three down per page,
@@ -231,15 +236,29 @@ private fun SpeedDialShelf(
         BoxWithConstraints {
             val pageWidth = maxWidth - PAGE_GUTTER * 2
             val tile = (pageWidth - SPEED_DIAL_GAP * (SPEED_DIAL_COLUMNS - 1)) / SPEED_DIAL_COLUMNS
+            val listState = rememberShelfListState("speed-dial:${shelf.title}")
+            if (pages.size > 1) {
+                val currentPage by remember(listState) {
+                    derivedStateOf {
+                        val index = listState.firstVisibleItemIndex
+                        if (listState.firstVisibleItemScrollOffset > 160) index + 1 else index
+                    }
+                }
+                SpeedDialPageDots(
+                    count = pages.size,
+                    current = currentPage,
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 2.dp),
+                )
+            }
             ShelfRow(
-                state = rememberShelfListState("speed-dial:${shelf.title}"),
-                contentPadding = PaddingValues(horizontal = PAGE_GUTTER),
+                state = listState,
+                contentPadding = PaddingValues(start = PAGE_GUTTER, end = PAGE_GUTTER, bottom = 24.dp),
                 horizontalArrangement = Arrangement.spacedBy(PAGE_GUTTER),
             ) {
                 items(pages, contentType = { "speed-dial-page" }) { page ->
                     Column(
                         modifier = Modifier.width(pageWidth),
-                        verticalArrangement = Arrangement.spacedBy(SPEED_DIAL_GAP),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
                         repeat(SPEED_DIAL_ROWS) { rowIndex ->
                             Row(horizontalArrangement = Arrangement.spacedBy(SPEED_DIAL_GAP)) {
@@ -249,7 +268,7 @@ private fun SpeedDialShelf(
                                     if (canShuffle && page === pages.first() && slot == SPEED_DIAL_COLUMNS * SPEED_DIAL_ROWS - 1) {
                                         SpeedDialShuffleTile(
                                             onClick = { onPlaySongs?.invoke(shuffleSongs.shuffled()) },
-                                            modifier = Modifier.size(tile),
+                                            modifier = Modifier.width(tile),
                                         )
                                     } else if (item != null) {
                                         SpeedDialTile(
@@ -258,10 +277,10 @@ private fun SpeedDialShelf(
                                             onLongPress = onItemLongPress?.let { { it(item) } },
                                             isCurrent = isCurrentItem(item),
                                             isPlaying = isCurrentItem(item) && isPlaying,
-                                            modifier = Modifier.size(tile),
+                                            modifier = Modifier.width(tile),
                                         )
                                     } else {
-                                        Spacer(Modifier.size(tile))
+                                        Spacer(Modifier.width(tile))
                                     }
                                 }
                             }
@@ -279,58 +298,99 @@ private fun SpeedDialShuffleTile(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val shape = RoundedCornerShape(12.dp)
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    val scale by animateFloatAsState(
-        targetValue = if (pressed) 0.94f else 1f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
-    )
+    val shape = RoundedCornerShape(14.dp)
     val accent = MaterialTheme.colorScheme.primary
-    Box(
-        modifier = modifier
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            }
-            .clip(shape)
-            .background(
-                Brush.linearGradient(
-                    listOf(
-                        accent.copy(alpha = 0.95f),
-                        accent.copy(alpha = 0.55f),
-                        MaterialTheme.colorScheme.surfaceVariant,
-                    ),
-                ),
-            )
-            .thumbnailBorder(shape)
-            .clickable(interactionSource = interaction, indication = null, onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
+    Column(modifier = modifier.longPressMenuClickable(onClick = onClick, onLongClick = null)) {
         Box(
             modifier = Modifier
-                .size(44.dp)
-                .clip(CircleShape)
-                .background(Color.White.copy(alpha = 0.22f)),
+                .fillMaxWidth()
+                .aspectRatio(1f)
+                .shadow(4.dp, shape, ambientColor = Color.Black.copy(alpha = 0.25f), spotColor = Color.Black.copy(alpha = 0.25f))
+                .clip(shape)
+                .background(Brush.linearGradient(listOf(accent.copy(alpha = 0.9f), accent.copy(alpha = 0.5f))))
+                .background(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.18f), Color.Transparent)))
+                .border(0.5.dp, Color.White.copy(alpha = 0.25f), shape),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
                 imageVector = ZenithIcons.Shuffle,
                 contentDescription = null,
                 tint = Color.White,
-                modifier = Modifier.size(22.dp),
+                modifier = Modifier.size(30.dp),
             )
         }
+        Spacer(Modifier.height(6.dp))
         Text(
             text = stringResource(Res.string.shuffle),
             style = MaterialTheme.typography.labelLarge,
-            color = Color.White,
+            color = MaterialTheme.colorScheme.onBackground,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(horizontal = 8.dp, vertical = 6.dp),
         )
+        Text(
+            text = stringResource(Res.string.speed_dial_shuffle_hint),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+/** Small glass disc with a chevron, marking a speed dial card that opens a page instead of playing. */
+@Composable
+private fun SpeedDialBadge(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .size(22.dp)
+            .clip(CircleShape)
+            .background(Color.Black.copy(alpha = 0.35f))
+            .border(0.5.dp, Color.White.copy(alpha = 0.3f), CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = ZenithIcons.ChevronRight,
+            contentDescription = null,
+            tint = Color.White,
+            modifier = Modifier.size(12.dp),
+        )
+    }
+}
+
+/** Page control dots under the speed dial grid: the current one is solid and full size. */
+@Composable
+private fun SpeedDialPageDots(
+    count: Int,
+    current: Int,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        repeat(count) { index ->
+            val selected = index == current
+            val dotAlpha by animateFloatAsState(
+                targetValue = if (selected) 0.9f else 0.28f,
+                animationSpec = spring(stiffness = Spring.StiffnessMedium),
+            )
+            val dotScale by animateFloatAsState(
+                targetValue = if (selected) 1f else 0.78f,
+                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+            )
+            Box(
+                modifier = Modifier
+                    .size(7.dp)
+                    .graphicsLayer {
+                        scaleX = dotScale
+                        scaleY = dotScale
+                        alpha = dotAlpha
+                    }
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.onBackground),
+            )
+        }
     }
 }
 
@@ -344,60 +404,57 @@ private fun SpeedDialTile(
     isPlaying: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    val shape = RoundedCornerShape(12.dp)
-    Box(
+    val isBrowse = item.browseId != null && item.videoId == null
+    val isArtist = isBrowse && item.browseId?.startsWith("UC") == true
+    val shape = if (isArtist) CircleShape else RoundedCornerShape(14.dp)
+    val align = if (isArtist) TextAlign.Center else TextAlign.Start
+    Column(
         modifier = modifier
-            .clip(shape)
-            .thumbnailBorder(shape)
-            .background(MaterialTheme.colorScheme.surfaceVariant)
             .longPressMenuClickable(onClick = onClick, onLongClick = onLongPress)
             .contextClick(onLongPress),
     ) {
-        AsyncImage(
-            model = item.thumbnailUrl.artworkAt(CARD_ART_PX),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize(),
-        )
-        Column(
+        Box(
             modifier = Modifier
-                .align(Alignment.BottomStart)
                 .fillMaxWidth()
-                .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.72f))))
-                .padding(
-                    start = 8.dp,
-                    end = if (item.browseId != null && item.videoId == null) 28.dp else 8.dp,
-                    top = 6.dp,
-                    bottom = 6.dp,
-                ),
+                .aspectRatio(1f)
+                .shadow(4.dp, shape, ambientColor = Color.Black.copy(alpha = 0.25f), spotColor = Color.Black.copy(alpha = 0.25f))
+                .clip(shape)
+                .thumbnailBorder(shape)
+                .background(MaterialTheme.colorScheme.surfaceVariant),
         ) {
-            Text(
-                text = item.title,
-                style = MaterialTheme.typography.labelLarge,
-                color = Color.White,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = localizeCardSubtitle(item.subtitle),
-                style = MaterialTheme.typography.labelSmall,
-                color = Color.White.copy(alpha = 0.75f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        if (isCurrent && isPlaying) SearchPlayingBars(Modifier.align(Alignment.Center))
-        if (item.browseId != null && item.videoId == null) {
-            Icon(
-                imageVector = ZenithIcons.ChevronRight,
+            AsyncImage(
+                model = item.thumbnailUrl.artworkAt(CARD_ART_PX),
                 contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(end = 8.dp, bottom = 8.dp)
-                    .size(16.dp),
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
             )
+            if (isCurrent && isPlaying) {
+                Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.3f)))
+                SearchPlayingBars(Modifier.align(Alignment.Center))
+            }
+            if (isBrowse && !isArtist) {
+                SpeedDialBadge(Modifier.align(Alignment.BottomEnd).padding(6.dp))
+            }
         }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = item.title,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onBackground,
+            textAlign = align,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Text(
+            text = localizeCardSubtitle(item.subtitle),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = align,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
 

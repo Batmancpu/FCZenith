@@ -195,6 +195,7 @@
     <string name="shelf_quick_picks">Quick picks</string>
     <string name="shelf_speed_dial">Speed dial</string>
     <string name="shuffle">Shuffle</string>
+    <string name="speed_dial_shuffle_hint">Play at random</string>
     <string name="shelf_recents">Recents</string>
     <string name="shelf_recommended_music_videos">Recommended music videos</string>
     <string name="shelf_shorts">Shorts</string>
