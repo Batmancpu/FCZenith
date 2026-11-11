@@ -97,6 +97,12 @@ suspend fun renderReplayPoster(
         val canvas = Canvas(bitmap)
         val type = Fonts(context)
 
+        // Recap penuh (dan kartu akhir) memakai layout baru ala ringkasan Replay.
+        if (page == null || page == ReplayStoryPage.SUMMARY) {
+            drawRecapPoster(canvas, context, type, summary, covers)
+            return@withContext bitmap
+        }
+
         // The same cover and the same turn of the colour wheel the card on
         // screen was drawn with, so the picture is recognisably that card.
         drawBackdrop(canvas, covers[lit], page?.let(::storyHue) ?: 0f)
@@ -153,10 +159,163 @@ private fun drawCard(
             drawArtistsCard(canvas, context, type, summary.artistRows(CARD_ROWS), covers, top)
         ReplayStoryPage.ALBUMS ->
             drawAlbumCard(canvas, context, type, summary.albumRows(CARD_ROWS), covers, top)
-        ReplayStoryPage.GENRES ->
-            drawGenreCard(canvas, context, type, summary.genreRows(CARD_ROWS), top)
+        ReplayStoryPage.GENRES -> drawPersonalityCard(canvas, context, type, summary, top)
         ReplayStoryPage.HABITS -> drawHabitCards(canvas, context, type, summary, top)
         ReplayStoryPage.SUMMARY -> drawLinerNotes(canvas, context, type, summary, top)
+    }
+}
+
+/**
+ * Poster recap: latar hitam dengan glow warna dari sampul teratas, tahun dan
+ * menit di tengah, tiga teratas di kiri, artwork bertumpuk keluar dari tepi kanan.
+ */
+private fun drawRecapPoster(
+    canvas: Canvas,
+    context: Context,
+    type: Fonts,
+    summary: ReplaySummary,
+    covers: Map<String, Bitmap?>,
+) {
+    val w = POSTER_W.toFloat()
+    val h = POSTER_H.toFloat()
+    canvas.drawColor(Color.BLACK)
+    val songs = summary.songRows(3)
+    val artists = summary.artistRows(3)
+    val albums = summary.albumRows(3)
+    val colors = paletteOf(songs.firstOrNull()?.artworkUrl?.let { covers[it] })
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    fun glow(cx: Float, cy: Float, radius: Float, color: Int, alpha: Int) {
+        paint.shader = RadialGradient(
+            cx,
+            cy,
+            radius,
+            intArrayOf(ColorUtils.setAlphaComponent(color, alpha), ColorUtils.setAlphaComponent(color, 0)),
+            null,
+            Shader.TileMode.CLAMP,
+        )
+        canvas.drawCircle(cx, cy, radius, paint)
+        paint.shader = null
+    }
+    glow(w * 0.5f, 0f, w * 0.95f, colors[0], 235)
+    glow(0f, h * 0.35f, w * 0.75f, colors[1], 200)
+    glow(w, h * 0.55f, w * 0.8f, colors[2], 210)
+    glow(w, h, w * 0.7f, colors[3], 150)
+
+    val label = summary.localizedLabel(context)
+    val title = if (label.length == 4 && label.all { it.isDigit() }) "Replay'${label.takeLast(2)}" else "Replay · $label"
+    canvas.drawText(title, MARGIN, 150f, type.heading(62f, Color.WHITE))
+    val brand = type.heading(46f, 0xE6FFFFFF.toInt()).apply { textAlign = Paint.Align.RIGHT }
+    canvas.drawText("Zenith", w - MARGIN, 150f, brand)
+    drawLogo(canvas, context, w - MARGIN - brand.measureText("Zenith") - LOGO_GAP, 150f)
+
+    val year = type.heading(190f, Color.WHITE).apply { textAlign = Paint.Align.CENTER }
+    canvas.drawText(ellipsised(label, year, CONTENT_W), w / 2f, 430f, year)
+    val minutes = type.body(52f, 0x99FFFFFF.toInt()).apply { textAlign = Paint.Align.CENTER }
+    canvas.drawText(
+        "${formatMinutes(summary.totalMs)} ${context.getString(R.string.minutes).lowercase(Locale.getDefault())}",
+        w / 2f,
+        510f,
+        minutes,
+    )
+
+    fun section(name: String, rows: List<ReplayRow>, subtitles: Boolean, top: Float): Float {
+        if (rows.isEmpty()) return top
+        canvas.drawText(name, MARGIN, top + 56f, type.heading(64f, Color.WHITE))
+        var y = top + 78f
+        val rowH = if (subtitles) 96f else 62f
+        rows.forEach { row ->
+            canvas.drawText(row.rank.toString(), MARGIN, y + 46f, type.body(40f, 0x66FFFFFF))
+            val titlePaint = type.body(44f, Color.WHITE)
+            canvas.drawText(ellipsised(row.title, titlePaint, 500f), MARGIN + 80f, y + 46f, titlePaint)
+            val sub = row.subtitle
+            if (subtitles && sub != null) {
+                val subPaint = type.body(34f, 0x80FFFFFF.toInt())
+                canvas.drawText(ellipsised(sub, subPaint, 500f), MARGIN + 80f, y + 86f, subPaint)
+            }
+            y += rowH
+        }
+        return y + 40f
+    }
+    var y = 700f
+    y = section(context.getString(R.string.top_artists), artists, false, y)
+    y = section(context.getString(R.string.top_songs), songs, true, y)
+    section(context.getString(R.string.top_albums), albums, true, y)
+
+    val size = 440f
+    val x = 690f
+    albums.firstOrNull()?.let {
+        drawShadow(canvas, x, 1400f, size, false, 0.08f)
+        drawArtwork(canvas, it.artworkUrl?.let { u -> covers[u] }, it.title, x, 1400f, size, false, 0.08f)
+    }
+    songs.firstOrNull()?.let {
+        drawShadow(canvas, x, 1030f, size, false, 0.08f)
+        drawArtwork(canvas, it.artworkUrl?.let { u -> covers[u] }, it.title, x, 1030f, size, false, 0.08f)
+    }
+    artists.firstOrNull()?.let {
+        drawShadow(canvas, x, 660f, size, true)
+        drawArtwork(canvas, it.artworkUrl?.let { u -> covers[u] }, it.title, x, 660f, size, true)
+        canvas.drawCircle(x + size / 2f, 660f + size / 2f, size / 2f, strokePaint(0x4DFFFFFF, 3f))
+    }
+    drawFooter(canvas, context, type)
+}
+
+/** Kartu kepribadian: orb suara dari 24 jam, nama, deskripsi, genre dan kebiasaan. */
+private fun drawPersonalityCard(
+    canvas: Canvas,
+    context: Context,
+    type: Fonts,
+    summary: ReplaySummary,
+    top: Float,
+) {
+    val persona = summary.personality()
+    val cx = POSTER_W / 2f
+    val cy = top + 330f
+    val inner = 130f
+    val reach = 250f
+    val hours = summary.hourOfDay
+    val peak = (hours.maxOrNull() ?: 0L).coerceAtLeast(1L).toFloat()
+    val glow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        shader = RadialGradient(cx, cy, 420f, intArrayOf(0x66EBD9A8, 0), null, Shader.TileMode.CLAMP)
+    }
+    canvas.drawCircle(cx, cy, 420f, glow)
+    val bar = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        strokeWidth = 9f
+        strokeCap = Paint.Cap.ROUND
+    }
+    val bars = 90
+    for (i in 0 until bars) {
+        val t = i / bars.toFloat()
+        val a = t * 2f * PI.toFloat() - PI.toFloat() / 2f
+        val pos = t * 24f
+        val h0 = pos.toInt() % 24
+        val h1 = (h0 + 1) % 24
+        val f = pos - pos.toInt()
+        val p = if (hours.size >= 24) (hours[h0] * (1f - f) + hours[h1] * f) / peak else 0.5f
+        val len = (0.14f + 0.86f * p) * reach * (0.7f + 0.3f * sin(a * 5f))
+        bar.color = ColorUtils.setAlphaComponent(Color.WHITE, (110 + 145 * p).toInt().coerceIn(0, 255))
+        canvas.drawLine(
+            cx + cos(a) * inner,
+            cy + sin(a) * inner,
+            cx + cos(a) * (inner + len),
+            cy + sin(a) * (inner + len),
+            bar,
+        )
+    }
+    canvas.drawCircle(cx, cy, inner * 0.9f, strokePaint(0x80FFFFFF.toInt(), 3f))
+
+    var y = cy + 400f
+    y = drawWrapped(canvas, persona.title(context), type.heading(104f, Color.WHITE), MARGIN, y, CONTENT_W, 112f, 2)
+    y = drawWrapped(canvas, persona.description(context), type.body(44f, 0xCCFFFFFF.toInt()), MARGIN, y + 8f, CONTENT_W, 58f, 3)
+    val genres = summary.genres.take(3).joinToString("  ·  ") { it.title }
+    if (genres.isNotEmpty()) {
+        val g = type.serif(46f, Color.WHITE, italic = true, bold = false)
+        canvas.drawText(ellipsised(genres, g, CONTENT_W), MARGIN, y + 36f, g)
+        y += 72f
+    }
+    val line = summary.behaviorLines(context, persona).firstOrNull()
+    if (line != null) {
+        val b = type.body(38f, 0xB3FFFFFF.toInt())
+        canvas.drawText(ellipsised(line, b, CONTENT_W), MARGIN, y + 44f, b)
     }
 }
 

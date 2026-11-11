@@ -118,6 +118,20 @@ private fun runs(vararg parts: Pair<String, Boolean>): List<HeadlineRun> =
 
 /** The sentence at the top of [page]. */
 fun ReplaySummary.storyHeadline(context: Context, page: ReplayStoryPage): List<HeadlineRun> = when (page) {
+    ReplayStoryPage.INTRO -> context.twoPart(R.string.replay_story_intro_a, R.string.replay_story_intro_b)
+    ReplayStoryPage.MINUTES -> context.twoPart(R.string.replay_story_minutes_a, R.string.replay_story_minutes_b)
+    ReplayStoryPage.ARTISTS -> context.twoPart(R.string.replay_story_artist_a, R.string.replay_story_artist_b)
+    ReplayStoryPage.SONGS -> context.twoPart(R.string.replay_story_songs_a, R.string.replay_story_songs_b)
+    ReplayStoryPage.ALBUMS -> context.twoPart(R.string.replay_story_albums_a, R.string.replay_story_albums_b)
+    ReplayStoryPage.GENRES -> context.twoPart(R.string.replay_story_personality_a, R.string.replay_story_personality_b)
+    ReplayStoryPage.SUMMARY -> context.twoPart(R.string.replay_story_final_a, R.string.replay_story_final_b)
+    else -> legacyStoryHeadline(context, page)
+}
+
+private fun Context.twoPart(first: Int, second: Int): List<HeadlineRun> =
+    listOf(HeadlineRun(getString(first), false), HeadlineRun(getString(second), true))
+
+private fun ReplaySummary.legacyStoryHeadline(context: Context, page: ReplayStoryPage): List<HeadlineRun> = when (page) {
     ReplayStoryPage.INTRO -> runs(
         context.getString(R.string.replay_intro_start) to false,
         " " to false,
@@ -253,6 +267,81 @@ fun storyHue(page: ReplayStoryPage): Float = when (page) {
     ReplayStoryPage.GENRES -> 240f
     ReplayStoryPage.HABITS -> 285f
     ReplayStoryPage.SUMMARY -> 325f
+}
+
+enum class ReplayPersonalityKind { NIGHT_EXPLORER, MELODIC_DREAMER, SONIC_ADVENTURER, RHYTHM_SEEKER }
+
+/** Kepribadian musik, dihitung dari data mendengarkan yang sebenarnya. */
+data class ReplayPersonality(
+    val kind: ReplayPersonalityKind,
+    /** Porsi mendengarkan antara 21.00 dan 04.59. */
+    val nightShare: Float,
+    /** Rata-rata putaran per lagu berbeda. */
+    val repeatRatio: Float,
+)
+
+/**
+ * Aturan sederhana dan berurutan: banyak mendengarkan malam hari, lalu banyaknya
+ * artis berbeda per putaran, lalu seberapa sering lagu yang sama diulang.
+ * Selain itu, Melodic Dreamer.
+ */
+fun ReplaySummary.personality(): ReplayPersonality {
+    val total = hourOfDay.sum().coerceAtLeast(1L)
+    val night = hourOfDay.withIndex().filter { it.index >= 21 || it.index <= 4 }.sumOf { it.value }
+    val nightShare = night.toFloat() / total
+    val variety = distinctArtists.toFloat() / totalPlays.coerceAtLeast(1)
+    val repeat = totalPlays.toFloat() / distinctSongs.coerceAtLeast(1)
+    val kind = when {
+        nightShare >= 0.34f -> ReplayPersonalityKind.NIGHT_EXPLORER
+        variety >= 0.28f && distinctArtists >= 8 -> ReplayPersonalityKind.SONIC_ADVENTURER
+        repeat >= 2.2f -> ReplayPersonalityKind.RHYTHM_SEEKER
+        else -> ReplayPersonalityKind.MELODIC_DREAMER
+    }
+    return ReplayPersonality(kind, nightShare, repeat)
+}
+
+fun ReplayPersonality.title(context: Context): String = context.getString(
+    when (kind) {
+        ReplayPersonalityKind.NIGHT_EXPLORER -> R.string.replay_persona_night_title
+        ReplayPersonalityKind.MELODIC_DREAMER -> R.string.replay_persona_dreamer_title
+        ReplayPersonalityKind.SONIC_ADVENTURER -> R.string.replay_persona_adventurer_title
+        ReplayPersonalityKind.RHYTHM_SEEKER -> R.string.replay_persona_rhythm_title
+    },
+)
+
+fun ReplayPersonality.description(context: Context): String = context.getString(
+    when (kind) {
+        ReplayPersonalityKind.NIGHT_EXPLORER -> R.string.replay_persona_night_desc
+        ReplayPersonalityKind.MELODIC_DREAMER -> R.string.replay_persona_dreamer_desc
+        ReplayPersonalityKind.SONIC_ADVENTURER -> R.string.replay_persona_adventurer_desc
+        ReplayPersonalityKind.RHYTHM_SEEKER -> R.string.replay_persona_rhythm_desc
+    },
+)
+
+/** Sampai tiga baris kebiasaan mendengarkan, semuanya dari angka nyata. */
+fun ReplaySummary.behaviorLines(context: Context, persona: ReplayPersonality): List<String> = buildList {
+    peakHour?.let { add(context.getString(R.string.replay_behavior_peak, formatHour(context, it))) }
+    if (persona.nightShare >= 0.05f) {
+        add(context.getString(R.string.replay_behavior_night, (persona.nightShare * 100f).toInt()))
+    }
+    if (persona.repeatRatio >= 1.2f) {
+        add(context.getString(R.string.replay_behavior_repeat, String.format(Locale.US, "%.1f", persona.repeatRatio)))
+    }
+    busiestDay?.let { add(context.getString(R.string.replay_behavior_day, formatDay(context, it))) }
+}.take(3)
+
+/** Rata-rata waktu mendengarkan per hari dalam periode yang dibuka. */
+fun ReplaySummary.averageMsPerDay(): Long {
+    val today = LocalDate.now()
+    val days = when (period) {
+        ReplayPeriod.THIS_WEEK -> today.dayOfWeek.value.toLong()
+        ReplayPeriod.THIS_MONTH -> today.dayOfMonth.toLong()
+        ReplayPeriod.THIS_YEAR -> today.dayOfYear.toLong()
+        ReplayPeriod.ALL_TIME -> runCatching {
+            java.time.temporal.ChronoUnit.DAYS.between(LocalDate.parse("$since-01"), today) + 1
+        }.getOrDefault(1L)
+    }
+    return totalMs / days.coerceAtLeast(1L)
 }
 
 /** Which page of the story view something opens onto. */

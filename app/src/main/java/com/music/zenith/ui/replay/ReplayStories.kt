@@ -1,49 +1,26 @@
 package com.music.zenith.ui.replay
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.border
-import androidx.compose.foundation.interaction.collectIsDraggedAsState
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontStyle
-import androidx.compose.ui.text.style.TextAlign
-import kotlin.math.PI
-import kotlin.math.abs
-import kotlin.math.cos
-import kotlin.math.sin
-import kotlin.random.Random
-import kotlinx.coroutines.Job
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -61,7 +38,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
-import com.music.zenith.ui.icons.SfIcons
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -72,30 +48,43 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PointMode
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.ColorUtils
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.Player
 import coil3.compose.AsyncImage
 import com.music.zenith.R
@@ -103,41 +92,30 @@ import com.music.zenith.data.model.CARD_ART_PX
 import com.music.zenith.data.model.HEADER_ART_PX
 import com.music.zenith.data.model.ROW_ART_PX
 import com.music.zenith.data.model.artworkAt
+import com.music.zenith.data.settings.AppSettings
 import com.music.zenith.data.stats.ReplaySummary
-import com.music.zenith.ui.player.MeshGradientBackground
+import com.music.zenith.ui.icons.SfIcons
 import com.music.zenith.ui.player.MeshPalette
 import com.music.zenith.ui.player.rememberArtworkColors
-import com.music.zenith.ui.theme.AccentRed
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import java.util.Locale
+import kotlin.math.PI
+import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlin.random.Random
 
 /**
- * The Replay as a run of full-screen cards you tap through.
+ * Replay sebagai rangkaian story layar penuh, bergaya editorial sinematik.
  *
- * ## Why a story rather than a scroll
+ * Satu backdrop gradien hidup berada di level Stage dan berpindah warna
+ * mengikuti posisi pager (tanpa rekomposisi), jadi tidak ada kedip antar-story.
+ * Tiap story punya komposisi sendiri: intro kolase, menit raksasa, potret artis,
+ * lagu editorial, album, kepribadian musik (Canvas) dan recap hitam dengan glow.
  *
- * The page below this already has every number on it, ranked and scrollable, and
- * that is the right shape for looking something up. It is the wrong shape for
- * being *told* something: a scroll gives every fact the same weight and lets the
- * eye run past the one that matters. A story gives each fact the whole screen
- * and a few seconds of nobody else's attention.
- *
- * ## The layout
- *
- * Every card is the same three bands, which is what makes eight of them read as
- * one piece rather than eight designs: a sentence at the top with the number in
- * it set bold, the thing that sentence is about in the middle, and the share
- * button at the bottom. The sentence carries the meaning, so a card that has
- * lost its artwork to a slow connection still says something.
- *
- * ## The mechanics people already know
- *
- * Tap the right of the screen to move on, the left to go back, hold anywhere to
- * stop the clock, swipe to move by hand, back or the cross to leave. None of it
- * is explained on screen: it is the same everywhere, and explaining it would be
- * the first thing on a page whose whole job is to be effortless.
- *
- * The auto-advance stops at the last card rather than closing — closing on a
- * timer takes the share button away from someone reaching for it.
+ * Navigasi tetap: tap kanan/kiri, tahan untuk jeda, swipe, progress di atas,
+ * tombol tutup. Auto-advance berhenti di story terakhir.
  */
 @Composable
 fun ReplayStories(
@@ -146,25 +124,18 @@ fun ReplayStories(
     onClose: () -> Unit,
     /** Shares the card that was on screen when the button was pressed. */
     onShare: (ReplayStoryPage) -> Unit,
-    /**
-     * Holds the clock while something is up in front of the story.
-     *
-     * The share sheet is the case: it covers the lower half of the card, takes a
-     * second to draw its picture, and behind it the story was still counting
-     * down — so by the time anyone had chosen an app, the card they were sending
-     * was two cards further on than the one on screen.
-     */
+    /** Holds the clock while something is up in front of the story. */
     paused: Boolean = false,
     /** The app's player, paused while the Replay plays its own backsound. */
     mainPlayer: Player? = null,
 ) {
-    // A category with nothing in it has no card: an empty page in the middle of
-    // a story reads as the app having lost something.
+    // Kategori kosong tidak punya story. Kebiasaan (HABITS) dilebur ke kartu
+    // kepribadian, jadi tidak lagi jadi slide sendiri.
     val pages = remember(summary) {
         ReplayStoryPage.ordered.filter { page ->
             when (page) {
                 ReplayStoryPage.ALBUMS -> summary.albums.isNotEmpty()
-                ReplayStoryPage.GENRES -> summary.genres.isNotEmpty()
+                ReplayStoryPage.HABITS -> false
                 else -> true
             }
         }
@@ -177,8 +148,6 @@ fun ReplayStories(
     var held by remember { mutableStateOf(false) }
     val progress = remember { Animatable(0f) }
     val current by remember { derivedStateOf { pagerState.settledPage } }
-    // A finger dragging the pager and a transition in flight both stop the
-    // clock, so the auto-advance can never fire into a card that is mid-slide.
     val dragging by pagerState.interactionSource.collectIsDraggedAsState()
     val moving by remember { derivedStateOf { pagerState.targetPage != pagerState.settledPage } }
     var nudge by remember { mutableStateOf(0) }
@@ -186,32 +155,22 @@ fun ReplayStories(
     val transition = remember { arrayOfNulls<Job>(1) }
     val seen = remember { intArrayOf(-1, -1) }
     val clockStopped = held || paused || dragging || moving
+    val reduceAnimation by AppSettings.reduceAnimation.collectAsStateWithLifecycle()
+    val motion = !reduceAnimation
 
-    // Scored like a recap reel: clips of the top songs, faded in and out, and
-    // ducked to silence whenever the story's own clock is stopped.
     ReplayBacksound(
         summary = summary,
         silenced = held || paused,
         mainPlayer = mainPlayer,
     )
 
-    /**
-     * Moves the story to [target] with one transition at a time.
-     *
-     * The previous transition is cancelled before the next starts, so two
-     * scroll requests never fight and the pager can't be left between cards.
-     * It runs on the composition's scope, so a page change can't cancel it.
-     * [nudge] marks that someone else moved the story, and [restart] restarts
-     * the clock when the request lands on the page already showing (a back tap
-     * on the first card used to leave the clock dead).
-     */
     fun goTo(target: Int, animate: Boolean) {
         val next = target.coerceIn(0, pages.lastIndex)
         nudge++
         if (next == pagerState.settledPage) restart++
         transition[0]?.cancel()
         transition[0] = scope.launch {
-            if (animate) {
+            if (animate && motion) {
                 pagerState.animateScrollToPage(
                     page = next,
                     animationSpec = tween(STEP_MILLIS, easing = FastOutSlowInEasing),
@@ -239,17 +198,12 @@ fun ReplayStories(
         }
         if (clockStopped) return@LaunchedEffect
         val ticket = nudge
-        // Resumed from where a hold left it rather than restarted.
         val remaining = ((1f - progress.value) * PAGE_MILLIS).toInt().coerceAtLeast(0)
         progress.animateTo(1f, tween(remaining, easing = LinearEasing))
-        // Someone moved the story while the clock was finishing: leave it be.
         if (ticket != nudge) return@LaunchedEffect
         if (current == pages.lastIndex) onClose() else goTo(current + 1, animate = true)
     }
 
-    // The system bars are kept outside the frame rather than padded for inside
-    // it: the card is a fixed canvas, so fitting the whole card into the safe
-    // area leaves it identical everywhere and puts the letterboxing at the bars.
     Box(
         Modifier
             .fillMaxSize()
@@ -265,30 +219,18 @@ fun ReplayStories(
                 summary = summary,
                 current = current,
                 progress = progress,
+                motion = motion,
                 onHold = { held = it },
                 onStep = ::step,
                 onClose = onClose,
                 onShare = onShare,
+                onRestart = { goTo(0, animate = true) },
             )
         }
     }
 }
 
-/**
- * Holds a story to 9:16 whatever shape the screen is.
- *
- * A story is a fixed canvas, not a responsive layout: the type sizes, the
- * collage offsets and the room the headline is allowed are all set against one
- * set of proportions, and a 20:9 phone stretches that into a column with a hole
- * in the middle while a tablet flattens it. It is also the shape the shared
- * image comes out as, so a card the user sends looks like the card they were
- * looking at when they tapped share.
- *
- * Fitted rather than filled — whichever of width and height runs out first is
- * the one that sets the size, and the rest is black. Letterboxing is the honest
- * failure here: cropping would take the headline or the share button off the
- * edge of the screen on the exact devices most likely to be running this.
- */
+/** Menahan story di 9:16 apa pun bentuk layarnya (letterbox, bukan crop). */
 @Composable
 private fun StoryFrame(content: @Composable () -> Unit) {
     BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -303,7 +245,6 @@ private fun StoryFrame(content: @Composable () -> Unit) {
     }
 }
 
-/** The story card itself, inside whatever box [StoryFrame] gave it. */
 @Composable
 private fun Stage(
     pages: List<ReplayStoryPage>,
@@ -311,16 +252,25 @@ private fun Stage(
     summary: ReplaySummary,
     current: Int,
     progress: Animatable<Float, *>,
+    motion: Boolean,
     onHold: (Boolean) -> Unit,
     onStep: (Boolean) -> Unit,
     onClose: () -> Unit,
     onShare: (ReplayStoryPage) -> Unit,
+    onRestart: () -> Unit,
 ) {
-    // The chrome follows the card that is mostly on screen, so the counter and
-    // segments flip with the slide instead of a beat after it.
     val shown = pagerState.currentPage
     val hold by rememberUpdatedState(onHold)
     val step by rememberUpdatedState(onStep)
+    val drift = rememberDrift(motion)
+
+    // Palet tiap story diekstrak sekali di sini (di-cache per URL), lalu dipakai
+    // backdrop bersama dan visual di tiap halaman.
+    val palettes = pages.map { rememberArtworkColors(summary.storyArtwork(it)) }
+    val hued = remember(palettes, pages) {
+        palettes.mapIndexed { index, palette -> palette.rotated(storyHue(pages[index])).colors }
+    }
+
     Box(
         Modifier
             .fillMaxSize()
@@ -332,22 +282,30 @@ private fun Stage(
                         tryAwaitRelease()
                         hold(false)
                     },
-                    // Supplied, and deliberately empty: without it every
-                    // press-and-release is reported as a tap and holding to
-                    // pause would turn the page the moment the finger lifts.
+                    // Sengaja kosong: tanpa ini tiap press-release dianggap tap.
                     onLongPress = {},
                     onTap = { offset -> step(offset.x >= size.width * BACK_ZONE) },
                 )
             },
     ) {
-        // Every card carries its own backdrop, so the colour slides with the
-        // card instead of snapping when the story settles on the next one.
+        StoryBackdrop(
+            colors = hued,
+            position = { pagerState.currentPage + pagerState.currentPageOffsetFraction },
+            drift = drift,
+        )
+        FilmGrain()
+
         HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { index ->
             StoryPage(
                 page = pages[index],
                 summary = summary,
+                colors = hued[index],
+                onNext = { step(true) },
+                onRestart = onRestart,
                 onShare = onShare,
                 pageOffset = { (pagerState.currentPage - index) + pagerState.currentPageOffsetFraction },
+                drift = drift,
+                motion = motion,
             )
         }
 
@@ -358,15 +316,109 @@ private fun Stage(
             shown = shown,
             progress = { progress.value },
             onClose = onClose,
+            onShare = { onShare(pages[shown.coerceIn(0, pages.lastIndex)]) },
         )
     }
 }
 
+/** Fase 0..1 yang berulang tiap 24 dtk; dibaca lambda saat draw, bukan di komposisi. */
+@Composable
+private fun rememberDrift(enabled: Boolean): () -> Float {
+    val transition = rememberInfiniteTransition(label = "drift")
+    val phase = transition.animateFloat(
+        initialValue = 0f,
+        targetValue = if (enabled) 1f else 0f,
+        animationSpec = infiniteRepeatable(tween(24_000, easing = LinearEasing)),
+        label = "driftPhase",
+    )
+    return { phase.value }
+}
+
 /**
- * The furniture that doesn't move between cards: the counter, the cross, the
- * run of progress segments and the title. The progress is read while drawing,
- * so the clock never recomposes the cards.
+ * Backdrop bersama: gradien radial berlapis yang warnanya bercampur mengikuti
+ * posisi pager. Tanpa blur — gradien radial murah dan tetap halus.
  */
+@Composable
+private fun StoryBackdrop(
+    colors: List<List<Color>>,
+    position: () -> Float,
+    drift: () -> Float,
+) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .drawBehind {
+                if (colors.isEmpty()) return@drawBehind
+                val last = colors.lastIndex
+                val pos = position().coerceIn(0f, last.toFloat())
+                val i = pos.toInt().coerceIn(0, last)
+                val j = (i + 1).coerceAtMost(last)
+                val f = pos - i
+                fun mix(k: Int): Color {
+                    val a = colors[i]
+                    val b = colors[j]
+                    return lerp(a[k % a.size], b[k % b.size], f)
+                }
+                val w = size.width
+                val h = size.height
+                drawRect(lerp(mix(0), Color.Black, 0.45f))
+                val turn = drift() * 2f * PI.toFloat()
+                for (k in 0 until 4) {
+                    val (ax, ay) = BlobAnchors[k]
+                    val a = turn + k * 1.7f
+                    val c = Offset(w * (ax + 0.07f * cos(a)), h * (ay + 0.05f * sin(a)))
+                    val r = w * 1.15f
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            listOf(mix(k).copy(alpha = 0.95f), Color.Transparent),
+                            center = c,
+                            radius = r,
+                        ),
+                        radius = r,
+                        center = c,
+                    )
+                }
+                drawRect(
+                    Brush.verticalGradient(
+                        0f to Color.Black.copy(alpha = 0.18f),
+                        0.4f to Color.Transparent,
+                        1f to Color.Black.copy(alpha = 0.30f),
+                    ),
+                )
+            },
+    )
+}
+
+/** Vignette dan butir film, digambar sekali ke layer sendiri. */
+@Composable
+private fun FilmGrain() {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .graphicsLayer { }
+            .drawWithCache {
+                val light = ArrayList<Offset>()
+                val dark = ArrayList<Offset>()
+                GrainDots.forEachIndexed { index, dot ->
+                    val o = Offset(size.width * dot.first, size.height * dot.second)
+                    if (index % 2 == 0) light.add(o) else dark.add(o)
+                }
+                val stroke = 1.6.dp.toPx()
+                val vignette = Brush.radialGradient(
+                    colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.34f)),
+                    center = Offset(size.width / 2f, size.height / 2f),
+                    radius = size.maxDimension * 0.8f,
+                )
+                onDrawBehind {
+                    drawRect(vignette)
+                    drawPoints(light, PointMode.Points, GrainLight, stroke, StrokeCap.Round)
+                    drawPoints(dark, PointMode.Points, GrainDark, stroke, StrokeCap.Round)
+                }
+            },
+    )
+}
+
+/** Progress minimalis, "Replay'xx", logo, share dan tutup. */
 @Composable
 private fun StoryChrome(
     label: String,
@@ -375,39 +427,11 @@ private fun StoryChrome(
     shown: Int,
     progress: () -> Float,
     onClose: () -> Unit,
+    onShare: () -> Unit,
 ) {
     Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
-        Row(
-            Modifier.fillMaxWidth().padding(top = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = "%02d".format(shown + 1) + "  /  " + "%02d".format(count),
-                style = MaterialTheme.typography.labelMedium,
-                fontFamily = FontFamily.Monospace,
-                letterSpacing = 1.5.sp,
-                color = Color.White.copy(alpha = 0.55f),
-                modifier = Modifier.weight(1f),
-            )
-            Box(
-                Modifier
-                    .size(32.dp)
-                    .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.12f))
-                    .border(0.8.dp, Color.White.copy(alpha = 0.24f), CircleShape)
-                    .clickable(onClick = onClose),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Close,
-                    contentDescription = stringResource(R.string.close_replay),
-                    tint = Color.White,
-                    modifier = Modifier.size(18.dp),
-                )
-            }
-        }
-        Spacer(Modifier.height(6.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Spacer(Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
             repeat(count) { index ->
                 Segment(
                     fraction = {
@@ -422,45 +446,73 @@ private fun StoryChrome(
                 )
             }
         }
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(12.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = if (label.length == 4 && label.all { it.isDigit() }) {
-                    "Replay ${label.takeLast(2)}"
+                    "Replay'${label.takeLast(2)}"
                 } else {
                     "Replay · $label"
                 },
                 style = MaterialTheme.typography.titleMedium,
-                fontFamily = FontFamily.Serif,
-                fontStyle = FontStyle.Italic,
-                fontWeight = FontWeight.W700,
+                fontWeight = FontWeight.W800,
                 color = Color.White,
                 modifier = Modifier.weight(1f),
             )
             Icon(
                 painter = painterResource(R.drawable.ic_logo),
                 contentDescription = null,
-                tint = Color.White.copy(alpha = 0.9f),
-                modifier = Modifier.size(width = 26.dp, height = 17.dp),
+                tint = Color.White.copy(alpha = 0.92f),
+                modifier = Modifier.size(width = 22.dp, height = 14.dp),
             )
-            Spacer(Modifier.width(7.dp))
+            Spacer(Modifier.width(6.dp))
             Text(
                 text = "Zenith",
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.W700,
-                color = Color.White.copy(alpha = 0.9f),
+                color = Color.White.copy(alpha = 0.92f),
             )
+            Spacer(Modifier.width(14.dp))
+            ChromeButton(onShare) {
+                Icon(
+                    imageVector = SfIcons.Share,
+                    contentDescription = stringResource(R.string.share_my_replay),
+                    tint = Color.White,
+                    modifier = Modifier.size(15.dp),
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            ChromeButton(onClose) {
+                Icon(
+                    imageVector = Icons.Rounded.Close,
+                    contentDescription = stringResource(R.string.close_replay),
+                    tint = Color.White,
+                    modifier = Modifier.size(17.dp),
+                )
+            }
         }
     }
+}
+
+@Composable
+private fun ChromeButton(onClick: () -> Unit, content: @Composable () -> Unit) {
+    Box(
+        Modifier
+            .size(30.dp)
+            .clip(CircleShape)
+            .background(Color.White.copy(alpha = 0.20f))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) { content() }
 }
 
 @Composable
 private fun Segment(fraction: () -> Float, modifier: Modifier = Modifier) {
     Box(
         modifier
-            .height(2.5.dp)
+            .height(2.dp)
             .clip(RoundedCornerShape(2.dp))
-            .background(Color.White.copy(alpha = 0.22f))
+            .background(Color.White.copy(alpha = 0.26f))
             .drawBehind {
                 drawRect(
                     color = Color.White,
@@ -470,154 +522,136 @@ private fun Segment(fraction: () -> Float, modifier: Modifier = Modifier) {
     )
 }
 
-// ── One card ────────────────────────────────────────────────────────────────
+// ── Motion helpers ──────────────────────────────────────────────────────────
 
-/**
- * Fades and lifts whatever it is applied to once [reveal] reaches [start], over
- * [span] of the reveal. Read while drawing, so staging a card costs no
- * recomposition.
- */
+private fun ease(t: Float): Float {
+    val c = t.coerceIn(0f, 1f)
+    val u = 1f - c
+    return 1f - u * u * u * u
+}
+
+/** Fade + naik halus saat [reveal] mencapai [start]. Dibaca saat draw. */
 private fun Modifier.staged(
     reveal: Animatable<Float, *>,
     start: Float,
-    span: Float = 0.5f,
+    span: Float = 0.45f,
     rise: Dp = 26.dp,
 ): Modifier = graphicsLayer {
-    val t = ((reveal.value - start) / span).coerceIn(0f, 1f)
-    val e = 1f - (1f - t) * (1f - t) * (1f - t)
+    val e = ease((reveal.value - start) / span)
     alpha = e
     translationY = (1f - e) * rise.toPx()
 }
+
+/** Fade + scale reveal untuk artwork. */
+private fun Modifier.popped(
+    reveal: Animatable<Float, *>,
+    start: Float,
+    span: Float = 0.5f,
+    from: Float = 0.82f,
+): Modifier = graphicsLayer {
+    val e = ease((reveal.value - start) / span)
+    alpha = e
+    val s = from + (1f - from) * e
+    scaleX = s
+    scaleY = s
+}
+
+/** Teks naik dari balik garis potong (mask reveal). */
+@Composable
+private fun MaskReveal(
+    reveal: Animatable<Float, *>,
+    start: Float,
+    modifier: Modifier = Modifier,
+    span: Float = 0.5f,
+    content: @Composable () -> Unit,
+) {
+    Box(modifier.clipToBounds()) {
+        Box(
+            Modifier.graphicsLayer {
+                val e = ease((reveal.value - start) / span)
+                translationY = (1f - e) * this.size.height * 1.1f
+            },
+        ) { content() }
+    }
+}
+
+// ── Satu halaman ────────────────────────────────────────────────────────────
 
 @Composable
 private fun StoryPage(
     page: ReplayStoryPage,
     summary: ReplaySummary,
+    colors: List<Color>,
+    onNext: () -> Unit,
+    onRestart: () -> Unit,
     onShare: (ReplayStoryPage) -> Unit,
     pageOffset: () -> Float,
+    drift: () -> Float,
+    motion: Boolean,
 ) {
+    val context = LocalContext.current
     val reveal = remember { Animatable(0f) }
-    LaunchedEffect(Unit) {
-        reveal.animateTo(1f, tween(1600, delayMillis = 100, easing = FastOutSlowInEasing))
+    LaunchedEffect(motion) {
+        if (motion) {
+            reveal.animateTo(1f, tween(2600, delayMillis = 80, easing = LinearEasing))
+        } else {
+            reveal.snapTo(1f)
+        }
     }
-    Box(Modifier.fillMaxSize()) {
-        StoryBackdrop(page, summary)
+    val headline = remember(summary, page) { summary.storyHeadline(context, page) }
+
+    Box(
+        Modifier
+            .fillMaxSize()
+            .graphicsLayer {
+                // Konten memimpin backdrop: keluar lebih cepat, masuk lebih lambat.
+                val o = pageOffset().coerceIn(-1f, 1f)
+                val a = abs(o)
+                translationX = -o * this.size.width * 0.20f
+                alpha = (1f - a * 1.1f).coerceIn(0f, 1f)
+                scaleX = 1f - a * 0.04f
+                scaleY = 1f - a * 0.04f
+            },
+    ) {
+        if (page == ReplayStoryPage.SUMMARY) RecapGlow(colors)
+        if (page == ReplayStoryPage.ARTISTS) ArtistPortraitBackdrop(summary, reveal, pageOffset, motion)
         Column(
             Modifier
                 .fillMaxSize()
-                .graphicsLayer {
-                    // The content leads the backdrop: it leaves faster and
-                    // arrives later, fading through the gap between cards.
-                    val o = pageOffset().coerceIn(-1f, 1f)
-                    val a = abs(o)
-                    translationX = -o * this.size.width * 0.22f
-                    alpha = (1f - a * 1.1f).coerceIn(0f, 1f)
-                    scaleX = 1f - a * 0.05f
-                    scaleY = 1f - a * 0.05f
-                }
                 .padding(horizontal = 20.dp)
                 .padding(top = CHROME_HEIGHT, bottom = 18.dp),
         ) {
-            Box(Modifier.weight(1f).fillMaxWidth()) {
-                Column(Modifier.fillMaxSize()) {
-                    val headline = summary.storyHeadline(LocalContext.current, page)
-                    when (page) {
-                        ReplayStoryPage.INTRO -> IntroCard(summary, headline, reveal)
-                        ReplayStoryPage.MINUTES -> MinutesCard(summary, headline, reveal)
-                        ReplayStoryPage.SONGS ->
-                            SongsCard(headline, summary.songRows(STORY_ROWS), reveal)
-                        ReplayStoryPage.ARTISTS ->
-                            ArtistsCard(headline, summary.artistRows(STORY_ROWS), reveal)
-                        ReplayStoryPage.ALBUMS ->
-                            AlbumsCard(headline, summary.albumRows(STORY_ROWS), reveal)
-                        ReplayStoryPage.GENRES -> GenresCard(summary, headline, reveal)
-                        ReplayStoryPage.HABITS -> HabitsCard(summary, headline, reveal)
-                        ReplayStoryPage.SUMMARY -> RecapCard(summary, headline, reveal)
-                    }
-                }
-            }
-            // The share button is on every card: the card somebody wants to
-            // send is whichever one surprised them. It sends *this* card.
-            Spacer(Modifier.height(14.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                Box(
-                    Modifier
-                        .size(46.dp)
-                        .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.14f))
-                        .border(0.8.dp, Color.White.copy(alpha = 0.26f), CircleShape)
-                        .clickable { onShare(page) },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = SfIcons.Share,
-                        contentDescription = stringResource(R.string.share_my_replay),
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
+            when (page) {
+                ReplayStoryPage.INTRO -> IntroStory(summary, headline, reveal, drift, pageOffset, onNext)
+                ReplayStoryPage.MINUTES -> MinutesStory(summary, headline, reveal, drift, pageOffset)
+                ReplayStoryPage.ARTISTS -> ArtistsStory(summary, headline, reveal, pageOffset)
+                ReplayStoryPage.SONGS -> SongsStory(summary, headline, reveal)
+                ReplayStoryPage.ALBUMS -> AlbumsStory(summary, headline, reveal, drift, pageOffset)
+                ReplayStoryPage.GENRES -> PersonalityStory(summary, headline, colors, reveal, drift)
+                ReplayStoryPage.HABITS -> Unit
+                ReplayStoryPage.SUMMARY ->
+                    RecapStory(summary, headline, reveal, onShare = { onShare(ReplayStoryPage.SUMMARY) }, onRestart = onRestart)
             }
         }
     }
 }
 
-/**
- * One card's own backdrop: the mesh coloured from what the card is about, then
- * its own atmosphere ([drawDecor]), then a vignette and film grain on all of
- * them so the eight read as one reel.
- */
-@Composable
-private fun StoryBackdrop(page: ReplayStoryPage, summary: ReplaySummary) {
-    val artwork = summary.storyArtwork(page)
-    val base = rememberArtworkColors(artwork)
-    val palette = remember(base, page) { base.rotated(storyHue(page)) }
-    Box(Modifier.fillMaxSize()) {
-        MeshGradientBackground(
-            palette = palette,
-            modifier = Modifier.fillMaxSize(),
-            trackKey = page.name,
-            animated = true,
-            colorFadeMillis = 900,
-        )
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        0.0f to Color.Black.copy(alpha = 0.45f),
-                        0.35f to Color.Black.copy(alpha = 0.10f),
-                        1.0f to Color.Black.copy(alpha = 0.34f),
-                    ),
-                ),
-        )
-        Box(
-            Modifier.fillMaxSize().drawBehind {
-                drawDecor(page)
-                drawVignetteAndGrain()
-            },
-        )
-    }
-}
+// ── Tipografi ───────────────────────────────────────────────────────────────
 
-/**
- * The sentence at the top of every card. Two weights in one line so the number
- * is the loud part of an ordinary sentence. [family] lets each card set it in
- * its own voice.
- */
 @Composable
 private fun Headline(
     parts: List<HeadlineRun>,
     modifier: Modifier = Modifier,
+    textSize: Int = 32,
     family: FontFamily = FontFamily.Default,
-    textSize: Int = 30,
 ) {
     Text(
         text = buildAnnotatedString {
             parts.forEach { run ->
                 withStyle(
                     SpanStyle(
-                        fontWeight = if (run.bold) FontWeight.W800 else FontWeight.W600,
-                        color = if (run.bold) Color.White else Color.White.copy(alpha = 0.62f),
+                        fontWeight = if (run.bold) FontWeight.W900 else FontWeight.W700,
+                        color = if (run.bold) Color.White else Color.White.copy(alpha = 0.86f),
                     ),
                 ) { append(run.text) }
             }
@@ -625,182 +659,380 @@ private fun Headline(
         style = MaterialTheme.typography.displayLarge,
         fontFamily = family,
         fontSize = textSize.sp,
-        lineHeight = (textSize * 1.22f).sp,
+        lineHeight = (textSize * 1.1f).sp,
+        letterSpacing = (-0.5f).sp,
         modifier = modifier.fillMaxWidth(),
     )
 }
 
 @Composable
-private fun GlassCard(
+private fun Kicker(text: String, modifier: Modifier = Modifier, alpha: Float = 0.8f) {
+    Text(
+        text = text.uppercase(Locale.ROOT),
+        style = MaterialTheme.typography.labelMedium,
+        fontWeight = FontWeight.W700,
+        letterSpacing = 3.sp,
+        color = Color.White.copy(alpha = alpha),
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun PillButton(
+    text: String,
+    filled: Boolean,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    corner: Dp = 20.dp,
-    edge: Color = Color.White.copy(alpha = 0.18f),
-    content: @Composable () -> Unit,
 ) {
-    val shape = RoundedCornerShape(corner)
     Box(
         modifier
-            .clip(shape)
-            .background(
-                Brush.verticalGradient(
-                    listOf(Color.White.copy(alpha = 0.16f), Color.White.copy(alpha = 0.06f)),
-                ),
-            )
-            .border(0.8.dp, edge, shape),
-    ) { content() }
-}
-
-@Composable
-private fun GoldRule() {
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .height(0.8.dp)
-            .background(
-                Brush.horizontalGradient(
-                    listOf(Color.Transparent, Champagne.copy(alpha = 0.55f), Color.Transparent),
-                ),
-            ),
-    )
-}
-
-// ── The cards ───────────────────────────────────────────────────────────────
-
-/** Intro — a pile of polaroids under a film-leader light leak. */
-@Composable
-private fun ColumnScope.IntroCard(
-    summary: ReplaySummary,
-    headline: List<HeadlineRun>,
-    reveal: Animatable<Float, *>,
-) {
-    Headline(headline, Modifier.staged(reveal, 0f), family = FontFamily.Serif)
-    Box(Modifier.weight(1f).fillMaxWidth()) {
-        ArtworkCollage(summary, reveal, Modifier.fillMaxSize())
-    }
-    Text(
-        text = stringResource(R.string.replay_private_counting),
-        style = MaterialTheme.typography.bodyMedium,
-        fontFamily = FontFamily.Serif,
-        fontStyle = FontStyle.Italic,
-        textAlign = TextAlign.Center,
-        color = Color.White.copy(alpha = 0.62f),
-        modifier = Modifier.fillMaxWidth().staged(reveal, 0.55f),
-    )
-}
-
-/** Minutes — a spinning record inside a clock dial. */
-@Composable
-private fun ColumnScope.MinutesCard(
-    summary: ReplaySummary,
-    headline: List<HeadlineRun>,
-    reveal: Animatable<Float, *>,
-) {
-    val context = LocalContext.current
-    Headline(headline, Modifier.staged(reveal, 0f))
-    BoxWithConstraints(
-        Modifier.weight(1f).fillMaxWidth().staged(reveal, 0.10f, 0.6f, 18.dp),
+            .clip(CircleShape)
+            .background(if (filled) Color.White else Color.White.copy(alpha = 0.14f))
+            .then(if (filled) Modifier else Modifier.border(0.8.dp, Color.White.copy(alpha = 0.35f), CircleShape))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 24.dp, vertical = 13.dp),
         contentAlignment = Alignment.Center,
     ) {
-        val d = minOf(maxWidth - 24.dp, maxHeight)
-        HourRing(d, summary.peakHour)
-        Vinyl(summary.songs.firstOrNull()?.song?.thumbnailUrl, d * 0.70f)
-    }
-    GlassCard(Modifier.fillMaxWidth().staged(reveal, 0.45f)) {
         Text(
-            // "That's 0 hours" reads as the page failing to count rather than
-            // as a small number. Under an hour, the plays are the only figure
-            // worth restating.
-            text = buildString {
-                if (summary.hours >= 1) {
-                    append(context.getString(R.string.replay_hours_across, grouped(summary.hours)))
-                } else {
-                    append(context.getString(R.string.replay_across))
-                    append(" ")
-                }
-                if (summary.hours >= 1) {
-                    append(", ")
-                }
-                append(context.resources.getQuantityString(
-                    R.plurals.replay_play_count,
-                    summary.totalPlays,
-                    grouped(summary.totalPlays.toLong()),
-                ))
-                if (summary.peakHour != null) {
-                    append(", mostly around ")
-                    append(formatHour(context, summary.peakHour!!))
-                    append(".")
-                } else {
-                    append(".")
-                }
-            },
-            style = MaterialTheme.typography.bodyLarge,
-            fontFamily = FontFamily.Serif,
-            color = Color.White.copy(alpha = 0.82f),
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
+            text = text.uppercase(Locale.ROOT),
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.W800,
+            letterSpacing = 1.5.sp,
+            color = if (filled) Color(0xFF0E0E10) else Color.White,
         )
     }
 }
 
-/** Songs — a spotlit number one over a typed-out tracklist. */
+// ── 01 · Intro ──────────────────────────────────────────────────────────────
+
 @Composable
-private fun ColumnScope.SongsCard(
+private fun ColumnScope.IntroStory(
+    summary: ReplaySummary,
     headline: List<HeadlineRun>,
-    rows: List<ReplayRow>,
+    reveal: Animatable<Float, *>,
+    drift: () -> Float,
+    pageOffset: () -> Float,
+    onNext: () -> Unit,
+) {
+    val context = LocalContext.current
+    Kicker(stringResource(R.string.replay_brand), Modifier.staged(reveal, 0f))
+    MaskReveal(reveal, 0.04f) {
+        Text(
+            text = summary.localizedLabel(context),
+            style = MaterialTheme.typography.displayMedium,
+            fontWeight = FontWeight.W300,
+            color = Color.White,
+        )
+    }
+    Box(Modifier.weight(1f).fillMaxWidth()) {
+        ArtworkCollage(summary, reveal, drift, pageOffset, Modifier.fillMaxSize())
+    }
+    MaskReveal(reveal, 0.55f, span = 0.4f) {
+        Headline(headline, textSize = 54)
+    }
+    Spacer(Modifier.height(8.dp))
+    Text(
+        text = stringResource(R.string.replay_story_intro_sub),
+        style = MaterialTheme.typography.bodyLarge,
+        fontFamily = FontFamily.Serif,
+        fontStyle = FontStyle.Italic,
+        color = Color.White.copy(alpha = 0.78f),
+        modifier = Modifier.staged(reveal, 0.70f),
+    )
+    Spacer(Modifier.height(16.dp))
+    PillButton(
+        text = stringResource(R.string.replay_cta_relive),
+        filled = true,
+        onClick = onNext,
+        modifier = Modifier.staged(reveal, 0.82f, 0.18f),
+    )
+}
+
+private class Slot(val x: Float, val y: Float, val s: Float, val angle: Float, val depth: Float)
+
+private val CollageSlots = listOf(
+    Slot(0.28f, 0.16f, 0.52f, -3f, 1.0f),
+    Slot(0.00f, 0.02f, 0.30f, -9f, 0.6f),
+    Slot(0.66f, 0.00f, 0.28f, 7f, 0.7f),
+    Slot(0.62f, 0.50f, 0.34f, 6f, 1.4f),
+    Slot(0.02f, 0.56f, 0.30f, -6f, 1.2f),
+    Slot(0.38f, 0.70f, 0.22f, 4f, 0.8f),
+    Slot(0.82f, 0.30f, 0.20f, -4f, 0.5f),
+)
+
+/** Kolase artwork berlapis: ukuran beragam, rotasi halus, kedalaman, melayang pelan. */
+@Composable
+private fun ArtworkCollage(
+    summary: ReplaySummary,
+    reveal: Animatable<Float, *>,
+    drift: () -> Float,
+    pageOffset: () -> Float,
+    modifier: Modifier = Modifier,
+) {
+    val covers = remember(summary) {
+        (summary.songs.mapNotNull { it.song.thumbnailUrl } + summary.albums.mapNotNull { it.artworkUrl })
+            .distinct()
+            .take(CollageSlots.size)
+    }
+    if (covers.isEmpty()) return
+    BoxWithConstraints(modifier) {
+        val w = maxWidth
+        val h = maxHeight
+        val unit = minOf(w, h * 1.05f)
+        covers.forEachIndexed { index, url ->
+            val slot = CollageSlots[index]
+            Cover(
+                url = url,
+                fallbackText = "",
+                size = unit * slot.s,
+                shape = RoundedCornerShape(10.dp),
+                px = CARD_ART_PX,
+                modifier = Modifier
+                    .offset(x = w * slot.x, y = h * slot.y)
+                    .graphicsLayer {
+                        val e = ease((reveal.value - 0.08f - index * 0.07f) / 0.45f)
+                        val phase = drift() * 2f * PI.toFloat() * 6f + index * 1.3f
+                        alpha = e
+                        val s = 0.8f + 0.2f * e
+                        scaleX = s
+                        scaleY = s
+                        translationY = (1f - e) * 40.dp.toPx() + sin(phase) * 5.dp.toPx()
+                        translationX = pageOffset() * 120.dp.toPx() * slot.depth
+                        rotationZ = slot.angle + sin(phase * 0.5f) * 0.9f
+                    }
+                    .border(0.6.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(10.dp)),
+            )
+        }
+    }
+}
+
+// ── 02 · Menit mendengarkan ─────────────────────────────────────────────────
+
+@Composable
+private fun ColumnScope.MinutesStory(
+    summary: ReplaySummary,
+    headline: List<HeadlineRun>,
+    reveal: Animatable<Float, *>,
+    drift: () -> Float,
+    pageOffset: () -> Float,
+) {
+    val context = LocalContext.current
+    MaskReveal(reveal, 0f) {
+        Headline(headline, textSize = 34, family = FontFamily.Serif)
+    }
+    Spacer(Modifier.weight(1f))
+    Kicker(stringResource(R.string.replay_total_minutes), Modifier.staged(reveal, 0.08f))
+    Spacer(Modifier.height(4.dp))
+    CountingNumber(
+        target = summary.minutes,
+        reveal = reveal,
+        modifier = Modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                translationX = pageOffset() * this.size.width * 0.40f
+                translationY = sin(drift() * 2f * PI.toFloat() * 4f) * 4.dp.toPx()
+            },
+    )
+    Spacer(Modifier.weight(1f))
+    val stats = buildList {
+        add(grouped(summary.hours) to stringResource(R.string.replay_stat_hours))
+        add(formatListening(context, summary.averageMsPerDay()) to stringResource(R.string.replay_stat_per_day))
+        summary.busiestDay?.let { add(formatDay(context, it) to stringResource(R.string.replay_stat_busiest)) }
+    }
+    Row(
+        Modifier.fillMaxWidth().staged(reveal, 0.55f, 0.35f),
+        horizontalArrangement = Arrangement.spacedBy(20.dp),
+    ) {
+        stats.forEach { (value, label) ->
+            Column(Modifier.weight(1f)) {
+                Box(Modifier.fillMaxWidth().height(0.8.dp).background(Color.White.copy(alpha = 0.35f)))
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = value,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.W800,
+                    color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = label.uppercase(Locale.ROOT),
+                    style = MaterialTheme.typography.labelSmall,
+                    letterSpacing = 2.sp,
+                    color = Color.White.copy(alpha = 0.6f),
+                )
+            }
+        }
+    }
+}
+
+/** Angka raksasa yang menghitung naik. Hanya composable ini yang rekomposisi per frame. */
+@Composable
+private fun CountingNumber(target: Long, reveal: Animatable<Float, *>, modifier: Modifier = Modifier) {
+    val finalText = grouped(target)
+    BoxWithConstraints(modifier) {
+        val fontSize = minOf(150f, maxWidth.value / (finalText.length * 0.56f)).sp
+        val shown = ease((reveal.value - 0.10f) / 0.65f)
+        Text(
+            text = grouped((target * shown).toLong()),
+            style = MaterialTheme.typography.displayLarge.copy(fontFeatureSettings = "tnum"),
+            fontSize = fontSize,
+            lineHeight = fontSize,
+            fontWeight = FontWeight.W900,
+            letterSpacing = (-2).sp,
+            color = Color.White,
+            maxLines = 1,
+            softWrap = false,
+        )
+    }
+}
+
+// ── 03 · Artis teratas ──────────────────────────────────────────────────────
+
+/** Potret artis memenuhi layar, dibalut warna latar, zoom sinematik pelan. */
+@Composable
+private fun ArtistPortraitBackdrop(
+    summary: ReplaySummary,
+    reveal: Animatable<Float, *>,
+    pageOffset: () -> Float,
+    motion: Boolean,
+) {
+    val url = summary.artists.firstOrNull()?.artworkUrl ?: return
+    val scale = remember { Animatable(1.14f) }
+    LaunchedEffect(motion) {
+        if (motion) {
+            scale.animateTo(1f, tween(PAGE_MILLIS.toInt() + 4_000, easing = LinearEasing))
+        } else {
+            scale.snapTo(1.04f)
+        }
+    }
+    Box(Modifier.fillMaxSize()) {
+        AsyncImage(
+            model = url.artworkAt(HEADER_ART_PX),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            alignment = Alignment.TopCenter,
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    val s = scale.value
+                    scaleX = s
+                    scaleY = s
+                    translationX = pageOffset() * this.size.width * 0.12f
+                    alpha = 0.30f * ease(reveal.value / 0.5f)
+                },
+        )
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        0f to Color.Black.copy(alpha = 0.25f),
+                        0.5f to Color.Transparent,
+                        1f to Color.Black.copy(alpha = 0.45f),
+                    ),
+                ),
+        )
+    }
+}
+
+@Composable
+private fun ColumnScope.ArtistsStory(
+    summary: ReplaySummary,
+    headline: List<HeadlineRun>,
+    reveal: Animatable<Float, *>,
+    pageOffset: () -> Float,
+) {
+    val lead = summary.artistRows(1).firstOrNull() ?: return
+    val name = lead.title
+    val nameSize = when {
+        name.length <= 8 -> 84
+        name.length <= 14 -> 64
+        else -> 46
+    }
+    val share = if (summary.totalMs > 0) (lead.ms * 100 / summary.totalMs).toInt() else 0
+    Kicker(stringResource(R.string.replay_kicker_top_artist), Modifier.staged(reveal, 0f))
+    Spacer(Modifier.height(6.dp))
+    MaskReveal(reveal, 0.05f) { Headline(headline, textSize = 21) }
+    Spacer(Modifier.height(12.dp))
+    MaskReveal(reveal, 0.15f, span = 0.55f) {
+        Text(
+            text = name,
+            style = MaterialTheme.typography.displayLarge,
+            fontSize = nameSize.sp,
+            lineHeight = (nameSize * 0.98f).sp,
+            fontWeight = FontWeight.W900,
+            letterSpacing = (-2).sp,
+            color = Color.White,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+    Spacer(Modifier.height(2.dp))
+    Text(
+        text = "${formatMinutes(lead.ms)} ${stringResource(R.string.minutes)}",
+        style = MaterialTheme.typography.titleLarge,
+        fontWeight = FontWeight.W600,
+        color = Color.White.copy(alpha = 0.95f),
+        modifier = Modifier.staged(reveal, 0.35f),
+    )
+    if (share > 0) {
+        Text(
+            text = stringResource(R.string.replay_share_of_listening, share),
+            style = MaterialTheme.typography.bodyMedium,
+            color = Color.White.copy(alpha = 0.65f),
+            modifier = Modifier.staged(reveal, 0.40f),
+        )
+    }
+    BoxWithConstraints(
+        Modifier.weight(1f).fillMaxWidth().padding(top = 14.dp),
+        contentAlignment = Alignment.BottomCenter,
+    ) {
+        val d = minOf(maxWidth * 0.96f, maxHeight)
+        Cover(
+            url = lead.artworkUrl,
+            fallbackText = name,
+            size = d,
+            shape = CircleShape,
+            px = HEADER_ART_PX,
+            modifier = Modifier
+                .popped(reveal, 0.25f, 0.6f, 0.86f)
+                .graphicsLayer { translationX = pageOffset() * this.size.width * 0.25f }
+                .border(1.dp, Color.White.copy(alpha = 0.25f), CircleShape),
+        )
+    }
+}
+
+// ── 04 · Lagu teratas ───────────────────────────────────────────────────────
+
+@Composable
+private fun ColumnScope.SongsStory(
+    summary: ReplaySummary,
+    headline: List<HeadlineRun>,
     reveal: Animatable<Float, *>,
 ) {
     val context = LocalContext.current
+    val rows = summary.songRows(STORY_ROWS)
     val lead = rows.firstOrNull() ?: return
-    val frame = RoundedCornerShape(8.dp)
-    Headline(headline, Modifier.staged(reveal, 0f))
-    Spacer(Modifier.height(22.dp))
-    Row(
-        Modifier.fillMaxWidth().staged(reveal, 0.12f),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            Modifier.drawBehind {
-                val glow = this.size.maxDimension * 0.95f
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(Champagne.copy(alpha = 0.40f), Color.Transparent),
-                        center = center,
-                        radius = glow,
-                    ),
-                    radius = glow,
-                )
-            },
+    MaskReveal(reveal, 0f) { Headline(headline, textSize = 32) }
+    Spacer(Modifier.height(14.dp))
+    BoxWithConstraints(Modifier.weight(2.5f).fillMaxWidth()) {
+        val d = minOf(maxHeight, maxWidth * 0.60f)
+        Text(
+            text = "01",
+            fontSize = (d.value * 0.62f).sp,
+            fontWeight = FontWeight.W900,
+            letterSpacing = (-4).sp,
+            color = Color.White.copy(alpha = 0.95f),
+            modifier = Modifier.align(Alignment.TopStart).staged(reveal, 0.05f, 0.5f, 40.dp),
+        )
+        Column(
+            Modifier.align(Alignment.BottomStart).width(maxWidth - d - 12.dp).staged(reveal, 0.30f),
         ) {
-            Cover(
-                lead.artworkUrl, lead.title, 132.dp, frame, HEADER_ART_PX,
-                modifier = Modifier.border(1.dp, Champagne.copy(alpha = 0.55f), frame),
-                elevated = true,
-            )
-        }
-        Spacer(Modifier.width(18.dp))
-        Column(Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "NO. 1",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontFamily = FontFamily.Monospace,
-                    letterSpacing = 3.sp,
-                    color = Champagne,
-                )
-                Spacer(Modifier.width(10.dp))
-                Box(
-                    Modifier
-                        .weight(1f)
-                        .height(0.8.dp)
-                        .background(Champagne.copy(alpha = 0.45f)),
-                )
-            }
-            Spacer(Modifier.height(6.dp))
             Text(
                 text = lead.title,
-                style = MaterialTheme.typography.headlineMedium,
-                fontFamily = FontFamily.Serif,
-                fontSize = 26.sp,
-                lineHeight = 30.sp,
+                style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.W800,
                 color = Color.White,
                 maxLines = 3,
@@ -809,166 +1041,135 @@ private fun ColumnScope.SongsCard(
             lead.subtitle?.let {
                 Text(
                     text = it,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = Color.White.copy(alpha = 0.7f),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.75f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            Spacer(Modifier.height(10.dp))
-            GlassCard(corner = 50.dp) {
-                Text(
-                    text = "${formatListening(context, lead.ms)} · " + context.resources.getQuantityString(
-                        R.plurals.replay_play_count,
-                        lead.plays,
-                        grouped(lead.plays.toLong()),
-                    ),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = Color.White.copy(alpha = 0.8f),
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
-                )
-            }
+            Text(
+                text = context.replayCount(lead.plays, R.plurals.replay_play_count),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.W700,
+                color = Color.White.copy(alpha = 0.9f),
+            )
         }
+        Cover(
+            url = lead.artworkUrl,
+            fallbackText = lead.title,
+            size = d,
+            shape = RoundedCornerShape(14.dp),
+            px = HEADER_ART_PX,
+            modifier = Modifier.align(Alignment.CenterEnd).popped(reveal, 0.10f, 0.55f, 0.8f),
+        )
     }
-    Spacer(Modifier.weight(1f))
-    Column(Modifier.fillMaxWidth().staged(reveal, 0.35f, 0.55f)) {
-        rows.drop(1).forEachIndexed { index, row ->
-            if (index > 0) GoldRule()
-            Row(
-                Modifier.fillMaxWidth().padding(vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = "%02d".format(row.rank),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontFamily = FontFamily.Serif,
-                    fontStyle = FontStyle.Italic,
-                    fontSize = 28.sp,
-                    color = Champagne,
-                    modifier = Modifier.width(44.dp),
-                )
-                Cover(row.artworkUrl, row.title, 44.dp, RoundedCornerShape(6.dp), ROW_ART_PX)
-                Spacer(Modifier.width(14.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        text = row.title,
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.W600,
-                        color = Color.White.copy(alpha = 0.95f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        text = formatListening(context, row.ms),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = Color.White.copy(alpha = 0.5f),
-                    )
-                }
-            }
-        }
+    Spacer(Modifier.height(12.dp))
+    rows.drop(1).forEachIndexed { index, row ->
+        SongRowItem(
+            row = row,
+            indent = if (index % 2 == 0) 0.dp else 28.dp,
+            reveal = reveal,
+            start = 0.40f + index * 0.09f,
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+        )
     }
 }
 
-/** Artists — a headliner under stage beams, ringed by pulsing halos. */
 @Composable
-private fun ColumnScope.ArtistsCard(
-    headline: List<HeadlineRun>,
-    rows: List<ReplayRow>,
+private fun SongRowItem(
+    row: ReplayRow,
+    indent: Dp,
     reveal: Animatable<Float, *>,
+    start: Float,
+    modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val lead = rows.firstOrNull() ?: return
-    Headline(headline, Modifier.staged(reveal, 0f))
-    Spacer(Modifier.height(8.dp))
-    BoxWithConstraints(
-        Modifier.weight(1f).fillMaxWidth().staged(reveal, 0.10f, 0.6f, 18.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        val d = minOf(maxWidth * 0.55f, maxHeight)
-        HaloAvatar(lead.artworkUrl, lead.title, d)
-    }
-    Text(
-        text = lead.title,
-        style = MaterialTheme.typography.headlineMedium,
-        fontSize = 28.sp,
-        lineHeight = 32.sp,
-        fontWeight = FontWeight.W800,
-        textAlign = TextAlign.Center,
-        color = Color.White,
-        maxLines = 2,
-        overflow = TextOverflow.Ellipsis,
-        modifier = Modifier.fillMaxWidth().staged(reveal, 0.35f),
-    )
-    Text(
-        text = "${formatListening(context, lead.ms)} · " + context.resources.getQuantityString(
-            R.plurals.replay_play_count,
-            lead.plays,
-            grouped(lead.plays.toLong()),
-        ),
-        style = MaterialTheme.typography.bodyMedium,
-        textAlign = TextAlign.Center,
-        color = Color.White.copy(alpha = 0.58f),
-        modifier = Modifier.fillMaxWidth().staged(reveal, 0.40f),
-    )
-    Spacer(Modifier.height(14.dp))
-    Row(
-        Modifier.fillMaxWidth().staged(reveal, 0.50f),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        rows.drop(1).forEach { row ->
-            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = "%02d".format(row.rank),
-                    style = MaterialTheme.typography.labelSmall,
-                    fontFamily = FontFamily.Monospace,
-                    color = Champagne.copy(alpha = 0.9f),
-                )
-                Spacer(Modifier.height(4.dp))
-                Cover(row.artworkUrl, row.title, 60.dp, CircleShape, ROW_ART_PX)
-                Spacer(Modifier.height(6.dp))
+    BoxWithConstraints(modifier.staged(reveal, start, 0.4f, 30.dp), contentAlignment = Alignment.CenterStart) {
+        val art = maxHeight * 0.84f
+        Row(Modifier.padding(start = indent), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "%02d".format(row.rank),
+                fontFamily = FontFamily.Serif,
+                fontStyle = FontStyle.Italic,
+                fontSize = 26.sp,
+                fontWeight = FontWeight.W700,
+                color = Color.White.copy(alpha = 0.85f),
+                modifier = Modifier.width(44.dp),
+            )
+            Cover(
+                url = row.artworkUrl,
+                fallbackText = row.title,
+                size = art,
+                shape = RoundedCornerShape(8.dp),
+                px = ROW_ART_PX,
+                modifier = Modifier.popped(reveal, start + 0.05f, 0.4f, 0.7f),
+            )
+            Spacer(Modifier.width(12.dp))
+            Column {
                 Text(
                     text = row.title,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.W600,
-                    textAlign = TextAlign.Center,
-                    color = Color.White.copy(alpha = 0.9f),
-                    maxLines = 2,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.W700,
+                    color = Color.White,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = formatListening(context, row.ms),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color.White.copy(alpha = 0.5f),
+                    text = listOfNotNull(
+                        row.subtitle,
+                        context.replayCount(row.plays, R.plurals.replay_play_count),
+                    ).joinToString(" · "),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Color.White.copy(alpha = 0.62f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
     }
 }
 
-/** Albums — a sleeve with its record sliding out, and the runners-up as a shelf. */
+// ── 05 · Album teratas ──────────────────────────────────────────────────────
+
 @Composable
-private fun ColumnScope.AlbumsCard(
+private fun ColumnScope.AlbumsStory(
+    summary: ReplaySummary,
     headline: List<HeadlineRun>,
-    rows: List<ReplayRow>,
     reveal: Animatable<Float, *>,
+    drift: () -> Float,
+    pageOffset: () -> Float,
 ) {
     val context = LocalContext.current
+    val rows = summary.albumRows(STORY_ROWS)
     val lead = rows.firstOrNull() ?: return
-    Headline(headline, Modifier.staged(reveal, 0f), family = FontFamily.Serif)
-    BoxWithConstraints(
-        Modifier.weight(1f).fillMaxWidth().staged(reveal, 0.10f, 0.6f, 20.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        val sleeve = minOf(maxWidth * 0.56f, maxHeight)
-        Box(Modifier.width(sleeve * 1.42f).height(sleeve)) {
-            Vinyl(
-                url = lead.artworkUrl,
-                diameter = sleeve * 0.98f,
-                modifier = Modifier.align(Alignment.CenterEnd),
-            )
-            Cover(lead.artworkUrl, lead.title, sleeve, RoundedCornerShape(4.dp), HEADER_ART_PX, elevated = true)
-        }
+    MaskReveal(reveal, 0f) { Headline(headline, textSize = 32) }
+    BoxWithConstraints(Modifier.weight(1.9f).fillMaxWidth().padding(top = 12.dp)) {
+        val d = minOf(maxHeight, maxWidth * 0.86f)
+        Cover(
+            url = lead.artworkUrl,
+            fallbackText = lead.title,
+            size = d,
+            shape = RoundedCornerShape(16.dp),
+            px = HEADER_ART_PX,
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .offset(x = 20.dp)
+                .popped(reveal, 0.08f, 0.6f, 0.84f)
+                .graphicsLayer {
+                    translationX = pageOffset() * this.size.width * 0.20f
+                    translationY = sin(drift() * 2f * PI.toFloat() * 3f) * 5.dp.toPx()
+                },
+        )
+        Text(
+            text = "01",
+            fontSize = (d.value * 0.42f).sp,
+            fontWeight = FontWeight.W900,
+            letterSpacing = (-3).sp,
+            color = Color.White,
+            modifier = Modifier.align(Alignment.BottomStart).staged(reveal, 0.22f, 0.5f, 40.dp),
+        )
     }
+    Spacer(Modifier.height(12.dp))
     Text(
         text = lead.title,
         style = MaterialTheme.typography.headlineMedium,
@@ -981,529 +1182,360 @@ private fun ColumnScope.AlbumsCard(
         overflow = TextOverflow.Ellipsis,
         modifier = Modifier.staged(reveal, 0.35f),
     )
-    lead.subtitle?.let {
-        Text(
-            text = it,
-            style = MaterialTheme.typography.bodyLarge,
-            color = Color.White.copy(alpha = 0.7f),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.staged(reveal, 0.38f),
-        )
-    }
     Text(
-        text = "${formatListening(context, lead.ms)} · " + context.resources.getQuantityString(
-            R.plurals.replay_play_count,
-            lead.plays,
-            grouped(lead.plays.toLong()),
-        ),
+        text = listOfNotNull(
+            lead.subtitle,
+            context.replayCount(lead.plays, R.plurals.replay_play_count),
+        ).joinToString(" · "),
         style = MaterialTheme.typography.bodyMedium,
-        color = Color.White.copy(alpha = 0.55f),
+        color = Color.White.copy(alpha = 0.72f),
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
         modifier = Modifier.staged(reveal, 0.40f),
     )
     Spacer(Modifier.height(14.dp))
-    rows.drop(1).chunked(2).forEachIndexed { line, pair ->
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(bottom = 8.dp)
-                .staged(reveal, 0.50f + line * 0.10f),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            pair.forEach { row ->
-                GlassCard(Modifier.weight(1f), corner = 16.dp) {
-                    Row(
-                        Modifier.padding(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Cover(row.artworkUrl, row.title, 48.dp, RoundedCornerShape(6.dp), ROW_ART_PX)
-                        Spacer(Modifier.width(10.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                text = row.title,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.W600,
-                                color = Color.White.copy(alpha = 0.94f),
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            Text(
-                                text = formatListening(context, row.ms),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = Color.White.copy(alpha = 0.55f),
-                            )
-                        }
-                    }
-                }
-            }
-            if (pair.size == 1) Spacer(Modifier.weight(1f))
-        }
-    }
-}
-
-/** Genres — the biggest word on the reel, over a live equalizer. */
-@Composable
-private fun ColumnScope.GenresCard(
-    summary: ReplaySummary,
-    headline: List<HeadlineRun>,
-    reveal: Animatable<Float, *>,
-) {
-    val context = LocalContext.current
-    val rows = summary.genreRows(STORY_ROWS)
-    val lead = rows.firstOrNull() ?: return
-    Headline(headline, Modifier.staged(reveal, 0f))
-    Spacer(Modifier.height(14.dp))
-    Text(
-        text = lead.title,
-        style = MaterialTheme.typography.displayLarge,
-        fontSize = 56.sp,
-        lineHeight = 58.sp,
-        letterSpacing = (-1).sp,
-        fontWeight = FontWeight.W800,
-        color = Color.White,
-        maxLines = 2,
-        overflow = TextOverflow.Ellipsis,
-        modifier = Modifier.staged(reveal, 0.10f),
-    )
-    Text(
-        text = formatListening(context, lead.ms),
-        style = MaterialTheme.typography.titleMedium,
-        color = Champagne.copy(alpha = 0.9f),
-        modifier = Modifier.staged(reveal, 0.16f),
-    )
-    Spacer(Modifier.weight(0.5f))
-    EqualizerChart(rows, reveal, Modifier.weight(2.2f).fillMaxWidth())
-    Spacer(Modifier.height(8.dp))
-}
-
-/** Habits — the numbers as ticket stubs pinned onto ruled diary paper. */
-@Composable
-private fun ColumnScope.HabitsCard(
-    summary: ReplaySummary,
-    headline: List<HeadlineRun>,
-    reveal: Animatable<Float, *>,
-) {
-    val context = LocalContext.current
-    Headline(headline, Modifier.staged(reveal, 0f), family = FontFamily.Serif)
-    Spacer(Modifier.weight(1f))
-    val tickets = buildList<Pair<String, String>> {
-        if (summary.distinctAlbums > 0) {
-            add(grouped(summary.distinctAlbums.toLong()) to stringResource(R.string.different_albums))
-        }
-        summary.busiestDay?.let {
-            add(
-                formatDay(context, it) to
-                    stringResource(R.string.your_biggest_day, formatListening(context, summary.busiestDayMs)),
-            )
-        }
-        summary.peakHour?.let {
-            add(formatHour(context, it) to stringResource(R.string.when_you_listen_the_most))
-        }
-    }
-    tickets.forEachIndexed { index, (value, label) ->
-        Ticket(
-            value = value,
-            label = label,
-            number = index + 1,
-            angle = if (index % 2 == 0) -1.6f else 1.3f,
-            modifier = Modifier.staged(reveal, 0.12f + index * 0.14f, 0.5f, 34.dp),
-        )
-    }
-    Spacer(Modifier.weight(0.4f))
-}
-
-/** Summary — the finale: liner notes in a champagne frame. */
-@Composable
-private fun ColumnScope.RecapCard(
-    summary: ReplaySummary,
-    headline: List<HeadlineRun>,
-    reveal: Animatable<Float, *>,
-) {
-    Headline(headline, Modifier.staged(reveal, 0f), family = FontFamily.Serif)
-    Spacer(Modifier.height(18.dp))
-    GlassCard(
-        Modifier.fillMaxWidth().weight(1f).staged(reveal, 0.14f, 0.55f),
-        corner = 26.dp,
-        edge = Champagne.copy(alpha = 0.5f),
-    ) {
-        Column(
-            Modifier.fillMaxSize().padding(horizontal = 22.dp, vertical = 20.dp),
-            verticalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Column {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        rows.drop(1).take(3).forEachIndexed { index, row ->
+            Column(
+                Modifier
+                    .weight(1f)
+                    .offset(y = if (index % 2 == 0) 0.dp else 12.dp)
+                    .staged(reveal, 0.50f + index * 0.09f, 0.4f, 30.dp),
+            ) {
                 Text(
-                    text = "LINER NOTES",
+                    text = "%02d".format(row.rank),
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.W700,
-                    letterSpacing = 3.sp,
-                    color = Champagne,
+                    letterSpacing = 1.5.sp,
+                    color = Color.White.copy(alpha = 0.7f),
                 )
                 Spacer(Modifier.height(4.dp))
+                Cover(
+                    url = row.artworkUrl,
+                    fallbackText = row.title,
+                    size = 72.dp,
+                    shape = RoundedCornerShape(10.dp),
+                    px = ROW_ART_PX,
+                )
+                Spacer(Modifier.height(5.dp))
                 Text(
-                    text = formatMinutes(summary.totalMs),
-                    style = MaterialTheme.typography.displayLarge,
-                    fontFamily = FontFamily.Serif,
-                    fontSize = 64.sp,
-                    lineHeight = 68.sp,
-                    fontWeight = FontWeight.W800,
+                    text = row.title,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.W700,
                     color = Color.White,
-                    maxLines = 1,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = stringResource(R.string.minutes).uppercase(),
-                    style = MaterialTheme.typography.labelMedium,
-                    letterSpacing = 2.sp,
-                    color = Color.White.copy(alpha = 0.6f),
+                    text = context.replayCount(row.plays, R.plurals.replay_play_count),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White.copy(alpha = 0.55f),
                 )
             }
-            GoldRule()
-            LinerItem(stringResource(R.string.top_song), summary.songs.firstOrNull()?.song?.title)
-            LinerItem(stringResource(R.string.top_artist), summary.artists.firstOrNull()?.title)
-            LinerItem(stringResource(R.string.top_album), summary.albums.firstOrNull()?.title)
-            LinerItem(stringResource(R.string.top_genre), summary.genres.firstOrNull()?.title)
         }
     }
-    Spacer(Modifier.height(14.dp))
-    Text(
-        text = stringResource(R.string.tap_share_for_picture),
-        style = MaterialTheme.typography.bodyLarge,
-        fontFamily = FontFamily.Serif,
-        fontStyle = FontStyle.Italic,
-        textAlign = TextAlign.Center,
-        color = Color.White.copy(alpha = 0.6f),
-        modifier = Modifier.fillMaxWidth().staged(reveal, 0.60f),
-    )
 }
 
+// ── 06 · Kepribadian musik ──────────────────────────────────────────────────
+
 @Composable
-private fun LinerItem(label: String, value: String?) {
-    if (value == null) return
-    Column {
+private fun ColumnScope.PersonalityStory(
+    summary: ReplaySummary,
+    headline: List<HeadlineRun>,
+    colors: List<Color>,
+    reveal: Animatable<Float, *>,
+    drift: () -> Float,
+) {
+    val context = LocalContext.current
+    val persona = remember(summary) { summary.personality() }
+    val behaviors = remember(summary, persona) { summary.behaviorLines(context, persona) }
+    val genres = remember(summary) { summary.genres.take(3).joinToString("  ·  ") { it.title } }
+
+    Kicker(stringResource(R.string.replay_kicker_personality), Modifier.staged(reveal, 0f))
+    SoundOrb(
+        hours = summary.hourOfDay,
+        colors = colors,
+        reveal = reveal,
+        drift = drift,
+        modifier = Modifier.weight(1.4f).fillMaxWidth(),
+    )
+    MaskReveal(reveal, 0.30f) {
         Text(
-            text = label.uppercase(),
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.W600,
-            letterSpacing = 2.5.sp,
-            color = Champagne.copy(alpha = 0.85f),
+            text = persona.title(context),
+            style = MaterialTheme.typography.displayMedium,
+            fontSize = 40.sp,
+            lineHeight = 42.sp,
+            fontWeight = FontWeight.W900,
+            letterSpacing = (-1).sp,
+            color = Color.White,
         )
-        Spacer(Modifier.height(2.dp))
+    }
+    Spacer(Modifier.height(6.dp))
+    Text(
+        text = persona.description(context),
+        style = MaterialTheme.typography.bodyMedium,
+        color = Color.White.copy(alpha = 0.80f),
+        modifier = Modifier.staged(reveal, 0.42f),
+    )
+    if (genres.isNotEmpty()) {
+        Spacer(Modifier.height(10.dp))
         Text(
-            text = value,
-            style = MaterialTheme.typography.titleLarge,
+            text = genres,
+            style = MaterialTheme.typography.titleSmall,
             fontFamily = FontFamily.Serif,
-            fontWeight = FontWeight.W700,
+            fontStyle = FontStyle.Italic,
             color = Color.White,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.staged(reveal, 0.52f),
         )
     }
-}
-
-// ── Card pieces ─────────────────────────────────────────────────────────────
-
-@Composable
-private fun Polaroid(
-    url: String,
-    cover: Dp,
-    angle: Float,
-    modifier: Modifier = Modifier,
-    tape: Boolean = false,
-) {
-    val pad = cover * 0.07f
-    val frame = RoundedCornerShape(3.dp)
-    Box(
-        modifier
-            .rotate(angle)
-            .shadow(14.dp, frame, clip = false)
-            .background(Paper, frame)
-            .padding(start = pad, top = pad, end = pad, bottom = pad * 3.2f),
-    ) {
-        Cover(url, "", cover, RoundedCornerShape(1.dp), CARD_ART_PX)
-        if (tape) {
-            Box(
-                Modifier
-                    .align(Alignment.TopCenter)
-                    .offset(y = -(pad + 10.dp))
-                    .size(width = cover * 0.34f, height = 16.dp)
-                    .rotate(-5f)
-                    .background(Champagne.copy(alpha = 0.55f)),
-            )
-        }
-    }
-}
-
-@Composable
-private fun HourRing(diameter: Dp, peakHour: Int?, modifier: Modifier = Modifier) {
-    val pulse by rememberInfiniteTransition(label = "ring").animateFloat(
-        initialValue = 0.55f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(2600, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "ringPulse",
-    )
-    Canvas(modifier.size(diameter)) {
-        val r = this.size.minDimension / 2f
-        val c = center
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(Champagne.copy(alpha = 0.22f), Color.Transparent),
-                center = c,
-                radius = r,
-            ),
-            radius = r,
-        )
-        // One tick per hour of the day, midnight at the top. The hour the
-        // listening peaks at is the long gold one.
-        for (i in 0 until RING_HOURS) {
-            val a = (i / RING_HOURS.toFloat()) * 2f * PI.toFloat() - PI.toFloat() / 2f
-            val peak = peakHour != null && i == peakHour
-            val major = i % 6 == 0
-            val len = if (peak) 24.dp.toPx() else if (major) 14.dp.toPx() else 8.dp.toPx()
-            val outer = r - 2.dp.toPx()
-            drawLine(
-                color = if (peak) {
-                    Champagne.copy(alpha = pulse)
-                } else {
-                    Color.White.copy(alpha = if (major) 0.40f else 0.20f)
-                },
-                start = Offset(c.x + cos(a) * (outer - len), c.y + sin(a) * (outer - len)),
-                end = Offset(c.x + cos(a) * outer, c.y + sin(a) * outer),
-                strokeWidth = if (peak) 3.2.dp.toPx() else 1.4.dp.toPx(),
-                cap = StrokeCap.Round,
-            )
-        }
-    }
-}
-
-@Composable
-private fun Vinyl(
-    url: String?,
-    diameter: Dp,
-    modifier: Modifier = Modifier,
-    spinning: Boolean = true,
-) {
-    val spin by rememberInfiniteTransition(label = "vinyl").animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(tween(14_000, easing = LinearEasing), RepeatMode.Restart),
-        label = "vinylSpin",
-    )
-    Box(
-        modifier.size(diameter).shadow(24.dp, CircleShape, clip = false),
-        contentAlignment = Alignment.Center,
-    ) {
-        Box(
-            Modifier
-                .fillMaxSize()
-                .graphicsLayer { rotationZ = if (spinning) spin else 0f }
-                .clip(CircleShape),
-            contentAlignment = Alignment.Center,
-        ) {
-            Canvas(Modifier.fillMaxSize()) {
-                val r = this.size.minDimension / 2f
-                drawCircle(
-                    brush = Brush.sweepGradient(
-                        listOf(
-                            Color(0xFF151518),
-                            Color(0xFF2B2B31),
-                            Color(0xFF111114),
-                            Color(0xFF2E2E34),
-                            Color(0xFF151518),
-                        ),
-                    ),
-                    radius = r,
-                )
-                var g = r * 0.40f
-                while (g < r * 0.97f) {
-                    drawCircle(Color.White.copy(alpha = 0.055f), g, style = Stroke(0.7.dp.toPx()))
-                    g += 3.4.dp.toPx()
-                }
-            }
-            Cover(url, "", diameter * 0.34f, CircleShape, CARD_ART_PX)
-            Box(Modifier.size(diameter * 0.05f).clip(CircleShape).background(Color(0xFF0B0B0D)))
-        }
-        // The light on the record stays put while the record turns under it.
-        Canvas(Modifier.fillMaxSize()) {
-            drawCircle(
-                brush = Brush.linearGradient(
-                    colors = listOf(
-                        Color.White.copy(alpha = 0.16f),
-                        Color.Transparent,
-                        Color.White.copy(alpha = 0.07f),
-                    ),
-                    start = Offset.Zero,
-                    end = Offset(this.size.width, this.size.height),
-                ),
-                radius = this.size.minDimension / 2f,
-            )
-        }
-    }
-}
-
-@Composable
-private fun HaloAvatar(url: String?, name: String, diameter: Dp) {
-    val pulse by rememberInfiniteTransition(label = "halo").animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(3200, easing = LinearEasing), RepeatMode.Restart),
-        label = "haloPhase",
-    )
-    Box(Modifier.size(diameter), contentAlignment = Alignment.Center) {
-        Canvas(Modifier.fillMaxSize()) {
-            val base = this.size.minDimension / 2f
-            for (i in 0 until 3) {
-                val t = (pulse + i / 3f) % 1f
-                drawCircle(
-                    Champagne.copy(alpha = (1f - t) * 0.34f),
-                    base * (1.05f + t * 0.75f),
-                    style = Stroke(1.2.dp.toPx()),
-                )
-            }
-        }
-        Cover(
-            url = url,
-            fallbackText = name,
-            size = diameter,
-            shape = CircleShape,
-            px = HEADER_ART_PX,
-            modifier = Modifier.border(2.dp, Color.White.copy(alpha = 0.85f), CircleShape),
-            elevated = true,
-        )
-    }
-}
-
-@Composable
-private fun EqualizerChart(rows: List<ReplayRow>, reveal: Animatable<Float, *>, modifier: Modifier = Modifier) {
-    BoxWithConstraints(modifier) {
-        val maxBar = maxHeight - 40.dp
-        val top = (rows.firstOrNull()?.ms ?: 1L).toFloat().coerceAtLeast(1f)
+    Spacer(Modifier.height(10.dp))
+    behaviors.forEachIndexed { index, line ->
         Row(
-            Modifier.fillMaxSize(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.Bottom,
+            Modifier.padding(vertical = 2.dp).staged(reveal, 0.60f + index * 0.08f, 0.3f, 18.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            rows.forEachIndexed { index, row ->
-                val fraction = (row.ms.toFloat() / top).coerceIn(0.14f, 1f)
-                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                    EqBar(maxBar * fraction, index == 0, index, reveal)
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        text = row.title,
-                        style = MaterialTheme.typography.labelMedium,
-                        textAlign = TextAlign.Center,
-                        color = Color.White.copy(alpha = if (index == 0) 0.95f else 0.7f),
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.height(32.dp),
-                    )
-                }
-            }
+            Box(Modifier.size(5.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.8f)))
+            Spacer(Modifier.width(10.dp))
+            Text(
+                text = line,
+                style = MaterialTheme.typography.labelLarge,
+                color = Color.White.copy(alpha = 0.78f),
+            )
         }
     }
 }
 
+/**
+ * Visualisasi suara melingkar dari jam-jam mendengarkan pengguna: panjang batang
+ * mengikuti profil 24 jam, bergelombang pelan, dengan partikel mengorbit.
+ */
 @Composable
-private fun EqBar(barHeight: Dp, strong: Boolean, order: Int, reveal: Animatable<Float, *>) {
-    val bob by rememberInfiniteTransition(label = "eq$order").animateFloat(
-        initialValue = 0.93f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            tween(780 + order * 140, easing = FastOutSlowInEasing),
-            RepeatMode.Reverse,
-        ),
-        label = "eqBob",
-    )
+private fun SoundOrb(
+    hours: List<Long>,
+    colors: List<Color>,
+    reveal: Animatable<Float, *>,
+    drift: () -> Float,
+    modifier: Modifier = Modifier,
+) {
+    val peak = remember(hours) { (hours.maxOrNull() ?: 0L).coerceAtLeast(1L).toFloat() }
+    val accent = colors.getOrElse(1) { Color.White }
+    val second = colors.getOrElse(2) { Color.White }
+    Canvas(modifier) {
+        val grow = ease((reveal.value - 0.05f) / 0.6f)
+        val c = center
+        val base = minOf(size.width, size.height) / 2f
+        val inner = base * 0.34f
+        val reach = base * 0.58f * grow
+        val turn = drift() * 2f * PI.toFloat()
+        val phase = turn * 4f
+        drawCircle(
+            brush = Brush.radialGradient(listOf(accent.copy(alpha = 0.55f), Color.Transparent), center = c, radius = base),
+            radius = base,
+            center = c,
+        )
+        val bars = 90
+        for (i in 0 until bars) {
+            val t = i / bars.toFloat()
+            val a = t * 2f * PI.toFloat() - PI.toFloat() / 2f
+            val pos = t * 24f
+            val h0 = pos.toInt() % 24
+            val h1 = (h0 + 1) % 24
+            val f = pos - pos.toInt()
+            val p = if (hours.size >= 24) (hours[h0] * (1f - f) + hours[h1] * f) / peak else 0.5f
+            val wave = 0.65f + 0.35f * sin(a * 5f + phase)
+            val len = (0.12f + 0.88f * p) * reach * wave
+            drawLine(
+                color = lerp(accent, Color.White, p),
+                start = Offset(c.x + cos(a) * inner, c.y + sin(a) * inner),
+                end = Offset(c.x + cos(a) * (inner + len), c.y + sin(a) * (inner + len)),
+                strokeWidth = 2.6.dp.toPx(),
+                cap = StrokeCap.Round,
+                alpha = (0.5f + 0.5f * p).coerceIn(0f, 1f),
+            )
+        }
+        drawCircle(Color.White.copy(alpha = 0.08f), inner * 0.9f, c)
+        drawCircle(Color.White.copy(alpha = 0.5f), inner * 0.9f, c, style = Stroke(1.dp.toPx()))
+        for (k in 0 until 12) {
+            val a = turn * (1 + k % 3) + k * 0.52f
+            val r = inner + reach * 0.9f + (k % 4) * 6.dp.toPx()
+            drawCircle(
+                color = second.copy(alpha = 0.75f * grow),
+                radius = (1.5f + k % 3).dp.toPx(),
+                center = Offset(c.x + cos(a) * r, c.y + sin(a) * r),
+            )
+        }
+    }
+}
+
+// ── 07 · Recap akhir ────────────────────────────────────────────────────────
+
+/** Latar hitam dengan glow warna di tepi, seperti ringkasan Replay Apple Music. */
+@Composable
+private fun RecapGlow(colors: List<Color>) {
     Box(
         Modifier
-            .width(26.dp)
-            .height(barHeight)
-            .graphicsLayer {
-                val t = ((reveal.value - 0.25f - order * 0.07f) / 0.45f).coerceIn(0f, 1f)
-                val e = 1f - (1f - t) * (1f - t) * (1f - t)
-                scaleY = e * bob
-                transformOrigin = TransformOrigin(0.5f, 1f)
-            }
-            .clip(RoundedCornerShape(topStart = 9.dp, topEnd = 9.dp, bottomStart = 3.dp, bottomEnd = 3.dp))
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        Color.White.copy(alpha = if (strong) 1f else 0.78f),
-                        Champagne.copy(alpha = if (strong) 0.55f else 0.28f),
-                    ),
-                ),
-            ),
+            .fillMaxSize()
+            .background(Color.Black)
+            .drawBehind {
+                val w = size.width
+                val h = size.height
+                fun glow(color: Color, cx: Float, cy: Float, r: Float, alpha: Float) {
+                    val c = Offset(cx, cy)
+                    drawCircle(
+                        brush = Brush.radialGradient(listOf(color.copy(alpha = alpha), Color.Transparent), center = c, radius = r),
+                        radius = r,
+                        center = c,
+                    )
+                }
+                fun at(i: Int) = colors[i % colors.size]
+                glow(at(0), w * 0.5f, 0f, w * 0.95f, 0.95f)
+                glow(at(1), 0f, h * 0.35f, w * 0.7f, 0.80f)
+                glow(at(2), w, h * 0.55f, w * 0.8f, 0.85f)
+                glow(at(3), w, h, w * 0.7f, 0.60f)
+            },
     )
 }
 
 @Composable
-private fun Ticket(
-    value: String,
-    label: String,
-    number: Int,
-    angle: Float,
-    modifier: Modifier = Modifier,
+private fun ColumnScope.RecapStory(
+    summary: ReplaySummary,
+    headline: List<HeadlineRun>,
+    reveal: Animatable<Float, *>,
+    onShare: () -> Unit,
+    onRestart: () -> Unit,
 ) {
-    val shape = RoundedCornerShape(14.dp)
-    Row(
-        modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp)
-            .rotate(angle)
-            .shadow(12.dp, shape, clip = false)
-            .clip(shape)
-            .background(Paper)
-            .drawBehind {
-                val x = this.size.width * 0.78f
-                drawLine(
-                    color = Ink.copy(alpha = 0.35f),
-                    start = Offset(x, 10.dp.toPx()),
-                    end = Offset(x, this.size.height - 10.dp.toPx()),
-                    strokeWidth = 1.2.dp.toPx(),
-                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 5.dp.toPx())),
-                )
-                drawCircle(Color(0x66000000), 7.dp.toPx(), Offset(x, 0f))
-                drawCircle(Color(0x66000000), 7.dp.toPx(), Offset(x, this.size.height))
-            },
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(0.78f).padding(horizontal = 18.dp, vertical = 14.dp)) {
-            Text(
-                text = value,
-                style = MaterialTheme.typography.headlineLarge,
-                fontFamily = FontFamily.Serif,
-                fontSize = 30.sp,
-                fontWeight = FontWeight.W800,
-                color = Ink,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodyMedium,
-                color = Ink.copy(alpha = 0.66f),
-            )
-        }
+    val context = LocalContext.current
+    val artists = remember(summary) { summary.artistRows(3) }
+    val songs = remember(summary) { summary.songRows(3) }
+    val albums = remember(summary) { summary.albumRows(3) }
+
+    Kicker(
+        stringResource(R.string.replay_brand),
+        Modifier.fillMaxWidth().staged(reveal, 0f),
+    )
+    Text(
+        text = summary.localizedLabel(context),
+        style = MaterialTheme.typography.displayMedium,
+        fontWeight = FontWeight.W800,
+        color = Color.White,
+        textAlign = TextAlign.Center,
+        modifier = Modifier.fillMaxWidth().staged(reveal, 0.04f),
+    )
+    Text(
+        text = "${formatMinutes(summary.totalMs)} ${stringResource(R.string.minutes).lowercase(Locale.getDefault())}",
+        style = MaterialTheme.typography.titleMedium,
+        color = Color.White.copy(alpha = 0.6f),
+        textAlign = TextAlign.Center,
+        modifier = Modifier.fillMaxWidth().staged(reveal, 0.10f),
+    )
+    summary.genres.firstOrNull()?.let {
+        Text(
+            text = stringResource(R.string.top_genre) + " · " + it.title,
+            style = MaterialTheme.typography.labelMedium,
+            color = Color.White.copy(alpha = 0.5f),
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().staged(reveal, 0.12f),
+        )
+    }
+    Spacer(Modifier.height(10.dp))
+    Row(Modifier.weight(1f).fillMaxWidth()) {
         Column(
-            Modifier.weight(0.22f),
-            horizontalAlignment = Alignment.CenterHorizontally,
+            Modifier.weight(1.2f).fillMaxHeight().staged(reveal, 0.18f, 0.5f),
+            verticalArrangement = Arrangement.SpaceEvenly,
         ) {
-            Text(
-                text = "NO.",
-                style = MaterialTheme.typography.labelSmall,
-                fontFamily = FontFamily.Monospace,
-                color = Ink.copy(alpha = 0.5f),
-            )
-            Text(
-                text = "%02d".format(number),
-                style = MaterialTheme.typography.titleMedium,
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.W700,
-                color = Ink.copy(alpha = 0.7f),
-            )
+            RecapList(stringResource(R.string.top_artists), artists, withSubtitle = false)
+            RecapList(stringResource(R.string.top_songs), songs, withSubtitle = true)
+            RecapList(stringResource(R.string.top_albums), albums, withSubtitle = true)
+        }
+        BoxWithConstraints(Modifier.weight(0.8f).fillMaxHeight()) {
+            val d = minOf(maxWidth, maxHeight / 2.6f)
+            albums.firstOrNull()?.let {
+                Cover(it.artworkUrl, it.title, d, RoundedCornerShape(14.dp), CARD_ART_PX,
+                    Modifier.offset(x = 20.dp, y = d * 1.58f).popped(reveal, 0.34f))
+            }
+            songs.firstOrNull()?.let {
+                Cover(it.artworkUrl, it.title, d, RoundedCornerShape(14.dp), CARD_ART_PX,
+                    Modifier.offset(x = 20.dp, y = d * 0.80f).popped(reveal, 0.28f))
+            }
+            artists.firstOrNull()?.let {
+                Cover(it.artworkUrl, it.title, d * 1.04f, CircleShape, CARD_ART_PX,
+                    Modifier.offset(x = 20.dp).popped(reveal, 0.22f).border(1.dp, Color.White.copy(alpha = 0.3f), CircleShape))
+            }
+        }
+    }
+    Spacer(Modifier.height(10.dp))
+    MaskReveal(reveal, 0.55f, span = 0.4f) {
+        Headline(headline, textSize = 24, family = FontFamily.Serif)
+    }
+    Text(
+        text = stringResource(R.string.replay_story_final_sub),
+        style = MaterialTheme.typography.bodyMedium,
+        color = Color.White.copy(alpha = 0.7f),
+        modifier = Modifier.staged(reveal, 0.65f),
+    )
+    Spacer(Modifier.height(12.dp))
+    PillButton(
+        text = stringResource(R.string.share_your_replay),
+        filled = true,
+        onClick = onShare,
+        modifier = Modifier.fillMaxWidth().staged(reveal, 0.78f, 0.2f),
+    )
+    Spacer(Modifier.height(8.dp))
+    PillButton(
+        text = stringResource(R.string.replay_cta_again),
+        filled = false,
+        onClick = onRestart,
+        modifier = Modifier.fillMaxWidth().staged(reveal, 0.84f, 0.16f),
+    )
+}
+
+@Composable
+private fun RecapList(title: String, rows: List<ReplayRow>, withSubtitle: Boolean) {
+    if (rows.isEmpty()) return
+    Column {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.W800,
+            color = Color.White,
+        )
+        rows.forEach { row ->
+            Row(Modifier.padding(top = 5.dp)) {
+                Text(
+                    text = row.rank.toString(),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.W700,
+                    color = Color.White.copy(alpha = 0.45f),
+                    modifier = Modifier.width(22.dp),
+                )
+                Column {
+                    Text(
+                        text = row.title,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.W600,
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    val sub = row.subtitle
+                    if (withSubtitle && sub != null) {
+                        Text(
+                            text = sub,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White.copy(alpha = 0.5f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
         }
     }
 }
 
-// ── Pieces ──────────────────────────────────────────────────────────────────
+// ── Potongan umum ───────────────────────────────────────────────────────────
 
 @Composable
 private fun Cover(
@@ -1517,7 +1549,6 @@ private fun Cover(
 ) {
     val base = modifier
         .size(size)
-        .let { if (elevated) it.shadow(18.dp, shape, clip = false) else it }
         .clip(shape)
     when {
         url != null -> AsyncImage(
@@ -1528,82 +1559,6 @@ private fun Cover(
         )
         fallbackText.isNotBlank() -> Box(base) { InitialTile(fallbackText, size, shape) }
         else -> Box(base.background(Color.White.copy(alpha = 0.10f)))
-    }
-}
-
-/**
- * The scatter of covers and faces the opening cards are built around.
- *
- * Deliberately hand-placed rather than laid out. A grid of the top six looks
- * like a search result; the point of this is to look like a pile of records
- * someone has been through, which needs overlap, rotation and inconsistent
- * sizes — none of which any layout the framework offers will produce, and all of
- * which are stable here because the offsets are fractions of the box rather than
- * pixel positions.
- *
- * Artists come back as circles and releases as squares, which is the same
- * distinction every music app makes and the only label these need.
- */
-@Composable
-private fun ArtworkCollage(
-    summary: ReplaySummary,
-    reveal: Animatable<Float, *>,
-    modifier: Modifier = Modifier,
-) {
-    val covers = remember(summary) {
-        summary.songs.mapNotNull { it.song.thumbnailUrl }.distinct().take(3)
-    }
-    val faces = remember(summary) {
-        summary.artists.mapNotNull { it.artworkUrl }.distinct()
-            .filterNot { it in covers }
-            .take(3)
-    }
-    if (covers.isEmpty() && faces.isEmpty()) return
-
-    BoxWithConstraints(modifier) {
-        val w = maxWidth
-        val h = maxHeight
-        // Sized from the smaller side, so the pile shrinks with the room the
-        // card gives it instead of overflowing it. Anchors are fractions of the
-        // box, chosen so every piece lands inside it.
-        val unit = minOf(w, h * 1.05f)
-        val squares = listOf(
-            Triple(0.27f to 0.30f, unit * 0.50f, -4f),
-            Triple(0.03f to 0.05f, unit * 0.30f, -10f),
-            Triple(0.64f to 0.00f, unit * 0.27f, 8f),
-        )
-        val circles = listOf(
-            Triple(0.02f to 0.64f, unit * 0.22f, 0f),
-            Triple(0.72f to 0.38f, unit * 0.26f, 0f),
-            Triple(0.46f to 0.74f, unit * 0.22f, 0f),
-        )
-        covers.forEachIndexed { index, url ->
-            val (position, dim, angle) = squares[index]
-            Polaroid(
-                url = url,
-                cover = dim,
-                angle = angle,
-                tape = index == 0,
-                modifier = Modifier
-                    .offset(x = w * position.first, y = h * position.second)
-                    .staged(reveal, 0.10f + index * 0.12f, 0.5f, 36.dp),
-            )
-        }
-        faces.forEachIndexed { index, url ->
-            val (position, dim, _) = circles[index]
-            Cover(
-                url = url,
-                fallbackText = "",
-                size = dim,
-                shape = CircleShape,
-                px = CARD_ART_PX,
-                modifier = Modifier
-                    .offset(x = w * position.first, y = h * position.second)
-                    .staged(reveal, 0.30f + index * 0.10f, 0.5f, 30.dp)
-                    .border(2.5.dp, Paper, CircleShape),
-                elevated = true,
-            )
-        }
     }
 }
 
@@ -1620,20 +1575,13 @@ private fun MeshPalette.rotated(degrees: Float): MeshPalette {
     )
 }
 
-/**
- * How much room [StoryChrome] takes above a card's content — the cross, the
- * segments and the two words, measured rather than guessed at because the
- * chrome is drawn over the pager and cannot push anything down.
- */
-private val CHROME_HEIGHT = 96.dp
+/** Ruang yang dipakai chrome (progress + header) di atas konten kartu. */
+private val CHROME_HEIGHT = 68.dp
 
 /** How far down a chart a card goes. */
 private const val STORY_ROWS = 5
 
-/**
- * The shape of a story card, everywhere. See [StoryFrame] for why it is fixed
- * rather than following the screen.
- */
+/** The shape of a story card, everywhere. */
 private const val STORY_ASPECT = 9f / 16f
 
 /** How long a card holds before moving on, unless a finger is on the screen. */
@@ -1642,187 +1590,16 @@ private const val PAGE_MILLIS = 14_000f
 /** How long a tap or auto-advance takes to slide from one card to the next. */
 private const val STEP_MILLIS = 420
 
-private val Champagne = Color(0xFFEBD9A8)
-private val Paper = Color(0xFFF4ECDD)
-private val Ink = Color(0xFF2A2118)
 private val GrainLight = Color.White.copy(alpha = 0.06f)
 private val GrainDark = Color.Black.copy(alpha = 0.09f)
+
+/** Posisi dasar empat gumpalan warna backdrop, sebagai pecahan layar. */
+private val BlobAnchors = listOf(0.15f to 0.12f, 0.88f to 0.30f, 0.80f to 0.88f, 0.10f to 0.75f)
 
 /** Fixed film grain: x, y as fractions of the card, then the speck's radius in dp. */
 private val GrainDots: List<Triple<Float, Float, Float>> = run {
     val random = Random(26)
     List(420) { Triple(random.nextFloat(), random.nextFloat(), 0.4f + random.nextFloat() * 0.9f) }
-}
-
-/** Ticks on the Minutes card's ring: one per hour of the day. */
-private const val RING_HOURS = 24
-
-/** Each card's own atmosphere, drawn behind its content. Drawn once, never invalidated. */
-private fun DrawScope.drawDecor(page: ReplayStoryPage) {
-    val w = size.width
-    val h = size.height
-    val white = Color.White
-    when (page) {
-        ReplayStoryPage.INTRO -> {
-            // A light leak off the corner and a film strip's perforations.
-            drawRect(
-                brush = Brush.radialGradient(
-                    colors = listOf(Color(0xFFFFC27A).copy(alpha = 0.40f), Color.Transparent),
-                    center = Offset(w, 0f),
-                    radius = w * 1.05f,
-                ),
-            )
-            drawRect(
-                brush = Brush.radialGradient(
-                    colors = listOf(Color(0xFFFF8FA3).copy(alpha = 0.22f), Color.Transparent),
-                    center = Offset(0f, h),
-                    radius = w * 0.95f,
-                ),
-            )
-            val hole = 8.dp.toPx()
-            val gap = 30.dp.toPx()
-            val holeW = hole * 0.7f
-            var y = gap * 0.5f
-            while (y < h) {
-                drawRoundRect(
-                    white.copy(alpha = 0.10f),
-                    Offset(5.dp.toPx(), y),
-                    Size(holeW, hole),
-                    CornerRadius(2.dp.toPx()),
-                )
-                drawRoundRect(
-                    white.copy(alpha = 0.10f),
-                    Offset(w - 5.dp.toPx() - holeW, y),
-                    Size(holeW, hole),
-                    CornerRadius(2.dp.toPx()),
-                )
-                y += gap
-            }
-        }
-        ReplayStoryPage.MINUTES -> {
-            drawRect(
-                brush = Brush.radialGradient(
-                    colors = listOf(white.copy(alpha = 0.14f), Color.Transparent),
-                    center = Offset(w * 0.5f, h * 0.52f),
-                    radius = w * 0.85f,
-                ),
-            )
-        }
-        ReplayStoryPage.SONGS -> {
-            drawRect(
-                brush = Brush.radialGradient(
-                    colors = listOf(white.copy(alpha = 0.20f), Color.Transparent),
-                    center = Offset(w * 0.5f, 0f),
-                    radius = w * 0.95f,
-                ),
-            )
-            drawRect(
-                brush = Brush.radialGradient(
-                    colors = listOf(Champagne.copy(alpha = 0.14f), Color.Transparent),
-                    center = Offset(w, h),
-                    radius = w * 0.9f,
-                ),
-            )
-        }
-        ReplayStoryPage.ARTISTS -> {
-            val tints = listOf(Color(0xFFFFD6A5), Color(0xFFA5C8FF))
-            for (side in 0..1) {
-                val x0 = if (side == 0) w * 0.12f else w * 0.88f
-                val beam = Path().apply {
-                    moveTo(x0 - 10.dp.toPx(), 0f)
-                    lineTo(x0 + 10.dp.toPx(), 0f)
-                    lineTo(w * 0.5f + w * 0.26f, h * 0.72f)
-                    lineTo(w * 0.5f - w * 0.26f, h * 0.72f)
-                    close()
-                }
-                drawPath(
-                    beam,
-                    Brush.verticalGradient(
-                        listOf(tints[side].copy(alpha = 0.18f), Color.Transparent),
-                        startY = 0f,
-                        endY = h * 0.72f,
-                    ),
-                )
-            }
-        }
-        ReplayStoryPage.ALBUMS -> {
-            // The grooves of a record too big for the card, bleeding off its corner.
-            val c = Offset(w * 1.02f, h * 0.9f)
-            var r = 22.dp.toPx()
-            while (r < w * 1.1f) {
-                drawCircle(white.copy(alpha = 0.07f), r, c, style = Stroke(0.8.dp.toPx()))
-                r += 13.dp.toPx()
-            }
-        }
-        ReplayStoryPage.GENRES -> {
-            // Halftone dots fading out from the top-left, like a pop poster.
-            val step = 24.dp.toPx()
-            var row = 0
-            var y = 0f
-            while (y < h) {
-                var x = if (row % 2 == 0) 0f else step / 2f
-                while (x < w) {
-                    val d = (x + (h - y) * 0.6f) / (w + h * 0.6f)
-                    val radius = step * 0.36f * (1f - d).coerceIn(0f, 1f)
-                    if (radius > 0.6f) drawCircle(white.copy(alpha = 0.10f), radius, Offset(x, y))
-                    x += step
-                }
-                y += step * 0.86f
-                row++
-            }
-        }
-        ReplayStoryPage.HABITS -> {
-            // Ruled diary paper with a red margin.
-            val gap = 34.dp.toPx()
-            var y = h * 0.26f
-            while (y < h) {
-                drawLine(white.copy(alpha = 0.07f), Offset(0f, y), Offset(w, y), 1.dp.toPx())
-                y += gap
-            }
-            drawLine(
-                AccentRed.copy(alpha = 0.26f),
-                Offset(w * 0.12f, 0f),
-                Offset(w * 0.12f, h),
-                1.2.dp.toPx(),
-            )
-        }
-        ReplayStoryPage.SUMMARY -> {
-            drawRect(
-                brush = Brush.radialGradient(
-                    colors = listOf(Color(0xFFF2D9A0).copy(alpha = 0.30f), Color.Transparent),
-                    center = Offset(w * 0.5f, h * 0.12f),
-                    radius = w * 0.9f,
-                ),
-            )
-            drawRect(
-                brush = Brush.radialGradient(
-                    colors = listOf(Champagne.copy(alpha = 0.12f), Color.Transparent),
-                    center = Offset(w * 0.5f, h),
-                    radius = w,
-                ),
-            )
-        }
-    }
-}
-
-/** The same darkened edge and film grain on every card, so the run reads as one reel. */
-private fun DrawScope.drawVignetteAndGrain() {
-    drawRect(
-        brush = Brush.radialGradient(
-            colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.42f)),
-            center = center,
-            radius = size.maxDimension * 0.78f,
-        ),
-    )
-    val w = size.width
-    val h = size.height
-    GrainDots.forEachIndexed { index, dot ->
-        drawCircle(
-            color = if (index % 2 == 0) GrainLight else GrainDark,
-            radius = dot.third.dp.toPx(),
-            center = Offset(w * dot.first, h * dot.second),
-        )
-    }
 }
 
 /** The share of the width that means "back" — the left edge, as everywhere else. */
