@@ -305,7 +305,14 @@ object YtMusicRepository {
     /** The charts page's shelves (top songs, trending and so on), for the lower half of Explore. */
     suspend fun exploreCharts(): Result<List<HomeShelf>> = call("explore:charts") {
         val pages = coroutineScope {
-            EXPLORE_BROWSE_IDS.map { id -> async { runCatching { shelvesOf(id) } } }.awaitAll()
+            val regional = EXPLORE_BROWSE_IDS.map { id -> async { runCatching { shelvesOf(id) } } }
+            val global = async {
+                runCatching {
+                    InnertubeParser.parseHome(Innertube.browseCharts("ZZ"))
+                        .map { it.copy(title = "${it.title} (Global)") }
+                }
+            }
+            (regional + global).awaitAll()
         }
         val shelves = pages
             .flatMap { it.getOrDefault(emptyList()) }

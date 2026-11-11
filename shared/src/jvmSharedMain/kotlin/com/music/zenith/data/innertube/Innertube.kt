@@ -630,6 +630,20 @@ object Innertube {
         }
     }
 
+    /** The charts page for one country; "ZZ" is Global. Cached like [browse] for FEmusic_charts. */
+    suspend fun browseCharts(country: String): JsonObject {
+        val file = browseCacheFile("FEmusic_charts", "country=$country")
+        readBrowseCache(file, browseFreshMs("FEmusic_charts"))?.let { return it }
+        return try {
+            postMusic("browse") {
+                put("browseId", "FEmusic_charts")
+                putJsonObject("formData") { putJsonArray("selectedValues") { add(country) } }
+            }.also { writeBrowseCache(file, it) }
+        } catch (e: IOException) {
+            readBrowseCache(file, BROWSE_STALE_LIMIT_MS) ?: throw e
+        }
+    }
+
     /**
      * The next page of a paged browse response — playlists and library feeds
      * come back roughly 100 rows at a time. YouTube Music takes the token as
