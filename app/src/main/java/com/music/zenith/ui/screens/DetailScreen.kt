@@ -2206,11 +2206,12 @@ private fun AlbumInfoFooter(
     songs: List<Song>,
     palette: ArtworkPalette,
 ) {
-    val parts = listOfNotNull(
-        releaseDate ?: year,
+    // Baris pertama tanggal rilis (atau tahun), baris kedua jumlah lagu dan durasi.
+    val dateLine = releaseDate ?: year
+    val countLine = listOfNotNull(
         pluralStringResource(R.plurals.song_count_plural, songs.size, songs.size),
         songs.playtime(),
-    )
+    ).joinToString(" · ")
     Column(
         modifier = Modifier.padding(
             start = ABOUT_GUTTER,
@@ -2219,8 +2220,15 @@ private fun AlbumInfoFooter(
             bottom = 12.dp,
         ),
     ) {
+        if (dateLine != null) {
+            Text(
+                text = dateLine,
+                style = MaterialTheme.typography.bodyMedium,
+                color = palette.onBackgroundVariant,
+            )
+        }
         Text(
-            text = parts.joinToString(" · "),
+            text = countLine,
             style = MaterialTheme.typography.bodyMedium,
             color = palette.onBackgroundVariant,
         )
