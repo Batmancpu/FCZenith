@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: build-apk-${{ github.ref }}
@@ -120,10 +120,3 @@ jobs:
         with:
           name: Zenith-APK
           path: dist/*.apk
-
-      - name: Publish GitHub Release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: dist/*.apk
-          body_path: RELEASE_NOTES.md

@@ -91,17 +91,20 @@ jobs:
             exit 1
           fi
 
-          release_exists=false
-          if gh release view "v$VERSION_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            release_exists=true
+          release_asset="Music-v${VERSION_NAME}.apk"
+          release_assets="$(gh release view "v$VERSION_NAME" --repo "$GITHUB_REPOSITORY" \
+            --json assets --jq '.assets[].name' 2>/dev/null || true)"
+          release_asset_exists=false
+          if grep -Fxq "$release_asset" <<< "$release_assets"; then
+            release_asset_exists=true
           fi
 
           if [[ "$UPSTREAM_VERSION" != "$CURRENT_UPSTREAM_VERSION" ]]; then
             # The parent published a new stable version. Start its FC sequence at .1.
             python3 fc/bump-version.py "$UPSTREAM_VERSION"
             should_release=true
-          elif [[ "$release_exists" == "false" ]]; then
-            # First FC release from the currently published stable parent version.
+          elif [[ "$release_asset_exists" == "false" ]]; then
+            # Also recover automatically if a previous run created the release but missed its APK.
             should_release=true
           else
             should_release=false
