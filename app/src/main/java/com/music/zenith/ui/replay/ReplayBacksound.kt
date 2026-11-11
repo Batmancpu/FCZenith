@@ -104,7 +104,8 @@ private fun BacksoundPlayer(
             // fade the sound out rather than cut it.
             CoroutineScope(Dispatchers.Main.immediate).launch {
                 for (step in FADE_STEPS downTo 1) {
-                    player.volume = last * (step - 1) / FADE_STEPS
+                    val fraction = (step - 1f) / FADE_STEPS
+                    player.volume = last * fraction * fraction
                     delay((FADE_OUT_MS / FADE_STEPS).toLong())
                 }
                 player.release()
@@ -116,12 +117,16 @@ private fun BacksoundPlayer(
     }
 
     LaunchedEffect(player) {
+        // Squared: loudness is not linear in amplitude, so a straight ramp
+        // sounds like it jumps up at the start and does nothing at the end.
         snapshotFlow { level.value * duck.value }
-            .collect { player.volume = (it * MAX_VOLUME).coerceIn(0f, 1f) }
+            .collect { player.volume = (it * it * MAX_VOLUME).coerceIn(0f, 1f) }
     }
 
     LaunchedEffect(silenced) {
         if (silenced) {
+            // A tap is a press too and must not dip the music: only a hold does.
+            delay(HOLD_GRACE_MS)
             duck.animateTo(0f, tween(FADE_OUT_MS, easing = LinearEasing))
             player.pause()
         } else {
@@ -215,9 +220,16 @@ private suspend fun playSegment(
         }
         player.seekTo(start)
         player.playWhenReady = !silenced()
+        // The fade starts when the sound does, not when it was asked for: a seek
+        // into a stream can take longer than the fade itself, and a fade run
+        // against the clock in that time is over before anything is audible,
+        // so the music arrives at full volume out of nowhere.
+        if (!silenced()) awaitState(START_TIMEOUT_MS) { player.isPlaying || silenced() }
         level.animateTo(1f, tween(FADE_IN_MS, easing = LinearEasing))
 
         val stop = (start + SEGMENT_MS).let { if (duration > 0L) minOf(it, duration) else it }
+        var lastPosition = player.currentPosition
+        var stalledMs = 0L
         // Position stops advancing while held, so the clip's length is only
         // ever counted in audible time.
         while (
@@ -226,6 +238,17 @@ private suspend fun playSegment(
             player.currentPosition < stop - FADE_OUT_MS
         ) {
             delay(POLL_MS)
+            // A clip that stops moving with nothing holding it has lost its stream.
+            val position = player.currentPosition
+            if (silenced() || position != lastPosition) {
+                lastPosition = position
+                stalledMs = 0L
+            } else if (stalledMs + POLL_MS >= STALL_MS) {
+                Log.w("Zenith", "Replay backsound: ${song.clipKey()} stalled")
+                return false
+            } else {
+                stalledMs += POLL_MS
+            }
         }
         level.animateTo(0f, tween(FADE_OUT_MS, easing = LinearEasing))
         return true
@@ -233,6 +256,13 @@ private suspend fun playSegment(
         player.removeListener(listener)
     }
 }
+
+/** Polls [condition] until it holds or [timeoutMs] passes. */
+private suspend fun awaitState(timeoutMs: Long, condition: () -> Boolean): Boolean =
+    withTimeoutOrNull(timeoutMs) {
+        while (!condition()) delay(START_POLL_MS)
+        true
+    } == true
 
 /** How many of the top songs take turns. */
 private const val MAX_TRACKS = 3
@@ -243,14 +273,24 @@ private const val SEGMENT_MS = 30_000L
 /** Where in the track a clip starts, as a share of its length: about where a hook sits. */
 private const val HOOK_FRACTION = 0.30f
 
-private const val FADE_IN_MS = 1_800
-private const val FADE_OUT_MS = 1_400
+private const val FADE_IN_MS = 2_200
+private const val FADE_OUT_MS = 1_800
 private const val FADE_STEPS = 28
 
 /** Quiet enough to sit under the story's text rather than over it. */
 private const val MAX_VOLUME = 0.85f
 
 private const val POLL_MS = 200L
+private const val START_POLL_MS = 50L
+
+/** How long the sound may take to actually start after a seek. */
+private const val START_TIMEOUT_MS = 8_000L
+
+/** A clip that has not moved for this long, with nothing holding it, is given up on. */
+private const val STALL_MS = 8_000L
+
+/** A press shorter than this is a tap, and leaves the music alone. */
+private const val HOLD_GRACE_MS = 250L
 
 /** Resolving a track and storing it on disk, before it is given up on. */
 private const val PREPARE_TIMEOUT_MS = 30_000L

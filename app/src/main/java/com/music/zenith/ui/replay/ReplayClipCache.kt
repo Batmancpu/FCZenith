@@ -3,6 +3,7 @@
 package com.music.zenith.ui.replay
 
 import android.content.Context
+import android.util.Log
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.database.StandaloneDatabaseProvider
 import androidx.media3.datasource.DataSource
@@ -20,8 +21,10 @@ import com.music.zenith.data.innertube.StreamResolver
 import com.music.zenith.data.model.Song
 import com.music.zenith.playback.ChunkedDataSource
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
@@ -49,11 +52,18 @@ object ReplayClipCache {
     /** Upper bound per range; [ChunkedDataSource] narrows it further per client. */
     private const val CHUNK_BYTES = 1L * 1024 * 1024
 
-    /** How long storing a clip may take before it is simply streamed instead. */
-    private const val STORE_TIMEOUT_MS = 12_000L
+    /**
+     * How long a clip is waited for while it is being stored. Past this it
+     * streams while the copy carries on, so the music starts instead of the
+     * Replay sitting silent behind a download.
+     */
+    private const val STORE_GRACE_MS = 4_000L
 
     /** Storing runs here, apart from the caller, so a stalled read can never hold the caller up. */
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    /** Copies in progress, by videoId. */
+    private val storing = ConcurrentHashMap<String, Deferred<Boolean>>()
 
     private val lock = Any()
     private var cache: SimpleCache? = null
@@ -103,12 +113,15 @@ object ReplayClipCache {
      */
     fun closeSession(id: Int) {
         val current = synchronized(lock) { if (id == session) cache else null } ?: return
+        storing.values.toList().forEach { it.cancel() }
+        storing.clear()
         current.keys.toList().forEach { runCatching { current.removeResource(it) } }
     }
 
     /** Removes one song's stored copy. Disk work: call off the main thread. */
     fun evict(song: Song) {
         if (!song.localUri.isNullOrBlank() || song.videoId.isBlank()) return
+        storing.remove(song.videoId)?.cancel()
         val current = synchronized(lock) { cache } ?: return
         runCatching { current.removeResource(song.videoId) }
     }
@@ -140,15 +153,24 @@ object ReplayClipCache {
         } catch (e: Exception) {
             return@withContext null
         }
-        val store = open(context)
-        if (!isStored(store, videoId)) {
-            val copy = scope.async { download(context, store, videoId, url) { isActive } }
-            val stored = try {
-                withTimeoutOrNull(STORE_TIMEOUT_MS) { copy.await() } ?: false
-            } finally {
-                if (copy.isActive) copy.cancel()
+        try {
+            val store = open(context)
+            if (!isStored(store, videoId)) {
+                val copy = storing.getOrPut(videoId) {
+                    scope.async {
+                        val ok = download(context, store, videoId, url) { isActive }
+                        if (!ok) runCatching { store.removeResource(videoId) }
+                        ok
+                    }.also { job -> job.invokeOnCompletion { storing.remove(videoId, job) } }
+                }
+                // Waited for only a moment: a clip not stored by then streams
+                // while the copy carries on.
+                withTimeoutOrNull(STORE_GRACE_MS) { copy.join() }
             }
-            if (!stored) runCatching { store.removeResource(videoId) }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w("Zenith", "Replay backsound: could not store $videoId: ${e.message}")
         }
         url
     }
