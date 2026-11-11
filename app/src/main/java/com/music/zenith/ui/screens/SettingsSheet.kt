@@ -2049,6 +2049,15 @@ fun SettingsScreen(
                             context.openLink("https://github.com/rezapranata089-bit")
                         },
                     )
+                    Text(
+                        text = "Reddit",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textDecoration = TextDecoration.Underline,
+                        modifier = Modifier.clickable {
+                            context.openLink("https://www.reddit.com/r/ZenithMusic/s/gN6chb7onR")
+                        },
+                    )
                 }
                 Text(
                     text = "Made by Zeuxxi",

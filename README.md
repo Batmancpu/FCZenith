@@ -13,6 +13,7 @@
 <a href="https://github.com/rezapranata089-bit/Zenith/releases"><img src="https://img.shields.io/github/downloads/rezapranata089-bit/Zenith/total?style=flat-square&amp;labelColor=0d1117&amp;color=ff4d6d" alt="Downloads" /></a>
 <a href="LICENSE"><img src="https://img.shields.io/github/license/rezapranata089-bit/Zenith?style=flat-square&amp;labelColor=0d1117&amp;color=ff4d6d" alt="License" /></a>
 <img src="https://img.shields.io/badge/Android-8.0%2B-ff4d6d?style=flat-square&amp;labelColor=0d1117" alt="Android 8.0+" />
+<a href="https://www.reddit.com/r/ZenithMusic/s/gN6chb7onR"><img src="https://img.shields.io/badge/Reddit-r%2FZenithMusic-ff4d6d?style=flat-square&amp;logo=reddit&amp;logoColor=white&amp;labelColor=0d1117" alt="Reddit community" /></a>
 </p>
 
 <a href="https://github.com/rezapranata089-bit/Zenith/releases/latest"><img src="https://img.shields.io/badge/Download%20the%20latest%20APK-ff4d6d?style=for-the-badge&amp;logo=android&amp;logoColor=white" alt="Download the latest APK" /></a>
@@ -23,6 +24,7 @@
 <a href="#download">Download</a> ·
 <a href="#features">Features</a> ·
 <a href="#whats-different-from-bitchord">What's different</a> ·
+<a href="#community">Community</a> ·
 <a href="#credits">Credits</a>
 </p>
 
@@ -67,6 +69,7 @@
 | **Queue** | Apple Music–style queue with an Add Songs popup and live search. |
 | **Offline** | Downloads, animated covers and browse data stay available without a connection. |
 | **Speed** | Disk caching and sensible first-run defaults for quicker loading. |
+| **Album pages** | Apple Music–style layout with genre and year, an inline MORE on the description, and a footer with the full release date, song count, runtime and ℗ line. |
 
 ---
 
@@ -107,6 +110,7 @@ Past versions and their changes are listed in [Releases](https://github.com/reza
 - Liquid Glass controls, plus a lighter Frosted Glass mode.
 - Mini player and big player share one panel, and covers fly between screens.
 - Animated album canvas and a theme that follows the album artwork.
+- Album pages in the Apple Music style: genre and year under the title, a compact description, clean track rows, and a footer with release date, song count, runtime and copyright line (looked up from the iTunes catalogue).
 
 </details>
 
@@ -144,6 +148,12 @@ Past versions and their changes are listed in [Releases](https://github.com/reza
 ## What's different from BitChord
 
 Zenith is my personal fork of [BitChord](https://github.com/kushagrasinghx/BitChord), rebuilt as an Android-only app with its own identity, interface and release pipeline.
+
+---
+
+## Community
+
+Join the discussion, share feedback or ask for help on [r/ZenithMusic](https://www.reddit.com/r/ZenithMusic/s/gN6chb7onR). Bug reports and feature requests are still welcome as [GitHub issues](../../issues).
 
 ---
 
