@@ -185,6 +185,8 @@ fun SongActionsMenu(
      * lalu menampilkan popup-nya sendiri; bila null, popup tampil di sini.
      */
     onShowSongInfo: ((Song) -> Unit)? = null,
+    /** Keeps Add to playlist (and Remove) on the menu without an account, for playlists kept on this device. */
+    canAddToPlaylist: Boolean = false,
 ) {
     var showingSongInfo by remember(song.videoId) { mutableStateOf(false) }
     var pickingSleepTimer by remember { mutableStateOf(false) }
@@ -290,7 +292,7 @@ fun SongActionsMenu(
         // player's own pair: a heart that files the track under this device's
         // Liked playlist, and the device's playlists. [likeStatus] is that
         // playlist's answer there, not YouTube's, and neither needs an account.
-        if (canRate) {
+        if (canRate || canAddToPlaylist) {
             if (startsGroup()) IosMenuSeparator()
             ActionRow(
                 icon = SfIcons.AddToPlaylist,

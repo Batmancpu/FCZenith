@@ -1374,6 +1374,7 @@
     <string name="import_spotify">Impor dari Spotify</string>
     <string name="import_spotify_subtitle">Dari tautan playlist</string>
     <string name="local_playlist_subtitle">%1$d lagu · Di perangkat ini</string>
+    <string name="pinned_playlists">Playlist Tersemat</string>
     <string name="lossless_output_permission_denied">Izin perangkat terdekat nonaktif</string>
     <string name="lossless_output_permission_denied_detail">Ketuk untuk membuka Pengaturan dan mengizinkan perangkat terdekat — tanpa itu codec Bluetooth Anda tidak bisa dibaca</string>
     <string name="recent_album">Album Terbaru</string>

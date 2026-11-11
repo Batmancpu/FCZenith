@@ -1045,9 +1045,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         song: Song,
         onResult: (added: Int, alreadyThere: Int, failed: Int) -> Unit = { _, _, _ -> },
     ) {
-        if (!requireSignIn() || playlists.isEmpty()) return
+        if (playlists.isEmpty()) return
+        // Playlists kept on this device need no account; only the rest do.
+        val (local, remote) = playlists.partition { it.playlistId.startsWith("sp_local_") }
+        if (remote.isNotEmpty() && !requireSignIn()) return
         viewModelScope.launch {
-            val outcomes = playlists.map { addOne(it, song) }
+            val outcomes = local.map { addToLocalPlaylist(it, song) } + remote.map { addOne(it, song) }
             onResult(
                 outcomes.count { it == AddOutcome.ADDED },
                 outcomes.count { it == AddOutcome.ALREADY_THERE },
@@ -1057,6 +1060,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private enum class AddOutcome { ADDED, ALREADY_THERE, FAILED }
+
+    private fun addToLocalPlaylist(playlist: UserPlaylist, song: Song): AddOutcome =
+        if (com.music.zenith.data.spotify.LocalPlaylistStore.addSong(playlist.playlistId, song)) {
+            AddOutcome.ADDED
+        } else {
+            AddOutcome.ALREADY_THERE
+        }
 
     private suspend fun addOne(playlist: UserPlaylist, song: Song): AddOutcome {
         val openSongs = (_detailStack.value.firstOrNull { it.browseId == playlist.browseId }
@@ -3311,6 +3321,29 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun retitleDetail(browseId: String, title: String) {
         if (title.isBlank()) return
         _detailStack.value = _detailStack.value.map { if (it.browseId == browseId) it.copy(title = title) else it }
+    }
+
+    /**
+     * Sets or clears (null) the gallery cover of a playlist kept on this device,
+     * and restates it on its open page. The cover is stored under the browse id,
+     * which is also what [openDetail] looks it up by.
+     */
+    fun setLocalPlaylistCover(browseId: String, cover: android.net.Uri?) {
+        viewModelScope.launch {
+            val app = getApplication<Application>()
+            val url = if (cover != null) {
+                com.music.zenith.data.PlaylistCovers.save(app, browseId, cover) ?: return@launch
+            } else {
+                com.music.zenith.data.PlaylistCovers.remove(app, browseId)
+                null
+            }
+            com.music.zenith.data.spotify.LocalPlaylistStore.setCover(browseId, url)
+            val shown = url ?: com.music.zenith.data.spotify.LocalPlaylistStore.getPlaylist(browseId)
+                ?.songs?.firstNotNullOfOrNull { it.thumbnailUrl }
+            _detailStack.value = _detailStack.value.map {
+                if (it.browseId == browseId) it.copy(thumbnailUrl = shown) else it
+            }
+        }
     }
 
     fun reloadLocalDetail(browseId: String) {

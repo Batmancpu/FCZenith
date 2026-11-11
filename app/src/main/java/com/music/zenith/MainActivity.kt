@@ -1078,10 +1078,34 @@ private fun ZenithApp(
         ShelfItem(
             title = playlist.title,
             subtitle = stringResource(R.string.local_playlist_subtitle, playlist.songs.size),
-            thumbnailUrl = playlist.songs.firstOrNull { !it.thumbnailUrl.isNullOrBlank() }?.thumbnailUrl,
+            thumbnailUrl = playlist.coverUrl
+                ?: playlist.songs.firstOrNull { !it.thumbnailUrl.isNullOrBlank() }?.thumbnailUrl,
             videoId = null,
             browseId = playlist.browseId,
         )
+    }
+    // Playlists pinned from their menu, drawn as one row at the top of Home.
+    // Looked up across the account's playlists and the ones kept on this
+    // device, in the order they were pinned.
+    val homePinnedIds by AppSettings.pinnedPlaylists.collectAsStateWithLifecycle()
+    val pinnedShelfTitle = stringResource(R.string.pinned_playlists)
+    LaunchedEffect(signedIn, homePinnedIds) {
+        if (signedIn && homePinnedIds.isNotEmpty()) viewModel.loadPlaylists()
+    }
+    val pinnedHomeShelf = remember(homePinnedIds, playlists, localPlaylists, pinnedShelfTitle) {
+        val byId = HashMap<String, ShelfItem>()
+        playlists.forEach { p ->
+            byId[p.browseId] = ShelfItem(
+                title = p.title,
+                subtitle = p.subtitle,
+                thumbnailUrl = p.thumbnailUrl,
+                videoId = null,
+                browseId = p.browseId,
+            )
+        }
+        localPlaylistItems.forEach { item -> item.browseId?.let { byId[it] = item } }
+        val items = homePinnedIds.mapNotNull { byId[it] }
+        if (items.isEmpty()) null else com.music.zenith.data.model.HomeShelf(pinnedShelfTitle, items)
     }
     // What a browse id is recorded under in Downloads.collections, when it names
     // a release downloaded whole — see BrowseTarget.downloadId. A downloaded
@@ -1091,7 +1115,7 @@ private fun ZenithApp(
     val downloadIdFor: (String?) -> String? = { id ->
         id?.let { Downloads.recordIdOf(it) ?: it }?.takeIf { it in savedCollections }
     }
-    LaunchedEffect(savedDownloads, savedCollections, topDetail?.browseId) {
+    LaunchedEffect(savedDownloads, savedCollections, topDetail?.browseId, localPlaylists) {
         val openPage = topDetail ?: return@LaunchedEffect
         val open = openPage.browseId
         // A downloaded playlist's page is a snapshot of the same folder and goes
@@ -3447,7 +3471,20 @@ private fun ZenithApp(
                                     viewModel.openDetail(id, name, "Artist", null, BrowseType.ARTIST)
                                 },
                                 onAddSuggested = { song -> viewModel.addSuggestedSong(page.browseId, song) },
-                                onAddSongs = if (signedIn &&
+                                onAddSongs = if (localPlaylists.any { it.browseId == page.browseId }) {
+                                    {
+                                        // Kept on this device: same popup, picks go to the local store.
+                                        addSongsPlaylist = localPlaylists.firstOrNull { it.browseId == page.browseId }
+                                            ?.let { lp ->
+                                                UserPlaylist(
+                                                    playlistId = lp.id,
+                                                    title = page.title,
+                                                    subtitle = "",
+                                                    thumbnailUrl = lp.coverUrl ?: page.thumbnailUrl,
+                                                )
+                                            }
+                                    }
+                                } else if (signedIn &&
                                     page.type == BrowseType.PLAYLIST &&
                                     ownedPlaylistPages[page.browseId] == true
                                 ) {
@@ -3571,6 +3608,7 @@ private fun ZenithApp(
                                 onMoodClick = playMood.takeUnless { hideHomeMoods },
                                 onMoodsShowAll = { navigator.push(AppRoute.Moods) },
                                 homeLayout = homeLayout,
+                                pinnedShelf = pinnedHomeShelf,
                                 onPlaySongs = { songs -> play(songs, 0) },
                                 artworkMotion = artworkMotion,
                                 onTopPickLongPress = { pick ->
@@ -4762,6 +4800,7 @@ private fun ZenithApp(
                         controller?.seekToNextMediaItem()
                     }
                 },
+                canAddToPlaylist = localPlaylists.isNotEmpty(),
                 onAddToPlaylist = {
                     songActions = null
                     if (song.localUri != null && (song.videoId.startsWith("content://") || song.videoId.startsWith("file://"))) {
@@ -4777,6 +4816,16 @@ private fun ZenithApp(
                         viewModel.removeFromPlaylist(it.browseId, song)
                     }
                 } ?: detail?.browseId
+                    ?.takeIf {
+                        !fromPlayer && com.music.zenith.data.spotify.LocalPlaylistStore.getPlaylist(it) != null
+                    }
+                    ?.let { id ->
+                        {
+                            songActions = null
+                            com.music.zenith.data.spotify.LocalPlaylistStore.removeSong(id, song.videoId)
+                        }
+                    }
+                    ?: detail?.browseId
                     ?.takeIf { !fromPlayer && song.localUri != null && OfflinePlaylists.isOfflinePlaylist(it) }
                     ?.let { id ->
                         {
@@ -5182,8 +5231,23 @@ private fun ZenithApp(
                 playlistTarget = null
                 creatingPlaylist = false
             }
+            // Playlists kept on this device (Spotify imports) sit in the same list.
+            val localChoices = remember(localPlaylists) {
+                localPlaylists.map { lp ->
+                    UserPlaylist(
+                        playlistId = lp.id,
+                        title = lp.title,
+                        subtitle = context.resources.getQuantityString(
+                            R.plurals.song_count_plural,
+                            lp.songs.size,
+                            lp.songs.size,
+                        ),
+                        thumbnailUrl = lp.coverUrl ?: lp.songs.firstNotNullOfOrNull { it.thumbnailUrl },
+                    )
+                }
+            }
             PlaylistPickerSheet(
-                playlists = playlists,
+                playlists = playlists + localChoices,
                 loading = playlistsLoading,
                 song = target,
                 startCreating = target == null,
@@ -5421,11 +5485,22 @@ private fun ZenithApp(
             // One of the offline player's own playlists, which are the user's
             // to rename and delete — all but Liked, which is the app's.
             val offlineEditable = OfflinePlaylists.get(target.browseId)?.takeUnless { it.isLiked }
+            // A Spotify import kept on this device: the user's own to rename,
+            // re-cover and delete. Read off the collected list so the sheet
+            // follows each edit.
+            val localEditable = target.browseId?.let { id -> localPlaylists.firstOrNull { it.browseId == id } }
             BrowseActionsMenu(
                 // The live answer, not the one the target was built with.
                 target = target.copy(
                     playlist = playlist ?: offlineEditable?.let {
                         UserPlaylist(playlistId = it.id, title = it.title, subtitle = "", thumbnailUrl = null)
+                    } ?: localEditable?.let {
+                        UserPlaylist(
+                            playlistId = it.id,
+                            title = it.title,
+                            subtitle = "",
+                            thumbnailUrl = it.coverUrl ?: it.songs.firstNotNullOfOrNull { s -> s.thumbnailUrl },
+                        )
                     },
                 ),
                 onRenameInSheet = {
@@ -5531,9 +5606,17 @@ private fun ZenithApp(
                         OfflinePlaylists.rename(p.browseId, name)
                         viewModel.retitleDetail(p.browseId, name.trim())
                     }
+                } ?: localEditable?.let { p ->
+                    { name: String ->
+                        browseActions = null
+                        com.music.zenith.data.spotify.LocalPlaylistStore.renamePlaylist(p.browseId, name.trim())
+                        viewModel.retitleDetail(p.browseId, name.trim())
+                    }
                 },
                 onChangeCover = playlist?.let { p ->
                     { uri: android.net.Uri? -> viewModel.setPlaylistCover(p, uri) }
+                } ?: localEditable?.let { p ->
+                    { uri: android.net.Uri? -> viewModel.setLocalPlaylistCover(p.browseId, uri) }
                 },
                 onReorder = playlist?.let { p ->
                     {
@@ -5573,6 +5656,14 @@ private fun ZenithApp(
                         // Its page has nothing left to show; take it away too.
                         if (detail?.browseId == p.browseId) viewModel.closeDetail()
                         OfflinePlaylists.delete(p.browseId)
+                    }
+                } ?: localEditable?.let { p ->
+                    {
+                        browseActions = null
+                        if (detail?.browseId == p.browseId) viewModel.closeDetail()
+                        com.music.zenith.data.PlaylistCovers.remove(context, p.browseId)
+                        if (p.browseId in pinnedPlaylists) AppSettings.togglePinnedPlaylist(p.browseId)
+                        com.music.zenith.data.spotify.LocalPlaylistStore.deletePlaylist(p.browseId)
                     }
                 },
                 onDeleteDownload = target.downloadId?.let { id ->
