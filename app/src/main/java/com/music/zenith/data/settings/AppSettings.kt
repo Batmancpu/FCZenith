@@ -77,17 +77,20 @@ enum class OutputPcmMode(val label: String) {
 data class GlassClarity(val level: Float) {
     private val t = level.coerceIn(0f, 1f)
 
-    private fun mix(clear: Float, balanced: Float, frosted: Float): Float =
+    // [soft]: sisi Clear -> Balanced dilandaikan (kuadrat) supaya perubahan blur dan
+    // resolusi dekat Clear bertahap, bukan melompat. Titik 0, 0.5 dan 1 tidak berubah.
+    private fun mix(clear: Float, balanced: Float, frosted: Float, soft: Boolean = false): Float =
         if (t <= 0.5f) {
-            clear + (balanced - clear) * (t / 0.5f)
+            val u = t / 0.5f
+            clear + (balanced - clear) * (if (soft) u * u else u)
         } else {
             balanced + (frosted - balanced) * ((t - 0.5f) / 0.5f)
         }
 
     val tintAlpha: Float = mix(0.12f, 0.30f, 0.46f)
-    val blurScale: Float = mix(0.1f, 1f, 1.35f)
+    val blurScale: Float = mix(0.1f, 1f, 1.35f, soft = true)
     val saturation: Float = mix(1.4f, 1.5f, 1.5f)
-    val resolutionScale: Float = mix(0.75f, 0.33f, 0.33f)
+    val resolutionScale: Float = mix(0.75f, 0.33f, 0.33f, soft = true)
     val lensScale: Float = mix(0.6f, 1f, 1f)
 
     // Refraksi tepi halus tanpa efek pelangi di sisi jernih.

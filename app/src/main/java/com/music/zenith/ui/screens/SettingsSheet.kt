@@ -1222,13 +1222,13 @@ fun SettingsScreen(
                             color = MaterialTheme.colorScheme.onBackground,
                             modifier = Modifier.padding(start = ROW_INSET, end = ROW_INSET, bottom = 8.dp),
                         )
-                        // 9 titik snap: Clear (kiri), Balanced (tengah), Frosted (kanan)
-                        // dan 3 posisi di antara tiap titik.
+                        // Kontinu: Clear (kiri), Balanced (tengah), Frosted (kanan)
+                        // hanyalah titik acuan, nilai di antaranya bebas dipilih.
                         IosSlider(
                             value = glassClarity.level,
                             onValueChange = { AppSettings.setGlassClarity(it) },
                             valueRange = 0f..1f,
-                            steps = 7,
+                            steps = 0,
                             activeColor = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.padding(horizontal = ROW_INSET),
                         )
