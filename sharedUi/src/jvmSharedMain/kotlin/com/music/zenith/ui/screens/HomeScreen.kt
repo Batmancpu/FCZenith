@@ -25,6 +25,7 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.border
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
+import com.music.zenith.ui.rememberIsForeground
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.aspectRatio
@@ -312,6 +313,18 @@ private fun SpeedDialShuffleTile(
     val phase = remember { Animatable(0f) }
     var searching by remember { mutableStateOf(false) }
     val latestClick by rememberUpdatedState(onClick)
+    // Idle breathing: a slow wave running through the four dots. It resumes from
+    // where it stopped, and stops while searching or while the app is not on screen.
+    val idle = remember { Animatable(0f) }
+    val foreground = rememberIsForeground()
+    LaunchedEffect(foreground, searching) {
+        if (!foreground || searching) return@LaunchedEffect
+        while (true) {
+            val start = idle.value % 1f
+            idle.snapTo(start)
+            idle.animateTo(start + 1f, tween(durationMillis = 3200, easing = LinearEasing))
+        }
+    }
     // One full swirl, as if looking for a song, then the shuffle starts.
     LaunchedEffect(searching) {
         if (searching) {
@@ -344,16 +357,20 @@ private fun SpeedDialShuffleTile(
             val eased = p * p * (3f - 2f * p)
             val envelope = sin(PI.toFloat() * p)
             val turn = 2f * PI.toFloat() * eased
+            val idleT = idle.value * 2f * PI.toFloat()
+            val calm = 1f - envelope
             val unit = size.minDimension
             val orbit = unit * 0.19f * 1.4142f * (1f - 0.45f * envelope)
             val base = unit * 0.085f
             for (i in 0 until 4) {
-                val angle = (PI.toFloat() / 4f + i * PI.toFloat() / 2f) + turn
-                val radius = base * (1f + 0.5f * envelope * sin(4f * PI.toFloat() * p + i * PI.toFloat() / 2f))
+                val wave = sin(idleT + i * PI.toFloat() / 2f)
+                val angle = (PI.toFloat() / 4f + i * PI.toFloat() / 2f) + turn + 0.12f * calm * wave
+                val radius = base * (1f + 0.5f * envelope * sin(4f * PI.toFloat() * p + i * PI.toFloat() / 2f) + 0.22f * calm * wave)
+                val reach = orbit * (1f + 0.07f * calm * wave)
                 drawCircle(
                     color = dotColor,
                     radius = radius,
-                    center = Offset(center.x + cos(angle) * orbit, center.y + sin(angle) * orbit),
+                    center = Offset(center.x + cos(angle) * reach, center.y + sin(angle) * reach),
                 )
             }
         }
