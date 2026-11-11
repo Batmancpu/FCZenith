@@ -89,7 +89,7 @@ fun OrganicFluidBackground(
     val speedState = rememberUpdatedState(speed)
     val colorsState = rememberUpdatedState(colors.ifEmpty { OrganicFluidDefaults.Palette })
 
-    val clock = remember { FluidClock(startAt = Random.nextDouble(8.0, 200.0)) }
+    val clock = remember { FluidClock(startAt = FluidTimeline.now(speed)) }
     val agsl = remember { if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) AgslFluid() else null }
 
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -97,13 +97,11 @@ fun OrganicFluidBackground(
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             snapshotFlow { clock.visible && speedState.value > 0f }.collectLatest { running ->
                 if (!running) return@collectLatest
-                var last = withFrameNanos { it }
+                // Semua instance (kartu, cover terbang, sleeve halaman) membaca jam yang
+                // sama, jadi fase blob tetap nyambung saat pindah kartu <-> halaman.
                 while (true) {
-                    val now = withFrameNanos { it }
-                    // Dibatasi supaya jeda (mis. frame drop) tidak jadi lompatan.
-                    val dt = ((now - last) / 1_000_000_000.0).coerceAtMost(0.1)
-                    last = now
-                    clock.seconds += dt * speedState.value
+                    withFrameNanos { }
+                    clock.seconds = FluidTimeline.now(speedState.value)
                 }
             }
         }
@@ -126,6 +124,19 @@ fun OrganicFluidBackground(
                 }
             },
     )
+}
+
+/**
+ * Jam bersama untuk semua latar cairan. Fase dihitung dari waktu proses, bukan
+ * dari angka acak per instance, supaya kartu dan halaman yang dibukanya
+ * menampilkan frame yang sama. Kecepatan 0 selalu jatuh ke fase dasar yang sama.
+ */
+private object FluidTimeline {
+    private const val BASE_SECONDS = 30.0
+    private val epochNanos = System.nanoTime()
+
+    fun now(speed: Float): Double =
+        BASE_SECONDS + (System.nanoTime() - epochNanos) / 1_000_000_000.0 * speed
 }
 
 private class FluidClock(startAt: Double) {
