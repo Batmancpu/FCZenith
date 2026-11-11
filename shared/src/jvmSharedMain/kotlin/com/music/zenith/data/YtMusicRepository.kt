@@ -319,7 +319,22 @@ object YtMusicRepository {
             .filter { it.items.isNotEmpty() }
             .distinctBy { it.title.trim().lowercase() }
         if (shelves.isEmpty()) pages.firstNotNullOfOrNull { it.exceptionOrNull() }?.let { throw it }
-        shelves
+        // Apple Music's "Latest Songs": track rows pulled out of whatever the pages carry.
+        val tracks = shelves.flatMap { it.items }
+            .filter { it.videoId != null && it.browseId == null }
+            .distinctBy { it.videoId }
+        val latest = tracks.filterNot { it.isVideo }.takeIf { it.size >= 4 } ?: tracks
+        if (latest.size < 4) {
+            shelves
+        } else {
+            listOf(
+                HomeShelf(
+                    title = "Latest songs",
+                    items = latest.take(20),
+                    layout = com.music.zenith.data.model.ShelfLayout.LIST,
+                ),
+            ) + shelves
+        }
     }
 
     /** The New tab reads new releases first, then YouTube's own Explore page, then the charts. */
