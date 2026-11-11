@@ -263,10 +263,11 @@ private val RELEASE_ACTION_GAP = 14.dp
 
 /**
  * Past this the Play pill stops growing, so neither a tablet nor a wide phone
- * gets a bar. Termasuk gutter kiri-kanan: sisa ~318dp untuk Shuffle, Play, dan
- * Add, sehingga pill Play sepanjang ~190dp seperti di Apple Music.
+ * gets a bar. Termasuk gutter kiri-kanan (24dp per sisi): sisa ~288dp untuk
+ * Shuffle, Play, dan Add, sehingga Play ~160dp dan tombol samping ~41dp dari
+ * tepi layar 360dp, seperti Apple Music.
  */
-private val RELEASE_ACTIONS_MAX_WIDTH = 372.dp
+private val RELEASE_ACTIONS_MAX_WIDTH = 336.dp
 private val PILL_SHAPE = RoundedCornerShape(12.dp)
 
 /**
