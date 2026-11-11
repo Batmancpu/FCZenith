@@ -562,6 +562,14 @@
     <string name="replay_behavior_night">%1$d%% waktu mendengarkan Anda terjadi setelah gelap</string>
     <string name="replay_behavior_repeat">Rata-rata %1$s putaran per lagu</string>
     <string name="replay_behavior_day">Hari terbesar Anda adalah %1$s</string>
+    <string name="replay_kicker_habits">Kebiasaan mendengarkan Anda</string>
+    <string name="replay_stat_peak">Jam puncak</string>
+    <string name="replay_stat_plays">Putaran</string>
+    <string name="replay_stat_songs">Lagu</string>
+    <string name="replay_stat_artists">Artis</string>
+    <string name="replay_stat_albums">Album</string>
+    <string name="replay_stat_night">Larut malam</string>
+    <string name="replay_stat_repeat">Putaran/lagu</string>
     <string name="couldnt_draw_picture">Tidak dapat membuat gambar</string>
     <string name="default_replay_holder">Pendengar Zenith</string>
     <string name="different_albums">Album yang berbeda</string>

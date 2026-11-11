@@ -58,6 +58,7 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -99,8 +100,6 @@ import com.music.zenith.data.model.ROW_ART_PX
 import com.music.zenith.data.model.artworkAt
 import com.music.zenith.data.settings.AppSettings
 import com.music.zenith.data.stats.ReplaySummary
-import com.music.zenith.ui.components.OrganicFluidBackground
-import com.music.zenith.ui.components.OrganicFluidSupport
 import com.music.zenith.ui.icons.SfIcons
 import com.music.zenith.ui.player.MeshPalette
 import com.music.zenith.ui.player.rememberArtworkColors
@@ -136,13 +135,12 @@ fun ReplayStories(
     /** The app's player, paused while the Replay plays its own backsound. */
     mainPlayer: Player? = null,
 ) {
-    // Kategori kosong tidak punya story. Kebiasaan (HABITS) dilebur ke kartu
-    // kepribadian, jadi tidak lagi jadi slide sendiri.
+    // Kategori kosong tidak punya story. Kebiasaan (HABITS) kini jadi slide
+    // sendiri: jam puncak, hari tersibuk, dan jumlah putaran.
     val pages = remember(summary) {
         ReplayStoryPage.ordered.filter { page ->
             when (page) {
                 ReplayStoryPage.ALBUMS -> summary.albums.isNotEmpty()
-                ReplayStoryPage.HABITS -> false
                 else -> true
             }
         }
@@ -430,7 +428,7 @@ private fun StoryBackdrop(
 }
 
 /** Story yang latarnya memakai blob shader; story lain tetap memakai [StoryBackdrop]. */
-private val FluidPages = setOf(ReplayStoryPage.INTRO, ReplayStoryPage.MINUTES, ReplayStoryPage.GENRES)
+private val FluidPages = ReplayStoryPage.entries.filter { it != ReplayStoryPage.SUMMARY }.toSet()
 
 /**
  * Blob shader (OrganicFluidBackground) di atas [StoryBackdrop], hanya terlihat di
@@ -445,9 +443,9 @@ private fun FluidBackdrop(
     position: () -> Float,
     active: Boolean,
 ) {
-    if (!OrganicFluidSupport.shaderSupported) return
+    if (!ReplayFluidSupport.shaderSupported) return
     if (pages.none { it in FluidPages }) return
-    val tinted = remember(colors) { colors.map { lerp(it, Color.Black, 0.35f) } }
+    val tinted = remember(colors) { colors.map { lerp(it, Color.Black, 0.10f) } }
     Box(
         Modifier
             .fillMaxSize()
@@ -461,10 +459,10 @@ private fun FluidBackdrop(
                 alpha = a + (b - a) * (pos - i)
             },
     ) {
-        OrganicFluidBackground(
-            modifier = Modifier.fillMaxSize(),
+        ReplayFluidBackground(
             colors = tinted,
-            animationSpeed = if (active) 0.6f else 0f,
+            modifier = Modifier.fillMaxSize(),
+            animationSpeed = if (active) 0.8f else 0f,
         )
         Box(
             Modifier
@@ -719,7 +717,7 @@ private fun StoryPage(
                 ReplayStoryPage.SONGS -> SongsStory(summary, headline, reveal)
                 ReplayStoryPage.ALBUMS -> AlbumsStory(summary, headline, reveal, drift, pageOffset)
                 ReplayStoryPage.GENRES -> PersonalityStory(summary, headline, colors, reveal, drift)
-                ReplayStoryPage.HABITS -> Unit
+                ReplayStoryPage.HABITS -> HabitsStory(summary, headline, reveal)
                 ReplayStoryPage.SUMMARY ->
                     RecapStory(summary, headline, reveal, onShare = { onShare(ReplayStoryPage.SUMMARY) }, onRestart = onRestart)
             }
@@ -955,6 +953,16 @@ private fun ColumnScope.MinutesStory(
             }
         }
     }
+    Spacer(Modifier.height(14.dp))
+    StatGrid(
+        stats = listOf(
+            grouped(summary.totalPlays.toLong()) to stringResource(R.string.replay_stat_plays),
+            grouped(summary.distinctSongs.toLong()) to stringResource(R.string.replay_stat_songs),
+            grouped(summary.distinctArtists.toLong()) to stringResource(R.string.replay_stat_artists),
+        ),
+        reveal = reveal,
+        start = 0.62f,
+    )
 }
 
 /** Angka raksasa yang menghitung naik. Hanya composable ini yang rekomposisi per frame. */
@@ -1076,6 +1084,11 @@ private fun ColumnScope.ArtistsStory(
             modifier = Modifier.staged(reveal, 0.40f),
         )
     }
+    val runnerUps = summary.artistRows(5).drop(1)
+    if (runnerUps.isNotEmpty()) {
+        Spacer(Modifier.height(12.dp))
+        RunnerUps(runnerUps, reveal, 0.46f)
+    }
     BoxWithConstraints(
         Modifier.weight(1f).fillMaxWidth().padding(top = 14.dp),
         contentAlignment = Alignment.BottomCenter,
@@ -1141,7 +1154,10 @@ private fun ColumnScope.SongsStory(
                 )
             }
             Text(
-                text = context.replayCount(lead.plays, R.plurals.replay_play_count),
+                text = listOf(
+                    context.replayCount(lead.plays, R.plurals.replay_play_count),
+                    formatListening(context, lead.ms),
+                ).joinToString(" · "),
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.W700,
                 color = Color.White.copy(alpha = 0.9f),
@@ -1278,6 +1294,7 @@ private fun ColumnScope.AlbumsStory(
         text = listOfNotNull(
             lead.subtitle,
             context.replayCount(lead.plays, R.plurals.replay_play_count),
+            formatListening(context, lead.ms),
         ).joinToString(" · "),
         style = MaterialTheme.typography.bodyMedium,
         color = Color.White.copy(alpha = 0.72f),
@@ -1371,19 +1388,10 @@ private fun ColumnScope.PersonalityStory(
     )
     if (genres.isNotEmpty()) {
         Spacer(Modifier.height(10.dp))
-        Text(
-            text = genres,
-            style = MaterialTheme.typography.titleSmall,
-            fontFamily = FontFamily.Serif,
-            fontStyle = FontStyle.Italic,
-            color = Color.White,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.staged(reveal, 0.52f),
-        )
+        GenreBars(summary, reveal, 0.52f)
     }
     Spacer(Modifier.height(10.dp))
-    behaviors.forEachIndexed { index, line ->
+    behaviors.take(1).forEachIndexed { index, line ->
         Row(
             Modifier.padding(vertical = 2.dp).staged(reveal, 0.60f + index * 0.08f, 0.3f, 18.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -1516,7 +1524,8 @@ private fun ColumnScope.RecapStory(
         modifier = Modifier.fillMaxWidth().staged(reveal, 0.04f),
     )
     Text(
-        text = "${formatMinutes(summary.totalMs)} ${stringResource(R.string.minutes).lowercase(Locale.getDefault())}",
+        text = "${formatMinutes(summary.totalMs)} ${stringResource(R.string.minutes).lowercase(Locale.getDefault())}" +
+            " · ${context.replayCount(summary.totalPlays, R.plurals.replay_play_count)}",
         style = MaterialTheme.typography.titleMedium,
         color = Color.White.copy(alpha = 0.6f),
         textAlign = TextAlign.Center,
@@ -1648,6 +1657,13 @@ private fun Cover(
 ) {
     val base = modifier
         .size(size)
+        .then(
+            if (elevated || size >= 120.dp) {
+                Modifier.shadow(20.dp, shape, clip = false, ambientColor = Color.Black, spotColor = Color.Black)
+            } else {
+                Modifier
+            },
+        )
         .clip(shape)
     when {
         url != null -> AsyncImage(
@@ -1658,6 +1674,226 @@ private fun Cover(
         )
         fallbackText.isNotBlank() -> Box(base) { InitialTile(fallbackText, size, shape) }
         else -> Box(base.background(Color.White.copy(alpha = 0.10f)))
+    }
+}
+
+// ── Kebiasaan mendengarkan ──────────────────────────────────────────────────
+
+/** Jam puncak, hari tersibuk, jumlah putaran, dan profil 24 jam, semuanya dari data nyata. */
+@Composable
+private fun ColumnScope.HabitsStory(
+    summary: ReplaySummary,
+    headline: List<HeadlineRun>,
+    reveal: Animatable<Float, *>,
+) {
+    val context = LocalContext.current
+    val persona = remember(summary) { summary.personality() }
+    val peak = summary.peakHour
+    val stats = buildList {
+        peak?.let { add(formatHour(context, it) to stringResource(R.string.replay_stat_peak)) }
+        add(formatListening(context, summary.averageMsPerDay()) to stringResource(R.string.replay_stat_per_day))
+        summary.busiestDay?.let { add(formatDay(context, it) to stringResource(R.string.replay_stat_busiest)) }
+        add(grouped(summary.totalPlays.toLong()) to stringResource(R.string.replay_stat_plays))
+        add(grouped(summary.distinctSongs.toLong()) to stringResource(R.string.replay_stat_songs))
+        add(grouped(summary.distinctArtists.toLong()) to stringResource(R.string.replay_stat_artists))
+        if (summary.distinctAlbums > 0) {
+            add(grouped(summary.distinctAlbums.toLong()) to stringResource(R.string.replay_stat_albums))
+        }
+        add("${(persona.nightShare * 100f).toInt()}%" to stringResource(R.string.replay_stat_night))
+        add(String.format(Locale.US, "%.1f", persona.repeatRatio) to stringResource(R.string.replay_stat_repeat))
+    }.take(9)
+
+    Kicker(stringResource(R.string.replay_kicker_habits), Modifier.staged(reveal, 0f))
+    Spacer(Modifier.height(6.dp))
+    MaskReveal(reveal, 0.05f) { Headline(headline, textSize = 28) }
+    Spacer(Modifier.height(14.dp))
+    Text(
+        text = stringResource(R.string.listening_shape).uppercase(Locale.ROOT),
+        style = MaterialTheme.typography.labelSmall,
+        letterSpacing = 2.sp,
+        color = Color.White.copy(alpha = 0.6f),
+        modifier = Modifier.staged(reveal, 0.15f),
+    )
+    Spacer(Modifier.height(8.dp))
+    HourChart(
+        hours = summary.hourOfDay,
+        peak = peak,
+        reveal = reveal,
+        modifier = Modifier.weight(1f).fillMaxWidth(),
+    )
+    Row(
+        Modifier.fillMaxWidth().padding(top = 4.dp).staged(reveal, 0.30f, 0.3f, 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        listOf("00", "06", "12", "18", "24").forEach {
+            Text(
+                text = it,
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White.copy(alpha = 0.55f),
+            )
+        }
+    }
+    Spacer(Modifier.height(16.dp))
+    StatGrid(stats, reveal, 0.45f)
+}
+
+/** 24 batang, satu per jam; jam puncak menyala penuh, lainnya meredup menurut porsinya. */
+@Composable
+private fun HourChart(
+    hours: List<Long>,
+    peak: Int?,
+    reveal: Animatable<Float, *>,
+    modifier: Modifier = Modifier,
+) {
+    val top = remember(hours) { (hours.maxOrNull() ?: 0L).coerceAtLeast(1L).toFloat() }
+    Canvas(modifier) {
+        val grow = ease((reveal.value - 0.15f) / 0.6f)
+        val n = 24
+        val gap = 3.dp.toPx()
+        val barWidth = (size.width - gap * (n - 1)) / n
+        val minHeight = 3.dp.toPx()
+        for (i in 0 until n) {
+            val v = if (hours.size >= n) hours[i] / top else 0f
+            val h = (minHeight + (size.height - minHeight) * v) * grow
+            drawRoundRect(
+                color = Color.White.copy(alpha = if (i == peak) 1f else 0.40f + 0.30f * v),
+                topLeft = Offset(i * (barWidth + gap), size.height - h),
+                size = Size(barWidth, h),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(barWidth / 2f),
+            )
+        }
+    }
+}
+
+/** Angka-angka kecil dalam grid tiga kolom, masuk bergantian per baris. */
+@Composable
+private fun StatGrid(
+    stats: List<Pair<String, String>>,
+    reveal: Animatable<Float, *>,
+    start: Float,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        stats.chunked(3).forEachIndexed { row, chunk ->
+            Row(
+                Modifier.fillMaxWidth().staged(reveal, start + row * 0.07f, 0.35f),
+                horizontalArrangement = Arrangement.spacedBy(20.dp),
+            ) {
+                chunk.forEach { (value, label) -> StatCell(value, label, Modifier.weight(1f)) }
+                repeat(3 - chunk.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatCell(value: String, label: String, modifier: Modifier = Modifier) {
+    Column(modifier) {
+        Box(Modifier.fillMaxWidth().height(0.8.dp).background(Color.White.copy(alpha = 0.35f)))
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.W800,
+            color = Color.White,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            text = label.uppercase(Locale.ROOT),
+            style = MaterialTheme.typography.labelSmall,
+            letterSpacing = 2.sp,
+            color = Color.White.copy(alpha = 0.6f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+/** Tiga genre teratas dengan porsi dari seluruh waktu genre yang tercatat. */
+@Composable
+private fun GenreBars(summary: ReplaySummary, reveal: Animatable<Float, *>, start: Float) {
+    val rows = remember(summary) { summary.genres.take(3) }
+    val total = remember(summary) { summary.genres.sumOf { it.ms }.coerceAtLeast(1L) }
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        rows.forEachIndexed { index, genre ->
+            val share = (genre.ms.toFloat() / total).coerceIn(0f, 1f)
+            Row(
+                Modifier.fillMaxWidth().staged(reveal, start + index * 0.07f, 0.3f, 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = genre.title,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.W700,
+                    color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.width(96.dp),
+                )
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .height(6.dp)
+                        .clip(CircleShape)
+                        .background(Color.White.copy(alpha = 0.20f)),
+                ) {
+                    Box(
+                        Modifier
+                            .fillMaxHeight()
+                            .fillMaxWidth(share.coerceAtLeast(0.03f))
+                            .clip(CircleShape)
+                            .background(Color.White),
+                    )
+                }
+                Text(
+                    text = "${(share * 100f).toInt()}%",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.W700,
+                    color = Color.White.copy(alpha = 0.85f),
+                    textAlign = TextAlign.End,
+                    modifier = Modifier.width(40.dp),
+                )
+            }
+        }
+    }
+}
+
+/** Artis peringkat 2 sampai 5, bundar kecil di bawah nama artis teratas. */
+@Composable
+private fun RunnerUps(rows: List<ReplayRow>, reveal: Animatable<Float, *>, start: Float) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        rows.take(4).forEachIndexed { index, row ->
+            Column(
+                Modifier.weight(1f).staged(reveal, start + index * 0.06f, 0.3f, 18.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Cover(
+                    url = row.artworkUrl,
+                    fallbackText = row.title,
+                    size = 44.dp,
+                    shape = CircleShape,
+                    px = ROW_ART_PX,
+                    modifier = Modifier.border(0.8.dp, Color.White.copy(alpha = 0.25f), CircleShape),
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = "%02d".format(row.rank),
+                    style = MaterialTheme.typography.labelSmall,
+                    letterSpacing = 1.5.sp,
+                    color = Color.White.copy(alpha = 0.6f),
+                )
+                Text(
+                    text = row.title,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.W700,
+                    color = Color.White,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
     }
 }
 

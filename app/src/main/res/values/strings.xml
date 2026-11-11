@@ -894,6 +894,14 @@
     <string name="replay_behavior_night">%1$d%% of your listening happens after dark</string>
     <string name="replay_behavior_repeat">%1$s plays per song on average</string>
     <string name="replay_behavior_day">Your biggest day was %1$s</string>
+    <string name="replay_kicker_habits">Your listening habits</string>
+    <string name="replay_stat_peak">Peak hour</string>
+    <string name="replay_stat_plays">Plays</string>
+    <string name="replay_stat_songs">Songs</string>
+    <string name="replay_stat_artists">Artists</string>
+    <string name="replay_stat_albums">Albums</string>
+    <string name="replay_stat_night">After dark</string>
+    <string name="replay_stat_repeat">Plays / song</string>
     <string name="couldnt_draw_picture">Could not create the picture</string>
     <string name="default_replay_holder">Zenith listener</string>
     <string name="different_albums">Different albums</string>
