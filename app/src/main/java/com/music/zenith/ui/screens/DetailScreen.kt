@@ -486,7 +486,7 @@ fun DetailScreen(
         // halamannya menyatu seperti halaman artis.
         imageUrl = appleArt?.heroUrl ?: page.thumbnailUrl
             ?: if (page.isFolderCover()) songs.firstOrNull { it.thumbnailUrl != null }?.thumbnailUrl else null,
-        keyColors = appleArt?.keyColors(),
+        keyColors = appleArt?.keyColors() ?: page.mix?.let { mixKeyColors(it) },
     )
 
     // Narrowing the running order in place — the release equivalent of the
@@ -624,7 +624,7 @@ fun DetailScreen(
             // other surface painted from it, and the two showed as mismatched squares.
             // Album full-bleed seperti foto artis: halamannya memakai wash yang
             // sama dengan tempat kaki cover larut, bukan latar bingkai polos.
-            val pageColor = if (isArtist || page.isAlbumHero()) palette.wash else palette.background
+            val pageColor = if (isArtist || page.isAlbumHero() || page.isMixHero()) palette.wash else palette.background
             BoxWithConstraints(Modifier.fillMaxSize().background(pageColor)) {
                 // Measured rather than read off the window. The player runs
                 // full-screen at every window size, so this page's own width in
@@ -641,7 +641,7 @@ fun DetailScreen(
                 val gridColumns = libraryGrid(maxWidth - PAGE_GUTTER * 2).columns
                 // Liked Music: tarikan ke bawah dibatasi kecil, jadi seni ekstra di
                 // atas hero cukup tipis dan lubang tidak pernah terlihat.
-                val listOverscroll = if (page.isLikedMusic() || page.covers.isNotEmpty() || page.isFolderCover() || page.isAlbumHero()) {
+                val listOverscroll = if (page.isLikedMusic() || page.covers.isNotEmpty() || page.isFolderCover() || page.isAlbumHero() || page.isMixHero()) {
                     rememberIosOverscrollEffect(LIKED_MAX_PULL)
                 } else {
                     rememberOverscrollEffect()
@@ -1065,7 +1065,8 @@ private fun ReleaseHeader(
     }
     // Liked Music dan Most Played tidak memakai sleeve berbingkai: seninya full-bleed.
     val albumHero = page.isAlbumHero()
-    val fullBleed = page.isLikedMusic() || page.covers.isNotEmpty() || page.isFolderCover() || albumHero
+    val mixHero = page.isMixHero()
+    val fullBleed = page.isLikedMusic() || page.covers.isNotEmpty() || page.isFolderCover() || albumHero || mixHero
     // Every row on a release carries the same credit — see [pageCredit] — so
     // the first one speaks for the whole page, the same source the rows'
     // own long-press "Open artist" already reads from.
@@ -1096,6 +1097,13 @@ private fun ReleaseHeader(
                 // supaya ketiganya sama dengan warna halaman di atas.
                 palette = palette.copy(background = palette.wash),
                 canvas = canvas,
+                height = heroHeight * ALBUM_HERO_HEIGHT_SCALE,
+            )
+        } else if (mixHero) {
+            MixHero(
+                page = page,
+                // Sama seperti AlbumHero: kaki hero dan wash target terbang memakai warna halaman.
+                palette = palette.copy(background = palette.wash),
                 height = heroHeight * ALBUM_HERO_HEIGHT_SCALE,
             )
         } else if (fullBleed) {
@@ -3227,6 +3235,101 @@ private fun AlbumHero(
         // Berakhir di warna halaman penuh, jadi tidak ada tepi tempat seni berhenti.
         // Mulai agak lebih bawah daripada hero folder: sampul album lebih banyak
         // yang perlu terbaca.
+        val page0 = palette.background.copy(alpha = 0f)
+        Box(
+            Modifier
+                .matchParentSize()
+                .background(
+                    Brush.verticalGradient(
+                        0.00f to page0,
+                        0.58f to page0,
+                        0.68f to palette.background.copy(alpha = 0.25f),
+                        0.78f to palette.background.copy(alpha = 0.60f),
+                        0.88f to palette.background.copy(alpha = 0.88f),
+                        0.95f to palette.background.copy(alpha = 0.97f),
+                        1.00f to palette.background,
+                    ),
+                ),
+        )
+
+        // Sedikit gelap di atas supaya ikon bar kaca tetap terbaca.
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(height * 0.28f)
+                .background(
+                    Brush.verticalGradient(
+                        0f to Color.Black.copy(alpha = 0.22f),
+                        1f to Color.Transparent,
+                    ),
+                ),
+        )
+    }
+}
+
+/** Made for You Mix: cairan warna mix full-bleed sampai di bawah bar, seperti [AlbumHero]. */
+private fun DetailPage.isMixHero(): Boolean = mix != null && covers.isEmpty()
+
+/**
+ * Header Made for You Mix: kerangka dan target terbang yang sama dengan
+ * [AlbumHero] (sudut 0, wash warna halaman), jadi cover kartu mendarat di kotak
+ * ini dan pulang dari sini lagi. Teks sampul muncul setelah cover mendarat dan
+ * ditata di area yang terlihat, di bawah bar dan di atas judul halaman.
+ */
+@Composable
+private fun MixHero(
+    page: DetailPage,
+    palette: ArtworkPalette,
+    height: Dp,
+    modifier: Modifier = Modifier,
+) {
+    val mixTitle = page.mix ?: return
+    Box(
+        modifier
+            .layout { measurable, constraints ->
+                val placeable = measurable.measure(constraints)
+                val overlap = LIKED_HERO_OVERLAP.roundToPx().coerceAtMost(placeable.height)
+                layout(placeable.width, placeable.height - overlap) { placeable.place(0, 0) }
+            }
+            .fillMaxWidth()
+            .height(height)
+            .drawWithContent {
+                val extra = LIKED_OVERSCROLL.toPx()
+                clipRect(left = 0f, top = -extra, right = size.width, bottom = size.height) {
+                    this@drawWithContent.drawContent()
+                }
+                val seam = 2.dp.toPx()
+                drawRect(
+                    color = palette.background,
+                    topLeft = Offset(0f, size.height - seam),
+                    size = androidx.compose.ui.geometry.Size(size.width, seam * 2f),
+                )
+            }
+            .coverFlightTarget(page.browseId, 0.dp, palette.background),
+    ) {
+        // Cairan lebih tinggi daripada hero: kelebihannya menjulur ke atas.
+        Box(
+            Modifier.layout { measurable, constraints ->
+                val extra = LIKED_OVERSCROLL.roundToPx()
+                val placeable = measurable.measure(
+                    Constraints.fixed(constraints.maxWidth, constraints.maxHeight + extra),
+                )
+                layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(0, -extra) }
+            },
+        ) {
+            MixFluidArt(title = mixTitle, modifier = Modifier.matchParentSize())
+        }
+
+        MixCoverOverlay(
+            title = mixTitle,
+            subtitle = "",
+            band = false,
+            modifier = Modifier
+                .matchParentSize()
+                .padding(top = topBarContentPadding(), bottom = LIKED_HERO_OVERLAP + 20.dp)
+                .flightReveal(delayMs = 0, rise = 0.dp, afterFlight = true),
+        )
+
         val page0 = palette.background.copy(alpha = 0f)
         Box(
             Modifier

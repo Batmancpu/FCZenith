@@ -330,6 +330,7 @@ import com.music.zenith.ui.player.PlayerDock
 import com.music.zenith.ui.screens.DetailScreen
 import com.music.zenith.ui.screens.sortedForDetail
 import com.music.zenith.ui.screens.ExploreScreen
+import com.music.zenith.ui.screens.mixKeyColors
 import com.music.zenith.ui.screens.LocalFolder
 import com.music.zenith.ui.screens.LocalFolderState
 import com.music.zenith.ui.screens.LocalFolderTab
@@ -2576,7 +2577,7 @@ private fun ZenithApp(
             }?.let { folderPage ->
                 (folderPage.songs as? UiState.Success)?.data?.firstOrNull { it.thumbnailUrl != null }?.thumbnailUrl
             },
-        keyColors = detailApple?.keyColors(),
+        keyColors = detailApple?.keyColors() ?: topDetail?.mix?.let { mixKeyColors(it) },
     )
 
     // One set of numbers for the cards, the page, the stories and the shared

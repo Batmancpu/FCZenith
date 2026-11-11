@@ -192,8 +192,14 @@ private val OrangeMix = listOf(Color(0xFFE8431C), Color(0xFFFF7A1A), Color(0xFFF
 private val GreenMix = listOf(Color(0xFF12B886), Color(0xFF2EC4B6), Color(0xFF5BE3A5), Color(0xFF0B7A75), Color(0xFF9AF0C4))
 private val MixCycle = listOf(TealMix, OrangeMix, IndigoMix, GreenMix, PurpleMix)
 
+/** Warna halaman sebuah mix: latar dari warna dasar cairannya, aksen dari warna terangnya. */
+fun mixKeyColors(title: String): com.music.zenith.ui.theme.ArtworkKeyColors {
+    val base = mixPalette(title)
+    return com.music.zenith.ui.theme.ArtworkKeyColors(background = base[0], accent = base[2])
+}
+
 /** Warna per jenis mix; "My Mix N" bergilir supaya tiap kartu di baris berbeda warna. */
-internal fun mixPalette(title: String): List<Color> {
+fun mixPalette(title: String): List<Color> {
     val t = title.lowercase()
     return when {
         "supermix" in t || "new release" in t || "new music" in t -> PinkMix
