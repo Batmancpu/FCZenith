@@ -406,17 +406,36 @@ fun SettingsScreen(
     ) {
         showPerformanceConfirmation = true
     }
+    // Drops the persisted grant of a folder that is no longer chosen so stale
+    // trees don't pile up. A tree the other folder setting still uses is kept.
+    fun releaseFolderGrant(old: String, stillUsed: String) {
+        if (old.isBlank() || old == stillUsed) return
+        runCatching {
+            context.contentResolver.releasePersistableUriPermission(
+                Uri.parse(old),
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+            )
+        }
+    }
     val localMusicFolderPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree(),
     ) { folder ->
         if (folder == null) return@rememberLauncherForActivityResult
-        runCatching {
+        val granted = runCatching {
             context.contentResolver.takePersistableUriPermission(
                 folder,
                 Intent.FLAG_GRANT_READ_URI_PERMISSION,
             )
+        }.isSuccess
+        if (granted) {
+            val previous = AppSettings.localMusicFolderUri.value
+            AppSettings.setLocalMusicFolderUri(folder.toString())
+            if (previous != folder.toString()) {
+                releaseFolderGrant(previous, AppSettings.downloadFolderUri.value)
+            }
+        } else {
+            Toast.makeText(context, "Couldn't get access to that folder", Toast.LENGTH_SHORT).show()
         }
-        AppSettings.setLocalMusicFolderUri(folder.toString())
     }
     val downloadFolderPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree(),
@@ -429,9 +448,15 @@ fun SettingsScreen(
             )
         }.isSuccess
         if (granted) {
+            val previous = AppSettings.downloadFolderUri.value
             AppSettings.setDownloadFolderUri(folder.toString())
             // A custom folder is an exported download, so it needs this on.
             AppSettings.setExportDownloads(true)
+            if (previous != folder.toString()) {
+                releaseFolderGrant(previous, AppSettings.localMusicFolderUri.value)
+            }
+        } else {
+            Toast.makeText(context, "Couldn't get access to that folder", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -701,7 +726,8 @@ fun SettingsScreen(
                     title = exportDownloadsTitle,
                     checked = exportDownloads,
                     onCheckedChange = AppSettings::setExportDownloads,
-                    subtitle = "Music/Zenith".takeIf { exportDownloads && downloadFolderUri.isBlank() },
+                    subtitle = (LocalMediaRepository.selectedFolderLabel(downloadFolderUri) ?: "Music/Zenith")
+                        .takeIf { exportDownloads },
                 )
             }
             val downloadFolderTitle = "Download folder"
@@ -709,9 +735,12 @@ fun SettingsScreen(
                 SettingsRow(
                     icon = SfIcons.Folder,
                     title = downloadFolderTitle,
-                    subtitle = LocalMediaRepository.selectedFolderLabel(downloadFolderUri)
-                        ?.takeIf { exportDownloads } ?: "Default",
-                    onClick = { downloadFolderPicker.launch(null) },
+                    subtitle = LocalMediaRepository.selectedFolderLabel(downloadFolderUri)?.let { label ->
+                        if (exportDownloads) label else "$label · export is off"
+                    } ?: "Default",
+                    onClick = {
+                        downloadFolderPicker.launch(downloadFolderUri.takeIf { it.isNotBlank() }?.let(Uri::parse))
+                    },
                 )
             }
             if (downloadFolderUri.isNotBlank()) {
@@ -721,7 +750,10 @@ fun SettingsScreen(
                         icon = SfIcons.LibraryMusic,
                         title = useDefaultDownloadFolderTitle,
                         subtitle = "Music/Zenith",
-                        onClick = { AppSettings.setDownloadFolderUri("") },
+                        onClick = {
+                            releaseFolderGrant(downloadFolderUri, AppSettings.localMusicFolderUri.value)
+                            AppSettings.setDownloadFolderUri("")
+                        },
                     )
                 }
             }
@@ -1447,9 +1479,15 @@ fun SettingsScreen(
                 SettingsRow(
                     icon = SfIcons.Folder,
                     title = localMusicFolderTitle,
-                    subtitle = LocalMediaRepository.selectedFolderLabel(localMusicFolderUri)
-                        ?: stringResource(R.string.all_audio_folders),
-                    onClick = { localMusicFolderPicker.launch(null) },
+                    subtitle = when {
+                        localMusicFolderUri.isBlank() -> stringResource(R.string.all_audio_folders)
+                        !LocalMediaRepository.hasFolderAccess(context) -> "Access lost, tap to choose again"
+                        else -> LocalMediaRepository.selectedFolderLabel(localMusicFolderUri)
+                            ?: stringResource(R.string.all_audio_folders)
+                    },
+                    onClick = {
+                        localMusicFolderPicker.launch(localMusicFolderUri.takeIf { it.isNotBlank() }?.let(Uri::parse))
+                    },
                 )
             }
             if (localMusicFolderUri.isNotBlank()) {
@@ -1459,7 +1497,10 @@ fun SettingsScreen(
                         icon = SfIcons.LibraryMusic,
                         title = useAllAudioFoldersTitle,
                         subtitle = stringResource(R.string.use_all_audio_folders_subtitle),
-                        onClick = { AppSettings.setLocalMusicFolderUri("") },
+                        onClick = {
+                            releaseFolderGrant(localMusicFolderUri, AppSettings.downloadFolderUri.value)
+                            AppSettings.setLocalMusicFolderUri("")
+                        },
                     )
                 }
             }
