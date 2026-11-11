@@ -16,7 +16,13 @@ import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.graphics.graphicsLayer
 import com.music.zenith.ui.components.longPressMenuClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -198,11 +204,24 @@ private fun SpeedDialShelf(
     onItemLongPress: ((ShelfItem) -> Unit)?,
     currentSong: Song?,
     isPlaying: Boolean,
+    onPlaySongs: ((List<Song>) -> Unit)? = null,
 ) {
     Column(Modifier.padding(bottom = 26.dp)) {
         SectionHeader(shelf.title, shelf.subtitle)
         val isCurrentItem = shelf.items.playingItemMatcher(currentSong)
-        val pages = remember(shelf.items) { shelf.items.chunked(SPEED_DIAL_COLUMNS * SPEED_DIAL_ROWS) }
+        val shuffleSongs = remember(shelf.items) {
+            shelf.items.mapNotNull { item ->
+                val id = item.videoId ?: return@mapNotNull null
+                if (item.browseId != null) {
+                    null
+                } else {
+                    Song(videoId = id, title = item.title, artist = item.subtitle, thumbnailUrl = item.thumbnailUrl)
+                }
+            }
+        }
+        val canShuffle = onPlaySongs != null && shuffleSongs.isNotEmpty()
+        val pageSize = SPEED_DIAL_COLUMNS * SPEED_DIAL_ROWS - if (canShuffle) 1 else 0
+        val pages = remember(shelf.items, pageSize) { shelf.items.chunked(pageSize) }
         BoxWithConstraints {
             val pageWidth = maxWidth - PAGE_GUTTER * 2
             val tile = (pageWidth - SPEED_DIAL_GAP * (SPEED_DIAL_COLUMNS - 1)) / SPEED_DIAL_COLUMNS
@@ -216,17 +235,28 @@ private fun SpeedDialShelf(
                         modifier = Modifier.width(pageWidth),
                         verticalArrangement = Arrangement.spacedBy(SPEED_DIAL_GAP),
                     ) {
-                        page.chunked(SPEED_DIAL_COLUMNS).forEach { row ->
+                        repeat(SPEED_DIAL_ROWS) { rowIndex ->
                             Row(horizontalArrangement = Arrangement.spacedBy(SPEED_DIAL_GAP)) {
-                                row.forEach { item ->
-                                    SpeedDialTile(
-                                        item = item,
-                                        onClick = { onItemClick(item) },
-                                        onLongPress = onItemLongPress?.let { { it(item) } },
-                                        isCurrent = isCurrentItem(item),
-                                        isPlaying = isCurrentItem(item) && isPlaying,
-                                        modifier = Modifier.size(tile),
-                                    )
+                                repeat(SPEED_DIAL_COLUMNS) { column ->
+                                    val slot = rowIndex * SPEED_DIAL_COLUMNS + column
+                                    val item = page.getOrNull(slot)
+                                    if (canShuffle && slot == SPEED_DIAL_COLUMNS * SPEED_DIAL_ROWS - 1) {
+                                        SpeedDialShuffleTile(
+                                            onClick = { onPlaySongs?.invoke(shuffleSongs.shuffled()) },
+                                            modifier = Modifier.size(tile),
+                                        )
+                                    } else if (item != null) {
+                                        SpeedDialTile(
+                                            item = item,
+                                            onClick = { onItemClick(item) },
+                                            onLongPress = onItemLongPress?.let { { it(item) } },
+                                            isCurrent = isCurrentItem(item),
+                                            isPlaying = isCurrentItem(item) && isPlaying,
+                                            modifier = Modifier.size(tile),
+                                        )
+                                    } else {
+                                        Spacer(Modifier.size(tile))
+                                    }
                                 }
                             }
                         }
@@ -234,6 +264,67 @@ private fun SpeedDialShelf(
                 }
             }
         }
+    }
+}
+
+/** Shuffle card in the last slot of a speed dial page: accent gradient, glass disc, springy press. */
+@Composable
+private fun SpeedDialShuffleTile(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val shape = RoundedCornerShape(12.dp)
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.94f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+    )
+    val accent = MaterialTheme.colorScheme.primary
+    Box(
+        modifier = modifier
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .clip(shape)
+            .background(
+                Brush.linearGradient(
+                    listOf(
+                        accent.copy(alpha = 0.95f),
+                        accent.copy(alpha = 0.55f),
+                        MaterialTheme.colorScheme.surfaceVariant,
+                    ),
+                ),
+            )
+            .thumbnailBorder(shape)
+            .clickable(interactionSource = interaction, indication = null, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .clip(CircleShape)
+                .background(Color.White.copy(alpha = 0.22f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = ZenithIcons.Shuffle,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(22.dp),
+            )
+        }
+        Text(
+            text = stringResource(Res.string.shuffle),
+            style = MaterialTheme.typography.labelLarge,
+            color = Color.White,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+        )
     }
 }
 
@@ -667,6 +758,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.itemsIndexedShelves(
                     onItemLongPress = onItemLongPress,
                     currentSong = currentSong,
                     isPlaying = isPlaying,
+                    onPlaySongs = onPlaySongs,
                 )
             } else if (shelf.isMixShelf()) {
                 MixCoverShelf(
