@@ -4751,6 +4751,9 @@ private fun ZenithApp(
                 value = song.localUri == null &&
                     withContext(Dispatchers.IO) { AudioCache.holds(song.videoId) }
             }
+            val trackSpatialOverrides by AppSettings.spatialAudioByTrack.collectAsStateWithLifecycle()
+            val spatialAudioGlobal by AppSettings.spatialAudio.collectAsStateWithLifecycle()
+            val spatialAudioOn = trackSpatialOverrides[song.videoId] ?: spatialAudioGlobal
             SongActionsMenu(
                 song = song,
                 signedIn = signedIn,
@@ -4971,6 +4974,12 @@ private fun ZenithApp(
                 } else {
                     null
                 },
+                onToggleSpatialAudio = if (fromPlayer && song.videoId.isNotBlank()) {
+                    { AppSettings.setSpatialAudioForTrack(song.videoId, !spatialAudioOn) }
+                } else {
+                    null
+                },
+                spatialAudioOn = spatialAudioOn,
             )
         }
         // ---- Now Playing ----

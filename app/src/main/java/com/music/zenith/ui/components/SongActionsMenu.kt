@@ -173,6 +173,13 @@ fun SongActionsMenu(
     /** Opens the timing control offered only by the main player's menu. */
     onLyricsOffset: (() -> Unit)? = null,
     /**
+     * Flips spatial audio for the playing track and saves the choice for it.
+     * Null hides the row; only the player's menu offers it.
+     */
+    onToggleSpatialAudio: (() -> Unit)? = null,
+    /** The track's effective spatial-audio state, so the row offers the opposite. */
+    spatialAudioOn: Boolean = false,
+    /**
      * True while a lookup for this track's album/artist ids is still in
      * flight, so it isn't yet known whether "Open album" and "Open artist"
      * belong on this menu at all. Only the player ever opens a menu before
@@ -382,7 +389,7 @@ fun SongActionsMenu(
 
         // The player's own: about the track playing right now rather than
         // about the song as a thing in a library.
-        if (showSleepTimer || onLyricsOffset != null || onCopyLog != null) {
+        if (showSleepTimer || onLyricsOffset != null || onCopyLog != null || onToggleSpatialAudio != null) {
             if (startsGroup()) IosMenuSeparator()
             if (showSleepTimer) {
                 ActionRow(
@@ -399,6 +406,18 @@ fun SongActionsMenu(
                     value = sleepTimerStatus(),
                     accent = palette.accent,
                 ) { pickingSleepTimer = true }
+            }
+            // Stays open after a tap: the label flips in place and the change
+            // is audible at once, so the two settings can be compared by ear.
+            onToggleSpatialAudio?.let {
+                ActionRow(
+                    icon = SfIcons.SurroundSound,
+                    label = stringResource(
+                        if (spatialAudioOn) R.string.spatial_audio_prefer_off else R.string.spatial_audio_prefer_on,
+                    ),
+                    accent = palette.accent,
+                    onClick = it,
+                )
             }
             // Local files and completed downloads use the same player lyric
             // clock (including embedded synced lyrics), so they need this

@@ -513,6 +513,13 @@ object AppSettings {
     val spatialAudio = MutableStateFlow(false)
 
     /**
+     * Per-track override of [spatialAudio], keyed by media id and saved the
+     * moment the player menu's row is tapped. A track without an entry
+     * follows the global switch.
+     */
+    val spatialAudioByTrack = MutableStateFlow<Map<String, Boolean>>(emptyMap())
+
+    /**
      * The app's own equaliser, master switch.
      *
      * Separate from the system equaliser row beside it, which is still there and
@@ -1287,6 +1294,7 @@ object AppSettings {
         dolbyAtmos.value = prefs.getBoolean(KEY_DOLBY_ATMOS, true)
         directSourceStream.value = prefs.getBoolean(KEY_DIRECT_SOURCE_STREAM, false)
         spatialAudio.value = prefs.getBoolean(KEY_SPATIAL_AUDIO, false)
+        spatialAudioByTrack.value = readSpatialAudioByTrack()
         equalizerEnabled.value = prefs.getBoolean(KEY_EQ_ENABLED, false)
         equalizerMode.value = runCatching {
             EqualizerMode.valueOf(prefs.getString(KEY_EQ_MODE, null) ?: EqualizerMode.DYNAMIC.name)
@@ -1657,6 +1665,33 @@ object AppSettings {
     fun setSpatialAudio(value: Boolean) {
         spatialAudio.value = value
         prefs.edit().putBoolean(KEY_SPATIAL_AUDIO, value).apply()
+    }
+
+    /** Spatial audio for [trackId]: its own saved choice, else the global switch. */
+    fun spatialAudioFor(trackId: String?): Boolean =
+        trackId?.let { spatialAudioByTrack.value[it] } ?: spatialAudio.value
+
+    /** Saves the choice for [trackId] right away; the oldest entries drop past the cap. */
+    fun setSpatialAudioForTrack(trackId: String, value: Boolean) {
+        if (trackId.isBlank()) return
+        val next = LinkedHashMap(spatialAudioByTrack.value)
+        next.remove(trackId)
+        next[trackId] = value
+        while (next.size > MAX_SPATIAL_TRACKS) next.remove(next.keys.first())
+        spatialAudioByTrack.value = next
+        val json = org.json.JSONObject()
+        next.forEach { (id, on) -> json.put(id, on) }
+        prefs.edit().putString(KEY_SPATIAL_AUDIO_BY_TRACK, json.toString()).apply()
+    }
+
+    private fun readSpatialAudioByTrack(): Map<String, Boolean> {
+        val raw = prefs.getString(KEY_SPATIAL_AUDIO_BY_TRACK, null) ?: return emptyMap()
+        return runCatching {
+            val json = org.json.JSONObject(raw)
+            val out = LinkedHashMap<String, Boolean>()
+            json.keys().forEach { out[it] = json.getBoolean(it) }
+            out as Map<String, Boolean>
+        }.getOrDefault(emptyMap())
     }
 
     fun setEqualizerEnabled(value: Boolean) {
@@ -2758,6 +2793,8 @@ object AppSettings {
     private const val KEY_DOLBY_ATMOS = "dolby_atmos"
     private const val KEY_DIRECT_SOURCE_STREAM = "direct_source_stream"
     private const val KEY_SPATIAL_AUDIO = "spatial_audio"
+    private const val KEY_SPATIAL_AUDIO_BY_TRACK = "spatial_audio_by_track"
+    private const val MAX_SPATIAL_TRACKS = 5000
     private const val KEY_EQ_ENABLED = "equalizer_enabled"
     private const val KEY_EQ_MODE = "equalizer_mode"
     private const val KEY_EQ_TONE_X = "equalizer_tone_x"

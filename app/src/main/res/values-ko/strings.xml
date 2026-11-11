@@ -204,6 +204,8 @@
     <string name="spatial_audio">공간 오디오</string>
     <string name="spatial_audio_subtitle">스테레오 트랙을 넓혀 더 몰입감 있게 들려줘요</string>
     <string name="spatial_audio_atmos_subtitle">이 트랙은 일시 중지됨 — Dolby Atmos는 이미 공간 오디오예요</string>
+    <string name="spatial_audio_prefer_off">공간 오디오 끄기 선호</string>
+    <string name="spatial_audio_prefer_on">공간 오디오 켜기 선호</string>
     <string name="animated_cover_cellular">모바일 데이터로 움직이는 커버 재생</string>
     <string name="replay">리플레이</string>
     <string name="replay_subtitle">내 인기 곡, 아티스트, 앨범, 장르</string>

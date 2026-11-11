@@ -3632,7 +3632,7 @@ class PlaybackService : MediaLibraryService() {
         // source resolution stands in until the decoder itself confirms or
         // corrects it — see [formatListener]'s onAudioInputFormatChanged.
         activeTrackIsDolbyAtmos = NerdStats.declaredFormat(mediaItem?.mediaId)?.isDolbyAtmos == true
-        applySpatialAudioEnabled()
+        applySpatialAudioEnabled(mediaItem?.mediaId)
 
         // A genuinely different track, so the gain is re-read for it. A
         // quality upgrade never reaches here — it returns early in
@@ -7223,7 +7223,11 @@ class PlaybackService : MediaLibraryService() {
             }
         }
         scope.launch {
-            AppSettings.spatialAudio.collect { applySpatialAudioEnabled() }
+            combine(
+                AppSettings.spatialAudio,
+                AppSettings.spatialAudioByTrack,
+            ) { global, perTrack -> global to perTrack }
+                .collect { applySpatialAudioEnabled() }
         }
         scope.launch {
             AppSettings.loudnessNormalization.collect {
@@ -7295,8 +7299,10 @@ class PlaybackService : MediaLibraryService() {
      * ever describes the active player — see [formatListener] — so both
      * processors are kept in lockstep rather than tracking a role swap.
      */
-    private fun applySpatialAudioEnabled() {
-        val enabled = AppSettings.spatialAudio.value && !activeTrackIsDolbyAtmos
+    private fun applySpatialAudioEnabled(
+        mediaId: String? = player?.currentMediaItem?.mediaId,
+    ) {
+        val enabled = AppSettings.spatialAudioFor(mediaId) && !activeTrackIsDolbyAtmos
         spatialAudioProcessorA.enabled = enabled
         spatialAudioProcessorB.enabled = enabled
     }
