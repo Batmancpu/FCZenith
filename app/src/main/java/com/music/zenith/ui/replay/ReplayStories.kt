@@ -43,6 +43,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -56,6 +57,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -64,7 +66,10 @@ import androidx.compose.ui.graphics.PointMode
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.layer.*
+import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
@@ -157,6 +162,8 @@ fun ReplayStories(
     val clockStopped = held || paused || dragging || moving
     val reduceAnimation by AppSettings.reduceAnimation.collectAsStateWithLifecycle()
     val motion = !reduceAnimation
+
+    DisposableEffect(Unit) { onDispose { ReplayCapture.clear() } }
 
     ReplayBacksound(
         summary = summary,
@@ -263,6 +270,19 @@ private fun Stage(
     val hold by rememberUpdatedState(onHold)
     val step by rememberUpdatedState(onStep)
     val drift = rememberDrift(motion)
+    val layer = rememberGraphicsLayer()
+    val captureScope = rememberCoroutineScope()
+    val shareCard: (ReplayStoryPage) -> Unit = { card ->
+        captureScope.launch {
+            ReplayCapture.clear()
+            // Kartu recap punya tombol di dalamnya, jadi tetap memakai poster.
+            if (card != ReplayStoryPage.SUMMARY) {
+                runCatching { layer.toImageBitmap().asAndroidBitmap() }
+                    .onSuccess { ReplayCapture.put(card, it) }
+            }
+            onShare(card)
+        }
+    }
 
     // Palet tiap story diekstrak sekali di sini (di-cache per URL), lalu dipakai
     // backdrop bersama dan visual di tiap halaman.
@@ -288,25 +308,34 @@ private fun Stage(
                 )
             },
     ) {
-        StoryBackdrop(
-            colors = hued,
-            position = { pagerState.currentPage + pagerState.currentPageOffsetFraction },
-            drift = drift,
-        )
-        FilmGrain()
-
-        HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { index ->
-            StoryPage(
-                page = pages[index],
-                summary = summary,
-                colors = hued[index],
-                onNext = { step(true) },
-                onRestart = onRestart,
-                onShare = onShare,
-                pageOffset = { (pagerState.currentPage - index) + pagerState.currentPageOffsetFraction },
+        Box(
+            Modifier
+                .fillMaxSize()
+                .drawWithContent {
+                    layer.record { this@drawWithContent.drawContent() }
+                    drawLayer(layer)
+                },
+        ) {
+            StoryBackdrop(
+                colors = hued,
+                position = { pagerState.currentPage + pagerState.currentPageOffsetFraction },
                 drift = drift,
-                motion = motion,
             )
+            FilmGrain()
+
+            HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { index ->
+                StoryPage(
+                    page = pages[index],
+                    summary = summary,
+                    colors = hued[index],
+                    onNext = { step(true) },
+                    onRestart = onRestart,
+                    onShare = shareCard,
+                    pageOffset = { (pagerState.currentPage - index) + pagerState.currentPageOffsetFraction },
+                    drift = drift,
+                    motion = motion,
+                )
+            }
         }
 
         StoryChrome(
@@ -316,7 +345,7 @@ private fun Stage(
             shown = shown,
             progress = { progress.value },
             onClose = onClose,
-            onShare = { onShare(pages[shown.coerceIn(0, pages.lastIndex)]) },
+            onShare = { shareCard(pages[shown.coerceIn(0, pages.lastIndex)]) },
         )
     }
 }
@@ -1017,22 +1046,24 @@ private fun ColumnScope.SongsStory(
     val lead = rows.firstOrNull() ?: return
     MaskReveal(reveal, 0f) { Headline(headline, textSize = 32) }
     Spacer(Modifier.height(14.dp))
-    BoxWithConstraints(Modifier.weight(2.5f).fillMaxWidth()) {
-        val d = minOf(maxHeight, maxWidth * 0.60f)
-        Text(
-            text = "01",
-            fontSize = (d.value * 0.62f).sp,
-            fontWeight = FontWeight.W900,
-            letterSpacing = (-4).sp,
-            color = Color.White.copy(alpha = 0.95f),
-            modifier = Modifier.align(Alignment.TopStart).staged(reveal, 0.05f, 0.5f, 40.dp),
-        )
+    BoxWithConstraints(Modifier.weight(3f).fillMaxWidth()) {
+        val d = minOf(maxHeight, maxWidth * 0.55f)
+        val numberSize = minOf(d.value * 0.36f, 64f)
         Column(
-            Modifier.align(Alignment.BottomStart).width(maxWidth - d - 12.dp).staged(reveal, 0.30f),
+            Modifier.align(Alignment.CenterStart).width(maxWidth - d - 12.dp).staged(reveal, 0.15f),
         ) {
             Text(
+                text = "01",
+                fontSize = numberSize.sp,
+                lineHeight = numberSize.sp,
+                fontWeight = FontWeight.W900,
+                letterSpacing = (-2).sp,
+                color = Color.White.copy(alpha = 0.95f),
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
                 text = lead.title,
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.W800,
                 color = Color.White,
                 maxLines = 3,
@@ -1144,7 +1175,7 @@ private fun ColumnScope.AlbumsStory(
     val lead = rows.firstOrNull() ?: return
     MaskReveal(reveal, 0f) { Headline(headline, textSize = 32) }
     BoxWithConstraints(Modifier.weight(1.9f).fillMaxWidth().padding(top = 12.dp)) {
-        val d = minOf(maxHeight, maxWidth * 0.86f)
+        val d = minOf(maxHeight, maxWidth * 0.70f)
         Cover(
             url = lead.artworkUrl,
             fallbackText = lead.title,
@@ -1153,7 +1184,6 @@ private fun ColumnScope.AlbumsStory(
             px = HEADER_ART_PX,
             modifier = Modifier
                 .align(Alignment.CenterEnd)
-                .offset(x = 20.dp)
                 .popped(reveal, 0.08f, 0.6f, 0.84f)
                 .graphicsLayer {
                     translationX = pageOffset() * this.size.width * 0.20f
@@ -1441,27 +1471,34 @@ private fun ColumnScope.RecapStory(
     }
     Spacer(Modifier.height(10.dp))
     Row(Modifier.weight(1f).fillMaxWidth()) {
-        Column(
-            Modifier.weight(1.2f).fillMaxHeight().staged(reveal, 0.18f, 0.5f),
-            verticalArrangement = Arrangement.SpaceEvenly,
-        ) {
-            RecapList(stringResource(R.string.top_artists), artists, withSubtitle = false)
-            RecapList(stringResource(R.string.top_songs), songs, withSubtitle = true)
-            RecapList(stringResource(R.string.top_albums), albums, withSubtitle = true)
+        BoxWithConstraints(Modifier.weight(1.2f).fillMaxHeight()) {
+            // Layar pendek: subtitle dibuang dan baris dirapatkan supaya
+            // ketiga daftar muat tanpa terpotong.
+            val roomy = maxHeight >= 400.dp
+            Column(
+                Modifier.fillMaxSize().staged(reveal, 0.18f, 0.5f),
+                verticalArrangement = Arrangement.SpaceEvenly,
+            ) {
+                RecapList(stringResource(R.string.top_artists), artists, withSubtitle = false, roomy = roomy)
+                RecapList(stringResource(R.string.top_songs), songs, withSubtitle = roomy, roomy = roomy)
+                RecapList(stringResource(R.string.top_albums), albums, withSubtitle = roomy, roomy = roomy)
+            }
         }
         BoxWithConstraints(Modifier.weight(0.8f).fillMaxHeight()) {
-            val d = minOf(maxWidth, maxHeight / 2.6f)
-            albums.firstOrNull()?.let {
-                Cover(it.artworkUrl, it.title, d, RoundedCornerShape(14.dp), CARD_ART_PX,
-                    Modifier.offset(x = 20.dp, y = d * 1.58f).popped(reveal, 0.34f))
+            val d = minOf(maxWidth - 8.dp, maxHeight / 3.3f)
+            val x = (maxWidth - d) / 2f
+            val gap = d * 1.12f
+            artists.firstOrNull()?.let {
+                Cover(it.artworkUrl, it.title, d, CircleShape, CARD_ART_PX,
+                    Modifier.offset(x = x).popped(reveal, 0.22f).border(1.dp, Color.White.copy(alpha = 0.3f), CircleShape))
             }
             songs.firstOrNull()?.let {
                 Cover(it.artworkUrl, it.title, d, RoundedCornerShape(14.dp), CARD_ART_PX,
-                    Modifier.offset(x = 20.dp, y = d * 0.80f).popped(reveal, 0.28f))
+                    Modifier.offset(x = x, y = gap).popped(reveal, 0.28f))
             }
-            artists.firstOrNull()?.let {
-                Cover(it.artworkUrl, it.title, d * 1.04f, CircleShape, CARD_ART_PX,
-                    Modifier.offset(x = 20.dp).popped(reveal, 0.22f).border(1.dp, Color.White.copy(alpha = 0.3f), CircleShape))
+            albums.firstOrNull()?.let {
+                Cover(it.artworkUrl, it.title, d, RoundedCornerShape(14.dp), CARD_ART_PX,
+                    Modifier.offset(x = x, y = gap * 2f).popped(reveal, 0.34f))
             }
         }
     }
@@ -1492,7 +1529,7 @@ private fun ColumnScope.RecapStory(
 }
 
 @Composable
-private fun RecapList(title: String, rows: List<ReplayRow>, withSubtitle: Boolean) {
+private fun RecapList(title: String, rows: List<ReplayRow>, withSubtitle: Boolean, roomy: Boolean = true) {
     if (rows.isEmpty()) return
     Column {
         Text(
@@ -1502,7 +1539,7 @@ private fun RecapList(title: String, rows: List<ReplayRow>, withSubtitle: Boolea
             color = Color.White,
         )
         rows.forEach { row ->
-            Row(Modifier.padding(top = 5.dp)) {
+            Row(Modifier.padding(top = if (roomy) 5.dp else 2.dp)) {
                 Text(
                     text = row.rank.toString(),
                     style = MaterialTheme.typography.labelLarge,

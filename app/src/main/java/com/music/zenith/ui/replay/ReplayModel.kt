@@ -128,8 +128,13 @@ fun ReplaySummary.storyHeadline(context: Context, page: ReplayStoryPage): List<H
     else -> legacyStoryHeadline(context, page)
 }
 
-private fun Context.twoPart(first: Int, second: Int): List<HeadlineRun> =
-    listOf(HeadlineRun(getString(first), false), HeadlineRun(getString(second), true))
+private fun Context.twoPart(first: Int, second: Int): List<HeadlineRun> {
+    // Android memangkas spasi di ujung string resource, jadi spasi antar-bagian
+    // ditambahkan di sini supaya "Lagu-lagu ini" + "menemani" tidak menempel.
+    val a = getString(first)
+    val lead = if (a.isEmpty() || a.last().isWhitespace()) a else "$a "
+    return listOf(HeadlineRun(lead, false), HeadlineRun(getString(second), true))
+}
 
 private fun ReplaySummary.legacyStoryHeadline(context: Context, page: ReplayStoryPage): List<HeadlineRun> = when (page) {
     ReplayStoryPage.INTRO -> runs(
