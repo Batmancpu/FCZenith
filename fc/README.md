@@ -25,9 +25,10 @@ this repository and select the Music APK asset.
 
 ## Stable upstream policy
 
-Production builds follow the upstream developer's latest **published stable
-GitHub Release**, not arbitrary commits on the moving `main` branch. This
-avoids packaging work-in-progress changes.
+Regular production builds follow the upstream developer's latest **published stable
+GitHub Release**. The explicitly requested v15.7.0.4 snapshot is a one-time exception:
+it includes upstream `main` through commit `677d992a0c6569e0ad34bcb2f2ddcfcde3d438d7`.
+After that snapshot, the automated pipeline returns to published stable releases.
 
 Version format is:
 
