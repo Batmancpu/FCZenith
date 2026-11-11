@@ -1,6 +1,8 @@
 name: FC Zenith — upstream sync and Music release
 
 on:
+  push:
+    branches: [main]
   schedule:
     - cron: '47 * * * *'
   workflow_dispatch:
@@ -330,6 +332,7 @@ jobs:
             - Android package: com.spotify.music
             - App label: Music
             - Built from the published stable upstream release ${{ steps.upstream.outputs.tag }}.
+            - Maintenance rebuild: no app feature or playback changes; this release carries FCZenith pipeline hardening.
             - The same FC signing certificate is checked before publishing.
 
             Obtainium source: https://github.com/Batmancpu/FCZenith
