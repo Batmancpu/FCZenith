@@ -154,13 +154,23 @@ fun ExploreScreen(
                     is UiState.Success -> {
                         chartsState.data.filter { it.title != editorial?.title }.forEachIndexed { index, shelf ->
                             item(key = "chart:$index:${shelf.title}") {
-                                Shelf(
-                                    shelf = shelf,
-                                    onItemClick = { onShelfItemClick?.invoke(it, shelf.title) },
-                                    onItemLongPress = onShelfItemLongPress,
-                                    currentSong = currentSong,
-                                    isPlaying = isPlaying,
-                                )
+                                if (shelf.layout == com.music.zenith.data.model.ShelfLayout.LIST) {
+                                    RecentShelf(
+                                        shelf = shelf,
+                                        onItemClick = { onShelfItemClick?.invoke(it, shelf.title) },
+                                        onItemLongPress = onShelfItemLongPress,
+                                        currentSong = currentSong,
+                                        isPlaying = isPlaying,
+                                    )
+                                } else {
+                                    Shelf(
+                                        shelf = shelf,
+                                        onItemClick = { onShelfItemClick?.invoke(it, shelf.title) },
+                                        onItemLongPress = onShelfItemLongPress,
+                                        currentSong = currentSong,
+                                        isPlaying = isPlaying,
+                                    )
+                                }
                             }
                         }
                     }

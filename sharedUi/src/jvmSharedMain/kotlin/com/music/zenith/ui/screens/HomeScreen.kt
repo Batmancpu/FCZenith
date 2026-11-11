@@ -954,7 +954,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.itemsIndexedShelves(
 
 /** The same four-rows-per-page treatment used by an artist's Top songs. */
 @Composable
-private fun RecentShelf(
+internal fun RecentShelf(
     shelf: HomeShelf,
     onItemClick: (ShelfItem) -> Unit,
     onItemLongPress: ((ShelfItem) -> Unit)?,
