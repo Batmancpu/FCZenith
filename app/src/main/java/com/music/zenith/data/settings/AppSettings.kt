@@ -639,7 +639,7 @@ object AppSettings {
     val smartVersionAlignment = MutableStateFlow(true)
 
     /** Music video diputar sebagai versi audionya — lihat [com.music.zenith.playback.MusicOnlyPlayback]. */
-    val autoMusicOnly = MutableStateFlow(false)
+    val autoMusicOnly = MutableStateFlow(true)
 
     /** Removes the Recents row from Home. */
     val hideHomeRecents = MutableStateFlow(false)
@@ -657,7 +657,7 @@ object AppSettings {
     val hideHomeMoods = MutableStateFlow(false)
 
     /** Shows every music video as a square, see [VideoThumbnails]. */
-    val squareVideoCovers = MutableStateFlow(false)
+    val squareVideoCovers = MutableStateFlow(true)
 
     /** Never plays the music video in the player: a video track shows its cover instead. */
     val stillVideoCovers = MutableStateFlow(false)
@@ -1339,13 +1339,13 @@ object AppSettings {
         swipeToPlayNext.value = prefs.getBoolean(KEY_SWIPE_TO_PLAY_NEXT, false)
         dontRepeatSuggestions.value = prefs.getBoolean(KEY_DONT_REPEAT_SUGGESTIONS, false)
         smartVersionAlignment.value = prefs.getBoolean(KEY_SMART_VERSION_ALIGNMENT, true)
-        autoMusicOnly.value = prefs.getBoolean(KEY_AUTO_MUSIC_ONLY, false)
+        autoMusicOnly.value = prefs.getBoolean(KEY_AUTO_MUSIC_ONLY, true)
         hideHomeRecents.value = prefs.getBoolean(KEY_HIDE_HOME_RECENTS, false)
         hideHomeBranding.value = prefs.getBoolean(KEY_HIDE_HOME_BRANDING, false)
         hideHomeVideos.value = prefs.getBoolean(KEY_HIDE_HOME_VIDEOS, false)
         hideHomeTopPicks.value = prefs.getBoolean(KEY_HIDE_HOME_TOP_PICKS, false)
         hideHomeMoods.value = prefs.getBoolean(KEY_HIDE_HOME_MOODS, false)
-        squareVideoCovers.value = prefs.getBoolean(KEY_SQUARE_VIDEO_COVERS, false)
+        squareVideoCovers.value = prefs.getBoolean(KEY_SQUARE_VIDEO_COVERS, true)
         VideoThumbnails.square = squareVideoCovers.value
         stillVideoCovers.value = prefs.getBoolean(KEY_STILL_VIDEO_COVERS, false)
         homeLayout.value = HomeLayout.decode(prefs.getString(KEY_HOME_LAYOUT, null))

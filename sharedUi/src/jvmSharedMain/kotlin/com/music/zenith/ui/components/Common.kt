@@ -206,7 +206,7 @@ fun Modifier.trackArtSize(height: Dp, isVideo: Boolean): Modifier =
  * each caller collecting a flow.
  */
 object VideoThumbnails {
-    var square by mutableStateOf(false)
+    var square by mutableStateOf(true)
 }
 
 /** Share of the row a lead-shelf card takes, so the next one peeks in past it. */
