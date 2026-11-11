@@ -521,18 +521,15 @@ private fun GlassNowPlaying(
             if (!isInline) {
                 // Glyph centres 44dp apart, as Apple's are.
                 Spacer(Modifier.width(4.dp))
-                IconButton(
+                MiniPlayerNextButton(
+                    tint = contentColor.copy(alpha = if (controlsLocked) 0.3f else 1f),
+                    enabled = !controlsLocked,
+                    slot = glyphSlot,
                     onClick = {
                         haptics.play(Haptic.SkipNext)
                         onNext()
                     },
-                    enabled = !controlsLocked,
-                    modifier = Modifier.size(glyphSlot),
-                ) {
-                    MiniPlayerNextGlyph(
-                        tint = contentColor.copy(alpha = if (controlsLocked) 0.3f else 1f),
-                    )
-                }
+                )
             }
         }
     }

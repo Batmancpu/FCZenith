@@ -69,7 +69,7 @@ import com.music.zenith.ui.components.ExplicitSongTitle
 import com.music.zenith.ui.components.FadingLine
 import com.music.zenith.ui.components.TrackTextSwitch
 import com.music.zenith.ui.components.LocalLiquidGlassEnabled
-import com.music.zenith.ui.components.MiniPlayerNextGlyph
+import com.music.zenith.ui.components.MiniPlayerNextButton
 import com.music.zenith.ui.components.glassContentColor
 import com.music.zenith.ui.components.isGlassSupported
 import com.music.zenith.ui.components.liquidGlass
@@ -423,18 +423,15 @@ private fun PanelMiniRow(
             }
             if (showNext) {
                 Spacer(Modifier.width(if (glass) 4.dp else 8.dp))
-                IconButton(
+                MiniPlayerNextButton(
+                    tint = contentColor.copy(alpha = if (controlsLocked) 0.3f else 1f),
+                    enabled = !controlsLocked,
+                    slot = glyphSlot,
                     onClick = {
                         haptics.play(Haptic.SkipNext)
                         onNext()
                     },
-                    enabled = !controlsLocked,
-                    modifier = Modifier.size(glyphSlot),
-                ) {
-                    MiniPlayerNextGlyph(
-                        tint = contentColor.copy(alpha = if (controlsLocked) 0.3f else 1f),
-                    )
-                }
+                )
             }
         }
     }
