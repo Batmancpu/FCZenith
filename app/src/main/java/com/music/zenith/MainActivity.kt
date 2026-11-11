@@ -891,6 +891,7 @@ private fun ZenithApp(
     val hideHomeTopPicks by AppSettings.hideHomeTopPicks.collectAsStateWithLifecycle()
     val hideHomeMoods by AppSettings.hideHomeMoods.collectAsStateWithLifecycle()
     val homeLayout by AppSettings.homeLayout.collectAsStateWithLifecycle()
+    val libraryLayout by AppSettings.libraryLayout.collectAsStateWithLifecycle()
     // Only what Home draws: Top Picks and Explore keep reading the full feed.
     val visibleHomeState = remember(homeState, hideHomeVideos, hideHomeRecents) {
         val loaded = homeState as? UiState.Success
@@ -3889,6 +3890,7 @@ private fun ZenithApp(
                                 contentPadding = listPadding,
                                 links = libraryLinks(signedIn),
                                 deviceItems = libraryDeviceItems(downloadedReleases) + localPlaylistItems,
+                                layout = libraryLayout,
                             )
                         }
                     }
@@ -5916,6 +5918,7 @@ private fun ZenithApp(
             HomeLayoutDialog(
                 hazeState = hazeState,
                 shelves = layoutShelves,
+                libraryShelves = (libraryState as? UiState.Success)?.data?.shelves.orEmpty(),
                 onDismiss = { showHomeLayout = false },
             )
         }

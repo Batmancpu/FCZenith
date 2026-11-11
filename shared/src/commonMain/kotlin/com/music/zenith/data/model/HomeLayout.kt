@@ -6,6 +6,12 @@ const val HOME_SLOT_TOP_PICKS = "slot:top-picks"
 /** Key of the Find Your Mood slot on Home. */
 const val HOME_SLOT_MOODS = "slot:moods"
 
+/** Keys of the fixed rows of the Library tab. Shelves use [homeShelfKey]. */
+const val LIBRARY_SLOT_PINNED = "slot:library-pinned"
+const val LIBRARY_SLOT_LINKS = "slot:library-links"
+const val LIBRARY_SLOT_REPLAY = "slot:library-replay"
+const val LIBRARY_SLOT_ON_DEVICE = "slot:library-on-device"
+
 /** Title of the speed dial built from local listening; kept apart from YouTube's Quick picks / Speed dial shelf. */
 const val LOCAL_SPEED_DIAL_TITLE = "My speed dial"
 

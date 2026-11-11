@@ -1128,6 +1128,10 @@
     <string name="customize_home">Atur susunan Beranda</string>
     <string name="customize_home_subtitle">Ubah urutan baris dan pilih mana yang tampil</string>
     <string name="home_layout_description">Seret baris lewat gagangnya untuk memindahkan. Hapus centang untuk menyembunyikannya dari Beranda.</string>
+    <string name="customize_library">Atur susunan Pustaka</string>
+    <string name="library_layout_description">Seret baris lewat gagangnya untuk memindahkan. Hapus centang untuk menyembunyikannya dari Pustaka.</string>
+    <string name="library_row_pinned">Playlist yang disematkan</string>
+    <string name="library_row_links">Folder</string>
     <string name="home_layout_empty">Beranda masih dimuat. Buka lagi setelah barisnya muncul.</string>
     <string name="home_row_top_picks">Pilihan Teratas untuk Anda</string>
     <string name="still_video_covers">Sampul, bukan video</string>

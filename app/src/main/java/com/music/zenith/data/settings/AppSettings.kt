@@ -665,6 +665,9 @@ object AppSettings {
     /** The listener's own order and hidden rows on Home. Empty keeps the built-in order. */
     val homeLayout = MutableStateFlow(HomeLayout())
 
+    /** The listener's own order and hidden rows on the Library tab. Empty keeps the built-in order. */
+    val libraryLayout = MutableStateFlow(HomeLayout())
+
     /** Drops haze blur (status bar, mini player, bottom fade, lyrics focus) for a solid-fill look. */
     val reduceDynamicBlur = MutableStateFlow(false)
 
@@ -1336,6 +1339,7 @@ object AppSettings {
         VideoThumbnails.square = squareVideoCovers.value
         stillVideoCovers.value = prefs.getBoolean(KEY_STILL_VIDEO_COVERS, false)
         homeLayout.value = HomeLayout.decode(prefs.getString(KEY_HOME_LAYOUT, null))
+        libraryLayout.value = HomeLayout.decode(prefs.getString(KEY_LIBRARY_LAYOUT, null))
         reduceDynamicBlur.value = prefs.getBoolean(KEY_REDUCE_BLUR, false)
         liquidGlass.value = prefs.getBoolean(KEY_LIQUID_GLASS, false)
         frostedGlass.value = prefs.getBoolean(KEY_FROSTED_GLASS, false)
@@ -1904,6 +1908,11 @@ object AppSettings {
                 setHideHomeMoods(value.isHidden(HOME_SLOT_MOODS))
             }
         }
+    }
+
+    fun setLibraryLayout(value: HomeLayout) {
+        libraryLayout.value = value
+        prefs.edit().putString(KEY_LIBRARY_LAYOUT, value.encode()).apply()
     }
 
     fun setReduceDynamicBlur(value: Boolean) {
@@ -2769,6 +2778,7 @@ object AppSettings {
     private const val KEY_SQUARE_VIDEO_COVERS = "square_video_covers"
     private const val KEY_STILL_VIDEO_COVERS = "still_video_covers"
     private const val KEY_HOME_LAYOUT = "home_layout"
+    private const val KEY_LIBRARY_LAYOUT = "library_layout"
     private const val KEY_REDUCE_BLUR = "reduce_dynamic_blur"
     private const val KEY_LIQUID_GLASS = "liquid_glass"
     private const val KEY_FROSTED_GLASS = "frosted_glass"

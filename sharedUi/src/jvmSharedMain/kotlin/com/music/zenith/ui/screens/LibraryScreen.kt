@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import com.music.zenith.ui.components.ShelfRow
 import com.music.zenith.ui.components.shelfStagger
@@ -49,8 +50,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.music.zenith.data.YtMusicRepository
+import com.music.zenith.data.model.HomeLayout
 import com.music.zenith.data.model.HomeShelf
+import com.music.zenith.data.model.LIBRARY_SLOT_LINKS
+import com.music.zenith.data.model.LIBRARY_SLOT_ON_DEVICE
+import com.music.zenith.data.model.LIBRARY_SLOT_PINNED
+import com.music.zenith.data.model.LIBRARY_SLOT_REPLAY
 import com.music.zenith.data.model.LibraryPage
+import com.music.zenith.data.model.homeShelfKey
 import com.music.zenith.data.model.ShelfItem
 import com.music.zenith.data.model.UiState
 import com.music.zenith.data.settings.LibrarySort
@@ -120,6 +127,8 @@ fun LibraryScreen(
     deviceItems: List<ShelfItem>,
     /** The big "Library" heading; the desktop's pages carry none. */
     showTitle: Boolean = true,
+    /** The listener's own order and hidden rows; empty keeps the built-in order. */
+    layout: HomeLayout = HomeLayout(),
 ) {
     val pinnedPlaylists by AppUi.host.pinnedPlaylists.collectAsStateWithLifecycle()
     val onDevice = stringResource(Res.string.on_device)
@@ -166,114 +175,138 @@ fun LibraryScreen(
                     )
                 }
             }
-            if (pinnedItems.isNotEmpty()) {
-                item(key = "pinned") {
-                    LibraryPinnedGrid(
-                        items = pinnedItems,
-                        onClick = onShelfItemClick,
-                        onLongPress = onShelfItemLongPress,
-                    )
+            // Tiap bagian halaman adalah satu slot, supaya urutan dan sembunyinya
+            // bisa diatur lewat Customize (AppSettings.libraryLayout).
+            val sections = ArrayList<Pair<String, LazyListScope.() -> Unit>>()
+            fun section(key: String, emit: LazyListScope.() -> Unit) {
+                sections += key to emit
+            }
+            // Status muat/gagal selalu di akhir dan tidak ikut diatur.
+            val status = ArrayList<LazyListScope.() -> Unit>()
+            section(LIBRARY_SLOT_PINNED) {
+                if (pinnedItems.isNotEmpty()) {
+                    item(key = "pinned") {
+                        LibraryPinnedGrid(
+                            items = pinnedItems,
+                            onClick = onShelfItemClick,
+                            onLongPress = onShelfItemLongPress,
+                        )
+                    }
                 }
             }
-            if (links.isNotEmpty()) {
-                item(key = "links") { LibraryLinkList(links = links, onClick = onShelfItemClick) }
+            section(LIBRARY_SLOT_LINKS) {
+                if (links.isNotEmpty()) {
+                    item(key = "links") { LibraryLinkList(links = links, onClick = onShelfItemClick) }
+                }
             }
-            item(key = "replay") { replay() }
-            if (deviceItems.isNotEmpty()) {
-                item(key = "shelf:$onDevice") {
-                    val onDeviceShelf = HomeShelf(title = onDevice, items = deviceItems)
-                    LibraryGridShelf(
-                        shelf = onDeviceShelf,
-                        onItemClick = onShelfItemClick,
-                        onItemLongPress = onShelfItemLongPress,
-                        onShowAll = { onShowAll(onDeviceShelf) },
-                    )
+            section(LIBRARY_SLOT_REPLAY) { item(key = "replay") { replay() } }
+            section(LIBRARY_SLOT_ON_DEVICE) {
+                if (deviceItems.isNotEmpty()) {
+                    item(key = "shelf:$onDevice") {
+                        val onDeviceShelf = HomeShelf(title = onDevice, items = deviceItems)
+                        LibraryGridShelf(
+                            shelf = onDeviceShelf,
+                            onItemClick = onShelfItemClick,
+                            onItemLongPress = onShelfItemLongPress,
+                            onShowAll = { onShowAll(onDeviceShelf) },
+                        )
+                    }
                 }
             }
             if (!signedIn) {
-                item(key = "shelf:$PLAYLISTS") {
-                    val emptyPlaylists = HomeShelf(PLAYLISTS, emptyList())
-                    PlaylistShelf(
-                        shelf = emptyPlaylists,
-                        onItemClick = onShelfItemClick,
-                        onItemLongPress = onShelfItemLongPress,
-                        onNewPlaylist = onNewPlaylist,
-                        onImportSpotifyPlaylist = onImportSpotifyPlaylist,
-                        onShowAll = { onShowAll(emptyPlaylists) },
-                    )
+                section(homeShelfKey(PLAYLISTS)) {
+                    item(key = "shelf:$PLAYLISTS") {
+                        val emptyPlaylists = HomeShelf(PLAYLISTS, emptyList())
+                        PlaylistShelf(
+                            shelf = emptyPlaylists,
+                            onItemClick = onShelfItemClick,
+                            onItemLongPress = onShelfItemLongPress,
+                            onNewPlaylist = onNewPlaylist,
+                            onImportSpotifyPlaylist = onImportSpotifyPlaylist,
+                            onShowAll = { onShowAll(emptyPlaylists) },
+                        )
+                    }
+                    item {
+                        MessageState(
+                            message = stringResource(Res.string.library_sign_in_description),
+                            actionLabel = stringResource(Res.string.sign_in),
+                            onAction = onSignIn,
+                        )
+                    }
                 }
-                item {
-                    MessageState(
-                        message = stringResource(Res.string.library_sign_in_description),
-                        actionLabel = stringResource(Res.string.sign_in),
-                        onAction = onSignIn,
-                    )
-                }
-                return@LazyColumn
-            }
-            when (state) {
-                is UiState.Loading -> librarySkeleton()
-                is UiState.Error -> item {
-                    MessageState(state.message, actionLabel = stringResource(Res.string.retry), onAction = onRetry)
-                }
-                is UiState.Success -> {
-                    // A fresh account has no Playlists shelf at all, and that
-                    // is exactly the account most in need of the button that
-                    // makes one — so the row is drawn either way, empty but
-                    // for the tile that creates the first playlist.
-                    val shelves = state.data.shelves
-                    if (shelves.none { it.title == PLAYLISTS }) {
-                        item(key = "shelf:$PLAYLISTS") {
-                            val emptyPlaylists = HomeShelf(PLAYLISTS, emptyList())
-                            PlaylistShelf(
-                                shelf = emptyPlaylists,
-                                onItemClick = onShelfItemClick,
-                                onItemLongPress = onShelfItemLongPress,
-                                onNewPlaylist = onNewPlaylist,
-                                onImportSpotifyPlaylist = onImportSpotifyPlaylist,
-                                onShowAll = { onShowAll(emptyPlaylists) },
-                            )
+            } else {
+                when (state) {
+                    is UiState.Loading -> status.add { librarySkeleton() }
+                    is UiState.Error -> status.add {
+                        item {
+                            MessageState(state.message, actionLabel = stringResource(Res.string.retry), onAction = onRetry)
                         }
                     }
-                    shelves.forEach { shelf ->
-                        item(key = "shelf:${shelf.title}") {
-                            if (shelf.title == PLAYLISTS) {
-                                val pinnedFirst = shelf
-                                    .copy(items = shelf.items.filterNot { it.browseId == YtMusicRepository.LIKED_MUSIC })
-                                    .pinnedFirst(pinnedPlaylists)
-                                // Yang di-pin sudah tampil di grid atas, jadi shelf
-                                // hanya menampilkan sisanya. "Show all" tetap membuka semuanya.
-                                val unpinned = pinnedFirst.copy(
-                                    items = pinnedFirst.items.filterNot { it.browseId != null && it.browseId in pinnedPlaylists },
-                                )
-                                PlaylistShelf(
-                                    shelf = unpinned,
-                                    onItemClick = onShelfItemClick,
-                                    onItemLongPress = onShelfItemLongPress,
-                                    onNewPlaylist = onNewPlaylist,
-                                    onImportSpotifyPlaylist = onImportSpotifyPlaylist,
-                                    onShowAll = { onShowAll(pinnedFirst) },
-                                    pinnedPlaylists = pinnedPlaylists,
-                                )
-                            } else if (shelf.title == ARTISTS_SHELF) {
-                                LibraryTwoColumnShelf(
-                                    shelf = shelf,
-                                    onItemClick = onShelfItemClick,
-                                    onItemLongPress = onShelfItemLongPress,
-                                    onShowAll = { onShowAll(shelf) },
-                                )
-                            } else {
-                                LibraryGridShelf(
-                                    shelf = shelf,
-                                    onItemClick = onShelfItemClick,
-                                    onItemLongPress = onShelfItemLongPress,
-                                    onShowAll = { onShowAll(shelf) },
-                                )
+                    is UiState.Success -> {
+                        // A fresh account has no Playlists shelf at all, and that
+                        // is exactly the account most in need of the button that
+                        // makes one — so the row is drawn either way, empty but
+                        // for the tile that creates the first playlist.
+                        val shelves = state.data.shelves
+                        if (shelves.none { it.title == PLAYLISTS }) {
+                            section(homeShelfKey(PLAYLISTS)) {
+                                item(key = "shelf:$PLAYLISTS") {
+                                    val emptyPlaylists = HomeShelf(PLAYLISTS, emptyList())
+                                    PlaylistShelf(
+                                        shelf = emptyPlaylists,
+                                        onItemClick = onShelfItemClick,
+                                        onItemLongPress = onShelfItemLongPress,
+                                        onNewPlaylist = onNewPlaylist,
+                                        onImportSpotifyPlaylist = onImportSpotifyPlaylist,
+                                        onShowAll = { onShowAll(emptyPlaylists) },
+                                    )
+                                }
+                            }
+                        }
+                        shelves.forEach { shelf ->
+                            section(homeShelfKey(shelf.title)) {
+                                item(key = "shelf:${shelf.title}") {
+                                    if (shelf.title == PLAYLISTS) {
+                                        val pinnedFirst = shelf
+                                            .copy(items = shelf.items.filterNot { it.browseId == YtMusicRepository.LIKED_MUSIC })
+                                            .pinnedFirst(pinnedPlaylists)
+                                        // Yang di-pin sudah tampil di grid atas, jadi shelf
+                                        // hanya menampilkan sisanya. "Show all" tetap membuka semuanya.
+                                        val unpinned = pinnedFirst.copy(
+                                            items = pinnedFirst.items.filterNot { it.browseId != null && it.browseId in pinnedPlaylists },
+                                        )
+                                        PlaylistShelf(
+                                            shelf = unpinned,
+                                            onItemClick = onShelfItemClick,
+                                            onItemLongPress = onShelfItemLongPress,
+                                            onNewPlaylist = onNewPlaylist,
+                                            onImportSpotifyPlaylist = onImportSpotifyPlaylist,
+                                            onShowAll = { onShowAll(pinnedFirst) },
+                                            pinnedPlaylists = pinnedPlaylists,
+                                        )
+                                    } else if (shelf.title == ARTISTS_SHELF) {
+                                        LibraryTwoColumnShelf(
+                                            shelf = shelf,
+                                            onItemClick = onShelfItemClick,
+                                            onItemLongPress = onShelfItemLongPress,
+                                            onShowAll = { onShowAll(shelf) },
+                                        )
+                                    } else {
+                                        LibraryGridShelf(
+                                            shelf = shelf,
+                                            onItemClick = onShelfItemClick,
+                                            onItemLongPress = onShelfItemLongPress,
+                                            onShowAll = { onShowAll(shelf) },
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
                 }
             }
+            layout.arrange(sections) { it.first }.forEach { it.second(this) }
+            status.forEach { it(this) }
         }
     }
 }

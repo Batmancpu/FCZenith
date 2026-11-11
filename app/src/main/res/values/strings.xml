@@ -302,6 +302,10 @@
     <string name="customize_home">Customize Home</string>
     <string name="customize_home_subtitle">Reorder rows and choose which ones show</string>
     <string name="home_layout_description">Drag a row by its handle to move it. Untick a row to hide it from Home.</string>
+    <string name="customize_library">Customize Library</string>
+    <string name="library_layout_description">Drag a row by its handle to move it. Untick a row to hide it from Library.</string>
+    <string name="library_row_pinned">Pinned playlists</string>
+    <string name="library_row_links">Folders</string>
     <string name="home_layout_empty">Home is still loading. Open this again once the rows have appeared.</string>
     <string name="home_row_top_picks">Top Picks for You</string>
     <string name="still_video_covers">Cover instead of video</string>
