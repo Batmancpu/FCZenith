@@ -272,14 +272,18 @@ private fun Stage(
     val drift = rememberDrift(motion)
     val layer = rememberGraphicsLayer()
     val captureScope = rememberCoroutineScope()
+    var capturing by remember { mutableStateOf(false) }
     val shareCard: (ReplayStoryPage) -> Unit = { card ->
         captureScope.launch {
             ReplayCapture.clear()
-            // Kartu recap punya tombol di dalamnya, jadi tetap memakai poster.
-            if (card != ReplayStoryPage.SUMMARY) {
-                runCatching { layer.toImageBitmap().asAndroidBitmap() }
-                    .onSuccess { ReplayCapture.put(card, it) }
-            }
+            // Selama capture, tombol di dalam kartu disembunyikan dan animasi
+            // masuk dilompati ke akhir, supaya gambar yang dibagikan sama
+            // dengan kartu di layar (termasuk recap).
+            capturing = true
+            repeat(3) { androidx.compose.runtime.withFrameNanos { } }
+            runCatching { layer.toImageBitmap().asAndroidBitmap() }
+                .onSuccess { ReplayCapture.put(card, it) }
+            capturing = false
             onShare(card)
         }
     }
@@ -343,7 +347,11 @@ private fun Stage(
                     pageOffset = { (pagerState.currentPage - index) + pagerState.currentPageOffsetFraction },
                     drift = drift,
                     motion = motion,
+                    capturing = capturing,
                 )
+            }
+            if (capturing) {
+                CaptureBrand(summary.localizedLabel(LocalContext.current))
             }
         }
 
@@ -677,6 +685,7 @@ private fun StoryPage(
     pageOffset: () -> Float,
     drift: () -> Float,
     motion: Boolean,
+    capturing: Boolean = false,
 ) {
     val context = LocalContext.current
     val reveal = remember { Animatable(0f) }
@@ -688,6 +697,8 @@ private fun StoryPage(
         }
     }
     val headline = remember(summary, page) { summary.storyHeadline(context, page) }
+    // Dicapture untuk share: lompat ke keadaan akhir supaya gambar tidak setengah jalan.
+    LaunchedEffect(capturing) { if (capturing) reveal.snapTo(1f) }
 
     Box(
         Modifier
@@ -719,7 +730,7 @@ private fun StoryPage(
                 ReplayStoryPage.GENRES -> PersonalityStory(summary, headline, colors, reveal, drift)
                 ReplayStoryPage.HABITS -> HabitsStory(summary, headline, reveal)
                 ReplayStoryPage.SUMMARY ->
-                    RecapStory(summary, headline, reveal, onShare = { onShare(ReplayStoryPage.SUMMARY) }, onRestart = onRestart)
+                    RecapStory(summary, headline, reveal, onShare = { onShare(ReplayStoryPage.SUMMARY) }, onRestart = onRestart, hideActions = capturing)
             }
         }
     }
@@ -1505,6 +1516,7 @@ private fun ColumnScope.RecapStory(
     reveal: Animatable<Float, *>,
     onShare: () -> Unit,
     onRestart: () -> Unit,
+    hideActions: Boolean = false,
 ) {
     val context = LocalContext.current
     val artists = remember(summary) { summary.artistRows(3) }
@@ -1546,13 +1558,17 @@ private fun ColumnScope.RecapStory(
             // Layar pendek: subtitle dibuang dan baris dirapatkan supaya
             // ketiga daftar muat tanpa terpotong.
             val roomy = maxHeight >= 400.dp
+            // Jumlah baris per daftar mengikuti tinggi yang tersedia, supaya
+            // daftar tidak meluber dan tertimpa headline di bawahnya.
+            val rowHeight = if (roomy) 42.dp else 24.dp
+            val perList = ((maxHeight / 3f - 30.dp) / rowHeight).toInt().coerceIn(1, 3)
             Column(
-                Modifier.fillMaxSize().staged(reveal, 0.18f, 0.5f),
+                Modifier.fillMaxSize().clipToBounds().staged(reveal, 0.18f, 0.5f),
                 verticalArrangement = Arrangement.SpaceEvenly,
             ) {
-                RecapList(stringResource(R.string.top_artists), artists, withSubtitle = false, roomy = roomy)
-                RecapList(stringResource(R.string.top_songs), songs, withSubtitle = roomy, roomy = roomy)
-                RecapList(stringResource(R.string.top_albums), albums, withSubtitle = roomy, roomy = roomy)
+                RecapList(stringResource(R.string.top_artists), artists.take(perList), withSubtitle = false, roomy = roomy)
+                RecapList(stringResource(R.string.top_songs), songs.take(perList), withSubtitle = roomy, roomy = roomy)
+                RecapList(stringResource(R.string.top_albums), albums.take(perList), withSubtitle = roomy, roomy = roomy)
             }
         }
         BoxWithConstraints(Modifier.weight(0.8f).fillMaxHeight()) {
@@ -1584,18 +1600,20 @@ private fun ColumnScope.RecapStory(
         modifier = Modifier.staged(reveal, 0.65f),
     )
     Spacer(Modifier.height(12.dp))
+    // Disembunyikan (tetap memakan ruang) saat kartu ditangkap untuk dibagikan.
+    val hide = if (hideActions) Modifier.graphicsLayer { alpha = 0f } else Modifier
     PillButton(
         text = stringResource(R.string.share_your_replay),
         filled = true,
         onClick = onShare,
-        modifier = Modifier.fillMaxWidth().staged(reveal, 0.78f, 0.2f),
+        modifier = Modifier.fillMaxWidth().then(hide).staged(reveal, 0.78f, 0.2f),
     )
     Spacer(Modifier.height(8.dp))
     PillButton(
         text = stringResource(R.string.replay_cta_again),
         filled = false,
         onClick = onRestart,
-        modifier = Modifier.fillMaxWidth().staged(reveal, 0.84f, 0.16f),
+        modifier = Modifier.fillMaxWidth().then(hide).staged(reveal, 0.84f, 0.16f),
     )
 }
 
@@ -1894,6 +1912,40 @@ private fun RunnerUps(rows: List<ReplayRow>, reveal: Animatable<Float, *>, start
                 )
             }
         }
+    }
+}
+
+/** Judul "Replay'xx" dan logo, hanya digambar saat kartu ditangkap untuk dibagikan. */
+@Composable
+private fun CaptureBrand(label: String) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(top = 24.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = if (label.length == 4 && label.all { it.isDigit() }) {
+                "Replay'${label.takeLast(2)}"
+            } else {
+                "Replay · $label"
+            },
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.W800,
+            color = Color.White,
+            modifier = Modifier.weight(1f),
+        )
+        Icon(
+            painter = painterResource(R.drawable.ic_logo),
+            contentDescription = null,
+            tint = Color.White.copy(alpha = 0.92f),
+            modifier = Modifier.size(width = 22.dp, height = 14.dp),
+        )
+        Spacer(Modifier.width(6.dp))
+        Text(
+            text = "Zenith",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.W700,
+            color = Color.White.copy(alpha = 0.92f),
+        )
     }
 }
 
