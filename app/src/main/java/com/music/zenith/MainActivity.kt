@@ -236,6 +236,7 @@ import com.music.zenith.ui.components.IosMenuPopover
 import com.music.zenith.ui.components.SongActionsMenu
 import com.music.zenith.ui.components.HeldContextMenu
 import com.music.zenith.ui.components.cancelCoverFlight
+import com.music.zenith.ui.components.coverFlightPagesOpen
 import com.music.zenith.ui.components.startCoverFlightFor
 import com.music.zenith.ui.components.HeldItem
 import androidx.media3.session.MediaController
@@ -861,6 +862,9 @@ private fun ZenithApp(
      * covers it. Most things want [detail] — the one actually on screen.
      */
     val topDetail = detailStack.lastOrNull()
+    androidx.compose.runtime.SideEffect {
+        coverFlightPagesOpen(detailStack.map { it.browseId })
+    }
     /** The release page on screen, or null when a route or a tab is. */
     val detail = topDetail?.takeIf { visibleEntry == null }
     // The reorder list lives on its playlist's page; leaving that page by any
