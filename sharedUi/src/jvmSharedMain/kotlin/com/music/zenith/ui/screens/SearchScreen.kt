@@ -94,6 +94,12 @@ import com.music.zenith.ui.components.SongRow
 import com.music.zenith.ui.components.SearchPlayingBars
 import com.music.zenith.ui.components.thumbnailBorder
 import com.music.zenith.ui.components.songListSkeleton
+import com.music.zenith.ui.components.optimizedHazeEffect
+import androidx.compose.ui.zIndex
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.HazeStyle
+import dev.chrisbanes.haze.HazeTint
+import dev.chrisbanes.haze.hazeSource
 import java.util.Locale
 
 @Composable
@@ -222,14 +228,34 @@ fun SearchScreen(
             if (!loadingMore && total > 0 && lastVisible >= total - 4) onLoadMore()
         }
     }
-    Column(modifier = modifier.fillMaxSize()) {
+    val frost = remember { HazeState() }
+    val frostFill = MaterialTheme.colorScheme.background
+    val frostStyle = remember(frostFill) {
+        HazeStyle(
+            backgroundColor = frostFill,
+            tints = listOf(HazeTint(frostFill.copy(alpha = 0.4f))),
+            blurRadius = 24.dp,
+            noiseFactor = 0f,
+            fallbackTint = HazeTint(frostFill),
+        )
+    }
+    var headerHeightPx by remember { mutableIntStateOf(0) }
+    val headerHeight = with(LocalDensity.current) { headerHeightPx.toDp() }
+    Box(modifier = modifier.fillMaxSize()) {
         // Search field and filter tabs stay fixed at the top, outside the
         // scrolling list, so they're always reachable rather than scrolling
         // away with the results or recent searches beneath them.
         // The FrostedTopBar is visible on this tab (showing "Search"), so we
         // clear it fully — status bar inset + bar height + breathing gap — so
         // the search field sits cleanly below the bar instead of overlapping it.
-        Column(modifier = Modifier.padding(top = topPadding)) {
+        Column(
+            modifier = Modifier
+                .zIndex(1f)
+                .fillMaxWidth()
+                .onSizeChanged { headerHeightPx = it.height }
+                .optimizedHazeEffect(frost, frostStyle)
+                .padding(top = topPadding),
+        ) {
             if (showField) {
                 SearchField(
                     query = query,
@@ -275,8 +301,8 @@ fun SearchScreen(
 
         LazyColumn(
             state = listState,
-            modifier = Modifier.weight(1f).fillMaxWidth().onSizeChanged { listWidthPx = it.width },
-            contentPadding = PaddingValues(bottom = contentPadding.calculateBottomPadding()),
+            modifier = Modifier.fillMaxSize().hazeSource(frost).onSizeChanged { listWidthPx = it.width },
+            contentPadding = PaddingValues(top = headerHeight, bottom = contentPadding.calculateBottomPadding()),
         ) {
             when {
                 searchingLibrary || searchingAddons -> librarySearchResults(
