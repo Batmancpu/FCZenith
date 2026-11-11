@@ -222,6 +222,8 @@ fun Modifier.liquidGlass(
     shape: CornerBasedShape,
     /** Drawn over the glass in place of the theme's default tint, when set. */
     surfaceTint: Color? = null,
+    /** False keeps the blur, tint and rim but skips the lens that bends what is behind. */
+    refract: Boolean = true,
 ): Modifier {
     if (!isGlassSupported()) return this
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
@@ -271,7 +273,7 @@ fun Modifier.liquidGlass(
             // Frosted: hanya saturasi ringan + blur, tanpa lensa (bagian terberat di GPU).
             colorControls(saturation = (if (frosted) 1.15f else clarity.saturation) * custom.saturation)
             blur(if (frosted) blurPx * 1.4f else blurPx)
-            if (!frosted && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (!frosted && refract && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 lens(
                     refractionHeight = lensHeightPx,
                     refractionAmount = lensAmountPx,
