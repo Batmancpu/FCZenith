@@ -570,7 +570,8 @@ private fun ZenithApp(
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     // Explore loads the first time it's shown, not at launch beside Home.
     LaunchedEffect(selectedTab) {
-        if (selectedTab == TAB_EXPLORE) viewModel.onExploreShown()
+        // The Search tab's categories come from the same feed Explore loads.
+        if (selectedTab == TAB_EXPLORE || selectedTab == TAB_SEARCH) viewModel.onExploreShown()
     }
     /**
      * Whether the player's sheet is up. The player is always a full-screen
@@ -812,6 +813,9 @@ private fun ZenithApp(
     // signal to focus the input field.
     var searchFocusRequested by remember { mutableStateOf(false) }
     val searchFieldFocus = remember { FocusRequester() }
+    // Whether the top bar's search field has focus. The Search tab shows its
+    // categories while it has none and the recent searches once it does.
+    var searchFieldFocused by remember { mutableStateOf(false) }
     // Invalidates an in-flight radio lookup when a later play request wins.
     var playRequestGeneration by remember { mutableIntStateOf(0) }
     // Starting radio from the item already playing must not replace that media
@@ -917,6 +921,7 @@ private fun ZenithApp(
     val query by viewModel.query.collectAsStateWithLifecycle()
     val results by viewModel.results.collectAsStateWithLifecycle()
     val exploreState by viewModel.explore.collectAsStateWithLifecycle()
+    val exploreCharts by viewModel.exploreCharts.collectAsStateWithLifecycle()
     val selectedMoodGenre by viewModel.selectedMoodGenre.collectAsStateWithLifecycle()
     val moodGenreShelves by viewModel.moodGenreShelves.collectAsStateWithLifecycle()
     val libraryState by viewModel.library.collectAsStateWithLifecycle()
@@ -1253,9 +1258,9 @@ private fun ZenithApp(
     val searchListState = rememberLazyListState()
     val currentListState = when (selectedTab) {
         TAB_HOME -> homeListState
-        TAB_EXPLORE -> if (selectedMoodGenre == null) exploreListState else moodGenreListState
+        TAB_EXPLORE -> exploreListState
         TAB_LIBRARY -> libraryListState
-        else -> searchListState
+        else -> if (selectedMoodGenre == null) searchListState else moodGenreListState
     }
 
 
@@ -2856,7 +2861,7 @@ private fun ZenithApp(
                         replayLandingPage = ReplayStoryPage.INTRO
                         navigator.push(AppRoute.Replay)
                     }
-                    PlaybackSourceType.EXPLORE -> selectedTab = TAB_EXPLORE
+                    PlaybackSourceType.EXPLORE -> selectedTab = TAB_SEARCH
                     PlaybackSourceType.SHARED_LINK -> {
                         val id = sourceId ?: return@openSource
                         context.startActivity(
@@ -3576,7 +3581,36 @@ private fun ZenithApp(
                                     }
                                 },
                             )
-                            TAB_EXPLORE -> selectedMoodGenre?.let { category ->
+                            TAB_EXPLORE -> ExploreScreen(
+                                chartsState = exploreCharts,
+                                listState = exploreListState,
+                                onRetry = viewModel::loadExplore,
+                                homeState = homeState,
+                                currentSong = player.song,
+                                isPlaying = player.isPlaying,
+                                onShelfItemClick = { item, shelfTitle ->
+                                    val song = shelfSong(item)
+                                    val browseId = item.browseId
+                                    when {
+                                        song != null -> playRadio(
+                                            song,
+                                            QueueSource(shelfTitle, PlaybackSourceType.HOME),
+                                        )
+                                        browseId != null -> viewModel.openDetail(
+                                            browseId = browseId,
+                                            title = item.title,
+                                            subtitle = item.subtitle,
+                                            thumbnailUrl = item.thumbnailUrl,
+                                        )
+                                    }
+                                },
+                                onShelfItemLongPress = onShelfLongPress,
+                                refreshing = MainViewModel.Feed.EXPLORE in refreshing,
+                                onRefresh = { viewModel.refresh(MainViewModel.Feed.EXPLORE) },
+                                pullState = explorePull,
+                                contentPadding = listPadding,
+                            )
+                            TAB_SEARCH -> selectedMoodGenre?.let { category ->
                                 MoodGenrePlaylistsScreen(
                                     title = category.title,
                                     state = moodGenreShelves,
@@ -3609,35 +3643,7 @@ private fun ZenithApp(
                                     onRetry = { viewModel.openMoodGenre(category) },
                                     contentPadding = listPadding,
                                 )
-                            } ?: ExploreScreen(
-                                state = exploreState,
-                                listState = exploreListState,
-                                onCategoryClick = viewModel::openMoodGenre,
-                                onRetry = viewModel::loadExplore,
-                                homeState = homeState,
-                                onShelfItemClick = { item, shelfTitle ->
-                                    val song = shelfSong(item)
-                                    val browseId = item.browseId
-                                    when {
-                                        song != null -> playRadio(
-                                            song,
-                                            QueueSource(shelfTitle, PlaybackSourceType.HOME),
-                                        )
-                                        browseId != null -> viewModel.openDetail(
-                                            browseId = browseId,
-                                            title = item.title,
-                                            subtitle = item.subtitle,
-                                            thumbnailUrl = item.thumbnailUrl,
-                                        )
-                                    }
-                                },
-                                onShelfItemLongPress = onShelfLongPress,
-                                refreshing = MainViewModel.Feed.EXPLORE in refreshing,
-                                onRefresh = { viewModel.refresh(MainViewModel.Feed.EXPLORE) },
-                                pullState = explorePull,
-                                contentPadding = listPadding,
-                            )
-                            TAB_SEARCH -> SearchScreen(
+                            } ?: SearchScreen(
                                 query = query,
                                 onQueryChange = viewModel::onQueryChange,
                                 filter = filter,
@@ -3782,6 +3788,10 @@ private fun ZenithApp(
                                         onSelect = { index -> onSearchSourceChange(SearchSource.entries[index]) },
                                     )
                                 },
+                                exploreState = exploreState,
+                                onCategoryClick = viewModel::openMoodGenre,
+                                onExploreRetry = viewModel::loadExplore,
+                                fieldFocused = searchFieldFocused,
                                 searchingLibrary = searchSource == SearchSource.LIBRARY,
                                 libraryResults = libraryResults,
                                 searchingAddons = searchSource == SearchSource.ADDONS,
@@ -4075,6 +4085,7 @@ private fun ZenithApp(
                                 onQueryChange = viewModel::onQueryChange,
                                 onSubmit = viewModel::submitSearch,
                                 focusRequester = searchFieldFocus,
+                                onFocusChange = { searchFieldFocused = it },
                                 placeholder = org.jetbrains.compose.resources.stringResource(
                                     if (searchSource == SearchSource.LIBRARY) {
                                         SharedRes.string.search_library_hint
@@ -4383,15 +4394,18 @@ private fun ZenithApp(
                         return@tabSelected
                     }
                     val index = if (listenTogetherTab && barIndex > TAB_LIBRARY) barIndex - 1 else barIndex
+                    // Coming in from another tab, or back from a category page, shows
+                    // the categories. Tapping Search while already on them opens the field.
+                    val reopenField = index == TAB_SEARCH && selectedTab == TAB_SEARCH &&
+                        route == null && detail == null && selectedMoodGenre == null
                     navigator.clear()
                     viewModel.closeMoodGenre()
                     selectedTab = index
+                    searchFieldFocused = false
 
-                    // Every search tab tap resets the field, focuses it, and opens
-                    // the keyboard through SearchScreen's focus request.
                     if (index == TAB_SEARCH) {
                         viewModel.onQueryChange("")
-                        searchFocusRequested = true
+                        searchFocusRequested = reopenField
                     }
                 }
 

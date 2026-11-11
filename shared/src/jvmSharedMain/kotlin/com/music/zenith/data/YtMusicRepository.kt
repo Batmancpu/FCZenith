@@ -302,7 +302,12 @@ object YtMusicRepository {
     private suspend fun shelvesOf(browseId: String): List<HomeShelf> =
         InnertubeParser.parseHome(Innertube.browse(browseId))
 
-    /** The server-defined mood and genre categories used by Explore. */
+    /** The charts page's shelves (top songs, trending and so on), for the lower half of Explore. */
+    suspend fun exploreCharts(): Result<List<HomeShelf>> = call("explore:charts") {
+        shelvesOf("FEmusic_charts")
+    }
+
+    /** The server-defined mood and genre categories shown as the Search tab's categories. */
     suspend fun moodAndGenres(): Result<List<MoodGenreSection>> = call("moods-and-genres") {
         InnertubeParser.parseMoodAndGenres(Innertube.browse("FEmusic_moods_and_genres"))
     }

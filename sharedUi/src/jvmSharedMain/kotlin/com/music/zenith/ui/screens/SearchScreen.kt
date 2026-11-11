@@ -55,7 +55,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import com.music.zenith.data.model.MoodGenre
+import com.music.zenith.data.model.MoodGenreSection
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -169,8 +176,16 @@ fun SearchScreen(
      * about the results, and the switcher would just push them down.
      */
     sourceSwitcher: (@Composable () -> Unit)? = null,
+    /** The mood and genre categories, shown while the field is empty and has no focus. */
+    exploreState: UiState<List<MoodGenreSection>>? = null,
+    onCategoryClick: ((MoodGenre) -> Unit)? = null,
+    onExploreRetry: () -> Unit = {},
+    /** Whether the search field has focus; the categories give way to recent searches once it does. */
+    fieldFocused: Boolean = true,
 ) {
     val focusRequester = remember { FocusRequester() }
+    var listWidthPx by remember { mutableIntStateOf(0) }
+    val categoryColumns = moodGenreColumns(with(LocalDensity.current) { listWidthPx.toDp() })
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     // Tapping the search tab from the nav bar sets focusRequested;
@@ -260,7 +275,7 @@ fun SearchScreen(
 
         LazyColumn(
             state = listState,
-            modifier = Modifier.weight(1f).fillMaxWidth(),
+            modifier = Modifier.weight(1f).fillMaxWidth().onSizeChanged { listWidthPx = it.width },
             contentPadding = PaddingValues(bottom = contentPadding.calculateBottomPadding()),
         ) {
             when {
@@ -305,6 +320,13 @@ fun SearchScreen(
                         )
                     }
                 }
+                results == null && !fieldFocused && query.isEmpty() &&
+                    exploreState != null && onCategoryClick != null -> moodGenreGrid(
+                    state = exploreState,
+                    columns = categoryColumns,
+                    onCategoryClick = onCategoryClick,
+                    onRetry = onExploreRetry,
+                )
                 results == null -> if (history.isEmpty()) {
                     item { MessageState(stringResource(Res.string.search_empty)) }
                 } else {

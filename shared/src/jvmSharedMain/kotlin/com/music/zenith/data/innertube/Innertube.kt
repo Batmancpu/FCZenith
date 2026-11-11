@@ -548,6 +548,7 @@ object Innertube {
         browseId.startsWith("UC") || browseId.startsWith("MPLA") -> 30L * 60 * 1000
         browseId == "FEmusic_moods_and_genres" -> 24L * 60 * 60 * 1000
         browseId == "FEmusic_explore" -> 6L * 60 * 60 * 1000
+        browseId == "FEmusic_charts" -> 6L * 60 * 60 * 1000
         else -> 0L
     }
 

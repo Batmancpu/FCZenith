@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 
 /**
@@ -73,6 +74,8 @@ fun SearchField(
      * it its own way (the glass pill on Settings). It must set its own height.
      */
     chrome: Modifier? = null,
+    /** Reports whether the field has focus, for a host that shows something else while it has none. */
+    onFocusChange: ((Boolean) -> Unit)? = null,
 ) {
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -149,7 +152,8 @@ fun SearchField(
                 keyboardActions = KeyboardActions(onSearch = { submit() }),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .focusRequester(focusRequester),
+                    .focusRequester(focusRequester)
+                    .onFocusChanged { onFocusChange?.invoke(it.isFocused) },
             )
         }
         // Emptying the field is also how the recent searches are got back to,

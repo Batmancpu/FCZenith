@@ -174,6 +174,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val _explore = MutableStateFlow<UiState<List<MoodGenreSection>>>(UiState.Loading)
     val explore: StateFlow<UiState<List<MoodGenreSection>>> = _explore.asStateFlow()
 
+    private val _exploreCharts = MutableStateFlow<UiState<List<HomeShelf>>>(UiState.Loading)
+    val exploreCharts: StateFlow<UiState<List<HomeShelf>>> = _exploreCharts.asStateFlow()
+
     private val _selectedMoodGenre = MutableStateFlow<MoodGenre?>(null)
     val selectedMoodGenre: StateFlow<MoodGenre?> = _selectedMoodGenre.asStateFlow()
 
@@ -1702,6 +1705,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun loadExplore() {
         exploreRequested = true
         _explore.value = UiState.Loading
+        _exploreCharts.value = UiState.Loading
         viewModelScope.launch { fetchExplore() }
     }
 
@@ -1712,7 +1716,24 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         if (!exploreRequested) loadExplore()
     }
 
+    /** Explore's charts shelves. A failed refresh keeps what is already on the page. */
+    private suspend fun fetchExploreCharts() {
+        YtMusicRepository.exploreCharts()
+            .onSuccess { shelves ->
+                val usable = shelves.filter { it.items.isNotEmpty() }
+                _exploreCharts.value = if (usable.isEmpty()) {
+                    UiState.Error(text(R.string.nothing_to_explore))
+                } else {
+                    UiState.Success(usable)
+                }
+            }
+            .onFailure {
+                if (_exploreCharts.value !is UiState.Success) _exploreCharts.value = UiState.Error(it.friendly())
+            }
+    }
+
     private suspend fun fetchExplore() {
+        viewModelScope.launch { fetchExploreCharts() }
         loadMoodArtworkFromDisk()
         val state = YtMusicRepository.moodAndGenres().fold(
             onSuccess = { sections ->
