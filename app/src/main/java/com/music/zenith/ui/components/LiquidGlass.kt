@@ -242,18 +242,24 @@ fun Modifier.liquidGlass(
         clarity.lensScale * custom.refraction
     val rainbowStrength = custom.rainbowStrength(clarity.chromatic)
     val highlightSpec = remember(custom.rim) { Highlight.Default.copy(alpha = custom.rim) }
-    val shadowSpec = remember(custom.shadow) {
-        Shadow.Default.copy(color = Color.Black.copy(alpha = (0.1f * custom.shadow).coerceIn(0f, 1f)))
+    val isLightTheme = MaterialTheme.colorScheme.surface.luminance() > 0.5f
+    val shadowSpec = remember(custom.shadow, isLightTheme) {
+        // A light page has nothing darker behind the bar, so the shadow sets it apart.
+        val base = if (isLightTheme) 0.18f else 0.1f
+        Shadow.Default.copy(color = Color.Black.copy(alpha = (base * custom.shadow).coerceIn(0f, 1f)))
     }
-    val themeTint = if (MaterialTheme.colorScheme.surface.luminance() > 0.5f) {
-        Color(0xFFFAFAFA)
+    val themeTint = if (isLightTheme) {
+        Color(0xFFF2F2F7)
     } else {
         Color(0xFF121212)
     }
-    val surfaceTintColor = surfaceTint ?: themeTint.copy(alpha = (clarity.tintAlpha * custom.tint).coerceIn(0f, 1f))
+    val tintAlpha = (clarity.tintAlpha * custom.tint).coerceIn(0f, 1f)
+    // White glass over a white page is invisible, so light theme keeps a minimum fill.
+    val surfaceTintColor = surfaceTint
+        ?: themeTint.copy(alpha = if (isLightTheme) maxOf(tintAlpha, 0.6f) else tintAlpha)
     // White 10% vanishes against a light page; use a dark hairline there.
-    val edgeColor = if (MaterialTheme.colorScheme.surface.luminance() > 0.5f) {
-        Color.Black.copy(alpha = 0.10f)
+    val edgeColor = if (isLightTheme) {
+        Color.Black.copy(alpha = 0.12f)
     } else {
         GLASS_EDGE_COLOR
     }
@@ -276,7 +282,7 @@ fun Modifier.liquidGlass(
             }
         },
         highlight = { highlightSpec },
-        shadow = { if (frosted) null else shadowSpec },
+        shadow = { if (frosted && !isLightTheme) null else shadowSpec },
         onDrawSurface = {
             drawRect(color = surfaceTintColor, size = size)
         },
