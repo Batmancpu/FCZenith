@@ -188,6 +188,10 @@ fun SearchScreen(
     onExploreRetry: () -> Unit = {},
     /** Whether the search field has focus; the categories give way to recent searches once it does. */
     fieldFocused: Boolean = true,
+    /** Applied to the scrolling list; the app uses it to record the list as a blur source. */
+    listModifier: Modifier = Modifier,
+    /** Applied to the fixed header; the app uses it to draw the blurred list behind the header. */
+    headerModifier: Modifier = Modifier,
 ) {
     val focusRequester = remember { FocusRequester() }
     var listWidthPx by remember { mutableIntStateOf(0) }
@@ -254,6 +258,7 @@ fun SearchScreen(
                 .fillMaxWidth()
                 .onSizeChanged { headerHeightPx = it.height }
                 .background(frostFill.copy(alpha = 0.9f))
+                .then(headerModifier)
                 .optimizedHazeEffect(frost, frostStyle)
                 .padding(top = topPadding),
         ) {
@@ -302,7 +307,7 @@ fun SearchScreen(
 
         LazyColumn(
             state = listState,
-            modifier = Modifier.fillMaxSize().hazeSource(frost).onSizeChanged { listWidthPx = it.width },
+            modifier = Modifier.fillMaxSize().hazeSource(frost).then(listModifier).onSizeChanged { listWidthPx = it.width },
             contentPadding = PaddingValues(top = headerHeight, bottom = contentPadding.calculateBottomPadding()),
         ) {
             when {
