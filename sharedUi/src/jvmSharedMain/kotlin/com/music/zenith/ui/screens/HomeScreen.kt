@@ -125,7 +125,8 @@ private fun List<HomeShelf>.withSpeedDialFirst(): List<HomeShelf> {
 private const val RECENT_TRACKS_PER_COLUMN = 4
 
 private val LISTEN_AGAIN_TITLES = listOf("Listen again", "Nghe lại", "もう一度聴く", "Dengarkan lagi", "Putar ulang", "다시 듣기")
-private val QUICK_PICKS_TITLES = listOf("Quick picks", "Lựa chọn nhanh", "Chọn nhanh đài phát", "クイック ミックス", "Pilihan cepat", "Pilihan singkat", "빠른 선곡", "빠른 선택")
+private val SPEED_DIAL_TITLES = listOf("Speed dial", "Panggilan cepat", "Quay số nhanh", "スピードダイヤル", "스피드 다이얼")
+private val QUICK_PICKS_TITLES = listOf("Quick picks", "Lựa chọn nhanh", "Chọn nhanh đài phát", "クイック ミックス", "Pilihan cepat", "Pilihan singkat", "빠른 선곡", "빠른 선택") + SPEED_DIAL_TITLES
 
 /**
  * Quick picks menempati slot Listen again (baris kartu persegi di depan),
@@ -178,6 +179,112 @@ private fun List<HomeShelf>.withOtherModelBelowListenAgain(): List<HomeShelf> {
 
 /** How many placeholder rows a custom layout shows while the feed loads. */
 private const val HOME_SKELETON_SLOTS = 4
+
+private const val SPEED_DIAL_COLUMNS = 3
+private const val SPEED_DIAL_ROWS = 3
+private val SPEED_DIAL_GAP = 8.dp
+
+/**
+ * Speed dial: a grid of square covers, three across and three down per page,
+ * as YouTube Music draws it. One tap plays the track; more pages scroll sideways.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun SpeedDialShelf(
+    shelf: HomeShelf,
+    onItemClick: (ShelfItem) -> Unit,
+    onItemLongPress: ((ShelfItem) -> Unit)?,
+    currentSong: Song?,
+    isPlaying: Boolean,
+) {
+    Column(Modifier.padding(bottom = 26.dp)) {
+        SectionHeader(shelf.title, shelf.subtitle)
+        val isCurrentItem = shelf.items.playingItemMatcher(currentSong)
+        val pages = remember(shelf.items) { shelf.items.chunked(SPEED_DIAL_COLUMNS * SPEED_DIAL_ROWS) }
+        BoxWithConstraints {
+            val pageWidth = maxWidth - PAGE_GUTTER * 2
+            val tile = (pageWidth - SPEED_DIAL_GAP * (SPEED_DIAL_COLUMNS - 1)) / SPEED_DIAL_COLUMNS
+            ShelfRow(
+                state = rememberShelfListState("speed-dial:${shelf.title}"),
+                contentPadding = PaddingValues(horizontal = PAGE_GUTTER),
+                horizontalArrangement = Arrangement.spacedBy(PAGE_GUTTER),
+            ) {
+                items(pages, contentType = { "speed-dial-page" }) { page ->
+                    Column(
+                        modifier = Modifier.width(pageWidth),
+                        verticalArrangement = Arrangement.spacedBy(SPEED_DIAL_GAP),
+                    ) {
+                        page.chunked(SPEED_DIAL_COLUMNS).forEach { row ->
+                            Row(horizontalArrangement = Arrangement.spacedBy(SPEED_DIAL_GAP)) {
+                                row.forEach { item ->
+                                    SpeedDialTile(
+                                        item = item,
+                                        onClick = { onItemClick(item) },
+                                        onLongPress = onItemLongPress?.let { { it(item) } },
+                                        isCurrent = isCurrentItem(item),
+                                        isPlaying = isCurrentItem(item) && isPlaying,
+                                        modifier = Modifier.size(tile),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun SpeedDialTile(
+    item: ShelfItem,
+    onClick: () -> Unit,
+    onLongPress: (() -> Unit)?,
+    isCurrent: Boolean,
+    isPlaying: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val shape = RoundedCornerShape(12.dp)
+    Box(
+        modifier = modifier
+            .clip(shape)
+            .thumbnailBorder(shape)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .longPressMenuClickable(onClick = onClick, onLongClick = onLongPress)
+            .contextClick(onLongPress),
+    ) {
+        AsyncImage(
+            model = item.thumbnailUrl.artworkAt(CARD_ART_PX),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize(),
+        )
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .fillMaxWidth()
+                .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.72f))))
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+        ) {
+            Text(
+                text = item.title,
+                style = MaterialTheme.typography.labelLarge,
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = localizeCardSubtitle(item.subtitle),
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White.copy(alpha = 0.75f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        if (isCurrent && isPlaying) SearchPlayingBars(Modifier.align(Alignment.Center))
+    }
+}
 
 /**
  * Loading placeholders in the order the listener arranged Home: Top Picks,
@@ -532,7 +639,18 @@ private fun androidx.compose.foundation.lazy.LazyListScope.itemsIndexedShelves(
             val isQuickPicks = QUICK_PICKS_TITLES.any { shelf.title.trim().equals(it, ignoreCase = true) }
             // Quick picks is one row of square cards, as Recently Played is on
             // Apple Music; Listen again and Recents keep the paged list.
-            if (shelf.isMixShelf()) {
+            if (SPEED_DIAL_TITLES.any { shelf.title.trim().equals(it, ignoreCase = true) }) {
+                SpeedDialShelf(
+                    shelf = shelf.copy(
+                        title = localizeShelfTitle(shelf.title),
+                        subtitle = localizeShelfSubtitle(shelf.subtitle),
+                    ),
+                    onItemClick = openItem,
+                    onItemLongPress = onItemLongPress,
+                    currentSong = currentSong,
+                    isPlaying = isPlaying,
+                )
+            } else if (shelf.isMixShelf()) {
                 MixCoverShelf(
                     shelf = shelf,
                     onItemClick = openItem,
@@ -919,6 +1037,8 @@ internal fun localizeShelfTitle(title: String): String {
             trimmed.equals("Danh sách phát nổi bật dành cho bạn", ignoreCase = true) ||
             trimmed.equals("おすすめの再生リスト", ignoreCase = true) ->
             stringResource(Res.string.shelf_featured_playlists_for_you)
+        SPEED_DIAL_TITLES.any { trimmed.equals(it, ignoreCase = true) } ->
+            stringResource(Res.string.shelf_speed_dial)
         trimmed.equals("Quick picks", ignoreCase = true) ||
             trimmed.equals("Lựa chọn nhanh", ignoreCase = true) ||
             trimmed.equals("Pilihan cepat", ignoreCase = true) ||
