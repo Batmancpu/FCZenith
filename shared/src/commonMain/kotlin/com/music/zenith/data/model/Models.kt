@@ -519,6 +519,29 @@ private const val REPEAT_SHELF_SHARE = 0.6
 
 private fun HomeShelf.browseKeys(): Set<String> = items.mapNotNullTo(HashSet()) { it.browseId }
 
+/**
+ * These shelves minus every card already on [other] (the Home feed), and minus any shelf
+ * left with too few cards to be worth a row. A card is matched by its album, playlist or
+ * artist page, or by its track when it has no page.
+ */
+fun List<HomeShelf>.withoutItemsOn(other: List<HomeShelf>): List<HomeShelf> {
+    if (other.isEmpty()) return this
+    val seen = other.flatMapTo(HashSet()) { shelf -> shelf.items.mapNotNull { it.cardKey() } }
+    return mapNotNull { shelf ->
+        val kept = shelf.items.filter { item -> item.cardKey()?.let { it !in seen } ?: true }
+        when {
+            kept.size == shelf.items.size -> shelf
+            kept.size >= MIN_SHELF_CARDS_LEFT -> shelf.copy(items = kept)
+            else -> null
+        }
+    }
+}
+
+/** Fewest cards a shelf keeps after its repeats of Home are taken out; fewer and the row is dropped. */
+private const val MIN_SHELF_CARDS_LEFT = 3
+
+private fun ShelfItem.cardKey(): String? = browseId?.let { "b:$it" } ?: videoId?.let { "v:$it" }
+
 /** A page of the Home feed, plus the token for the next one — null once exhausted. */
 data class HomeFeed(
     val shelves: List<HomeShelf>,

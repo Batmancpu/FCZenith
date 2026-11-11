@@ -50,6 +50,7 @@ import com.music.zenith.data.model.MoodGenreSection
 import com.music.zenith.data.model.ShelfItem
 import com.music.zenith.data.model.Song
 import com.music.zenith.data.model.UiState
+import com.music.zenith.data.model.withoutItemsOn
 import com.music.zenith.ui.components.MessageState
 import com.music.zenith.ui.components.PAGE_GUTTER
 import com.music.zenith.ui.components.PullToRefresh
@@ -95,6 +96,14 @@ fun ExploreScreen(
         }
         if (found != null) lastEditorial = found
         found ?: lastEditorial
+    }
+    // Cards the Home tab already shows are left out here, so New is not Home again.
+    val homeShelves = (homeState as? UiState.Success)?.data
+    val chartShelves = remember(chartsState, homeShelves, editorial) {
+        (chartsState as? UiState.Success)?.data
+            ?.filter { it.title != editorial?.title }
+            ?.withoutItemsOn(homeShelves.orEmpty())
+            .orEmpty()
     }
     PullToRefresh(
         refreshing = refreshing,
@@ -152,7 +161,7 @@ fun ExploreScreen(
                         }
                     }
                     is UiState.Success -> {
-                        chartsState.data.filter { it.title != editorial?.title }.forEachIndexed { index, shelf ->
+                        chartShelves.forEachIndexed { index, shelf ->
                             item(key = "chart:$index:${shelf.title}") {
                                 if (shelf.layout == com.music.zenith.data.model.ShelfLayout.LIST) {
                                     RecentShelf(
