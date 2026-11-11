@@ -220,8 +220,14 @@ private fun SpeedDialShelf(
             }
         }
         val canShuffle = onPlaySongs != null && shuffleSongs.isNotEmpty()
-        val pageSize = SPEED_DIAL_COLUMNS * SPEED_DIAL_ROWS - if (canShuffle) 1 else 0
-        val pages = remember(shelf.items, pageSize) { shelf.items.chunked(pageSize) }
+        val perPage = SPEED_DIAL_COLUMNS * SPEED_DIAL_ROWS
+        val pages = remember(shelf.items, canShuffle) {
+            if (canShuffle) {
+                listOf(shelf.items.take(perPage - 1)) + shelf.items.drop(perPage - 1).chunked(perPage)
+            } else {
+                shelf.items.chunked(perPage)
+            }
+        }
         BoxWithConstraints {
             val pageWidth = maxWidth - PAGE_GUTTER * 2
             val tile = (pageWidth - SPEED_DIAL_GAP * (SPEED_DIAL_COLUMNS - 1)) / SPEED_DIAL_COLUMNS
@@ -240,7 +246,7 @@ private fun SpeedDialShelf(
                                 repeat(SPEED_DIAL_COLUMNS) { column ->
                                     val slot = rowIndex * SPEED_DIAL_COLUMNS + column
                                     val item = page.getOrNull(slot)
-                                    if (canShuffle && slot == SPEED_DIAL_COLUMNS * SPEED_DIAL_ROWS - 1) {
+                                    if (canShuffle && page === pages.first() && slot == SPEED_DIAL_COLUMNS * SPEED_DIAL_ROWS - 1) {
                                         SpeedDialShuffleTile(
                                             onClick = { onPlaySongs?.invoke(shuffleSongs.shuffled()) },
                                             modifier = Modifier.size(tile),
