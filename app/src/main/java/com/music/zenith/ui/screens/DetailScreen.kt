@@ -3320,16 +3320,6 @@ private fun MixHero(
             MixFluidArt(title = mixTitle, modifier = Modifier.matchParentSize())
         }
 
-        MixCoverOverlay(
-            title = mixTitle,
-            subtitle = "",
-            band = false,
-            modifier = Modifier
-                .matchParentSize()
-                .padding(top = topBarContentPadding(), bottom = LIKED_HERO_OVERLAP + 20.dp)
-                .flightReveal(delayMs = 0, rise = 0.dp, afterFlight = true),
-        )
-
         val page0 = palette.background.copy(alpha = 0f)
         Box(
             Modifier
