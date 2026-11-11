@@ -1,8 +1,6 @@
 name: FC Zenith — upstream sync and Music release
 
 on:
-  push:
-    branches: [main]
   schedule:
     - cron: '47 * * * *'
   workflow_dispatch:
@@ -60,8 +58,26 @@ jobs:
             echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "The published upstream release $TAG is already in FCZenith main."
           else
-            # Never force-resolve source conflicts; stop and inspect them.
-            git merge --no-edit --no-ff "$TARGET"
+            # Keep FC-owned workflow files, but never hide conflicts in app source.
+            if ! git merge --no-edit --no-ff "$TARGET"; then
+              conflicts="$(git diff --name-only --diff-filter=U)"
+              if [[ -z "$conflicts" ]] || grep -qv '^.github/workflows/' <<< "$conflicts"; then
+                echo "Upstream merge has conflicts outside FC-owned workflows; stopping safely." >&2
+                git merge --abort
+                exit 1
+              fi
+
+              git checkout "$BASE_SHA" -- .github/workflows
+              git add -A .github/workflows
+              remaining="$(git diff --name-only --diff-filter=U)"
+              if [[ -n "$remaining" ]]; then
+                echo "Workflow conflict could not be resolved safely:" >&2
+                echo "$remaining" >&2
+                git merge --abort
+                exit 1
+              fi
+              git commit --no-edit
+            fi
             echo "changed=true" >> "$GITHUB_OUTPUT"
             echo "Merged published upstream release $TAG."
           fi
