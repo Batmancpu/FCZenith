@@ -2037,7 +2037,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             .take(18)
         if (songs.size < 3) return null
         return HomeShelf(
-            title = "Speed dial",
+            title = com.music.zenith.data.model.LOCAL_SPEED_DIAL_TITLE,
             items = songs.map { song ->
                 com.music.zenith.data.model.ShelfItem(
                     title = song.title,

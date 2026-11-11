@@ -79,6 +79,7 @@ import coil3.compose.AsyncImage
 import com.music.zenith.data.model.CARD_ART_PX
 import com.music.zenith.data.model.HEADER_ART_PX
 import com.music.zenith.data.model.HomeShelf
+import com.music.zenith.data.model.LOCAL_SPEED_DIAL_TITLE
 import com.music.zenith.data.model.ROW_ART_PX
 import com.music.zenith.data.model.ShelfItem
 import com.music.zenith.data.model.ShelfLayout
@@ -125,8 +126,9 @@ private fun List<HomeShelf>.withSpeedDialFirst(): List<HomeShelf> {
 private const val RECENT_TRACKS_PER_COLUMN = 4
 
 private val LISTEN_AGAIN_TITLES = listOf("Listen again", "Nghe lại", "もう一度聴く", "Dengarkan lagi", "Putar ulang", "다시 듣기")
-private val SPEED_DIAL_TITLES = listOf("Speed dial", "Panggilan cepat", "Quay số nhanh", "スピードダイヤル", "스피드 다이얼")
-private val QUICK_PICKS_TITLES = listOf("Quick picks", "Lựa chọn nhanh", "Chọn nhanh đài phát", "クイック ミックス", "Pilihan cepat", "Pilihan singkat", "빠른 선곡", "빠른 선택") + SPEED_DIAL_TITLES
+private val SPEED_DIAL_TITLES = listOf(LOCAL_SPEED_DIAL_TITLE, "Speed dial", "Panggilan cepat", "Quay số nhanh", "スピードダイヤル", "스피드 다이얼")
+private val QUICK_PICKS_TITLES = listOf("Quick picks", "Lựa chọn nhanh", "Chọn nhanh đài phát", "クイック ミックス", "Pilihan cepat", "Pilihan singkat", "빠른 선곡", "빠른 선택") +
+    SPEED_DIAL_TITLES.filterNot { it.equals(LOCAL_SPEED_DIAL_TITLE, ignoreCase = true) }
 
 /**
  * Quick picks menempati slot Listen again (baris kartu persegi di depan),
