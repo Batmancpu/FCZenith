@@ -304,8 +304,19 @@ object YtMusicRepository {
 
     /** The charts page's shelves (top songs, trending and so on), for the lower half of Explore. */
     suspend fun exploreCharts(): Result<List<HomeShelf>> = call("explore:charts") {
-        shelvesOf("FEmusic_charts")
+        val pages = coroutineScope {
+            EXPLORE_BROWSE_IDS.map { id -> async { runCatching { shelvesOf(id) } } }.awaitAll()
+        }
+        val shelves = pages
+            .flatMap { it.getOrDefault(emptyList()) }
+            .filter { it.items.isNotEmpty() }
+            .distinctBy { it.title.trim().lowercase() }
+        if (shelves.isEmpty()) pages.firstNotNullOfOrNull { it.exceptionOrNull() }?.let { throw it }
+        shelves
     }
+
+    /** The New tab reads new releases first, then YouTube's own Explore page, then the charts. */
+    private val EXPLORE_BROWSE_IDS = listOf("FEmusic_new_releases", "FEmusic_explore", "FEmusic_charts")
 
     /** The server-defined mood and genre categories shown as the Search tab's categories. */
     suspend fun moodAndGenres(): Result<List<MoodGenreSection>> = call("moods-and-genres") {

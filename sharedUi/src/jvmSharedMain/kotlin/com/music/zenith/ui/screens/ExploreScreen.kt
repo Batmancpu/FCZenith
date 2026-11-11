@@ -152,7 +152,7 @@ fun ExploreScreen(
                         }
                     }
                     is UiState.Success -> {
-                        chartsState.data.forEachIndexed { index, shelf ->
+                        chartsState.data.filter { it.title != editorial?.title }.forEachIndexed { index, shelf ->
                             item(key = "chart:$index:${shelf.title}") {
                                 Shelf(
                                     shelf = shelf,
