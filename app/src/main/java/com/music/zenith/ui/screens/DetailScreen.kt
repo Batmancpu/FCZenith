@@ -165,7 +165,9 @@ import com.music.zenith.data.useTrackTags
 import com.music.zenith.ui.components.CoverPlaceholder
 import com.music.zenith.data.canvas.AppleArtistArt
 import com.music.zenith.data.DebugLog as Log
+import com.music.zenith.data.canvas.AppleAlbumInfoRepository
 import com.music.zenith.data.canvas.AppleArtistArtRepository
+import com.music.zenith.data.canvas.releaseDateText
 import com.music.zenith.data.canvas.appleCatalogue
 import com.music.zenith.data.canvas.ArtistSignature
 import com.music.zenith.data.canvas.ArtistSignatureRepository
@@ -556,6 +558,21 @@ fun DetailScreen(
         val found = CanvasRepository.canvasForAlbum(page.title, credit)
         if (found != null && found.url != canvas?.url) canvas = found
     }
+    // Tanggal rilis lengkap dan baris ℗ dari Apple, hanya untuk album. Tahun dari
+    // subtitle tampil lebih dulu; jawaban Apple menggantinya begitu datang.
+    var albumInfo by remember(page.browseId) {
+        mutableStateOf(AppleAlbumInfoRepository.cached(page.browseId))
+    }
+    LaunchedEffect(page.browseId, page.title, credit, songsLoading) {
+        if (page.type == BrowseType.ALBUM && folder == null &&
+            !page.browseId.startsWith("local:") && !songsLoading && credit.isNotBlank()
+        ) {
+            albumInfo = AppleAlbumInfoRepository.infoFor(
+                page.browseId, page.title, credit, songs.size,
+            ) ?: albumInfo
+        }
+    }
+
     // An artist's clip comes with the same Apple lookup as its photograph.
     val artistVideo = appleArt?.videoUrl
     LaunchedEffect(artistVideo, canvasEnabled) {
@@ -898,7 +915,9 @@ fun DetailScreen(
                 if (albumSongs.isNotEmpty()) {
                     item(key = "album-info") {
                         AlbumInfoFooter(
+                            releaseDate = albumInfo?.releaseDateText(),
                             year = RELEASE_YEAR.find(page.subtitle)?.value,
+                            copyright = albumInfo?.copyright,
                             songs = albumSongs,
                             palette = palette,
                         )
@@ -2157,29 +2176,45 @@ private fun AboutSignature(
     }
 }
 
-/** Baris info di kaki halaman album: "1988 · 5 songs · 18 min". */
+/**
+ * Kaki halaman album: "March 3, 1988 · 5 songs · 18 min", lalu baris ℗ bila
+ * Apple punya. Sebelum Apple menjawab, [year] dari subtitle yang dipakai.
+ */
 @Composable
 private fun AlbumInfoFooter(
+    releaseDate: String?,
     year: String?,
+    copyright: String?,
     songs: List<Song>,
     palette: ArtworkPalette,
 ) {
     val parts = listOfNotNull(
-        year,
+        releaseDate ?: year,
         pluralStringResource(R.plurals.song_count_plural, songs.size, songs.size),
         songs.playtime(),
     )
-    Text(
-        text = parts.joinToString(" · "),
-        style = MaterialTheme.typography.bodyMedium,
-        color = palette.onBackgroundVariant,
+    Column(
         modifier = Modifier.padding(
             start = ABOUT_GUTTER,
             end = ABOUT_GUTTER,
             top = 16.dp,
             bottom = 12.dp,
         ),
-    )
+    ) {
+        Text(
+            text = parts.joinToString(" · "),
+            style = MaterialTheme.typography.bodyMedium,
+            color = palette.onBackgroundVariant,
+        )
+        if (copyright != null) {
+            Text(
+                text = copyright,
+                style = MaterialTheme.typography.bodySmall,
+                color = palette.onBackgroundVariant,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
+    }
 }
 
 @Composable
