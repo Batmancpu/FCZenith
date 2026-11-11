@@ -723,10 +723,10 @@ private fun SharedTransitionScope.InlineTab(
             .clip(shapes.tabBarShape)
             .then(tabBarContentModifier())
             .clickable(
-                onClick = {
-                    onInlineTabClick()
-                    inlineTab.onClick()
-                },
+                // Sentuhan pertama hanya membuka bar ke bentuk expanded (mini
+                // player kembali di atas). Pindah tab baru terjadi di sentuhan
+                // berikutnya, lewat pil tab yang sudah terbuka.
+                onClick = { onInlineTabClick() },
                 indication = inlineTab.indication?.invoke(),
                 interactionSource = remember { MutableInteractionSource() }
             )
