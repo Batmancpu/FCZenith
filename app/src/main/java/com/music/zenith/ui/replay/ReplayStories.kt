@@ -560,9 +560,9 @@ private fun StoryChrome(
                 painter = painterResource(R.drawable.ic_logo),
                 contentDescription = null,
                 tint = Color.White.copy(alpha = 0.92f),
-                modifier = Modifier.size(width = 22.dp, height = 14.dp),
+                modifier = Modifier.size(width = 22.dp, height = 14.dp).offset(y = 2.dp),
             )
-            Spacer(Modifier.width(6.dp))
+            Spacer(Modifier.width(3.dp))
             Text(
                 text = "Zenith",
                 style = MaterialTheme.typography.titleSmall,
@@ -1937,9 +1937,9 @@ private fun CaptureBrand(label: String) {
             painter = painterResource(R.drawable.ic_logo),
             contentDescription = null,
             tint = Color.White.copy(alpha = 0.92f),
-            modifier = Modifier.size(width = 22.dp, height = 14.dp),
+            modifier = Modifier.size(width = 22.dp, height = 14.dp).offset(y = 2.dp),
         )
-        Spacer(Modifier.width(6.dp))
+        Spacer(Modifier.width(3.dp))
         Text(
             text = "Zenith",
             style = MaterialTheme.typography.titleSmall,
