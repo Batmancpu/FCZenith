@@ -892,6 +892,20 @@ fun DetailScreen(
                 }
             }
 
+            // Info album di bawah daftar lagu: tahun, jumlah lagu, total durasi.
+            if (page.type == BrowseType.ALBUM && folder == null) {
+                val albumSongs = (page.songs as? UiState.Success)?.data.orEmpty()
+                if (albumSongs.isNotEmpty()) {
+                    item(key = "album-info") {
+                        AlbumInfoFooter(
+                            year = RELEASE_YEAR.find(page.subtitle)?.value,
+                            songs = albumSongs,
+                            palette = palette,
+                        )
+                    }
+                }
+            }
+
             // Tracks YouTube offers to round the playlist out, never folded
             // into the list above — see [DetailPage.suggestedSongs].
             if (suggested.isNotEmpty()) {
@@ -2141,6 +2155,31 @@ private fun AboutSignature(
         )
         if (loaded) SignedByCaption(name = name, palette = palette, textAlign = TextAlign.Start)
     }
+}
+
+/** Baris info di kaki halaman album: "1988 · 5 songs · 18 min". */
+@Composable
+private fun AlbumInfoFooter(
+    year: String?,
+    songs: List<Song>,
+    palette: ArtworkPalette,
+) {
+    val parts = listOfNotNull(
+        year,
+        pluralStringResource(R.plurals.song_count_plural, songs.size, songs.size),
+        songs.playtime(),
+    )
+    Text(
+        text = parts.joinToString(" · "),
+        style = MaterialTheme.typography.bodyMedium,
+        color = palette.onBackgroundVariant,
+        modifier = Modifier.padding(
+            start = ABOUT_GUTTER,
+            end = ABOUT_GUTTER,
+            top = 16.dp,
+            bottom = 12.dp,
+        ),
+    )
 }
 
 @Composable
