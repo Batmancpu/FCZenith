@@ -267,7 +267,12 @@ private fun SpeedDialTile(
                 .align(Alignment.BottomStart)
                 .fillMaxWidth()
                 .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.72f))))
-                .padding(horizontal = 8.dp, vertical = 6.dp),
+                .padding(
+                    start = 8.dp,
+                    end = if (item.browseId != null && item.videoId == null) 28.dp else 8.dp,
+                    top = 6.dp,
+                    bottom = 6.dp,
+                ),
         ) {
             Text(
                 text = item.title,
@@ -285,6 +290,17 @@ private fun SpeedDialTile(
             )
         }
         if (isCurrent && isPlaying) SearchPlayingBars(Modifier.align(Alignment.Center))
+        if (item.browseId != null && item.videoId == null) {
+            Icon(
+                imageVector = ZenithIcons.ChevronRight,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 8.dp, bottom = 8.dp)
+                    .size(16.dp),
+            )
+        }
     }
 }
 
