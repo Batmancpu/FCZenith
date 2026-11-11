@@ -1,5 +1,6 @@
 package com.music.zenith.ui.icons
 
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.SolidColor
@@ -9,6 +10,13 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.unit.dp
+
+/**
+ * The share glyph every share button draws. [ZenithIcons.Share] by default; the
+ * app provides its SF Symbol one, so screens in this module and the app's own
+ * screens show the same Apple Music style glyph.
+ */
+val LocalShareIcon = staticCompositionLocalOf { ZenithIcons.Share }
 
 /**
  * Thick-stroke, round-capped icons in the spirit of Telegram's modern icon set.
@@ -21,6 +29,40 @@ object ZenithIcons {
 
     private const val STROKE = 2.2f
     private val stroke = SolidColor(Color.Black)
+
+    /**
+     * Apple Music's share glyph (SF Symbol "square.and.arrow.up"): an open-topped
+     * box with an arrow rising out of it. Read through [LocalShareIcon].
+     */
+    val Share: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "bc_share", defaultWidth = 24.dp, defaultHeight = 24.dp,
+            viewportWidth = 24f, viewportHeight = 24f,
+        ).apply {
+            path(
+                stroke = stroke, strokeLineWidth = STROKE,
+                strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round,
+            ) {
+                // The box, open where the arrow leaves it.
+                moveTo(8.5f, 9f)
+                lineTo(7f, 9f)
+                quadTo(4.5f, 9f, 4.5f, 11.5f)
+                lineTo(4.5f, 18.5f)
+                quadTo(4.5f, 21f, 7f, 21f)
+                lineTo(17f, 21f)
+                quadTo(19.5f, 21f, 19.5f, 18.5f)
+                lineTo(19.5f, 11.5f)
+                quadTo(19.5f, 9f, 17f, 9f)
+                lineTo(15.5f, 9f)
+                // The arrow: shaft, then head.
+                moveTo(12f, 14.5f)
+                lineTo(12f, 3.5f)
+                moveTo(8.4f, 7f)
+                lineTo(12f, 3.4f)
+                lineTo(15.6f, 7f)
+            }
+        }.build()
+    }
 
     /** Compact list and quotation-bubble shapes used by the player controls. */
     val Queue: ImageVector by lazy {
@@ -231,12 +273,23 @@ object ZenithIcons {
      * just past the em box, and the viewport would clip it flat.
      */
     val TabLibrary: ImageVector by lazy {
-        fontGlyph(
-            "bc_tab_library",
-            "M154 27.24Q156 0.24 185 0.24H322Q352 0.24 353 27.24Z" +
-                "M116 87.24Q121 56.24 150 56.24H356Q385 56.24 390 87.24Z" +
-                "M133 500.24Q66 500.24 66 434.24V187.24Q66 121.24 133 121.24H378Q446 121.24 446 187.24V434.24Q446 500.24 385 500.24Z",
-        )
+        // Apple Music's album stack, solid and without lettering: two edges of
+        // the cards behind and the front card.
+        ImageVector.Builder(
+            name = "bc_tab_library_plain",
+            defaultWidth = 24.dp, defaultHeight = 24.dp,
+            viewportWidth = 512f, viewportHeight = 512f,
+        ).addPath(
+            pathData = addPathNodes(
+                "M154 27.24Q156 0.24 185 0.24H322Q352 0.24 353 27.24Z" +
+                    "M116 87.24Q121 56.24 150 56.24H356Q385 56.24 390 87.24Z" +
+                    "M133 500.24Q66 500.24 66 434.24V187.24Q66 121.24 133 121.24H378Q446 121.24 446 187.24V434.24Q446 500.24 385 500.24Z" +
+                    // Beamed double note, cut out of the front card (even-odd): one outline, two heads joined by a beam.
+                    "M219.8 222.5L353.1 195.8L353.1 368.5A39.9 30.5 0 1 1 334.2 342.5L334.2 237.4L238.7 256.5L238.7 394.7A39.9 30.5 0 1 1 219.8 368.8L219.8 260.3Z",
+            ),
+            pathFillType = androidx.compose.ui.graphics.PathFillType.EvenOdd,
+            fill = stroke,
+        ).build()
     }
 
     val TabSearch: ImageVector by lazy {

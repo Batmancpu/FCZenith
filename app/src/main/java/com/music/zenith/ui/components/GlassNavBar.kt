@@ -135,7 +135,7 @@ val selectedColor = if (isDarkGlass) {
 } else {
     MaterialTheme.colorScheme.primary
 }
-val unselectedColor = contentColor.copy(alpha = 0.72f)
+val unselectedColor = contentColor.copy(alpha = 0.88f)
 val haptics = rememberHaptics()
     // Goyangan jelly pill now playing, dibagikan ke tab dan Search di sebelahnya.
     val jellyPush = remember { JellyPush() }
@@ -500,20 +500,16 @@ private fun GlassNowPlaying(
                     )
                 }
             } else {
-                IconButton(
+                MiniPlayerPlayPauseButton(
+                    isPlaying = isPlaying,
+                    tint = contentColor,
+                    slot = glyphSlot,
+                    glyphSize = glyphSize,
                     onClick = {
                         haptics.play(if (isPlaying) Haptic.Pause else Haptic.Resume)
                         onPlayPause()
                     },
-                    modifier = Modifier.size(glyphSlot),
-                ) {
-                    Icon(
-                        imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                        contentDescription = stringResource(if (isPlaying) R.string.pause else R.string.play),
-                        tint = contentColor,
-                        modifier = Modifier.size(glyphSize),
-                    )
-                }
+                )
             }
             // Dropped inline: the collapsed row is sharing its width with the
             // tab pill and the Search circle, and the title is what has to
@@ -521,18 +517,15 @@ private fun GlassNowPlaying(
             if (!isInline) {
                 // Glyph centres 44dp apart, as Apple's are.
                 Spacer(Modifier.width(4.dp))
-                IconButton(
+                MiniPlayerNextButton(
+                    tint = contentColor.copy(alpha = if (controlsLocked) 0.3f else 1f),
+                    enabled = !controlsLocked,
+                    slot = glyphSlot,
                     onClick = {
                         haptics.play(Haptic.SkipNext)
                         onNext()
                     },
-                    enabled = !controlsLocked,
-                    modifier = Modifier.size(glyphSlot),
-                ) {
-                    MiniPlayerNextGlyph(
-                        tint = contentColor.copy(alpha = if (controlsLocked) 0.3f else 1f),
-                    )
-                }
+                )
             }
         }
     }

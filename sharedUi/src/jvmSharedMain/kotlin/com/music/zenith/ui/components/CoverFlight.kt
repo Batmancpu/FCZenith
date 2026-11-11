@@ -184,8 +184,11 @@ private object CoverFlightState {
     /** 0 to 1 over the current flight. Read only inside draw and graphicsLayer blocks. */
     var flightProgress by mutableFloatStateOf(0f)
 
-    /** The page last flown into: only that page is flown back out of. */
-    var landed: String? = null
+    /** The pages flown into and not yet closed: only those are flown back out of. */
+    val landed = HashSet<String>()
+
+    /** The release pages still on the back stack: a page that leaves while on it is covered, not closed. */
+    var openPages: Set<String> = emptySet()
 
     /** The cover is in the air: the card and the sleeve both stand aside for it. */
     val flying: Boolean
@@ -300,7 +303,8 @@ private fun startFlight(
     if (source.bounds.isEmpty) return
     CoverFlightState.target = null
     CoverFlightState.targetWash = Color.Unspecified
-    CoverFlightState.landed = browseId
+    if (CoverFlightState.landed.size > 32) CoverFlightState.landed.clear()
+    CoverFlightState.landed.add(browseId)
     val clip = source.canvas
     if (clip != null) CoverFlightState.clips[browseId] = clip else CoverFlightState.clips.remove(browseId)
     CoverFlightState.clipRendered = null
@@ -319,8 +323,10 @@ private fun startFlight(
 }
 
 private fun startReturn(browseId: String, from: Rect, cornerPx: Float, wash: Color) {
-    if (CoverFlightState.landed != browseId) return
-    CoverFlightState.landed = null
+    if (browseId !in CoverFlightState.landed) return
+    // Covered by a page opened over it (an artist from an album), not closed:
+    // it stays landed so its cover still flies home when it really closes.
+    if (browseId in CoverFlightState.openPages) return
     // Out again before the cover has landed: it turns round where it is in the
     // air instead of jumping to the sleeve it was heading for.
     val air = CoverFlightState.airFlight?.takeIf {
@@ -332,13 +338,17 @@ private fun startReturn(browseId: String, from: Rect, cornerPx: Float, wash: Col
     // one anyway showed the card in full while its cover was still elsewhere.
     val pending = CoverFlightState.flight?.takeIf { !it.reverse && it.browseId == browseId }
     if (pending != null && !inAir) {
+        CoverFlightState.landed.remove(browseId)
         CoverFlightState.flight = null
         CoverFlightState.target = null
         CoverFlightState.holding = false
         CoverFlightState.clips.remove(browseId)
         return
     }
+    // Sleeve scrolled out of view (its lazy item disposed): not a real exit, so
+    // `landed` stays set for the flight when the page actually closes.
     if (!inAir && visibleShare(from) < MIN_RETURN_VISIBLE) return
+    CoverFlightState.landed.remove(browseId)
     val settled = if (inAir) CoverFlightState.airProgress.coerceIn(0f, 1f) else 1f
     val start = if (inAir) CoverFlightState.airRect else from
     val startCorner = air?.takeIf { inAir }?.let { lerpF(it.fromCornerPx, cornerPx, settled) } ?: cornerPx
@@ -405,6 +415,11 @@ fun coverFlightPending(): Boolean = CoverFlightState.flight?.reverse == false
 
 /** That cover is in the air: the card it left has stood aside for it. */
 fun coverFlightAirborne(): Boolean = CoverFlightState.flying
+
+/** Release pages still on the back stack; a page leaving while listed here is covered by another, so no flight home. */
+fun coverFlightPagesOpen(browseIds: Collection<String>) {
+    CoverFlightState.openPages = browseIds.toHashSet()
+}
 
 /** Where the held-item menu has lifted the card to, written by that menu's layout. */
 object LiftedPreview {

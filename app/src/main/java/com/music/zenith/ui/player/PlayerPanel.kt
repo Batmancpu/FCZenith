@@ -69,7 +69,8 @@ import com.music.zenith.ui.components.ExplicitSongTitle
 import com.music.zenith.ui.components.FadingLine
 import com.music.zenith.ui.components.TrackTextSwitch
 import com.music.zenith.ui.components.LocalLiquidGlassEnabled
-import com.music.zenith.ui.components.MiniPlayerNextGlyph
+import com.music.zenith.ui.components.MiniPlayerNextButton
+import com.music.zenith.ui.components.MiniPlayerPlayPauseButton
 import com.music.zenith.ui.components.glassContentColor
 import com.music.zenith.ui.components.isGlassSupported
 import com.music.zenith.ui.components.liquidGlass
@@ -406,35 +407,28 @@ private fun PanelMiniRow(
                     )
                 }
             } else {
-                IconButton(
+                MiniPlayerPlayPauseButton(
+                    isPlaying = isPlaying,
+                    tint = contentColor,
+                    slot = glyphSlot,
+                    glyphSize = glyphSize,
                     onClick = {
                         haptics.play(if (isPlaying) Haptic.Pause else Haptic.Resume)
                         onPlayPause()
                     },
-                    modifier = Modifier.size(glyphSlot),
-                ) {
-                    Icon(
-                        imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                        contentDescription = stringResource(if (isPlaying) R.string.pause else R.string.play),
-                        tint = contentColor,
-                        modifier = Modifier.size(glyphSize),
-                    )
-                }
+                )
             }
             if (showNext) {
                 Spacer(Modifier.width(if (glass) 4.dp else 8.dp))
-                IconButton(
+                MiniPlayerNextButton(
+                    tint = contentColor.copy(alpha = if (controlsLocked) 0.3f else 1f),
+                    enabled = !controlsLocked,
+                    slot = glyphSlot,
                     onClick = {
                         haptics.play(Haptic.SkipNext)
                         onNext()
                     },
-                    enabled = !controlsLocked,
-                    modifier = Modifier.size(glyphSlot),
-                ) {
-                    MiniPlayerNextGlyph(
-                        tint = contentColor.copy(alpha = if (controlsLocked) 0.3f else 1f),
-                    )
-                }
+                )
             }
         }
     }

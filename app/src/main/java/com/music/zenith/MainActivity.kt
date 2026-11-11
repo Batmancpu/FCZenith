@@ -65,7 +65,7 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.History
-import androidx.compose.material.icons.rounded.IosShare
+import com.music.zenith.ui.icons.SfIcons
 import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.Sort
 import androidx.compose.material.icons.rounded.Upgrade
@@ -146,6 +146,7 @@ import com.music.zenith.data.model.durationMillis
 import com.music.zenith.data.scrobbling.LastFM
 import com.music.zenith.data.settings.AppSettings
 import com.music.zenith.data.settings.BitPerfectMode
+import com.music.zenith.data.settings.LastPlayerScreen
 import com.music.zenith.ui.AddonBlockedAlert
 import com.music.zenith.data.settings.LibrarySort
 import com.music.zenith.data.settings.ThemeMode
@@ -165,6 +166,7 @@ import com.music.zenith.ui.components.CoverFlightLayer
 import com.music.zenith.ui.components.LocalCoverVisibilityScope
 import com.music.zenith.ui.navigation.AppRoute
 import com.music.zenith.ui.screens.EqualizerPresetPage
+import com.music.zenith.ui.screens.SettingsChoiceKind
 import com.music.zenith.ui.screens.SettingsChoicePage
 import com.music.zenith.ui.components.SpotifyImportAlert
 import com.music.zenith.ui.screens.AccountAndScrobblingScreen
@@ -234,6 +236,7 @@ import com.music.zenith.ui.components.IosMenuPopover
 import com.music.zenith.ui.components.SongActionsMenu
 import com.music.zenith.ui.components.HeldContextMenu
 import com.music.zenith.ui.components.cancelCoverFlight
+import com.music.zenith.ui.components.coverFlightPagesOpen
 import com.music.zenith.ui.components.startCoverFlightFor
 import com.music.zenith.ui.components.HeldItem
 import androidx.media3.session.MediaController
@@ -263,6 +266,9 @@ import com.music.zenith.ui.components.backdrop.backdrops.layerBackdrop
 import com.music.zenith.ui.components.backdrop.backdrops.rememberLayerBackdrop
 import com.music.zenith.ui.components.backdrop.backdrops.rememberSnapshotBackdrop
 import com.music.zenith.ui.components.backdrop.backdrops.snapshotBackdropSource
+
+import com.music.zenith.ui.components.backdrop.drawPlainBackdrop
+import com.music.zenith.ui.components.backdrop.effects.blur
 import com.music.zenith.ui.components.isGlassSupported
 import com.music.zenith.data.sources.SourceConfig
 import com.music.zenith.data.sources.SourceKind
@@ -297,6 +303,7 @@ import com.music.zenith.ui.components.ServerEditorHost
 import com.music.zenith.ui.components.UpdateAvailableDialog
 import com.music.zenith.ui.components.WebDavConflictAlert
 import com.music.zenith.ui.components.FieldConfig
+import com.music.zenith.ui.icons.LocalShareIcon
 import com.music.zenith.ui.icons.ZenithIcons
 import androidx.media3.common.Player
 import com.music.zenith.data.YtMusicRepository
@@ -326,6 +333,7 @@ import com.music.zenith.ui.player.PlayerDock
 import com.music.zenith.ui.screens.DetailScreen
 import com.music.zenith.ui.screens.sortedForDetail
 import com.music.zenith.ui.screens.ExploreScreen
+import com.music.zenith.ui.screens.mixKeyColors
 import com.music.zenith.ui.screens.LocalFolder
 import com.music.zenith.ui.screens.LocalFolderState
 import com.music.zenith.ui.screens.LocalFolderTab
@@ -431,6 +439,7 @@ class MainActivity : AppCompatActivity() {
                     LocalOverscrollFactory provides iosOverscrollFactory,
                     LocalLiquidGlassEnabled provides liquidGlassEnabled,
                     LocalSegmentedControlStyle provides AppSegmentedControlStyle,
+                    LocalShareIcon provides SfIcons.Share,
                     LocalMostPlayedArt provides { covers, motion, modifier ->
                         MostPlayedArt(covers, motion, modifier)
                     },
@@ -559,6 +568,10 @@ private fun ZenithApp(
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
     val progressiveBlur by AppSettings.progressiveBlur.collectAsStateWithLifecycle()
     val glassSamplesBackdrop = glassActive && !reduceDynamicBlur
+    // Local backdrop for the Search tab: records the mood grid so the fixed
+    // header above it can draw a blurred copy of what scrolls underneath.
+    val searchBackdrop = rememberLayerBackdrop()
+    val searchHeaderTint = MaterialTheme.colorScheme.background.copy(alpha = 0.55f)
     // What folds [GlassNavBar] between its expanded and inline shapes. Held here
     // rather than inside the bar because the page's scroll is what drives it,
     // and the page is a sibling of the bar rather than a child.
@@ -566,7 +579,8 @@ private fun ZenithApp(
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     // Explore loads the first time it's shown, not at launch beside Home.
     LaunchedEffect(selectedTab) {
-        if (selectedTab == TAB_EXPLORE) viewModel.onExploreShown()
+        // The Search tab's categories come from the same feed Explore loads.
+        if (selectedTab == TAB_EXPLORE || selectedTab == TAB_SEARCH) viewModel.onExploreShown()
     }
     /**
      * Whether the player's sheet is up. The player is always a full-screen
@@ -808,6 +822,9 @@ private fun ZenithApp(
     // signal to focus the input field.
     var searchFocusRequested by remember { mutableStateOf(false) }
     val searchFieldFocus = remember { FocusRequester() }
+    // Whether the top bar's search field has focus. The Search tab shows its
+    // categories while it has none and the recent searches once it does.
+    var searchFieldFocused by remember { mutableStateOf(false) }
     // Invalidates an in-flight radio lookup when a later play request wins.
     var playRequestGeneration by remember { mutableIntStateOf(0) }
     // Starting radio from the item already playing must not replace that media
@@ -840,11 +857,22 @@ private fun ZenithApp(
     val detailActiveShelf = artistShelfRoute?.shelf
     /** The route on screen, or null when a release page or a tab is. */
     val route = visibleEntry?.route
+    // Halaman pengaturan Kaca Cair dipakai untuk melihat hasil efek, jadi navbar
+    // dikunci di bentuk expanded: mini player tetap di atas pil tab dan tidak
+    // pernah melipat ke tengah bar saat halaman digulir.
+    val glassPreviewPage =
+        (route as? AppRoute.SettingsChoice)?.choice == SettingsChoiceKind.LIQUID_GLASS
+    LaunchedEffect(glassPreviewPage) {
+        if (glassPreviewPage) navBarScroll.expand()
+    }
     /**
      * The release page at the top of its stack, whether or not a route
      * covers it. Most things want [detail] — the one actually on screen.
      */
     val topDetail = detailStack.lastOrNull()
+    androidx.compose.runtime.SideEffect {
+        coverFlightPagesOpen(detailStack.map { it.browseId })
+    }
     /** The release page on screen, or null when a route or a tab is. */
     val detail = topDetail?.takeIf { visibleEntry == null }
     // The reorder list lives on its playlist's page; leaving that page by any
@@ -864,6 +892,8 @@ private fun ZenithApp(
     val hideHomeTopPicks by AppSettings.hideHomeTopPicks.collectAsStateWithLifecycle()
     val hideHomeMoods by AppSettings.hideHomeMoods.collectAsStateWithLifecycle()
     val homeLayout by AppSettings.homeLayout.collectAsStateWithLifecycle()
+    val libraryArtistsRow by AppSettings.libraryArtistsRow.collectAsStateWithLifecycle()
+    val libraryLayout by AppSettings.libraryLayout.collectAsStateWithLifecycle()
     // Only what Home draws: Top Picks and Explore keep reading the full feed.
     val visibleHomeState = remember(homeState, hideHomeVideos, hideHomeRecents) {
         val loaded = homeState as? UiState.Success
@@ -905,6 +935,7 @@ private fun ZenithApp(
     val query by viewModel.query.collectAsStateWithLifecycle()
     val results by viewModel.results.collectAsStateWithLifecycle()
     val exploreState by viewModel.explore.collectAsStateWithLifecycle()
+    val exploreCharts by viewModel.exploreCharts.collectAsStateWithLifecycle()
     val selectedMoodGenre by viewModel.selectedMoodGenre.collectAsStateWithLifecycle()
     val moodGenreShelves by viewModel.moodGenreShelves.collectAsStateWithLifecycle()
     val libraryState by viewModel.library.collectAsStateWithLifecycle()
@@ -1241,9 +1272,9 @@ private fun ZenithApp(
     val searchListState = rememberLazyListState()
     val currentListState = when (selectedTab) {
         TAB_HOME -> homeListState
-        TAB_EXPLORE -> if (selectedMoodGenre == null) exploreListState else moodGenreListState
+        TAB_EXPLORE -> exploreListState
         TAB_LIBRARY -> libraryListState
-        else -> searchListState
+        else -> if (selectedMoodGenre == null) searchListState else moodGenreListState
     }
 
 
@@ -1656,6 +1687,23 @@ private fun ZenithApp(
             id = first?.playbackSourceId,
         )
         playFrom(songs, index, source)
+    }
+    // A new track always opens the player on its main screen, never on the
+    // lyrics left over from the previous one. Done here, where the player is
+    // always composed, so it holds whichever way the track changed (Search,
+    // album, queue, next/previous) and also while the player is closed to the
+    // mini player. The first track seen is skipped so a restart still restores
+    // the last screen.
+    var lastTrackId by remember { mutableStateOf(player.song?.videoId) }
+    LaunchedEffect(player.song?.videoId) {
+        val id = player.song?.videoId ?: return@LaunchedEffect
+        val previous = lastTrackId
+        lastTrackId = id
+        if (previous != null && previous != id &&
+            AppSettings.lastPlayerScreen.value == LastPlayerScreen.LYRICS
+        ) {
+            AppSettings.setLastPlayerScreen(LastPlayerScreen.MAIN)
+        }
     }
     LaunchedEffect(player.song?.videoId) {
         if (optimisticVersionSong?.videoId == player.song?.videoId ||
@@ -2538,7 +2586,7 @@ private fun ZenithApp(
             }?.let { folderPage ->
                 (folderPage.songs as? UiState.Success)?.data?.firstOrNull { it.thumbnailUrl != null }?.thumbnailUrl
             },
-        keyColors = detailApple?.keyColors(),
+        keyColors = detailApple?.keyColors() ?: topDetail?.mix?.let { mixKeyColors(it) },
     )
 
     // One set of numbers for the cards, the page, the stories and the shared
@@ -2827,7 +2875,7 @@ private fun ZenithApp(
                         replayLandingPage = ReplayStoryPage.INTRO
                         navigator.push(AppRoute.Replay)
                     }
-                    PlaybackSourceType.EXPLORE -> selectedTab = TAB_EXPLORE
+                    PlaybackSourceType.EXPLORE -> selectedTab = TAB_SEARCH
                     PlaybackSourceType.SHARED_LINK -> {
                         val id = sourceId ?: return@openSource
                         context.startActivity(
@@ -2990,7 +3038,7 @@ private fun ZenithApp(
                     modifier = Modifier
                         .nestedScroll(pageScrollConnection)
                         .then(
-                            if (glassActive) {
+                            if (glassActive && !glassPreviewPage) {
                                 Modifier
                                     // Every page's scroll passes through here, so
                                     // the glass bar collapses on all of them
@@ -3547,7 +3595,36 @@ private fun ZenithApp(
                                     }
                                 },
                             )
-                            TAB_EXPLORE -> selectedMoodGenre?.let { category ->
+                            TAB_EXPLORE -> ExploreScreen(
+                                chartsState = exploreCharts,
+                                listState = exploreListState,
+                                onRetry = viewModel::loadExplore,
+                                homeState = homeState,
+                                currentSong = player.song,
+                                isPlaying = player.isPlaying,
+                                onShelfItemClick = { item, shelfTitle ->
+                                    val song = shelfSong(item)
+                                    val browseId = item.browseId
+                                    when {
+                                        song != null -> playRadio(
+                                            song,
+                                            QueueSource(shelfTitle, PlaybackSourceType.HOME),
+                                        )
+                                        browseId != null -> viewModel.openDetail(
+                                            browseId = browseId,
+                                            title = item.title,
+                                            subtitle = item.subtitle,
+                                            thumbnailUrl = item.thumbnailUrl,
+                                        )
+                                    }
+                                },
+                                onShelfItemLongPress = onShelfLongPress,
+                                refreshing = MainViewModel.Feed.EXPLORE in refreshing,
+                                onRefresh = { viewModel.refresh(MainViewModel.Feed.EXPLORE) },
+                                pullState = explorePull,
+                                contentPadding = listPadding,
+                            )
+                            TAB_SEARCH -> selectedMoodGenre?.let { category ->
                                 MoodGenrePlaylistsScreen(
                                     title = category.title,
                                     state = moodGenreShelves,
@@ -3580,35 +3657,7 @@ private fun ZenithApp(
                                     onRetry = { viewModel.openMoodGenre(category) },
                                     contentPadding = listPadding,
                                 )
-                            } ?: ExploreScreen(
-                                state = exploreState,
-                                listState = exploreListState,
-                                onCategoryClick = viewModel::openMoodGenre,
-                                onRetry = viewModel::loadExplore,
-                                homeState = homeState,
-                                onShelfItemClick = { item, shelfTitle ->
-                                    val song = shelfSong(item)
-                                    val browseId = item.browseId
-                                    when {
-                                        song != null -> playRadio(
-                                            song,
-                                            QueueSource(shelfTitle, PlaybackSourceType.HOME),
-                                        )
-                                        browseId != null -> viewModel.openDetail(
-                                            browseId = browseId,
-                                            title = item.title,
-                                            subtitle = item.subtitle,
-                                            thumbnailUrl = item.thumbnailUrl,
-                                        )
-                                    }
-                                },
-                                onShelfItemLongPress = onShelfLongPress,
-                                refreshing = MainViewModel.Feed.EXPLORE in refreshing,
-                                onRefresh = { viewModel.refresh(MainViewModel.Feed.EXPLORE) },
-                                pullState = explorePull,
-                                contentPadding = listPadding,
-                            )
-                            TAB_SEARCH -> SearchScreen(
+                            } ?: SearchScreen(
                                 query = query,
                                 onQueryChange = viewModel::onQueryChange,
                                 filter = filter,
@@ -3740,6 +3789,22 @@ private fun ZenithApp(
                                 // suggestions and filters, and a gap reads as a break.
                                 topPadding = topBarHeight() + 4.dp,
                                 showField = false,
+                                listModifier = if (glassSamplesBackdrop) {
+                                    Modifier.layerBackdrop(searchBackdrop)
+                                } else {
+                                    Modifier
+                                },
+                                headerModifier = if (glassSamplesBackdrop) {
+                                    Modifier.drawPlainBackdrop(
+                                        backdrop = searchBackdrop,
+                                        shape = { androidx.compose.ui.graphics.RectangleShape },
+                                        effects = { blur(24.dp.toPx()) },
+                                        onDrawSurface = { drawRect(searchHeaderTint) },
+                                    )
+                                } else {
+                                    Modifier
+                                },
+
                                 // The settings page's own two-state selector, so the
                                 // app has one look for "pick one of these".
                                 sourceSwitcher = {
@@ -3753,6 +3818,10 @@ private fun ZenithApp(
                                         onSelect = { index -> onSearchSourceChange(SearchSource.entries[index]) },
                                     )
                                 },
+                                exploreState = exploreState,
+                                onCategoryClick = viewModel::openMoodGenre,
+                                onExploreRetry = viewModel::loadExplore,
+                                fieldFocused = searchFieldFocused,
                                 searchingLibrary = searchSource == SearchSource.LIBRARY,
                                 libraryResults = libraryResults,
                                 searchingAddons = searchSource == SearchSource.ADDONS,
@@ -3824,6 +3893,9 @@ private fun ZenithApp(
                                 contentPadding = listPadding,
                                 links = libraryLinks(signedIn),
                                 deviceItems = libraryDeviceItems(downloadedReleases) + localPlaylistItems,
+                                artistsRow = libraryArtistsRow,
+                                onArtistsRowChange = AppSettings::setLibraryArtistsRow,
+                                layout = libraryLayout,
                             )
                         }
                     }
@@ -4046,6 +4118,7 @@ private fun ZenithApp(
                                 onQueryChange = viewModel::onQueryChange,
                                 onSubmit = viewModel::submitSearch,
                                 focusRequester = searchFieldFocus,
+                                onFocusChange = { searchFieldFocused = it },
                                 placeholder = org.jetbrains.compose.resources.stringResource(
                                     if (searchSource == SearchSource.LIBRARY) {
                                         SharedRes.string.search_library_hint
@@ -4268,7 +4341,7 @@ private fun ZenithApp(
                                     },
                                 ) {
                                     Icon(
-                                        Icons.Rounded.IosShare,
+                                        SfIcons.Share,
                                         contentDescription = stringResource(R.string.share),
                                         tint = MaterialTheme.colorScheme.onSurface,
                                     )
@@ -4354,15 +4427,18 @@ private fun ZenithApp(
                         return@tabSelected
                     }
                     val index = if (listenTogetherTab && barIndex > TAB_LIBRARY) barIndex - 1 else barIndex
+                    // Coming in from another tab, or back from a category page, shows
+                    // the categories. Tapping Search while already on them opens the field.
+                    val reopenField = index == TAB_SEARCH && selectedTab == TAB_SEARCH &&
+                        route == null && detail == null && selectedMoodGenre == null
                     navigator.clear()
                     viewModel.closeMoodGenre()
                     selectedTab = index
+                    searchFieldFocused = false
 
-                    // Every search tab tap resets the field, focuses it, and opens
-                    // the keyboard through SearchScreen's focus request.
                     if (index == TAB_SEARCH) {
                         viewModel.onQueryChange("")
-                        searchFocusRequested = true
+                        searchFocusRequested = reopenField
                     }
                 }
 
@@ -5001,6 +5077,7 @@ private fun ZenithApp(
                         showReplayShare = true
                     },
                     paused = showReplayShare,
+                    mainPlayer = controller,
                 )
             }
         }
@@ -5847,6 +5924,7 @@ private fun ZenithApp(
             HomeLayoutDialog(
                 hazeState = hazeState,
                 shelves = layoutShelves,
+                libraryShelves = (libraryState as? UiState.Success)?.data?.shelves.orEmpty(),
                 onDismiss = { showHomeLayout = false },
             )
         }

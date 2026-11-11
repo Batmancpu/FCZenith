@@ -6,8 +6,17 @@ const val HOME_SLOT_TOP_PICKS = "slot:top-picks"
 /** Key of the Find Your Mood slot on Home. */
 const val HOME_SLOT_MOODS = "slot:moods"
 
+/** Keys of the fixed rows of the Library tab. Shelves use [homeShelfKey]. */
+const val LIBRARY_SLOT_PINNED = "slot:library-pinned"
+const val LIBRARY_SLOT_LINKS = "slot:library-links"
+const val LIBRARY_SLOT_REPLAY = "slot:library-replay"
+const val LIBRARY_SLOT_ON_DEVICE = "slot:library-on-device"
+
+/** Title of the speed dial built from local listening; kept apart from YouTube's Quick picks / Speed dial shelf. */
+const val LOCAL_SPEED_DIAL_TITLE = "My speed dial"
+
 private val LISTEN_AGAIN_ALIASES = listOf("Listen again", "Nghe lại", "もう一度聴く", "Dengarkan lagi", "Putar ulang", "다시 듣기")
-private val QUICK_PICKS_ALIASES = listOf("Quick picks", "Lựa chọn nhanh", "Chọn nhanh đài phát", "クイック ミックス", "Pilihan cepat", "Pilihan singkat", "빠른 선곡", "빠른 선택")
+private val QUICK_PICKS_ALIASES = listOf("Quick picks", "Speed dial", "Panggilan cepat", "Quay số nhanh", "スピードダイヤル", "스피드 다이얼", "Lựa chọn nhanh", "Chọn nhanh đài phát", "クイック ミックス", "Pilihan cepat", "Pilihan singkat", "빠른 선곡", "빠른 선택")
 
 /**
  * A stable key for a feed shelf. The same shelf keeps its key across app

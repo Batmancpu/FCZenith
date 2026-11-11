@@ -165,7 +165,9 @@ import com.music.zenith.data.useTrackTags
 import com.music.zenith.ui.components.CoverPlaceholder
 import com.music.zenith.data.canvas.AppleArtistArt
 import com.music.zenith.data.DebugLog as Log
+import com.music.zenith.data.canvas.AppleAlbumInfoRepository
 import com.music.zenith.data.canvas.AppleArtistArtRepository
+import com.music.zenith.data.canvas.releaseDateText
 import com.music.zenith.data.canvas.appleCatalogue
 import com.music.zenith.data.canvas.ArtistSignature
 import com.music.zenith.data.canvas.ArtistSignatureRepository
@@ -259,8 +261,13 @@ private val SLEEVE_SHADOW = 18.dp
 private val RELEASE_SIDE_BUTTON = 50.dp
 private val RELEASE_ACTION_GAP = 14.dp
 
-/** Past this the Play pill stops growing, so a tablet doesn't get a bar. */
-private val RELEASE_ACTIONS_MAX_WIDTH = 420.dp
+/**
+ * Past this the Play pill stops growing, so neither a tablet nor a wide phone
+ * gets a bar. Termasuk gutter kiri-kanan (24dp per sisi): sisa ~288dp untuk
+ * Shuffle, Play, dan Add, sehingga Play ~160dp dan tombol samping ~41dp dari
+ * tepi layar 360dp, seperti Apple Music.
+ */
+private val RELEASE_ACTIONS_MAX_WIDTH = 336.dp
 private val PILL_SHAPE = RoundedCornerShape(12.dp)
 
 /**
@@ -479,7 +486,7 @@ fun DetailScreen(
         // halamannya menyatu seperti halaman artis.
         imageUrl = appleArt?.heroUrl ?: page.thumbnailUrl
             ?: if (page.isFolderCover()) songs.firstOrNull { it.thumbnailUrl != null }?.thumbnailUrl else null,
-        keyColors = appleArt?.keyColors(),
+        keyColors = appleArt?.keyColors() ?: page.mix?.let { mixKeyColors(it) },
     )
 
     // Narrowing the running order in place — the release equivalent of the
@@ -556,6 +563,21 @@ fun DetailScreen(
         val found = CanvasRepository.canvasForAlbum(page.title, credit)
         if (found != null && found.url != canvas?.url) canvas = found
     }
+    // Tanggal rilis lengkap dan baris ℗ dari Apple, hanya untuk album. Tahun dari
+    // subtitle tampil lebih dulu; jawaban Apple menggantinya begitu datang.
+    var albumInfo by remember(page.browseId) {
+        mutableStateOf(AppleAlbumInfoRepository.cached(page.browseId))
+    }
+    LaunchedEffect(page.browseId, page.title, credit, songsLoading) {
+        if (page.type == BrowseType.ALBUM && folder == null &&
+            !page.browseId.startsWith("local:") && !songsLoading && credit.isNotBlank()
+        ) {
+            albumInfo = AppleAlbumInfoRepository.infoFor(
+                page.browseId, page.title, credit, songs.size,
+            ) ?: albumInfo
+        }
+    }
+
     // An artist's clip comes with the same Apple lookup as its photograph.
     val artistVideo = appleArt?.videoUrl
     LaunchedEffect(artistVideo, canvasEnabled) {
@@ -600,7 +622,9 @@ fun DetailScreen(
             // [palette] already eases into the artwork's colour (see
             // rememberArtworkPalette). A second ease here lagged behind every
             // other surface painted from it, and the two showed as mismatched squares.
-            val pageColor = if (isArtist) palette.wash else palette.background
+            // Album full-bleed seperti foto artis: halamannya memakai wash yang
+            // sama dengan tempat kaki cover larut, bukan latar bingkai polos.
+            val pageColor = if (isArtist || page.isAlbumHero() || page.isMixHero()) palette.wash else palette.background
             BoxWithConstraints(Modifier.fillMaxSize().background(pageColor)) {
                 // Measured rather than read off the window. The player runs
                 // full-screen at every window size, so this page's own width in
@@ -617,7 +641,7 @@ fun DetailScreen(
                 val gridColumns = libraryGrid(maxWidth - PAGE_GUTTER * 2).columns
                 // Liked Music: tarikan ke bawah dibatasi kecil, jadi seni ekstra di
                 // atas hero cukup tipis dan lubang tidak pernah terlihat.
-                val listOverscroll = if (page.isLikedMusic() || page.covers.isNotEmpty() || page.isFolderCover()) {
+                val listOverscroll = if (page.isLikedMusic() || page.covers.isNotEmpty() || page.isFolderCover() || page.isAlbumHero() || page.isMixHero()) {
                     rememberIosOverscrollEffect(LIKED_MAX_PULL)
                 } else {
                     rememberOverscrollEffect()
@@ -658,6 +682,7 @@ fun DetailScreen(
                         palette = palette,
                         sleeveSize = sleeveSize,
                         heroHeight = artHeight * 0.92f,
+                        albumGenre = albumInfo?.genre,
                         canvas = canvas,
                         songs = songs,
                         onPlay = { onSongClick(songs, 0) },
@@ -747,6 +772,7 @@ fun DetailScreen(
                         text = description?.takeIf { it.isNotBlank() },
                         palette = palette,
                         horizontalPadding = if (isArtist) ARTIST_CONTENT_GUTTER else ABOUT_GUTTER,
+                        compact = !isArtist,
                         stats = if (hasStats) {
                             {
                                 ArtistStatsRow(
@@ -870,6 +896,10 @@ fun DetailScreen(
                             // what the filter — or a sort — left standing.
                             trackNumber = originalTrackNumbers[song.videoId].takeIf { numbered },
                             subtitleColor = palette.onBackgroundVariant,
+                            // Apple Music: no artist line when it is the album's own
+                            // artist, and no per-row duration on an album.
+                            hideArtistOf = credit.takeIf { numbered && it.isNotBlank() },
+                            showDuration = !numbered,
                             downloadedTint = downloadedTint,
                             isCurrent = isCurrent,
                             isPlaying = isCurrent && isPlaying,
@@ -886,6 +916,22 @@ fun DetailScreen(
                             )
                         }
                         }
+                    }
+                }
+            }
+
+            // Info album di bawah daftar lagu: tahun, jumlah lagu, total durasi.
+            if (page.type == BrowseType.ALBUM && folder == null) {
+                val albumSongs = (page.songs as? UiState.Success)?.data.orEmpty()
+                if (albumSongs.isNotEmpty()) {
+                    item(key = "album-info") {
+                        AlbumInfoFooter(
+                            releaseDate = albumInfo?.releaseDateText(),
+                            year = RELEASE_YEAR.find(page.subtitle)?.value,
+                            copyright = albumInfo?.copyright,
+                            songs = albumSongs,
+                            palette = palette,
+                        )
                     }
                 }
             }
@@ -1007,10 +1053,20 @@ private fun ReleaseHeader(
     onAddSongs: (() -> Unit)? = null,
     /** Tinggi hero full-bleed, hanya dipakai halaman Liked Music. */
     heroHeight: Dp = sleeveSize * 1.2f,
+    /** Genre yang Apple catat untuk album ini; tampil menggantikan label "Album". */
+    albumGenre: String? = null,
 ) {
-    val (credit, meta) = page.headerLines(songs.size, songs.playtime())
+    val (credit, listMeta) = page.headerLines(songs.size, songs.playtime())
+    // Apple Music: "Jazz • 2023". Jumlah lagu dan durasi pindah ke kaki halaman.
+    val meta = if (page.type == BrowseType.ALBUM && !page.browseId.startsWith("local:")) {
+        page.albumMeta(albumGenre)
+    } else {
+        listMeta
+    }
     // Liked Music dan Most Played tidak memakai sleeve berbingkai: seninya full-bleed.
-    val fullBleed = page.isLikedMusic() || page.covers.isNotEmpty() || page.isFolderCover()
+    val albumHero = page.isAlbumHero()
+    val mixHero = page.isMixHero()
+    val fullBleed = page.isLikedMusic() || page.covers.isNotEmpty() || page.isFolderCover() || albumHero || mixHero
     // Every row on a release carries the same credit — see [pageCredit] — so
     // the first one speaks for the whole page, the same source the rows'
     // own long-press "Open artist" already reads from.
@@ -1032,6 +1088,23 @@ private fun ReleaseHeader(
                 palette = palette,
                 songs = songs,
                 height = heroHeight,
+            )
+        } else if (albumHero) {
+            AlbumHero(
+                page = page,
+                // Kaki hero, jahitan, dan wash target terbang semuanya membaca
+                // palette.background di dalam AlbumHero; diganti wash di sini
+                // supaya ketiganya sama dengan warna halaman di atas.
+                palette = palette.copy(background = palette.wash),
+                canvas = canvas,
+                height = heroHeight * ALBUM_HERO_HEIGHT_SCALE,
+            )
+        } else if (mixHero) {
+            MixHero(
+                page = page,
+                // Sama seperti AlbumHero: kaki hero dan wash target terbang memakai warna halaman.
+                palette = palette.copy(background = palette.wash),
+                height = heroHeight * ALBUM_HERO_HEIGHT_SCALE,
             )
         } else if (fullBleed) {
             LikedMusicHero(
@@ -2130,12 +2203,63 @@ private fun AboutSignature(
     }
 }
 
+/**
+ * Kaki halaman album: "March 3, 1988 · 5 songs · 18 min", lalu baris ℗ bila
+ * Apple punya. Sebelum Apple menjawab, [year] dari subtitle yang dipakai.
+ */
+@Composable
+private fun AlbumInfoFooter(
+    releaseDate: String?,
+    year: String?,
+    copyright: String?,
+    songs: List<Song>,
+    palette: ArtworkPalette,
+) {
+    // Baris pertama tanggal rilis (atau tahun), baris kedua jumlah lagu dan durasi.
+    val dateLine = releaseDate ?: year
+    val countLine = listOfNotNull(
+        pluralStringResource(R.plurals.song_count_plural, songs.size, songs.size),
+        songs.playtime(),
+    ).joinToString(" · ")
+    Column(
+        modifier = Modifier.padding(
+            start = ABOUT_GUTTER,
+            end = ABOUT_GUTTER,
+            top = 16.dp,
+            bottom = 12.dp,
+        ),
+    ) {
+        if (dateLine != null) {
+            Text(
+                text = dateLine,
+                style = MaterialTheme.typography.bodyMedium,
+                color = palette.onBackgroundVariant,
+            )
+        }
+        Text(
+            text = countLine,
+            style = MaterialTheme.typography.bodyMedium,
+            color = palette.onBackgroundVariant,
+        )
+        if (copyright != null) {
+            Text(
+                text = copyright,
+                style = MaterialTheme.typography.bodySmall,
+                color = palette.onBackgroundVariant,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
+    }
+}
+
 @Composable
 private fun AboutSection(
     title: String,
     text: String?,
     palette: ArtworkPalette,
     horizontalPadding: Dp = ABOUT_GUTTER,
+    /** Ala Apple Music: tanpa judul, dengan MORE di ujung baris kedua. */
+    compact: Boolean = false,
     /** Drawn under the text. */
     stats: (@Composable () -> Unit)? = null,
     /** Drawn last, under the stats. */
@@ -2144,7 +2268,7 @@ private fun AboutSection(
     var expanded by remember(text) { mutableStateOf(false) }
     var clipped by remember(text) { mutableStateOf(false) }
     Column {
-        Text(
+        if (!compact) Text(
             text = title,
             style = MaterialTheme.typography.titleMedium,
             color = palette.onBackground,
@@ -2155,7 +2279,37 @@ private fun AboutSection(
                 bottom = 6.dp,
             ),
         )
-        if (text != null) Text(
+        if (text != null && compact) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .animateContentSize()
+                    .padding(horizontal = horizontalPadding, vertical = 4.dp)
+                    .let { m -> if (clipped || expanded) m.clickable { expanded = !expanded } else m },
+                verticalAlignment = Alignment.Bottom,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    text = text,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = palette.onBackgroundVariant,
+                    maxLines = if (expanded) Int.MAX_VALUE else 2,
+                    overflow = TextOverflow.Ellipsis,
+                    onTextLayout = { result -> if (!expanded) clipped = result.hasVisualOverflow },
+                    modifier = Modifier.weight(1f),
+                )
+                if (clipped && !expanded) {
+                    Text(
+                        text = stringResource(R.string.more).uppercase(),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = palette.onBackground,
+                    )
+                }
+            }
+        }
+        if (text != null && !compact) Text(
             text = text,
             style = MaterialTheme.typography.bodyLarge,
             fontWeight = FontWeight.Medium,
@@ -2169,7 +2323,7 @@ private fun AboutSection(
                 .padding(horizontal = horizontalPadding)
                 .let { m -> if (clipped || expanded) m.clickable { expanded = !expanded } else m },
         )
-        if (clipped || expanded) {
+        if (!compact && (clipped || expanded)) {
             Text(
                 text = stringResource(if (expanded) R.string.less else R.string.more),
                 style = MaterialTheme.typography.labelLarge,
@@ -2668,6 +2822,18 @@ private fun DetailPage.headerLines(trackCount: Int, playtime: String? = null): P
     return credit to meta
 }
 
+/** Baris info header album ala Apple Music: genre (atau jenis rilisan) • tahun. */
+@Composable
+private fun DetailPage.albumMeta(genre: String?): String {
+    val parts = subtitle.split("•", "·").map { it.trim() }.filter { it.isNotEmpty() }
+    val year = parts.lastOrNull { it.length == 4 && it.all(Char::isDigit) }
+    val kind = parts.firstOrNull { it.lowercase(Locale.ROOT) in KIND_WORDS }
+    return listOfNotNull(
+        genre ?: (kind ?: type.localizedLabel())?.capitalizeWords(),
+        year,
+    ).joinToString(" • ")
+}
+
 /**
  * Header Most Played: mosaic yang sama dengan kartu Home, full-bleed selebar
  * layar sampai di bawah bar (tanpa bingkai dan sudut membulat). Kakinya larut
@@ -2956,6 +3122,236 @@ private fun FolderCoverHero(
     }
 }
 
+/** Album: cover full-bleed sampai di bawah bar, seperti halaman folder perangkat. */
+private fun DetailPage.isAlbumHero(): Boolean =
+    type == BrowseType.ALBUM && mix == null && covers.isEmpty() &&
+        !isFolderCover() && !isLikedMusic()
+
+/** Hero album sedikit lebih tinggi dari hero folder, supaya cover persegi tidak banyak terpotong. */
+private const val ALBUM_HERO_HEIGHT_SCALE = 1.13f
+
+/**
+ * Header album: cover full-bleed sampai di bawah bar, kakinya larut ke warna
+ * halaman. Kerangkanya sama dengan [FolderCoverHero] (kotak target terbang yang
+ * sama, sudut 0, wash warna halaman), jadi cover terbang dari kartu mendarat di
+ * kotak ini dan pulang dari sini lagi. Klip cover animasi, kalau ada, berjalan
+ * di kotak yang persis sama dengan target terbang, bukan di seni yang menjulur
+ * ke atas, supaya frame yang ditahan selama terbang tidak bergeser.
+ */
+@Composable
+private fun AlbumHero(
+    page: DetailPage,
+    palette: ArtworkPalette,
+    canvas: CanvasArtwork?,
+    height: Dp,
+    modifier: Modifier = Modifier,
+) {
+    val coverUrl = page.thumbnailUrl
+    var artFailed by remember(coverUrl) { mutableStateOf(false) }
+
+    Box(
+        modifier
+            .layout { measurable, constraints ->
+                val placeable = measurable.measure(constraints)
+                val overlap = LIKED_HERO_OVERLAP.roundToPx().coerceAtMost(placeable.height)
+                layout(placeable.width, placeable.height - overlap) { placeable.place(0, 0) }
+            }
+            .fillMaxWidth()
+            .height(height)
+            .drawWithContent {
+                val extra = LIKED_OVERSCROLL.toPx()
+                clipRect(left = 0f, top = -extra, right = size.width, bottom = size.height) {
+                    this@drawWithContent.drawContent()
+                }
+                val seam = 2.dp.toPx()
+                drawRect(
+                    color = palette.background,
+                    topLeft = Offset(0f, size.height - seam),
+                    size = androidx.compose.ui.geometry.Size(size.width, seam * 2f),
+                )
+            }
+            .coverFlightTarget(page.browseId, 0.dp, palette.background),
+    ) {
+        // Seni lebih tinggi daripada hero: kelebihannya menjulur ke atas.
+        Box(
+            Modifier.layout { measurable, constraints ->
+                val extra = LIKED_OVERSCROLL.roundToPx()
+                val placeable = measurable.measure(
+                    Constraints.fixed(constraints.maxWidth, constraints.maxHeight + extra),
+                )
+                layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(0, -extra) }
+            },
+        ) {
+            Box(Modifier.matchParentSize().background(palette.elevated))
+            if (coverUrl == null || artFailed) {
+                CoverPlaceholder(
+                    icon = page.placeholderIcon(),
+                    base = palette.elevated,
+                    tint = palette.onBackgroundVariant,
+                    modifier = Modifier.matchParentSize(),
+                )
+            }
+            AsyncImage(
+                model = coverUrl.artworkAt(CARD_ART_PX),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.matchParentSize(),
+            )
+            AsyncImage(
+                model = coverUrl.artworkAt(HEADER_ART_PX),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                onState = { artFailed = it is AsyncImagePainter.State.Error },
+                modifier = Modifier.matchParentSize(),
+            )
+        }
+
+        // Cover animasi di atas gambar diam dan di bawah gradien kaki, di kotak
+        // yang sama dengan target terbang. Selalu berjalan: halaman ini hanya
+        // hidup selagi dibaca.
+        canvas?.let { clip ->
+            val frameGrab = remember(clip) { CanvasFrameGrab() }
+            RegisterCoverFlightGrab(page.browseId, frameGrab)
+            var clipShown by remember(clip) { mutableStateOf(false) }
+            val clipAlpha by animateFloatAsState(
+                targetValue = if (clipShown) 1f else 0f,
+                animationSpec = tween(400),
+                label = "albumHeroClipFade",
+            )
+            CanvasArtworkPlayer(
+                canvas = clip,
+                isPlaying = true,
+                modifier = Modifier
+                    .matchParentSize()
+                    .graphicsLayer { alpha = clipAlpha },
+                onRenderedChanged = {
+                    clipShown = it
+                    if (it) coverFlightClipRendered(page.browseId)
+                },
+                frameGrab = frameGrab,
+            )
+        }
+
+        // Berakhir di warna halaman penuh, jadi tidak ada tepi tempat seni berhenti.
+        // Mulai agak lebih bawah daripada hero folder: sampul album lebih banyak
+        // yang perlu terbaca.
+        val page0 = palette.background.copy(alpha = 0f)
+        Box(
+            Modifier
+                .matchParentSize()
+                .background(
+                    Brush.verticalGradient(
+                        0.00f to page0,
+                        0.58f to page0,
+                        0.68f to palette.background.copy(alpha = 0.25f),
+                        0.78f to palette.background.copy(alpha = 0.60f),
+                        0.88f to palette.background.copy(alpha = 0.88f),
+                        0.95f to palette.background.copy(alpha = 0.97f),
+                        1.00f to palette.background,
+                    ),
+                ),
+        )
+
+        // Sedikit gelap di atas supaya ikon bar kaca tetap terbaca.
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(height * 0.28f)
+                .background(
+                    Brush.verticalGradient(
+                        0f to Color.Black.copy(alpha = 0.22f),
+                        1f to Color.Transparent,
+                    ),
+                ),
+        )
+    }
+}
+
+/** Made for You Mix: cairan warna mix full-bleed sampai di bawah bar, seperti [AlbumHero]. */
+private fun DetailPage.isMixHero(): Boolean = mix != null && covers.isEmpty()
+
+/**
+ * Header Made for You Mix: kerangka dan target terbang yang sama dengan
+ * [AlbumHero] (sudut 0, wash warna halaman), jadi cover kartu mendarat di kotak
+ * ini dan pulang dari sini lagi. Teks sampul muncul setelah cover mendarat dan
+ * ditata di area yang terlihat, di bawah bar dan di atas judul halaman.
+ */
+@Composable
+private fun MixHero(
+    page: DetailPage,
+    palette: ArtworkPalette,
+    height: Dp,
+    modifier: Modifier = Modifier,
+) {
+    val mixTitle = page.mix ?: return
+    Box(
+        modifier
+            .layout { measurable, constraints ->
+                val placeable = measurable.measure(constraints)
+                val overlap = LIKED_HERO_OVERLAP.roundToPx().coerceAtMost(placeable.height)
+                layout(placeable.width, placeable.height - overlap) { placeable.place(0, 0) }
+            }
+            .fillMaxWidth()
+            .height(height)
+            .drawWithContent {
+                val extra = LIKED_OVERSCROLL.toPx()
+                clipRect(left = 0f, top = -extra, right = size.width, bottom = size.height) {
+                    this@drawWithContent.drawContent()
+                }
+                val seam = 2.dp.toPx()
+                drawRect(
+                    color = palette.background,
+                    topLeft = Offset(0f, size.height - seam),
+                    size = androidx.compose.ui.geometry.Size(size.width, seam * 2f),
+                )
+            }
+            .coverFlightTarget(page.browseId, 0.dp, palette.background),
+    ) {
+        // Cairan lebih tinggi daripada hero: kelebihannya menjulur ke atas.
+        Box(
+            Modifier.layout { measurable, constraints ->
+                val extra = LIKED_OVERSCROLL.roundToPx()
+                val placeable = measurable.measure(
+                    Constraints.fixed(constraints.maxWidth, constraints.maxHeight + extra),
+                )
+                layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(0, -extra) }
+            },
+        ) {
+            MixFluidArt(title = mixTitle, modifier = Modifier.matchParentSize())
+        }
+
+        val page0 = palette.background.copy(alpha = 0f)
+        Box(
+            Modifier
+                .matchParentSize()
+                .background(
+                    Brush.verticalGradient(
+                        0.00f to page0,
+                        0.58f to page0,
+                        0.68f to palette.background.copy(alpha = 0.25f),
+                        0.78f to palette.background.copy(alpha = 0.60f),
+                        0.88f to palette.background.copy(alpha = 0.88f),
+                        0.95f to palette.background.copy(alpha = 0.97f),
+                        1.00f to palette.background,
+                    ),
+                ),
+        )
+
+        // Sedikit gelap di atas supaya ikon bar kaca tetap terbaca.
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(height * 0.28f)
+                .background(
+                    Brush.verticalGradient(
+                        0f to Color.Black.copy(alpha = 0.22f),
+                        1f to Color.Transparent,
+                    ),
+                ),
+        )
+    }
+}
+
 /** Liked Music di YouTube Music (VLLM) atau Liked milik perangkat. */
 private fun DetailPage.isLikedMusic(): Boolean =
     browseId == YtMusicRepository.LIKED_MUSIC || OfflinePlaylists.isLikedPage(browseId)
@@ -3154,12 +3550,11 @@ private fun LikedFluidBackground(covers: List<String>, modifier: Modifier = Modi
     val top by androidx.compose.animation.animateColorAsState(tint[0], fade, label = "likedTop")
     val mid by androidx.compose.animation.animateColorAsState(tint[1], fade, label = "likedMid")
     val bottom by androidx.compose.animation.animateColorAsState(tint[2], fade, label = "likedBottom")
-    OrganicFluidBackground(
-        modifier = modifier,
-        colors = mixContrastPalette(
-            listOf(mid, top, bottom, top.lighter(0.5f), mid.lighter(0.35f)),
-        ),
-        animationSpeed = if (HeroMotion.frozen) 0f else 1.6f,
+    // Gradasi statis dari warna cover: tanpa shader, tanpa clock, tanpa redraw per frame.
+    Box(
+        modifier = modifier.drawBehind {
+            drawRect(Brush.verticalGradient(listOf(top, mid, bottom)))
+        },
     )
 }
 

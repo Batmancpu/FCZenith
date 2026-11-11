@@ -153,17 +153,23 @@ fun Modifier.lightweightLiquidGlass(
         Color(0xFF121212)
     }
     val shapeProvider = ShapeProvider { shape }
+    val custom by AppSettings.glassCustom.collectAsStateWithLifecycle()
+    val highlightSpec = remember(custom.rim) { Highlight.Default.copy(alpha = custom.rim) }
 
     return clip(shape)
         .background(
-            color = if (useGlass) glassTint.copy(alpha = SURFACE_OPACITY) else fallbackColor,
+            color = if (useGlass) {
+                glassTint.copy(alpha = (SURFACE_OPACITY * custom.tint).coerceIn(0f, 1f))
+            } else {
+                fallbackColor
+            },
             shape = shape,
         )
         .then(
             if (useGlass) {
                 HighlightElement(
                     shapeProvider = shapeProvider,
-                    highlight = { Highlight.Default },
+                    highlight = { highlightSpec },
                 )
             } else {
                 Modifier
@@ -185,10 +191,12 @@ fun Modifier.lightweightLiquidGlass(
 fun Modifier.liquidGlassRim(shape: CornerBasedShape): Modifier {
     if (!LocalLiquidGlassEnabled.current || !isGlassSupported()) return this
     val shapeProvider = remember(shape) { ShapeProvider { shape } }
+    val custom by AppSettings.glassCustom.collectAsStateWithLifecycle()
+    val highlightSpec = remember(custom.rim) { Highlight.Default.copy(alpha = custom.rim) }
     return then(
         HighlightElement(
             shapeProvider = shapeProvider,
-            highlight = { Highlight.Default },
+            highlight = { highlightSpec },
         ),
     )
 }
@@ -214,11 +222,14 @@ fun Modifier.liquidGlass(
     shape: CornerBasedShape,
     /** Drawn over the glass in place of the theme's default tint, when set. */
     surfaceTint: Color? = null,
+    /** False keeps the blur, tint and rim but skips the lens that bends what is behind. */
+    refract: Boolean = true,
 ): Modifier {
     if (!isGlassSupported()) return this
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
     val frosted by AppSettings.frostedGlass.collectAsStateWithLifecycle()
     val clarity by AppSettings.glassClarity.collectAsStateWithLifecycle()
+    val custom by AppSettings.glassCustom.collectAsStateWithLifecycle()
     if (reduceDynamicBlur) {
         return background(MaterialTheme.colorScheme.surface, shape)
             .border(GLASS_EDGE_WIDTH, GLASS_EDGE_COLOR, shape)
@@ -226,19 +237,31 @@ fun Modifier.liquidGlass(
     val backdrop = LocalAppBackdrop.current
     val exportedBackdrop = LocalGlassExport.current
     val density = LocalDensity.current
-    val resolution = clarity.resolutionScale
-    val blurPx = with(density) { BLUR_RADIUS_DP.dp.toPx() } * resolution * clarity.blurScale
-    val lensHeightPx = with(density) { (LENS_HEIGHT * LENS_MAX_DP).dp.toPx() } * resolution
-    val lensAmountPx = with(density) { (LENS_AMOUNT * LENS_MAX_DP).dp.toPx() } * resolution * clarity.lensScale
-    val themeTint = if (MaterialTheme.colorScheme.surface.luminance() > 0.5f) {
-        Color(0xFFFAFAFA)
+    val resolution = (clarity.resolutionScale * custom.quality).coerceIn(0.2f, 1f)
+    val blurPx = with(density) { BLUR_RADIUS_DP.dp.toPx() } * resolution * clarity.blurScale * custom.blur
+    val lensHeightPx = with(density) { (LENS_HEIGHT * LENS_MAX_DP).dp.toPx() } * resolution * custom.refractionWidth
+    val lensAmountPx = with(density) { (LENS_AMOUNT * LENS_MAX_DP).dp.toPx() } * resolution *
+        clarity.lensScale * custom.refraction
+    val rainbowStrength = custom.rainbowStrength(clarity.chromatic)
+    val highlightSpec = remember(custom.rim) { Highlight.Default.copy(alpha = custom.rim) }
+    val isLightTheme = MaterialTheme.colorScheme.surface.luminance() > 0.5f
+    val shadowSpec = remember(custom.shadow, isLightTheme) {
+        // A light page has nothing darker behind the bar, so the shadow sets it apart.
+        val base = if (isLightTheme) 0.18f else 0.1f
+        Shadow.Default.copy(color = Color.Black.copy(alpha = (base * custom.shadow).coerceIn(0f, 1f)))
+    }
+    val themeTint = if (isLightTheme) {
+        Color(0xFFF2F2F7)
     } else {
         Color(0xFF121212)
     }
-    val surfaceTintColor = surfaceTint ?: themeTint.copy(alpha = clarity.tintAlpha)
+    val tintAlpha = (clarity.tintAlpha * custom.tint).coerceIn(0f, 1f)
+    // White glass over a white page is invisible, so light theme keeps a minimum fill.
+    val surfaceTintColor = surfaceTint
+        ?: themeTint.copy(alpha = if (isLightTheme) maxOf(tintAlpha, 0.6f) else tintAlpha)
     // White 10% vanishes against a light page; use a dark hairline there.
-    val edgeColor = if (MaterialTheme.colorScheme.surface.luminance() > 0.5f) {
-        Color.Black.copy(alpha = 0.10f)
+    val edgeColor = if (isLightTheme) {
+        Color.Black.copy(alpha = 0.12f)
     } else {
         GLASS_EDGE_COLOR
     }
@@ -248,19 +271,20 @@ fun Modifier.liquidGlass(
         shape = { shape },
         effects = {
             // Frosted: hanya saturasi ringan + blur, tanpa lensa (bagian terberat di GPU).
-            colorControls(saturation = if (frosted) 1.15f else clarity.saturation)
+            colorControls(saturation = (if (frosted) 1.15f else clarity.saturation) * custom.saturation)
             blur(if (frosted) blurPx * 1.4f else blurPx)
-            if (!frosted && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (!frosted && refract && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 lens(
                     refractionHeight = lensHeightPx,
                     refractionAmount = lensAmountPx,
-                    depthEffect = true,
-                    chromaticAberration = clarity.chromatic,
+                    depthEffect = custom.depth,
+                    chromaticAberration = rainbowStrength > 0f,
+                    chromaticStrength = rainbowStrength,
                 )
             }
         },
-        highlight = { Highlight.Default },
-        shadow = { if (frosted) null else Shadow.Default },
+        highlight = { highlightSpec },
+        shadow = { if (frosted && !isLightTheme) null else shadowSpec },
         onDrawSurface = {
             drawRect(color = surfaceTintColor, size = size)
         },

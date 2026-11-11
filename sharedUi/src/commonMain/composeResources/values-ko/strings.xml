@@ -147,7 +147,7 @@
     <string name="pull_to_refresh">당겨서 새로고침</string>
     <string name="pull_release">놓아서 새로고침</string>
     <string name="pull_refreshing">새로고침 중…</string>
-    <string name="explore">탐색</string>
+    <string name="explore">신규</string>
     <string name="library">보관함</string>
     <string name="library_sign_in_description">Google 계정에 로그인하여 좋아요 표시한 곡, 재생목록, YouTube Music 기록을 확인하세요.</string>
     <string name="new_playlist">새 재생목록</string>
@@ -192,6 +192,7 @@
     <string name="card_monthly_listeners_format">월간 청취자 %1$s명</string>
     <string name="search_top_result">상위 검색결과</string>
     <string name="shelf_quick_picks">빠른 선곡</string>
+    <string name="shelf_speed_dial">스피드 다이얼</string>
     <string name="shelf_recents">최근 항목</string>
     <string name="shelf_recommended_music_videos">추천 뮤직비디오</string>
     <string name="shelf_shorts">쇼츠</string>

@@ -99,6 +99,9 @@ private class ResumeGate {
 
     /** Whether the frame on screen is one a caller holds a still of. */
     var holdingStill = false
+
+    /** Jumlah frame video yang sudah mendarat di surface; dipakai untuk melewati salinan yang sama. */
+    var videoFrames = 0L
 }
 
 /** What a clip's player needs to leave the screen without blocking it. */
@@ -408,8 +411,13 @@ internal fun AndroidCanvasArtworkPlayer(
         // jadi frame yang dipakai sleeve ikut diperbarui tiap frame dan cover
         // yang terbang tetap bergerak. Untuk collapse lyrics/queue klip dijeda,
         // sehingga satu salinan di atas sudah cukup.
+        var copiedFrames = gate.videoFrames
         while (!currentPausedForTransition) {
             withFrameMillis { }
+            // Klip hanya 24-30 fps, sedangkan layar 60-120 Hz. Menyalin frame yang
+            // sama lagi di tiap vsync cuma membuang PixelCopy dan alokasi bitmap.
+            if (gate.videoFrames == copiedFrames) continue
+            copiedFrames = gate.videoFrames
             val live = view.copyStill(
                 player.videoSize,
                 clipAspect,
@@ -579,6 +587,7 @@ internal fun AndroidCanvasArtworkPlayer(
 
                     override fun onSurfaceTextureUpdated(surface: SurfaceTexture) {
                         delegate?.onSurfaceTextureUpdated(surface)
+                        gate.videoFrames++
                         // A frame while playing is the clip moving on from its still.
                         if (gate.holdingStill && player.playWhenReady) {
                             gate.holdingStill = false

@@ -48,8 +48,13 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.music.zenith.R
+import com.music.zenith.data.YtMusicRepository
 import com.music.zenith.data.model.HOME_SLOT_MOODS
 import com.music.zenith.data.model.HOME_SLOT_TOP_PICKS
+import com.music.zenith.data.model.LIBRARY_SLOT_LINKS
+import com.music.zenith.data.model.LIBRARY_SLOT_ON_DEVICE
+import com.music.zenith.data.model.LIBRARY_SLOT_PINNED
+import com.music.zenith.data.model.LIBRARY_SLOT_REPLAY
 import com.music.zenith.data.model.HomeLayout
 import com.music.zenith.data.model.HomeShelf
 import com.music.zenith.data.model.HomeSlot
@@ -75,12 +80,42 @@ import dev.chrisbanes.haze.materials.HazeMaterials
 fun HomeLayoutDialog(
     hazeState: HazeState,
     shelves: List<HomeShelf>,
+    /** The account's library shelves, for the Library tab of the dialog. */
+    libraryShelves: List<HomeShelf> = emptyList(),
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
     val layout by AppSettings.homeLayout.collectAsStateWithLifecycle()
     val shape = RoundedCornerShape(ALERT_CORNER)
+
+    // 0 = Home, 1 = Library.
+    var tab by remember { mutableIntStateOf(0) }
+
+    // Library tab: the fixed rows plus whatever shelves the account's library has.
+    val libraryLayout by AppSettings.libraryLayout.collectAsStateWithLifecycle()
+    val libraryTitles = remember(libraryShelves) {
+        val titles = libraryShelves.map { it.title } + YtMusicRepository.PLAYLISTS_SHELF
+        titles.distinctBy { homeShelfKey(it) }.associate { homeShelfKey(it) to it }
+    }
+    val libraryDefaults = remember(libraryTitles) {
+        listOf(LIBRARY_SLOT_PINNED, LIBRARY_SLOT_LINKS, LIBRARY_SLOT_REPLAY, LIBRARY_SLOT_ON_DEVICE) +
+            libraryTitles.keys
+    }
+    val libraryOrder = remember(libraryLayout, libraryDefaults) {
+        val remembered = libraryLayout.slots.map { it.key }.filter { it !in libraryDefaults }
+        libraryLayout.arrange(libraryDefaults + remembered, dropHidden = false) { it }
+    }
+    val libraryHidden = remember(libraryLayout, libraryOrder) {
+        libraryOrder.filter { libraryLayout.isHidden(it) }.toSet()
+    }
+    fun saveLibrary(keys: List<String>, hiddenKeys: Set<String>) {
+        if (keys.isEmpty()) return
+        val unseen = libraryLayout.slots.filter { it.key !in keys }
+        AppSettings.setLibraryLayout(
+            HomeLayout(keys.map { HomeSlot(it, it in hiddenKeys) } + unseen),
+        )
+    }
 
     // Top Picks and Find Your Mood hide with the layout. AppSettings keeps these
     // two flags in step with it, so a flag set before any layout existed still
@@ -165,7 +200,7 @@ fun HomeLayoutDialog(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
-                    text = stringResource(R.string.customize_home),
+                    text = stringResource(if (tab == 1) R.string.customize_library else R.string.customize_home),
                     style = MaterialTheme.typography.bodyLarge.copy(
                         fontSize = 17.sp,
                         fontWeight = FontWeight.W600,
@@ -174,7 +209,9 @@ fun HomeLayoutDialog(
                     textAlign = TextAlign.Center,
                 )
                 Text(
-                    text = stringResource(R.string.home_layout_description),
+                    text = stringResource(
+                        if (tab == 1) R.string.library_layout_description else R.string.home_layout_description,
+                    ),
                     modifier = Modifier.padding(top = 4.dp),
                     style = MaterialTheme.typography.bodyMedium.copy(
                         fontSize = 13.sp,
@@ -185,7 +222,28 @@ fun HomeLayoutDialog(
                 )
             }
 
-            if (shelves.isEmpty() && !layout.isCustom) {
+            GlassSegmentedControl(
+                options = listOf(stringResource(R.string.home), stringResource(R.string.library)),
+                selectedIndex = tab,
+                onSelect = { tab = it },
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp),
+                liquid = true,
+            )
+
+            if (tab == 1) {
+                ReorderableHomeSlotList(
+                    order = libraryOrder,
+                    hidden = libraryHidden,
+                    titles = libraryTitles,
+                    onReorder = { saveLibrary(it, libraryHidden) },
+                    onToggle = { slot ->
+                        saveLibrary(
+                            libraryOrder,
+                            if (slot in libraryHidden) libraryHidden - slot else libraryHidden + slot,
+                        )
+                    },
+                )
+            } else if (shelves.isEmpty() && !layout.isCustom) {
                 AlertRule()
                 Text(
                     text = stringResource(R.string.home_layout_empty),
@@ -212,7 +270,13 @@ fun HomeLayoutDialog(
             AlertAction(
                 label = stringResource(R.string.reset_to_default),
                 emphasised = false,
-                onClick = { AppSettings.setHomeLayout(HomeLayout()) },
+                onClick = {
+                    if (tab == 1) {
+                        AppSettings.setLibraryLayout(HomeLayout())
+                    } else {
+                        AppSettings.setHomeLayout(HomeLayout())
+                    }
+                },
             )
             AlertRule()
             AlertAction(label = stringResource(R.string.done), emphasised = true, onClick = onDismiss)
@@ -224,6 +288,10 @@ fun HomeLayoutDialog(
 private fun homeSlotTitle(slot: String, titles: Map<String, String>): String = when (slot) {
     HOME_SLOT_TOP_PICKS -> stringResource(R.string.home_row_top_picks)
     HOME_SLOT_MOODS -> stringResource(R.string.find_your_mood)
+    LIBRARY_SLOT_PINNED -> stringResource(R.string.library_row_pinned)
+    LIBRARY_SLOT_LINKS -> stringResource(R.string.library_row_links)
+    LIBRARY_SLOT_REPLAY -> stringResource(R.string.replay)
+    LIBRARY_SLOT_ON_DEVICE -> stringResource(R.string.on_device)
     "shelf:listen-again" -> homeShelfLabel(titles[slot] ?: "Listen again")
     "shelf:quick-picks" -> homeShelfLabel(titles[slot] ?: "Quick picks")
     else -> homeShelfLabel(

@@ -89,7 +89,7 @@ fun OrganicFluidBackground(
     val speedState = rememberUpdatedState(speed)
     val colorsState = rememberUpdatedState(colors.ifEmpty { OrganicFluidDefaults.Palette })
 
-    val clock = remember { FluidClock(startAt = Random.nextDouble(8.0, 200.0)) }
+    val clock = remember { FluidClock(startAt = FluidTimeline.phase) }
     val agsl = remember { if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) AgslFluid() else null }
 
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -97,13 +97,11 @@ fun OrganicFluidBackground(
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             snapshotFlow { clock.visible && speedState.value > 0f }.collectLatest { running ->
                 if (!running) return@collectLatest
-                var last = withFrameNanos { it }
+                // Semua instance (kartu, cover terbang, sleeve halaman) membaca jam yang
+                // sama, jadi fase blob tetap nyambung saat pindah kartu <-> halaman.
                 while (true) {
-                    val now = withFrameNanos { it }
-                    // Dibatasi supaya jeda (mis. frame drop) tidak jadi lompatan.
-                    val dt = ((now - last) / 1_000_000_000.0).coerceAtMost(0.1)
-                    last = now
-                    clock.seconds += dt * speedState.value
+                    val frameNanos = withFrameNanos { it }
+                    clock.seconds = FluidTimeline.tick(frameNanos, speedState.value)
                 }
             }
         }
@@ -126,6 +124,28 @@ fun OrganicFluidBackground(
                 }
             },
     )
+}
+
+/**
+ * Jam bersama untuk semua latar cairan. Fase bertambah hanya saat ada instance
+ * yang berjalan (satu kali per frame, berapa pun jumlah instance), jadi kartu,
+ * cover terbang, dan halaman menampilkan frame yang sama, dan saat semuanya
+ * di-pause fase berhenti lalu lanjut dari frame terakhir.
+ */
+private object FluidTimeline {
+    var phase: Double = 30.0
+        private set
+    private var lastFrameNanos = 0L
+
+    fun tick(frameNanos: Long, speed: Float): Double {
+        if (frameNanos > lastFrameNanos) {
+            // Dibatasi supaya jeda (pause / frame drop) tidak jadi lompatan.
+            val dt = if (lastFrameNanos == 0L) 0.0 else ((frameNanos - lastFrameNanos) / 1_000_000_000.0).coerceAtMost(0.1)
+            lastFrameNanos = frameNanos
+            phase += dt * speed
+        }
+        return phase
+    }
 }
 
 private class FluidClock(startAt: Double) {

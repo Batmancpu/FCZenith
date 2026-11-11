@@ -15,7 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Download
-import androidx.compose.material.icons.rounded.IosShare
+import com.music.zenith.ui.icons.SfIcons
 import androidx.compose.material.icons.rounded.PhoneIphone
 import androidx.compose.material.icons.rounded.Undo
 import androidx.compose.material3.CircularProgressIndicator
@@ -188,7 +188,7 @@ internal fun AndroidLyricsShareSheet(
                 )
                 ShareAction(
                     label = stringResource(R.string.share),
-                    icon = Icons.Rounded.IosShare,
+                    icon = SfIcons.Share,
                     accent = true,
                     enabled = image != null,
                     modifier = Modifier.weight(1f),

@@ -548,6 +548,7 @@ object Innertube {
         browseId.startsWith("UC") || browseId.startsWith("MPLA") -> 30L * 60 * 1000
         browseId == "FEmusic_moods_and_genres" -> 24L * 60 * 60 * 1000
         browseId == "FEmusic_explore" -> 6L * 60 * 60 * 1000
+        browseId == "FEmusic_charts" -> 6L * 60 * 60 * 1000
         else -> 0L
     }
 
@@ -626,6 +627,20 @@ object Innertube {
             readBrowseCache(file, BROWSE_STALE_LIMIT_MS)?.also {
                 Log.d(TAG, "browse $browseId offline, serving cached copy")
             } ?: throw e
+        }
+    }
+
+    /** The charts page for one country; "ZZ" is Global. Cached like [browse] for FEmusic_charts. */
+    suspend fun browseCharts(country: String): JsonObject {
+        val file = browseCacheFile("FEmusic_charts", "country=$country")
+        readBrowseCache(file, browseFreshMs("FEmusic_charts"))?.let { return it }
+        return try {
+            postMusic("browse") {
+                put("browseId", "FEmusic_charts")
+                putJsonObject("formData") { putJsonArray("selectedValues") { add(country) } }
+            }.also { writeBrowseCache(file, it) }
+        } catch (e: IOException) {
+            readBrowseCache(file, BROWSE_STALE_LIMIT_MS) ?: throw e
         }
     }
 

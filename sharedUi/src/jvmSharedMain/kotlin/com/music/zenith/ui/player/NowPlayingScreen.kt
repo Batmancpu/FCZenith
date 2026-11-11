@@ -67,7 +67,7 @@ import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.material.icons.rounded.FastForward
 import androidx.compose.material.icons.rounded.FastRewind
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.IosShare
+import com.music.zenith.ui.icons.LocalShareIcon
 import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -1661,8 +1661,12 @@ fun NowPlayingScreen(
         // Klip hero (Apple dsb.): frame ditahan di lapisan seukuran player, lapisan yang
         // sama dengan tempat klipnya, jadi posisi dan ukurannya persis sama. Di kotak
         // sleeve ia di-crop atau meloncat ukuran saat klip dilepas.
-        val heroGrab = if (panelsUp || !heroMode) null else canvasFrameGrab.grab?.invoke()
-        dissolve.holdFrame(if (panelsUp || heroMode) null else canvasFrameGrab.grab?.invoke())
+        // Landscape tidak punya banner hero; sleeve-nya tetap tampil walau panel terbuka.
+        val inLandscape = landscapePlayerAvailable(windowWidth, windowHeight)
+        val heroGrab = if (inLandscape || panelsUp || !heroMode) null else canvasFrameGrab.grab?.invoke()
+        dissolve.holdFrame(
+            if (!inLandscape && (panelsUp || heroMode)) null else canvasFrameGrab.grab?.invoke(),
+        )
         if (heroGrab != null) {
             dissolve.holdFullFrame(
                 heroGrab,
@@ -2399,6 +2403,9 @@ fun NowPlayingScreen(
             val versionAligning by PlayerSettings.versionAlignmentInProgress.collectAsStateWithLifecycle()
             val transitionWindow by PlayerSettings.smartTransitionWindow.collectAsStateWithLifecycle()
             val panelOpen = lyricsOpen || queueOpen
+            // Still cover only: a running clip is a TextureView, which the
+            // right-edge fade mask cannot reach, so it keeps the square sleeve.
+            val landscapeFullBleed = fullBleedArt && canvas == null
 
             // Where the sleeve is drawn this frame on its way to or from the mini
             // player's cover, or null when it can't be worked out.
@@ -2410,7 +2417,9 @@ fun NowPlayingScreen(
             // cover — the same share, for the same reason, as the portrait
             // sleeve's `dockRide`.
             fun landscapeDockPose(): LandscapeDockPose? {
-                if (dock == null) return null
+                // The full-bleed cover is not square, so it is not carried onto
+                // the mini player's cover; it fades with the player instead.
+                if (dock == null || landscapeFullBleed) return null
                 val t = dockT()
                 val mini = dock.miniArtOnScreen() ?: return null
                 val anchor = dockFrame.anchor ?: return null
@@ -2445,6 +2454,13 @@ fun NowPlayingScreen(
                 }
             }
 
+            // Frame klip yang ditahan, seperti di sleeve portrait: TextureView tidak
+            // andal digambar ke dalam layer yang terbang, jadi selama docking klip
+            // disembunyikan dan salinan frame-nya yang digambar.
+            val landscapeStillStart = remember(canvas?.url) { stillAtMount() }
+            fun landscapeStillTakesOver(): Boolean =
+                still() != null && CanvasStills.fresh && (dockMoving || !canvasRendered)
+
             Box(modifier = Modifier.fillMaxSize().then(dockHost)) {
                 LandscapePlayerLayout(
                     pane = when {
@@ -2452,6 +2468,7 @@ fun NowPlayingScreen(
                         queueOpen -> PlayerPane.Queue
                         else -> PlayerPane.Main
                     },
+                    fullBleed = landscapeFullBleed,
                     background = { backgroundModifier ->
                         // The whole screen is the sheets' frost source: there is
                         // no full-bleed banner here to be it instead.
@@ -2462,17 +2479,29 @@ fun NowPlayingScreen(
                             artRequest = art.request,
                             artLoaded = art.loaded,
                             onArtState = art::onState,
+                            dissolve = dissolve,
                             canvas = canvas,
                             canvasRendered = canvasRendered,
                             isPlaying = isPlaying,
                             onCanvasRenderedChange = { canvasRendered = it },
+                            frameGrab = canvasFrameGrab,
                             // A clip decoding behind a player on its way to the
                             // bar is work nobody sees — see [dockMoving].
                             pausedForTransition = dockMoving || overlayOpen.value,
-                            sleeveShape = landscapeArtShape,
+                            // Sama seperti sleeve portrait: klip dipadamkan halus saat
+                            // mix/crossfade supaya dissolve cover di bawahnya terlihat,
+                            // lalu klip lagu baru menyala kembali.
+                            presentationAlpha = { if (landscapeStillTakesOver()) 0f else clipMixFade.value },
+                            startPositionMs = landscapeStillStart?.positionMs ?: 0L,
+                            revealInstantly = landscapeStillStart != null,
+                            captureStill = dockMoving,
+                            onStillCaptured = onStillCaptured,
+                            onResumed = onClipResumed,
+                            sleeveShape = if (landscapeFullBleed) ({ RectangleShape }) else landscapeArtShape,
+                            fadeRightEdge = landscapeFullBleed,
                             // Let go of on the way to the mini player, whose
                             // cover sits flat in its bar.
-                            shadowFraction = dockT,
+                            shadowFraction = if (landscapeFullBleed) ({ 0f }) else dockT,
                             modifier = artworkModifier
                                 .then(
                                     if (dock != null) {
@@ -2509,7 +2538,13 @@ fun NowPlayingScreen(
                                     // let go of on the way, as the portrait
                                     // sleeve's are: the cover does neither.
                                     val t = dockT()
-                                    val scale = if (t >= 1f) landscapeArtScale else 1f + (landscapeArtScale - 1f) * t
+                                    val scale = if (landscapeFullBleed) {
+                                        1f
+                                    } else if (t >= 1f) {
+                                        landscapeArtScale
+                                    } else {
+                                        1f + (landscapeArtScale - 1f) * t
+                                    }
                                     scaleX = scale
                                     scaleY = scale
                                     translationX = if (t >= 1f) swipeSettle.value else swipeSettle.value * t
@@ -2525,6 +2560,20 @@ fun NowPlayingScreen(
                                     closeLyrics()
                                 },
                         ) {
+                            // Frame klip yang ditahan, digambar menggantikan klip selagi
+                            // sleeve terbang ke mini player.
+                            Box(
+                                Modifier
+                                    .matchParentSize()
+                                    .graphicsLayer {
+                                        shape = if (landscapeFullBleed) RectangleShape else landscapeArtShape()
+                                        clip = true
+                                    }
+                                    .drawBehind {
+                                        val frame = if (landscapeStillTakesOver()) still()?.image else null
+                                        if (frame != null) drawCropped(frame)
+                                    },
+                            )
                             // The stats belong to the player, not to the sleeve, so
                             // they leave it along with the rest of the player.
                             SleeveNerdStats(
@@ -2534,7 +2583,7 @@ fun NowPlayingScreen(
                                     .padding(horizontal = 10.dp, vertical = 8.dp)
                                     // Faded with the player rather than flown with
                                     // the sleeve: the cover in the bar has none.
-                                    .graphicsLayer { alpha = if (panelOpen) 0f else dockFade() },
+                                    .graphicsLayer { alpha = if (panelOpen || landscapeFullBleed) 0f else dockFade() },
                             )
                         }
                     },
@@ -3336,7 +3385,7 @@ fun NowPlayingScreen(
                         // theirs. Sizing it off the width alone is what pushed the
                         // credits down across the scrubber on anything but a phone.
                         val wantArt = minOf(
-                            if (heroMode) maxWidth + 48.dp else maxWidth,
+                            if (heroMode) maxWidth + 48.dp else maxWidth + 16.dp,
                             roomy - ART_TITLE_GAP - HEADER_HEIGHT,
                         )
                         // Held to what the box has actually got, for the single frame it
@@ -4630,7 +4679,7 @@ Spacer(Modifier.width(12.dp))
                                 icon = when {
                                     showRevertCue -> Icons.AutoMirrored.Rounded.Undo
                                     lyricsShareGlyphVisible && lyricPicker.picking -> Icons.Rounded.Close
-                                    lyricsShareGlyphVisible -> Icons.Rounded.IosShare
+                                    lyricsShareGlyphVisible -> LocalShareIcon.current
                                     else -> Icons.Rounded.MoreHoriz
                                 },
                                 contentDescription = stringResource(

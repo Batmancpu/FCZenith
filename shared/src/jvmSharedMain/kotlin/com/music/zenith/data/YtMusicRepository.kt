@@ -302,7 +302,82 @@ object YtMusicRepository {
     private suspend fun shelvesOf(browseId: String): List<HomeShelf> =
         InnertubeParser.parseHome(Innertube.browse(browseId))
 
-    /** The server-defined mood and genre categories used by Explore. */
+    /** The charts page's shelves (top songs, trending and so on), for the lower half of Explore. */
+    suspend fun exploreCharts(): Result<List<HomeShelf>> = call("explore:charts") {
+        val pages = coroutineScope {
+            val regional = EXPLORE_BROWSE_IDS.map { id -> async { runCatching { shelvesOf(id) } } }
+            val global = async {
+                runCatching {
+                    InnertubeParser.parseHome(Innertube.browseCharts("ZZ"))
+                        .map { it.copy(title = "${it.title} (Global)") }
+                }
+            }
+            (regional + global).awaitAll()
+        }
+        val shelves = pages
+            .flatMap { it.getOrDefault(emptyList()) }
+            .filter { it.items.isNotEmpty() }
+            .distinctBy { it.title.trim().lowercase() }
+        if (shelves.isEmpty()) pages.firstNotNullOfOrNull { it.exceptionOrNull() }?.let { throw it }
+        // Apple Music's "Latest Songs". YouTube Music has no endpoint for new
+        // songs: New releases lists albums and singles, and its video tab lists
+        // music videos. So the list is the first track of each newest single,
+        // and chart songs only stand in when there are too few singles. A
+        // video is never passed off as a song.
+        val singleTracks = shelves.flatMap { it.items }
+            .filter { item ->
+                item.browseId?.startsWith("MPREb") == true &&
+                    item.subtitle.trim().startsWith("Single", ignoreCase = true)
+            }
+            .distinctBy { it.browseId }
+            .take(LATEST_SINGLES_LIMIT)
+            .let { singles ->
+                coroutineScope {
+                    singles.map { single ->
+                        async {
+                            runCatching { pageOf(Innertube.browse(single.browseId!!)).songs.firstOrNull() }
+                                .getOrNull()
+                                ?.takeUnless { it.isVideo }
+                                ?.let { song ->
+                                    ShelfItem(
+                                        title = song.title,
+                                        subtitle = song.artist.ifBlank {
+                                            InnertubeParser.artistFromSubtitle(single.subtitle)
+                                        },
+                                        thumbnailUrl = single.thumbnailUrl ?: song.thumbnailUrl,
+                                        videoId = song.videoId,
+                                        browseId = null,
+                                    )
+                                }
+                        }
+                    }.awaitAll().filterNotNull()
+                }
+            }
+            .distinctBy { it.videoId }
+        val chartTracks = shelves.flatMap { it.items }
+            .filter { it.videoId != null && it.browseId == null && !it.isVideo }
+            .distinctBy { it.videoId }
+        val latest = singleTracks.takeIf { it.size >= 4 } ?: chartTracks
+        if (latest.size < 4) {
+            shelves
+        } else {
+            listOf(
+                HomeShelf(
+                    title = "Latest songs",
+                    items = latest.take(20),
+                    layout = com.music.zenith.data.model.ShelfLayout.LIST,
+                ),
+            ) + shelves
+        }
+    }
+
+    /** The New tab reads new releases first, then YouTube's own Explore page, then the charts. */
+    private val EXPLORE_BROWSE_IDS = listOf("FEmusic_new_releases", "FEmusic_explore", "FEmusic_charts")
+
+    /** How many of the newest singles are opened to build the Latest songs list. */
+    private const val LATEST_SINGLES_LIMIT = 12
+
+    /** The server-defined mood and genre categories shown as the Search tab's categories. */
     suspend fun moodAndGenres(): Result<List<MoodGenreSection>> = call("moods-and-genres") {
         InnertubeParser.parseMoodAndGenres(Innertube.browse("FEmusic_moods_and_genres"))
     }

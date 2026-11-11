@@ -83,7 +83,7 @@ private fun mixDescription(title: String): String {
 
 /** Teks di atas [MixFluidArt]; bayangan lembut menjaga keterbacaan di atas warna terang. */
 @Composable
-fun MixCoverOverlay(title: String, subtitle: String, modifier: Modifier = Modifier) {
+fun MixCoverOverlay(title: String, subtitle: String, modifier: Modifier = Modifier, band: Boolean = true) {
     val (name, tail) = remember(title) { splitMixTitle(title) }
     val style = MaterialTheme.typography.headlineMedium.copy(
         fontSize = 34.sp,
@@ -94,7 +94,7 @@ fun MixCoverOverlay(title: String, subtitle: String, modifier: Modifier = Modifi
     val madeForYou = stringResource(Res.string.top_pick_made_for_you)
     Box(modifier) {
         // Band gelap di kaki kartu, seperti kartu Top Picks lain.
-        Box(
+        if (band) Box(
             Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()

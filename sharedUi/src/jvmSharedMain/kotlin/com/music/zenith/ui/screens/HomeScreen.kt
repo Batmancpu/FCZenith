@@ -16,7 +16,29 @@ import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.border
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import com.music.zenith.ui.rememberIsForeground
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.style.TextAlign
 import com.music.zenith.ui.components.longPressMenuClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -79,6 +101,7 @@ import coil3.compose.AsyncImage
 import com.music.zenith.data.model.CARD_ART_PX
 import com.music.zenith.data.model.HEADER_ART_PX
 import com.music.zenith.data.model.HomeShelf
+import com.music.zenith.data.model.LOCAL_SPEED_DIAL_TITLE
 import com.music.zenith.data.model.ROW_ART_PX
 import com.music.zenith.data.model.ShelfItem
 import com.music.zenith.data.model.ShelfLayout
@@ -115,10 +138,19 @@ import com.music.zenith.ui.player.MeshPalette
 internal val HOME_TITLE_LIFT = 28.dp
 
 private const val RECENTS_TITLE = "Recents"
+
+/** Speed dial leads Home, above Listen again and Recents, wherever the feed put it. */
+private fun List<HomeShelf>.withSpeedDialFirst(): List<HomeShelf> {
+    val at = indexOfFirst { shelf -> SPEED_DIAL_TITLES.any { shelf.title.trim().equals(it, ignoreCase = true) } }
+    if (at <= 0) return this
+    return toMutableList().also { it.add(0, it.removeAt(at)) }
+}
 private const val RECENT_TRACKS_PER_COLUMN = 4
 
 private val LISTEN_AGAIN_TITLES = listOf("Listen again", "Nghe lại", "もう一度聴く", "Dengarkan lagi", "Putar ulang", "다시 듣기")
-private val QUICK_PICKS_TITLES = listOf("Quick picks", "Lựa chọn nhanh", "Chọn nhanh đài phát", "クイック ミックス", "Pilihan cepat", "Pilihan singkat", "빠른 선곡", "빠른 선택")
+private val SPEED_DIAL_TITLES = listOf(LOCAL_SPEED_DIAL_TITLE, "Speed dial", "Panggilan cepat", "Quay số nhanh", "スピードダイヤル", "스피드 다이얼")
+private val QUICK_PICKS_TITLES = listOf("Quick picks", "Lựa chọn nhanh", "Chọn nhanh đài phát", "クイック ミックス", "Pilihan cepat", "Pilihan singkat", "빠른 선곡", "빠른 선택") +
+    SPEED_DIAL_TITLES.filterNot { it.equals(LOCAL_SPEED_DIAL_TITLE, ignoreCase = true) }
 
 /**
  * Quick picks menempati slot Listen again (baris kartu persegi di depan),
@@ -171,6 +203,297 @@ private fun List<HomeShelf>.withOtherModelBelowListenAgain(): List<HomeShelf> {
 
 /** How many placeholder rows a custom layout shows while the feed loads. */
 private const val HOME_SKELETON_SLOTS = 4
+
+private const val SPEED_DIAL_COLUMNS = 3
+private const val SPEED_DIAL_ROWS = 3
+private val SPEED_DIAL_GAP = 12.dp
+
+/**
+ * Speed dial: a grid of square covers, three across and three down per page,
+ * as YouTube Music draws it. One tap plays the track; more pages scroll sideways.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun SpeedDialShelf(
+    shelf: HomeShelf,
+    onItemClick: (ShelfItem) -> Unit,
+    onItemLongPress: ((ShelfItem) -> Unit)?,
+    currentSong: Song?,
+    isPlaying: Boolean,
+    onPlaySongs: ((List<Song>) -> Unit)? = null,
+) {
+    Column(Modifier.padding(bottom = 26.dp)) {
+        SectionHeader(shelf.title, shelf.subtitle)
+        val isCurrentItem = shelf.items.playingItemMatcher(currentSong)
+        val shuffleSongs = remember(shelf.items) {
+            shelf.items.mapNotNull { item ->
+                val id = item.videoId ?: return@mapNotNull null
+                if (item.browseId != null) {
+                    null
+                } else {
+                    Song(videoId = id, title = item.title, artist = item.subtitle, thumbnailUrl = item.thumbnailUrl)
+                }
+            }
+        }
+        val canShuffle = onPlaySongs != null && shuffleSongs.isNotEmpty()
+        val perPage = SPEED_DIAL_COLUMNS * SPEED_DIAL_ROWS
+        val pages = remember(shelf.items, canShuffle) {
+            if (canShuffle) {
+                listOf(shelf.items.take(perPage - 1)) + shelf.items.drop(perPage - 1).chunked(perPage)
+            } else {
+                shelf.items.chunked(perPage)
+            }
+        }
+        BoxWithConstraints {
+            val pageWidth = maxWidth - PAGE_GUTTER * 2
+            val tile = (pageWidth - SPEED_DIAL_GAP * (SPEED_DIAL_COLUMNS - 1)) / SPEED_DIAL_COLUMNS
+            val listState = rememberShelfListState("speed-dial:${shelf.title}")
+            if (pages.size > 1) {
+                val currentPage by remember(listState) {
+                    derivedStateOf {
+                        val index = listState.firstVisibleItemIndex
+                        if (listState.firstVisibleItemScrollOffset > 160) index + 1 else index
+                    }
+                }
+                SpeedDialPageDots(
+                    count = pages.size,
+                    current = currentPage,
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 2.dp),
+                )
+            }
+            ShelfRow(
+                state = listState,
+                contentPadding = PaddingValues(start = PAGE_GUTTER, end = PAGE_GUTTER, bottom = 24.dp),
+                horizontalArrangement = Arrangement.spacedBy(PAGE_GUTTER),
+            ) {
+                items(pages, contentType = { "speed-dial-page" }) { page ->
+                    Column(
+                        modifier = Modifier.width(pageWidth),
+                        verticalArrangement = Arrangement.spacedBy(SPEED_DIAL_GAP),
+                    ) {
+                        repeat(SPEED_DIAL_ROWS) { rowIndex ->
+                            Row(horizontalArrangement = Arrangement.spacedBy(SPEED_DIAL_GAP)) {
+                                repeat(SPEED_DIAL_COLUMNS) { column ->
+                                    val slot = rowIndex * SPEED_DIAL_COLUMNS + column
+                                    val item = page.getOrNull(slot)
+                                    if (canShuffle && page === pages.first() && slot == SPEED_DIAL_COLUMNS * SPEED_DIAL_ROWS - 1) {
+                                        SpeedDialShuffleTile(
+                                            onClick = { onPlaySongs?.invoke(shuffleSongs.shuffled()) },
+                                            modifier = Modifier.width(tile),
+                                        )
+                                    } else if (item != null) {
+                                        SpeedDialTile(
+                                            item = item,
+                                            onClick = { onItemClick(item) },
+                                            onLongPress = onItemLongPress?.let { { it(item) } },
+                                            isCurrent = isCurrentItem(item),
+                                            isPlaying = isCurrentItem(item) && isPlaying,
+                                            modifier = Modifier.width(tile),
+                                        )
+                                    } else {
+                                        Spacer(Modifier.width(tile))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Shuffle card in the last slot of a speed dial page: accent gradient, glass disc, springy press. */
+@Composable
+private fun SpeedDialShuffleTile(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val shape = RoundedCornerShape(12.dp)
+    val phase = remember { Animatable(0f) }
+    var searching by remember { mutableStateOf(false) }
+    val latestClick by rememberUpdatedState(onClick)
+    // Idle breathing: a slow wave running through the four dots. It resumes from
+    // where it stopped, and stops while searching or while the app is not on screen.
+    val idle = remember { Animatable(0f) }
+    val foreground = rememberIsForeground()
+    LaunchedEffect(foreground, searching) {
+        if (!foreground || searching) return@LaunchedEffect
+        while (true) {
+            val start = idle.value % 1f
+            idle.snapTo(start)
+            idle.animateTo(start + 1f, tween(durationMillis = 3200, easing = LinearEasing))
+        }
+    }
+    // One full swirl, as if looking for a song, then the shuffle starts.
+    LaunchedEffect(searching) {
+        if (searching) {
+            phase.snapTo(0f)
+            phase.animateTo(1f, tween(durationMillis = 1100, easing = LinearEasing))
+            latestClick()
+            phase.snapTo(0f)
+            searching = false
+        }
+    }
+    val dotColor = MaterialTheme.colorScheme.primary
+    Box(
+        modifier = modifier
+            .aspectRatio(1f)
+            .clip(shape)
+            .thumbnailBorder(shape)
+            .background(
+                Brush.linearGradient(
+                    listOf(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.surface),
+                ),
+            )
+            .longPressMenuClickable(onClick = { if (!searching) searching = true }, onLongClick = null),
+    ) {
+        Canvas(
+            Modifier
+                .align(Alignment.Center)
+                .size(56.dp),
+        ) {
+            val p = phase.value
+            val eased = p * p * (3f - 2f * p)
+            val envelope = sin(PI.toFloat() * p)
+            val turn = 2f * PI.toFloat() * eased
+            val idleT = idle.value * 2f * PI.toFloat()
+            val calm = 1f - envelope
+            val unit = size.minDimension
+            val orbit = unit * 0.19f * 1.4142f * (1f - 0.45f * envelope)
+            val base = unit * 0.085f
+            for (i in 0 until 4) {
+                val wave = sin(idleT + i * PI.toFloat() / 2f)
+                val angle = (PI.toFloat() / 4f + i * PI.toFloat() / 2f) + turn + 0.12f * calm * wave
+                val radius = base * (1f + 0.5f * envelope * sin(4f * PI.toFloat() * p + i * PI.toFloat() / 2f) + 0.22f * calm * wave)
+                val reach = orbit * (1f + 0.07f * calm * wave)
+                drawCircle(
+                    color = dotColor,
+                    radius = radius,
+                    center = Offset(center.x + cos(angle) * reach, center.y + sin(angle) * reach),
+                )
+            }
+        }
+    }
+}
+
+/** Small glass disc with a chevron, marking a speed dial card that opens a page instead of playing. */
+@Composable
+private fun SpeedDialBadge(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .size(22.dp)
+            .clip(CircleShape)
+            .background(Color.Black.copy(alpha = 0.35f))
+            .border(0.5.dp, Color.White.copy(alpha = 0.3f), CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = ZenithIcons.ChevronRight,
+            contentDescription = null,
+            tint = Color.White,
+            modifier = Modifier.size(12.dp),
+        )
+    }
+}
+
+/** Page control dots under the speed dial grid: the current one is solid and full size. */
+@Composable
+private fun SpeedDialPageDots(
+    count: Int,
+    current: Int,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        repeat(count) { index ->
+            val selected = index == current
+            val dotAlpha by animateFloatAsState(
+                targetValue = if (selected) 0.9f else 0.28f,
+                animationSpec = spring(stiffness = Spring.StiffnessMedium),
+            )
+            val dotScale by animateFloatAsState(
+                targetValue = if (selected) 1f else 0.78f,
+                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+            )
+            Box(
+                modifier = Modifier
+                    .size(7.dp)
+                    .graphicsLayer {
+                        scaleX = dotScale
+                        scaleY = dotScale
+                        alpha = dotAlpha
+                    }
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.onBackground),
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun SpeedDialTile(
+    item: ShelfItem,
+    onClick: () -> Unit,
+    onLongPress: (() -> Unit)?,
+    isCurrent: Boolean,
+    isPlaying: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val isBrowse = item.browseId != null && item.videoId == null
+    val shape = RoundedCornerShape(12.dp)
+    Box(
+        modifier = modifier
+            .aspectRatio(1f)
+            .clip(shape)
+            .thumbnailBorder(shape)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .longPressMenuClickable(onClick = onClick, onLongClick = onLongPress)
+            .contextClick(onLongPress),
+    ) {
+        AsyncImage(
+            model = item.thumbnailUrl.artworkAt(CARD_ART_PX),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize(),
+        )
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .fillMaxWidth()
+                .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.72f))))
+                .padding(
+                    start = 8.dp,
+                    end = if (isBrowse) 32.dp else 8.dp,
+                    top = 6.dp,
+                    bottom = 6.dp,
+                ),
+        ) {
+            Text(
+                text = item.title,
+                style = MaterialTheme.typography.labelLarge,
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = localizeCardSubtitle(item.subtitle),
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White.copy(alpha = 0.75f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        if (isCurrent && isPlaying) SearchPlayingBars(Modifier.align(Alignment.Center))
+        if (isBrowse) {
+            SpeedDialBadge(Modifier.align(Alignment.BottomEnd).padding(6.dp))
+        }
+    }
+}
 
 /**
  * Loading placeholders in the order the listener arranged Home: Top Picks,
@@ -448,7 +771,7 @@ fun HomeScreen(
 fun homeFeedShelves(shelves: List<HomeShelf>, dropEditorial: Boolean = true): List<HomeShelf> {
     val editorial = if (dropEditorial) editorialShelfIndex(shelves) else null
     val kept = if (editorial != null) shelves.filterIndexed { index, _ -> index != editorial } else shelves
-    return kept.withListenAgainFirst().withQuickPicksInListenAgainSlot().withOtherModelBelowListenAgain()
+    return kept.withListenAgainFirst().withQuickPicksInListenAgainSlot().withOtherModelBelowListenAgain().withSpeedDialFirst()
 }
 
 /**
@@ -509,7 +832,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.itemsIndexedShelves(
     } else {
         shelves
     }
-    val ordered = withRecentsSlot.withListenAgainFirst().withQuickPicksInListenAgainSlot().withOtherModelBelowListenAgain()
+    val ordered = withRecentsSlot.withListenAgainFirst().withQuickPicksInListenAgainSlot().withOtherModelBelowListenAgain().withSpeedDialFirst()
     // Find Your Mood sits right after Recents, so it never follows another
     // row of cards directly. Without Recents (a guest) it goes after the second shelf.
     val moodAt = (ordered.indexOfFirst { it.title.trim().equals(RECENTS_TITLE, ignoreCase = true) }
@@ -525,7 +848,19 @@ private fun androidx.compose.foundation.lazy.LazyListScope.itemsIndexedShelves(
             val isQuickPicks = QUICK_PICKS_TITLES.any { shelf.title.trim().equals(it, ignoreCase = true) }
             // Quick picks is one row of square cards, as Recently Played is on
             // Apple Music; Listen again and Recents keep the paged list.
-            if (shelf.isMixShelf()) {
+            if (SPEED_DIAL_TITLES.any { shelf.title.trim().equals(it, ignoreCase = true) }) {
+                SpeedDialShelf(
+                    shelf = shelf.copy(
+                        title = localizeShelfTitle(shelf.title),
+                        subtitle = localizeShelfSubtitle(shelf.subtitle),
+                    ),
+                    onItemClick = openItem,
+                    onItemLongPress = onItemLongPress,
+                    currentSong = currentSong,
+                    isPlaying = isPlaying,
+                    onPlaySongs = onPlaySongs,
+                )
+            } else if (shelf.isMixShelf()) {
                 MixCoverShelf(
                     shelf = shelf,
                     onItemClick = openItem,
@@ -619,7 +954,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.itemsIndexedShelves(
 
 /** The same four-rows-per-page treatment used by an artist's Top songs. */
 @Composable
-private fun RecentShelf(
+internal fun RecentShelf(
     shelf: HomeShelf,
     onItemClick: (ShelfItem) -> Unit,
     onItemLongPress: ((ShelfItem) -> Unit)?,
@@ -912,6 +1247,8 @@ internal fun localizeShelfTitle(title: String): String {
             trimmed.equals("Danh sách phát nổi bật dành cho bạn", ignoreCase = true) ||
             trimmed.equals("おすすめの再生リスト", ignoreCase = true) ->
             stringResource(Res.string.shelf_featured_playlists_for_you)
+        SPEED_DIAL_TITLES.any { trimmed.equals(it, ignoreCase = true) } ->
+            stringResource(Res.string.shelf_speed_dial)
         trimmed.equals("Quick picks", ignoreCase = true) ||
             trimmed.equals("Lựa chọn nhanh", ignoreCase = true) ||
             trimmed.equals("Pilihan cepat", ignoreCase = true) ||
@@ -1098,6 +1435,19 @@ internal fun localizeCardSubtitle(subtitle: String): String {
     return localizedParts.joinToString(delimiter)
 }
 
+/**
+ * Kunci stabil untuk tiap kartu rak: videoId, lalu browseId, lalu judul.
+ * Kembaran dalam satu rak diberi akhiran, karena LazyList menolak kunci ganda.
+ */
+private fun shelfItemKeys(items: List<ShelfItem>): List<String> {
+    val seen = HashMap<String, Int>(items.size)
+    return items.map { item ->
+        val base = "i:" + (item.videoId ?: item.browseId ?: "${item.title}|${item.subtitle}")
+        val n = seen.merge(base, 1, Int::plus)!!
+        if (n == 1) base else "$base#$n"
+    }
+}
+
 @Composable
 private fun HeroShelf(
     shelf: HomeShelf,
@@ -1109,6 +1459,7 @@ private fun HeroShelf(
     Column(Modifier.padding(bottom = 26.dp)) {
         SectionHeader(shelf.title, shelf.subtitle)
         val isCurrentItem = shelf.items.playingItemMatcher(currentSong)
+        val itemKeys = remember(shelf.items) { shelfItemKeys(shelf.items) }
         // Measured rather than taken as a share of the parent, because the card
         // has a ceiling as well as a fraction — see [heroCardWidth]. A fixed
         // width is also the only one of the two the aspect ratio below can turn
@@ -1120,7 +1471,11 @@ private fun HeroShelf(
                 contentPadding = PaddingValues(horizontal = PAGE_GUTTER),
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                itemsIndexed(shelf.items, contentType = { _, _ -> "hero-card" }) { index, item ->
+                itemsIndexed(
+                    shelf.items,
+                    key = { index, _ -> itemKeys[index] },
+                    contentType = { _, _ -> "hero-card" },
+                ) { index, item ->
                     HeroCard(
                         item = item,
                         onClick = { onItemClick(item) },
@@ -1223,13 +1578,18 @@ internal fun Shelf(
     Column(Modifier.padding(bottom = 26.dp)) {
         SectionHeader(shelf.title, shelf.subtitle)
         val isCurrentItem = shelf.items.playingItemMatcher(currentSong)
+        val itemKeys = remember(shelf.items) { shelfItemKeys(shelf.items) }
         ShelfRow(
             state = rememberShelfListState("shelf:${shelf.title}"),
             contentPadding = PaddingValues(horizontal = PAGE_GUTTER),
             horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             leadingCard?.let { card -> item(key = "leading") { card() } }
-            itemsIndexed(shelf.items, contentType = { _, _ -> "shelf-card" }) { index, item ->
+            itemsIndexed(
+                shelf.items,
+                key = { index, _ -> itemKeys[index] },
+                contentType = { _, _ -> "shelf-card" },
+            ) { index, item ->
                 Box(Modifier.shelfStagger(index)) {
                     if (shelf.layout == ShelfLayout.VIDEO) {
                         VideoShelfCard(

@@ -52,5 +52,29 @@
     "block": 2,
     "layer": "not_found_in_project",
     "file": "app/src/main/java/com/music/zenith/ui/components/floatingtabbar/FloatingTabBar.kt"
+  },
+  {
+    "timestamp": "2026-11-11 10:52:09",
+    "block": 1,
+    "layer": "not_found_in_project",
+    "file": "sharedUi/src/jvmSharedMain/kotlin/com/music/zenith/ui/screens/HomeScreen.kt"
+  },
+  {
+    "timestamp": "2026-11-11 10:52:15",
+    "block": 1,
+    "layer": "not_found_in_project",
+    "file": "shared/src/commonMain/kotlin/com/music/zenith/data/model/HomeLayout.kt"
+  },
+  {
+    "timestamp": "2026-11-11 10:52:44",
+    "block": 4,
+    "layer": "not_found_in_project",
+    "file": "app/src/main/java/com/music/zenith/ui/MainViewModel.kt"
+  },
+  {
+    "timestamp": "2026-11-11 10:52:44",
+    "block": 5,
+    "layer": "not_found_in_project",
+    "file": "app/src/main/java/com/music/zenith/ui/MainViewModel.kt"
   }
 ]

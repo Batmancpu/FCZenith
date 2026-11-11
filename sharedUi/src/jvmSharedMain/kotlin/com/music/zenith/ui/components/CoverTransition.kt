@@ -27,6 +27,7 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -43,13 +44,16 @@ import androidx.compose.ui.Modifier
 val LocalCoverTransitionScope = staticCompositionLocalOf<SharedTransitionScope?> { null }
 val LocalCoverVisibilityScope = compositionLocalOf<AnimatedVisibilityScope?> { null }
 
-private class TappedCover(val browseId: String, val token: Any)
-
-private var tappedCover by mutableStateOf<TappedCover?>(null)
+// One tapped card per release rather than a single global. Opening an album and
+// then an artist from it must not make the album's card forget it was the one
+// tapped, or going back twice leaves the cover with nowhere to fly to.
+private val tappedCovers = mutableStateMapOf<String, Any>()
 
 /** Call from a card's click, before it navigates. [token] is the card's own `remember { Any() }`. */
 fun markCoverTapped(browseId: String?, token: Any) {
-    tappedCover = browseId?.takeIf { it.isNotEmpty() }?.let { TappedCover(it, token) }
+    if (browseId.isNullOrEmpty()) return
+    if (tappedCovers.size > 32 && !tappedCovers.containsKey(browseId)) tappedCovers.clear()
+    tappedCovers[browseId] = token
 }
 
 /**
@@ -67,10 +71,7 @@ fun Modifier.coverSharedElement(browseId: String?, token: Any? = null): Modifier
     } else {
         // A boolean, so a tap recomposes only the cards whose answer flips.
         val tapped by remember(token, browseId) {
-            derivedStateOf {
-                val current = tappedCover
-                current != null && current.token === token && current.browseId == browseId
-            }
+            derivedStateOf { tappedCovers[browseId] === token }
         }
         tapped
     }

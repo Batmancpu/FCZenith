@@ -77,17 +77,20 @@ enum class OutputPcmMode(val label: String) {
 data class GlassClarity(val level: Float) {
     private val t = level.coerceIn(0f, 1f)
 
-    private fun mix(clear: Float, balanced: Float, frosted: Float): Float =
+    // [soft]: sisi Clear -> Balanced dilandaikan (kuadrat) supaya perubahan blur dan
+    // resolusi dekat Clear bertahap, bukan melompat. Titik 0, 0.5 dan 1 tidak berubah.
+    private fun mix(clear: Float, balanced: Float, frosted: Float, soft: Boolean = false): Float =
         if (t <= 0.5f) {
-            clear + (balanced - clear) * (t / 0.5f)
+            val u = t / 0.5f
+            clear + (balanced - clear) * (if (soft) u * u else u)
         } else {
             balanced + (frosted - balanced) * ((t - 0.5f) / 0.5f)
         }
 
     val tintAlpha: Float = mix(0.12f, 0.30f, 0.46f)
-    val blurScale: Float = mix(0.1f, 1f, 1.35f)
+    val blurScale: Float = mix(0.1f, 1f, 1.35f, soft = true)
     val saturation: Float = mix(1.4f, 1.5f, 1.5f)
-    val resolutionScale: Float = mix(0.75f, 0.33f, 0.33f)
+    val resolutionScale: Float = mix(0.75f, 0.33f, 0.33f, soft = true)
     val lensScale: Float = mix(0.6f, 1f, 1f)
 
     // Refraksi tepi halus tanpa efek pelangi di sisi jernih.
@@ -106,6 +109,50 @@ data class GlassClarity(val level: Float) {
             "FROSTED" -> FROSTED_LEVEL
             else -> BALANCED_LEVEL
         }
+    }
+}
+
+/**
+ * Pengaturan manual tiap efek Liquid Glass, ditumpuk di atas [GlassClarity].
+ * Semua pengali bernilai 1f = tampilan bawaan, jadi pengguna yang tidak
+ * menyentuhnya tidak melihat perubahan apa pun.
+ *
+ * [rainbow] adalah kekuatan efek pelangi di tepi (chromatic aberration);
+ * [RAINBOW_AUTO] mengikuti preset kejernihan seperti sebelumnya.
+ */
+data class GlassCustom(
+    val blur: Float = 1f,
+    val saturation: Float = 1f,
+    val tint: Float = 1f,
+    val refraction: Float = 1f,
+    val refractionWidth: Float = 1f,
+    val depth: Boolean = true,
+    val rainbow: Float = RAINBOW_AUTO,
+    val rim: Float = 1f,
+    val shadow: Float = 1f,
+    val quality: Float = 1f,
+) {
+    val isDefault: Boolean get() = this == DEFAULT
+
+    /** Kekuatan pelangi yang dipakai: nilai pengguna, atau ikut preset saat Auto. */
+    fun rainbowStrength(autoOn: Boolean): Float =
+        if (rainbow < 0f) (if (autoOn) 1f else 0f) else rainbow
+
+    fun coerced(): GlassCustom = copy(
+        blur = blur.coerceIn(0f, 2.5f),
+        saturation = saturation.coerceIn(0f, 2.5f),
+        tint = tint.coerceIn(0f, 2.5f),
+        refraction = refraction.coerceIn(0f, 2.5f),
+        refractionWidth = refractionWidth.coerceIn(0.2f, 2.5f),
+        rainbow = if (rainbow < 0f) RAINBOW_AUTO else rainbow.coerceIn(0f, 3f),
+        rim = rim.coerceIn(0f, 1f),
+        shadow = shadow.coerceIn(0f, 3f),
+        quality = quality.coerceIn(0.5f, 1.5f),
+    )
+
+    companion object {
+        const val RAINBOW_AUTO = -1f
+        val DEFAULT = GlassCustom()
     }
 }
 
@@ -618,6 +665,12 @@ object AppSettings {
     /** The listener's own order and hidden rows on Home. Empty keeps the built-in order. */
     val homeLayout = MutableStateFlow(HomeLayout())
 
+    /** The Artists shelf in Library: false is the two-across grid, true is one row that scrolls sideways. */
+    val libraryArtistsRow = MutableStateFlow(false)
+
+    /** The listener's own order and hidden rows on the Library tab. Empty keeps the built-in order. */
+    val libraryLayout = MutableStateFlow(HomeLayout())
+
     /** Drops haze blur (status bar, mini player, bottom fade, lyrics focus) for a solid-fill look. */
     val reduceDynamicBlur = MutableStateFlow(false)
 
@@ -633,6 +686,9 @@ object AppSettings {
 
     /** Kejernihan Liquid Glass sebagai slider (Clear ... Balanced ... Frosted). Hanya berlaku saat [liquidGlass] aktif. */
     val glassClarity = MutableStateFlow(GlassClarity.BALANCED)
+
+    /** Pengaturan manual tiap efek Liquid Glass (blur, refraksi, pelangi, tepi, bayangan, kualitas). */
+    val glassCustom = MutableStateFlow(GlassCustom())
 
     /**
      * Blurs what scrolls under the status bar and the top controls, easing out
@@ -1286,6 +1342,8 @@ object AppSettings {
         VideoThumbnails.square = squareVideoCovers.value
         stillVideoCovers.value = prefs.getBoolean(KEY_STILL_VIDEO_COVERS, false)
         homeLayout.value = HomeLayout.decode(prefs.getString(KEY_HOME_LAYOUT, null))
+        libraryArtistsRow.value = prefs.getBoolean(KEY_LIBRARY_ARTISTS_ROW, false)
+        libraryLayout.value = HomeLayout.decode(prefs.getString(KEY_LIBRARY_LAYOUT, null))
         reduceDynamicBlur.value = prefs.getBoolean(KEY_REDUCE_BLUR, false)
         liquidGlass.value = prefs.getBoolean(KEY_LIQUID_GLASS, false)
         frostedGlass.value = prefs.getBoolean(KEY_FROSTED_GLASS, false)
@@ -1296,6 +1354,18 @@ object AppSettings {
                 GlassClarity.levelForLegacyName(prefs.getString(KEY_GLASS_CLARITY, null))
             },
         )
+        glassCustom.value = GlassCustom(
+            blur = prefs.getFloat(KEY_GLASS_BLUR, 1f),
+            saturation = prefs.getFloat(KEY_GLASS_SATURATION, 1f),
+            tint = prefs.getFloat(KEY_GLASS_TINT, 1f),
+            refraction = prefs.getFloat(KEY_GLASS_REFRACTION, 1f),
+            refractionWidth = prefs.getFloat(KEY_GLASS_REFRACTION_WIDTH, 1f),
+            depth = prefs.getBoolean(KEY_GLASS_DEPTH, true),
+            rainbow = prefs.getFloat(KEY_GLASS_RAINBOW, GlassCustom.RAINBOW_AUTO),
+            rim = prefs.getFloat(KEY_GLASS_RIM, 1f),
+            shadow = prefs.getFloat(KEY_GLASS_SHADOW, 1f),
+            quality = prefs.getFloat(KEY_GLASS_QUALITY, 1f),
+        ).coerced()
         progressiveBlur.value = prefs.getBoolean(KEY_PROGRESSIVE_BLUR, false)
         lyricsBlur.value = prefs.getBoolean(KEY_LYRICS_BLUR, true)
         liquidFlow.value = prefs.getBoolean(KEY_LIQUID_FLOW, true)
@@ -1844,6 +1914,16 @@ object AppSettings {
         }
     }
 
+    fun setLibraryLayout(value: HomeLayout) {
+        libraryLayout.value = value
+        prefs.edit().putString(KEY_LIBRARY_LAYOUT, value.encode()).apply()
+    }
+
+    fun setLibraryArtistsRow(value: Boolean) {
+        libraryArtistsRow.value = value
+        prefs.edit().putBoolean(KEY_LIBRARY_ARTISTS_ROW, value).apply()
+    }
+
     fun setReduceDynamicBlur(value: Boolean) {
         reduceDynamicBlur.value = value
         if (value) highPerformanceMode.value = false
@@ -1866,6 +1946,23 @@ object AppSettings {
         val clamped = level.coerceIn(0f, 1f)
         glassClarity.value = GlassClarity(clamped)
         prefs.edit().putFloat(KEY_GLASS_CLARITY_LEVEL, clamped).apply()
+    }
+
+    fun setGlassCustom(value: GlassCustom) {
+        val v = value.coerced()
+        glassCustom.value = v
+        prefs.edit()
+            .putFloat(KEY_GLASS_BLUR, v.blur)
+            .putFloat(KEY_GLASS_SATURATION, v.saturation)
+            .putFloat(KEY_GLASS_TINT, v.tint)
+            .putFloat(KEY_GLASS_REFRACTION, v.refraction)
+            .putFloat(KEY_GLASS_REFRACTION_WIDTH, v.refractionWidth)
+            .putBoolean(KEY_GLASS_DEPTH, v.depth)
+            .putFloat(KEY_GLASS_RAINBOW, v.rainbow)
+            .putFloat(KEY_GLASS_RIM, v.rim)
+            .putFloat(KEY_GLASS_SHADOW, v.shadow)
+            .putFloat(KEY_GLASS_QUALITY, v.quality)
+            .apply()
     }
 
     fun setProgressiveBlur(value: Boolean) {
@@ -2690,11 +2787,23 @@ object AppSettings {
     private const val KEY_SQUARE_VIDEO_COVERS = "square_video_covers"
     private const val KEY_STILL_VIDEO_COVERS = "still_video_covers"
     private const val KEY_HOME_LAYOUT = "home_layout"
+    private const val KEY_LIBRARY_ARTISTS_ROW = "library_artists_row"
+    private const val KEY_LIBRARY_LAYOUT = "library_layout"
     private const val KEY_REDUCE_BLUR = "reduce_dynamic_blur"
     private const val KEY_LIQUID_GLASS = "liquid_glass"
     private const val KEY_FROSTED_GLASS = "frosted_glass"
     private const val KEY_GLASS_CLARITY = "glass_clarity"
     private const val KEY_GLASS_CLARITY_LEVEL = "glass_clarity_level"
+    private const val KEY_GLASS_BLUR = "glass_custom_blur"
+    private const val KEY_GLASS_SATURATION = "glass_custom_saturation"
+    private const val KEY_GLASS_TINT = "glass_custom_tint"
+    private const val KEY_GLASS_REFRACTION = "glass_custom_refraction"
+    private const val KEY_GLASS_REFRACTION_WIDTH = "glass_custom_refraction_width"
+    private const val KEY_GLASS_DEPTH = "glass_custom_depth"
+    private const val KEY_GLASS_RAINBOW = "glass_custom_rainbow"
+    private const val KEY_GLASS_RIM = "glass_custom_rim"
+    private const val KEY_GLASS_SHADOW = "glass_custom_shadow"
+    private const val KEY_GLASS_QUALITY = "glass_custom_quality"
     private const val KEY_PROGRESSIVE_BLUR = "progressive_blur"
     private const val KEY_LYRICS_BLUR = "lyrics_blur"
     private const val KEY_LIQUID_FLOW = "liquid_flow_motion"

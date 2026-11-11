@@ -148,7 +148,7 @@
     <string name="pull_to_refresh">Pull to refresh</string>
     <string name="pull_release">Release to refresh</string>
     <string name="pull_refreshing">Refreshing…</string>
-    <string name="explore">Explore</string>
+    <string name="explore">New</string>
     <string name="library">Library</string>
     <string name="library_sign_in_description">Sign in to your Google account to see your liked songs, playlists, and YouTube Music history.</string>
     <string name="new_playlist">New playlist</string>
@@ -193,6 +193,9 @@
     <string name="card_monthly_listeners_format">%1$s monthly listeners</string>
     <string name="search_top_result">Top result</string>
     <string name="shelf_quick_picks">Quick picks</string>
+    <string name="shelf_speed_dial">Speed dial</string>
+    <string name="shuffle">Shuffle</string>
+    <string name="speed_dial_shuffle_hint">Play at random</string>
     <string name="shelf_recents">Recents</string>
     <string name="shelf_recommended_music_videos">Recommended music videos</string>
     <string name="shelf_shorts">Shorts</string>

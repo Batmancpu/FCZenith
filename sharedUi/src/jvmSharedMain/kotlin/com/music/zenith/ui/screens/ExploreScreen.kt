@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -47,7 +48,9 @@ import com.music.zenith.data.model.HomeShelf
 import com.music.zenith.data.model.MoodGenre
 import com.music.zenith.data.model.MoodGenreSection
 import com.music.zenith.data.model.ShelfItem
+import com.music.zenith.data.model.Song
 import com.music.zenith.data.model.UiState
+import com.music.zenith.data.model.withoutItemsOn
 import com.music.zenith.ui.components.MessageState
 import com.music.zenith.ui.components.PAGE_GUTTER
 import com.music.zenith.ui.components.PullToRefresh
@@ -66,9 +69,9 @@ private var lastEditorial: HomeShelf? = null
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExploreScreen(
-    state: UiState<List<MoodGenreSection>>,
+    /** The charts page's shelves; the mood and genre cards now live on the Search tab. */
+    chartsState: UiState<List<HomeShelf>>,
     listState: LazyListState,
-    onCategoryClick: (MoodGenre) -> Unit,
     onRetry: () -> Unit,
     refreshing: Boolean,
     onRefresh: () -> Unit,
@@ -84,6 +87,8 @@ fun ExploreScreen(
     homeState: UiState<List<HomeShelf>>? = null,
     onShelfItemClick: ((ShelfItem, String) -> Unit)? = null,
     onShelfItemLongPress: ((ShelfItem) -> Unit)? = null,
+    currentSong: Song? = null,
+    isPlaying: Boolean = false,
 ) {
     val editorial = remember(homeState) {
         val found = (homeState as? UiState.Success)?.data?.let { shelves ->
@@ -91,6 +96,14 @@ fun ExploreScreen(
         }
         if (found != null) lastEditorial = found
         found ?: lastEditorial
+    }
+    // Cards the Home tab already shows are left out here, so New is not Home again.
+    val homeShelves = (homeState as? UiState.Success)?.data
+    val chartShelves = remember(chartsState, homeShelves, editorial) {
+        (chartsState as? UiState.Success)?.data
+            ?.filter { it.title != editorial?.title }
+            ?.withoutItemsOn(homeShelves.orEmpty())
+            .orEmpty()
     }
     PullToRefresh(
         refreshing = refreshing,
@@ -100,15 +113,6 @@ fun ExploreScreen(
         modifier = modifier,
     ) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
-            val columns = moodColumns(maxWidth)
-            // Dihitung sekali per data/kolom, bukan di setiap recomposition.
-            val moodRows = remember(state, columns) {
-                (state as? UiState.Success)?.data
-                    ?.flatMap(MoodGenreSection::items)
-                    ?.distinctBy { it.browseId to it.params }
-                    ?.chunked(columns)
-                    .orEmpty()
-            }
             LazyColumn(
                 state = listState,
                 // The heading sits where Home's does: the whole page is lifted
@@ -147,16 +151,36 @@ fun ExploreScreen(
                     // the mood grid doesn't jump down when it lands.
                     item(key = "editorial-skeleton") { EditorialShelfSkeleton() }
                 }
-                when (state) {
-                    UiState.Loading -> item { ExploreSkeletonRows(columns) }
-                    is UiState.Error -> item {
-                        MessageState(state.message, actionLabel = stringResource(Res.string.retry), onAction = onRetry)
+                when (chartsState) {
+                    UiState.Loading -> {
+                        if (editorial == null) item(key = "charts-skeleton") { EditorialShelfSkeleton() }
+                    }
+                    is UiState.Error -> {
+                        if (editorial == null) item(key = "charts-error") {
+                            MessageState(chartsState.message, actionLabel = stringResource(Res.string.retry), onAction = onRetry)
+                        }
                     }
                     is UiState.Success -> {
-                        // Moods and genres read as one grid; the server's
-                        // grouping only decides the order.
-                        items(moodRows, key = { row -> row.first().let { "${it.browseId}|${it.params}" } }) { row ->
-                            MoodGenreRow(row = row, columns = columns, onCategoryClick = onCategoryClick)
+                        chartShelves.forEachIndexed { index, shelf ->
+                            item(key = "chart:$index:${shelf.title}") {
+                                if (shelf.layout == com.music.zenith.data.model.ShelfLayout.LIST) {
+                                    RecentShelf(
+                                        shelf = shelf,
+                                        onItemClick = { onShelfItemClick?.invoke(it, shelf.title) },
+                                        onItemLongPress = onShelfItemLongPress,
+                                        currentSong = currentSong,
+                                        isPlaying = isPlaying,
+                                    )
+                                } else {
+                                    Shelf(
+                                        shelf = shelf,
+                                        onItemClick = { onShelfItemClick?.invoke(it, shelf.title) },
+                                        onItemLongPress = onShelfItemLongPress,
+                                        currentSong = currentSong,
+                                        isPlaying = isPlaying,
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -331,6 +355,37 @@ private const val MOOD_MAX_COLUMNS = 6
 private fun moodColumns(available: Dp): Int {
     val row = available - PAGE_GUTTER * 2
     return ((row + MOOD_SPACING) / (MOOD_MIN_CARD_WIDTH + MOOD_SPACING)).toInt().coerceIn(2, MOOD_MAX_COLUMNS)
+}
+
+/** The column count the mood and genre grid uses for a list [available] wide. */
+internal fun moodGenreColumns(available: Dp): Int = moodColumns(available)
+
+/**
+ * The mood and genre cards as one grid, for a page that draws them inside its
+ * own list (the Search tab's Browse Categories). The server's grouping only
+ * decides the order.
+ */
+internal fun LazyListScope.moodGenreGrid(
+    state: UiState<List<MoodGenreSection>>,
+    columns: Int,
+    onCategoryClick: (MoodGenre) -> Unit,
+    onRetry: () -> Unit,
+) {
+    when (state) {
+        UiState.Loading -> item(key = "mood-skeleton") { ExploreSkeletonRows(columns) }
+        is UiState.Error -> item(key = "mood-error") {
+            MessageState(state.message, actionLabel = stringResource(Res.string.retry), onAction = onRetry)
+        }
+        is UiState.Success -> {
+            val rows = state.data
+                .flatMap(MoodGenreSection::items)
+                .distinctBy { it.browseId to it.params }
+                .chunked(columns)
+            items(rows, key = { row -> row.first().let { "${it.browseId}|${it.params}" } }) { row ->
+                MoodGenreRow(row = row, columns = columns, onCategoryClick = onCategoryClick)
+            }
+        }
+    }
 }
 
 @Composable

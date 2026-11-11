@@ -145,7 +145,7 @@
     <string name="pull_to_refresh">Tarik untuk memuat ulang</string>
     <string name="pull_release">Lepas untuk memuat ulang</string>
     <string name="pull_refreshing">Memuat ulang…</string>
-    <string name="explore">Jelajahi</string>
+    <string name="explore">Baru</string>
     <string name="library">Pustaka</string>
     <string name="library_sign_in_description">Masuk ke akun Google Anda untuk melihat lagu yang disukai, playlist, dan riwayat YouTube Music Anda.</string>
     <string name="new_playlist">Playlist baru</string>
@@ -184,6 +184,7 @@
     <string name="card_monthly_listeners_format">%1$s pendengar bulanan</string>
     <string name="search_top_result">Hasil teratas</string>
     <string name="shelf_quick_picks">Pilihan cepat</string>
+    <string name="shelf_speed_dial">Putar cepat</string>
     <string name="shelf_recents">Terbaru</string>
     <string name="shelf_recommended_music_videos">Video musik yang direkomendasikan</string>
     <string name="shelf_shorts">Shorts</string>

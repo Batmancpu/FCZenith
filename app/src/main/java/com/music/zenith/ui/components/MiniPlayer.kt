@@ -5,8 +5,21 @@ import com.music.zenith.R
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -582,38 +595,31 @@ fun MiniPlayer(
                     )
                 }
             } else {
-                IconButton(
+                MiniPlayerPlayPauseButton(
+                    isPlaying = isPlaying,
+                    tint = MaterialTheme.colorScheme.onBackground,
+                    slot = GLYPH_SLOT,
+                    glyphSize = GLYPH_SIZE,
                     onClick = {
                         haptics.play(if (isPlaying) Haptic.Pause else Haptic.Resume)
                         onPlayPause()
                     },
-                    modifier = Modifier.size(GLYPH_SLOT),
-                ) {
-                    Icon(
-                        imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                        contentDescription = stringResource(if (isPlaying) R.string.pause else R.string.play),
-                        tint = MaterialTheme.colorScheme.onBackground,
-                        modifier = Modifier.size(GLYPH_SIZE),
-                    )
-                }
+                )
             }
             Spacer(Modifier.width(TRANSPORT_GAP))
             // Faded and inert rather than removed while the host holds the
             // controls, so the bar keeps its shape — see [controlsLocked].
-            IconButton(
+            MiniPlayerNextButton(
+                tint = MaterialTheme.colorScheme.onBackground
+                    .copy(alpha = if (controlsLocked) 0.3f else 1f),
+                enabled = !controlsLocked,
+                slot = GLYPH_SLOT,
                 onClick = {
                     haptics.play(Haptic.SkipNext)
                     com.music.zenith.ui.components.TrackFlow.hint(true)
                     onNext()
                 },
-                enabled = !controlsLocked,
-                modifier = Modifier.size(GLYPH_SLOT),
-            ) {
-                MiniPlayerNextGlyph(
-                    tint = MaterialTheme.colorScheme.onBackground
-                        .copy(alpha = if (controlsLocked) 0.3f else 1f),
-                )
-            }
+            )
         }
     }
 }
@@ -639,3 +645,149 @@ internal fun MiniPlayerNextGlyph(tint: Color) {
 }
 
 private val NEXT_GLYPH_SIZE = 25.dp
+
+/**
+ * The mini players' play/pause button, with the full player's feel: the glyph
+ * shrinks under the finger and springs back, and play and pause morph into
+ * each other (scale + fade) instead of swapping in one frame. Shared by the
+ * plain bar, the glass bar and the docked player.
+ */
+@Composable
+internal fun MiniPlayerPlayPauseButton(
+    isPlaying: Boolean,
+    tint: Color,
+    slot: Dp,
+    glyphSize: Dp,
+    onClick: () -> Unit,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val pressScale = animateFloatAsState(
+        targetValue = if (pressed) 0.72f else 1f,
+        animationSpec = spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessMedium),
+        label = "miniPlayPausePress",
+    )
+    val pressDisc by animateFloatAsState(
+        targetValue = if (pressed) 0.18f else 0f,
+        animationSpec = tween(durationMillis = if (pressed) 70 else 260),
+        label = "miniPlayPauseDisc",
+    )
+    Box(
+        modifier = Modifier
+            .size(slot)
+            .drawBehind {
+                if (pressDisc > 0f) {
+                    drawCircle(
+                        color = tint.copy(alpha = pressDisc),
+                        radius = this.size.minDimension / 2f,
+                    )
+                }
+            }
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                role = androidx.compose.ui.semantics.Role.Button,
+            ) { onClick() },
+        contentAlignment = Alignment.Center,
+    ) {
+        AnimatedContent(
+            targetState = isPlaying,
+            transitionSpec = {
+                (
+                    fadeIn(spring(stiffness = Spring.StiffnessMedium)) +
+                        scaleIn(
+                            initialScale = 0.55f,
+                            animationSpec = spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMediumLow),
+                        )
+                    ) togetherWith (
+                    fadeOut(tween(90)) +
+                        scaleOut(targetScale = 0.55f, animationSpec = tween(120))
+                    )
+            },
+            contentAlignment = Alignment.Center,
+            label = "miniPlayPause",
+        ) { playing ->
+            Icon(
+                imageVector = if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                contentDescription = stringResource(if (playing) R.string.pause else R.string.play),
+                tint = tint,
+                modifier = Modifier
+                    .size(glyphSize)
+                    .graphicsLayer {
+                        scaleX = pressScale.value
+                        scaleY = pressScale.value
+                    },
+            )
+        }
+    }
+}
+
+/**
+ * The mini players' skip-forward button, with the full player's press feel:
+ * the glyph shrinks under the finger and springs back, and a tap kicks it
+ * forward with a ring. Shared by the plain bar, the glass bar and the docked
+ * player so all three answer a tap the same way.
+ */
+@Composable
+internal fun MiniPlayerNextButton(
+    tint: Color,
+    enabled: Boolean,
+    slot: Dp,
+    onClick: () -> Unit,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val pressScale = animateFloatAsState(
+        targetValue = if (pressed && enabled) 0.72f else 1f,
+        animationSpec = spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessMedium),
+        label = "miniNextPress",
+    )
+    val pressDisc by animateFloatAsState(
+        targetValue = if (pressed && enabled) 0.18f else 0f,
+        animationSpec = tween(durationMillis = if (pressed) 70 else 260),
+        label = "miniNextDisc",
+    )
+    val scope = rememberCoroutineScope()
+    val kick = remember { Animatable(0f) }
+    Box(
+        modifier = Modifier
+            .size(slot)
+            .drawBehind {
+                if (pressDisc > 0f) {
+                    drawCircle(
+                        color = tint.copy(alpha = pressDisc),
+                        radius = this.size.minDimension / 2f,
+                    )
+                }
+            }
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                enabled = enabled,
+                role = androidx.compose.ui.semantics.Role.Button,
+            ) {
+                scope.launch {
+                    kick.snapTo(0f)
+                    kick.animateTo(1f, tween(durationMillis = 80, easing = FastOutSlowInEasing))
+                    kick.animateTo(0f, spring(dampingRatio = 0.4f, stiffness = Spring.StiffnessMediumLow))
+                }
+                onClick()
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            painter = painterResource(SharedRes.drawable.ic_player_next),
+            contentDescription = stringResource(R.string.widget_next),
+            tint = tint,
+            modifier = Modifier
+                .size(NEXT_GLYPH_SIZE)
+                .graphicsLayer {
+                    val k = kick.value
+                    translationX = k * 6.dp.toPx()
+                    scaleX = pressScale.value * (1f + abs(k) * 0.15f)
+                    // The glyph's own 0.85 squash, kept so it still matches the play glyph.
+                    scaleY = pressScale.value * (1f - abs(k) * 0.06f) * 0.85f
+                },
+        )
+    }
+}

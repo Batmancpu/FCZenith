@@ -91,6 +91,8 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Velocity
 import kotlin.math.PI
@@ -392,6 +394,13 @@ fun SongRow(
      * songs folder's per-track download button. Null on every other list.
      */
     trailing: (@Composable () -> Unit)? = null,
+    /**
+     * The album's artist: a row by this same artist leaves its artist line off,
+     * as Apple Music's album listings do. Null keeps the line on every row.
+     */
+    hideArtistOf: String? = null,
+    /** False drops the trailing duration, which Apple Music's album listings omit. */
+    showDuration: Boolean = true,
 ) {
     SwipeToQueueBox(
         onSwipeToQueue = onSwipeToQueue,
@@ -413,6 +422,8 @@ fun SongRow(
             selected = selected,
             showSourceQuality = showSourceQuality,
             trailing = trailing,
+            hideArtistOf = hideArtistOf,
+            showDuration = showDuration,
         )
     }
 }
@@ -689,6 +700,8 @@ private fun SongRowContent(
     selected: Boolean = false,
     showSourceQuality: Boolean = false,
     trailing: (@Composable () -> Unit)? = null,
+    hideArtistOf: String? = null,
+    showDuration: Boolean = true,
 ) {
     val titleColor by animateColorAsState(
         targetValue = if (isCurrent && !searchPlayingStyle) activeTint else MaterialTheme.colorScheme.onBackground,
@@ -775,14 +788,18 @@ private fun SongRowContent(
                 color = titleColor,
             )
             Spacer(Modifier.height(2.dp))
-            val subtitle = remember(song.artist, song.downloadFormat) {
+            val hideArtist = hideArtistOf != null &&
+                song.artist.trim().equals(hideArtistOf.trim(), ignoreCase = true)
+            val subtitle = remember(song.artist, song.downloadFormat, hideArtist) {
                 listOfNotNull(
-                    song.artist.takeIf { it.isNotBlank() },
+                    song.artist.takeIf { it.isNotBlank() && !hideArtist },
                     song.downloadFormat,
                 ).joinToString(" · ")
             }
             val quality = if (showSourceQuality) song.sourceQualityBadge() else null
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            // Apple Music leaves the line off when it would only repeat the album's artist.
+            val showSubtitleLine = hideArtistOf == null || subtitle.isNotEmpty() || quality != null
+            if (showSubtitleLine) Row(verticalAlignment = Alignment.CenterVertically) {
                 if (quality != null) {
                     SourceQualityBadge(
                         quality = quality,
@@ -828,7 +845,7 @@ private fun SongRowContent(
                 color = subtitleColor,
             )
         } else {
-            song.durationText?.let {
+            song.durationText?.takeIf { showDuration }?.let {
                 Spacer(Modifier.width(8.dp))
                 Text(
                     text = it,
@@ -1255,8 +1272,30 @@ fun PullToRefresh(
         ) {
             content()
         }
+        RefreshInputBlocker(state = state)
         ElasticRefreshHint(state = state, topInset = topInset)
     }
+}
+
+/**
+ * Menelan semua sentuhan di atas halaman selama refresh berjalan, supaya kartu
+ * tidak bisa diketuk dan daftar tidak bisa digeser sementara halaman ditahan.
+ * Dibaca di composable sendiri agar hanya ia yang recompose saat status berganti.
+ */
+@Composable
+private fun RefreshInputBlocker(state: ElasticRefreshState) {
+    if (!state.holding) return
+    Box(
+        Modifier
+            .fillMaxSize()
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
+                    }
+                }
+            },
+    )
 }
 
 /**
@@ -1359,6 +1398,7 @@ private fun ElasticRefreshHint(state: ElasticRefreshState, topInset: Dp) {
  * Drawn white-on-colour in either theme, like Replay and the welcome — the
  * mesh is the card, and white type is what sits on colour.
  */
+@Suppress("UNUSED_PARAMETER")
 @Composable
 fun SignInBanner(
     onSignIn: () -> Unit,
@@ -1381,33 +1421,28 @@ fun SignInBanner(
                 scaleX = scale
                 scaleY = scale
             }
-            .clip(RoundedCornerShape(22.dp))
+            .clip(RoundedCornerShape(20.dp))
+            .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.05f))
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.08f),
+                shape = RoundedCornerShape(20.dp),
+            )
             .clickable(interactionSource = interaction, indication = null, onClick = onSignIn),
     ) {
-        // A card is a few hundred dp the reader is looking straight at, which
-        // is the case the mesh lets keep moving — see its `continuous` note.
-        MeshGradientBackground(
-            palette = cyclingMeshPalette(WelcomeMeshPalettes, running = motion),
-            modifier = Modifier.matchParentSize(),
-            continuous = true,
-            paused = !motion,
-            driftMillis = 6_000,
-            blurRadius = 36.dp,
-            colorFadeMillis = MESH_CYCLE_MILLIS,
-        )
-        Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 18.dp)) {
+        Column(Modifier.padding(start = 18.dp, end = 18.dp, top = 16.dp, bottom = 16.dp)) {
             Text(
                 text = stringResource(Res.string.sign_in_youtube_music),
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.W800,
-                color = Color.White,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.W600,
+                color = MaterialTheme.colorScheme.onBackground,
             )
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(12.dp))
             Row(
                 Modifier
                     .clip(CircleShape)
-                    .background(Color.White)
-                    .padding(start = 16.dp, end = 20.dp, top = 10.dp, bottom = 10.dp),
+                    .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.08f))
+                    .padding(start = 12.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Image(
@@ -1419,9 +1454,9 @@ fun SignInBanner(
                 Text(
                     text = stringResource(Res.string.sign_in_with_google),
                     style = MaterialTheme.typography.titleMedium,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.W700,
-                    color = Color.Black,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.W600,
+                    color = MaterialTheme.colorScheme.onBackground,
                 )
             }
         }

@@ -55,7 +55,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import com.music.zenith.data.model.MoodGenre
+import com.music.zenith.data.model.MoodGenreSection
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -87,6 +94,12 @@ import com.music.zenith.ui.components.SongRow
 import com.music.zenith.ui.components.SearchPlayingBars
 import com.music.zenith.ui.components.thumbnailBorder
 import com.music.zenith.ui.components.songListSkeleton
+import com.music.zenith.ui.components.optimizedHazeEffect
+import androidx.compose.ui.zIndex
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.HazeStyle
+import dev.chrisbanes.haze.HazeTint
+import dev.chrisbanes.haze.hazeSource
 import java.util.Locale
 
 @Composable
@@ -169,8 +182,20 @@ fun SearchScreen(
      * about the results, and the switcher would just push them down.
      */
     sourceSwitcher: (@Composable () -> Unit)? = null,
+    /** The mood and genre categories, shown while the field is empty and has no focus. */
+    exploreState: UiState<List<MoodGenreSection>>? = null,
+    onCategoryClick: ((MoodGenre) -> Unit)? = null,
+    onExploreRetry: () -> Unit = {},
+    /** Whether the search field has focus; the categories give way to recent searches once it does. */
+    fieldFocused: Boolean = true,
+    /** Applied to the scrolling list; the app uses it to record the list as a blur source. */
+    listModifier: Modifier = Modifier,
+    /** Applied to the fixed header; the app uses it to draw the blurred list behind the header. */
+    headerModifier: Modifier = Modifier,
 ) {
     val focusRequester = remember { FocusRequester() }
+    var listWidthPx by remember { mutableIntStateOf(0) }
+    val categoryColumns = moodGenreColumns(with(LocalDensity.current) { listWidthPx.toDp() })
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     // Tapping the search tab from the nav bar sets focusRequested;
@@ -207,14 +232,45 @@ fun SearchScreen(
             if (!loadingMore && total > 0 && lastVisible >= total - 4) onLoadMore()
         }
     }
-    Column(modifier = modifier.fillMaxSize()) {
+    val frost = remember { HazeState() }
+    val frostFill = MaterialTheme.colorScheme.background
+    val frostStyle = remember(frostFill) {
+        HazeStyle(
+            backgroundColor = frostFill,
+            tints = listOf(HazeTint(frostFill.copy(alpha = 0.55f))),
+            blurRadius = 24.dp,
+            noiseFactor = 0f,
+            fallbackTint = HazeTint(frostFill),
+        )
+    }
+    var headerHeightPx by remember { mutableIntStateOf(0) }
+    val headerHeight = with(LocalDensity.current) { headerHeightPx.toDp() }
+    Box(modifier = modifier.fillMaxSize()) {
         // Search field and filter tabs stay fixed at the top, outside the
         // scrolling list, so they're always reachable rather than scrolling
         // away with the results or recent searches beneath them.
         // The FrostedTopBar is visible on this tab (showing "Search"), so we
         // clear it fully — status bar inset + bar height + breathing gap — so
         // the search field sits cleanly below the bar instead of overlapping it.
-        Column(modifier = Modifier.padding(top = topPadding)) {
+        Column(
+            modifier = Modifier
+                .zIndex(1f)
+                .fillMaxWidth()
+                .onSizeChanged { headerHeightPx = it.height }
+                .clip(RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp))
+                .background(frostFill.copy(alpha = 0.9f))
+                .then(headerModifier)
+                // When the app supplies its own backdrop blur it is the frost;
+                // Haze on top would blur the same list a second time.
+                .then(
+                    if (headerModifier === Modifier) {
+                        Modifier.optimizedHazeEffect(frost, frostStyle)
+                    } else {
+                        Modifier
+                    },
+                )
+                .padding(top = topPadding),
+        ) {
             if (showField) {
                 SearchField(
                     query = query,
@@ -260,8 +316,13 @@ fun SearchScreen(
 
         LazyColumn(
             state = listState,
-            modifier = Modifier.weight(1f).fillMaxWidth(),
-            contentPadding = PaddingValues(bottom = contentPadding.calculateBottomPadding()),
+            modifier = Modifier
+                .fillMaxSize()
+                // Only recorded while Haze is the one blurring the header.
+                .then(if (headerModifier === Modifier) Modifier.hazeSource(frost) else Modifier)
+                .then(listModifier)
+                .onSizeChanged { listWidthPx = it.width },
+            contentPadding = PaddingValues(top = headerHeight, bottom = contentPadding.calculateBottomPadding()),
         ) {
             when {
                 searchingLibrary || searchingAddons -> librarySearchResults(
@@ -305,6 +366,13 @@ fun SearchScreen(
                         )
                     }
                 }
+                results == null && !fieldFocused && query.isEmpty() &&
+                    exploreState != null && onCategoryClick != null -> moodGenreGrid(
+                    state = exploreState,
+                    columns = categoryColumns,
+                    onCategoryClick = onCategoryClick,
+                    onRetry = onExploreRetry,
+                )
                 results == null -> if (history.isEmpty()) {
                     item { MessageState(stringResource(Res.string.search_empty)) }
                 } else {

@@ -541,7 +541,7 @@ private fun AccessoryPill(
             .height(TOP_CONTROL_SIZE)
             .then(
                 if (floating) {
-                    artworkPageSurface(shape = shape, hazeState = hazeState)
+                    artworkPageSurface(shape = shape, hazeState = hazeState, refract = false)
                 } else {
                     Modifier
                         .clip(shape)
@@ -597,6 +597,8 @@ private fun Modifier.artworkActionEdgePadding(): Modifier = layout { measurable,
 private fun artworkPageSurface(
     shape: CornerBasedShape,
     hazeState: HazeState?,
+    /** False for a control over page content, where bending what is behind it helps no one. */
+    refract: Boolean = true,
 ): Modifier {
     val container = MaterialTheme.colorScheme.surface
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
@@ -606,7 +608,7 @@ private fun artworkPageSurface(
         .clip(shape)
         .then(
             when {
-                useLiquidGlass -> Modifier.liquidGlass(shape)
+                useLiquidGlass -> Modifier.liquidGlass(shape, refract = refract)
                 reduceDynamicBlur || hazeState == null -> Modifier.background(container)
                 else -> Modifier.optimizedHazeEffect(
                     state = hazeState,
