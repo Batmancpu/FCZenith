@@ -233,7 +233,7 @@ fun SearchScreen(
     val frostStyle = remember(frostFill) {
         HazeStyle(
             backgroundColor = frostFill,
-            tints = listOf(HazeTint(frostFill.copy(alpha = 0.4f))),
+            tints = listOf(HazeTint(frostFill.copy(alpha = 0.55f))),
             blurRadius = 24.dp,
             noiseFactor = 0f,
             fallbackTint = HazeTint(frostFill),
@@ -253,6 +253,7 @@ fun SearchScreen(
                 .zIndex(1f)
                 .fillMaxWidth()
                 .onSizeChanged { headerHeightPx = it.height }
+                .background(frostFill.copy(alpha = 0.9f))
                 .optimizedHazeEffect(frost, frostStyle)
                 .padding(top = topPadding),
         ) {
