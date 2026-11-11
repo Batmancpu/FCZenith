@@ -66,6 +66,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.ColorUtils
+import androidx.media3.common.Player
 import coil3.compose.AsyncImage
 import com.music.zenith.R
 import com.music.zenith.data.model.CARD_ART_PX
@@ -124,6 +125,8 @@ fun ReplayStories(
      * was two cards further on than the one on screen.
      */
     paused: Boolean = false,
+    /** The app's player, paused while the Replay plays its own backsound. */
+    mainPlayer: Player? = null,
 ) {
     // A category with nothing in it has no card: an empty page in the middle of
     // a story reads as the app having lost something.
@@ -144,6 +147,14 @@ fun ReplayStories(
     var held by remember { mutableStateOf(false) }
     val progress = remember { Animatable(0f) }
     val current by remember { derivedStateOf { pagerState.settledPage } }
+
+    // Scored like a recap reel: clips of the top songs, faded in and out, and
+    // ducked to silence whenever the story's own clock is stopped.
+    ReplayBacksound(
+        summary = summary,
+        silenced = held || paused,
+        mainPlayer = mainPlayer,
+    )
 
     /**
      * Where a tap sends the story.

@@ -5059,6 +5059,7 @@ private fun ZenithApp(
                         showReplayShare = true
                     },
                     paused = showReplayShare,
+                    mainPlayer = controller,
                 )
             }
         }
