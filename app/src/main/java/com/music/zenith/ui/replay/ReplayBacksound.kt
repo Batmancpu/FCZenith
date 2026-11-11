@@ -1,5 +1,6 @@
 package com.music.zenith.ui.replay
 
+import android.util.Log
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
@@ -149,6 +150,7 @@ private fun BacksoundPlayer(
             val source = withTimeoutOrNull(PREPARE_TIMEOUT_MS) { prepare(song).await() }
             // The next song is made ready while this one plays.
             if (next.clipKey() != song.clipKey()) prepare(next)
+            if (source == null) Log.w("Zenith", "Replay backsound: ${song.clipKey()} could not be prepared")
             val played = source != null &&
                 playSegment(player, level, { silencedNow }, song, source)
             // This song is done with: its copy goes now, not when the Replay closes.
@@ -187,6 +189,7 @@ private suspend fun playSegment(
         }
 
         override fun onPlayerError(error: PlaybackException) {
+            Log.w("Zenith", "Replay backsound: ${error.errorCodeName}: ${error.message}")
             ready.complete(false)
         }
     }
@@ -250,7 +253,7 @@ private const val MAX_VOLUME = 0.85f
 private const val POLL_MS = 200L
 
 /** Resolving a track and storing it on disk, before it is given up on. */
-private const val PREPARE_TIMEOUT_MS = 25_000L
+private const val PREPARE_TIMEOUT_MS = 30_000L
 private const val READY_TIMEOUT_MS = 12_000L
 
 /** A whole round of tracks that would not play is retried this many times, this far apart. */

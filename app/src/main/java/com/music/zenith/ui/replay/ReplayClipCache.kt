@@ -8,6 +8,7 @@ import androidx.media3.database.StandaloneDatabaseProvider
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.ResolvingDataSource
 import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.datasource.cache.CacheWriter
 import androidx.media3.datasource.cache.ContentMetadata
@@ -17,12 +18,15 @@ import androidx.media3.datasource.okhttp.OkHttpDataSource
 import com.music.zenith.data.Http
 import com.music.zenith.data.innertube.StreamResolver
 import com.music.zenith.data.model.Song
+import com.music.zenith.playback.ChunkedDataSource
 import java.io.File
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Short-lived disk store for the Replay's backsound clips.
@@ -42,6 +46,15 @@ object ReplayClipCache {
     /** A track bigger than this is streamed as before rather than stored. */
     private const val MAX_CLIP_BYTES = 24L * 1024 * 1024
 
+    /** Upper bound per range; [ChunkedDataSource] narrows it further per client. */
+    private const val CHUNK_BYTES = 1L * 1024 * 1024
+
+    /** How long storing a clip may take before it is simply streamed instead. */
+    private const val STORE_TIMEOUT_MS = 12_000L
+
+    /** Storing runs here, apart from the caller, so a stalled read can never hold the caller up. */
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     private val lock = Any()
     private var cache: SimpleCache? = null
     private var session = 0
@@ -57,8 +70,28 @@ object ReplayClipCache {
         }
     }
 
+    /**
+     * The same fetch the app's own player makes: bounded ranges, because
+     * googlevideo paces an open-ended read down to playback speed, and the
+     * headers of whichever client minted the URL, because a stream is refused
+     * without them. A bare OkHttp read had neither, which is what left the
+     * Replay silent.
+     */
     private fun upstream(context: Context): DataSource.Factory =
-        DefaultDataSource.Factory(context, OkHttpDataSource.Factory(Http.client))
+        ResolvingDataSource.Factory(
+            ChunkedDataSource.Factory(
+                DefaultDataSource.Factory(context, OkHttpDataSource.Factory(Http.client)),
+                CHUNK_BYTES,
+            ),
+        ) { spec ->
+            if (spec.uri.scheme == "http" || spec.uri.scheme == "https") {
+                spec.buildUpon()
+                    .setHttpRequestHeaders(StreamResolver.mediaHeadersFor(spec.uri.toString()))
+                    .build()
+            } else {
+                spec
+            }
+        }
 
     /** Marks a new Replay as the owner of the store. */
     fun openSession(): Int = synchronized(lock) { ++session }
@@ -107,12 +140,15 @@ object ReplayClipCache {
         } catch (e: Exception) {
             return@withContext null
         }
-        val job = currentCoroutineContext().job
         val store = open(context)
         if (!isStored(store, videoId)) {
-            if (!download(context, store, videoId, url) { job.isActive }) {
-                runCatching { store.removeResource(videoId) }
+            val copy = scope.async { download(context, store, videoId, url) { isActive } }
+            val stored = try {
+                withTimeoutOrNull(STORE_TIMEOUT_MS) { copy.await() } ?: false
+            } finally {
+                if (copy.isActive) copy.cancel()
             }
+            if (!stored) runCatching { store.removeResource(videoId) }
         }
         url
     }
