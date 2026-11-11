@@ -1397,7 +1397,6 @@ private fun ZenithApp(
     // and every glass surface on them recompose once per frame for the length of
     // a fold. Keyed on the labels so a locale change still rebuilds it.
     val homeLabel = stringResource(R.string.home)
-    val playLabel = stringResource(R.string.play)
     val exploreLabel = stringResource(R.string.explore)
     val libraryLabel = stringResource(R.string.library)
     val searchLabel = stringResource(R.string.search)

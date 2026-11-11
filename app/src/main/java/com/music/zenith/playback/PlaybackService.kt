@@ -200,20 +200,12 @@ private val BOUNDED_CONTINUATION_RETRIES_MS = longArrayOf(2_000L, 5_000L, 15_000
 const val ACTION_START_BOUNDED_CONTEXT = "com.music.zenith.action.START_BOUNDED_CONTEXT"
 const val ACTION_CLEAR_BOUNDED_CONTEXT = "com.music.zenith.action.CLEAR_BOUNDED_CONTEXT"
 const val EXTRA_BOUNDED_CONTEXT_SONGS = "zenith.boundedContext.songs"
-const val EXTRA_BOUNDED_CONTEXT_START_INDEX = "zenith.boundedContext.startIndex"
-const val EXTRA_BOUNDED_CONTEXT_SOURCE_TITLE = "zenith.boundedContext.sourceTitle"
-const val EXTRA_BOUNDED_CONTEXT_SOURCE_TYPE = "zenith.boundedContext.sourceType"
-const val EXTRA_BOUNDED_CONTEXT_SOURCE_ID = "zenith.boundedContext.sourceId"
-const val EXTRA_BOUNDED_CONTEXT_CONTINUATION = "zenith.boundedContext.continuation"
 
 /** Session command used to smoothly swap the current track's version (film vs release). */
 const val ACTION_SWAP_VERSION = "com.music.zenith.action.SWAP_VERSION"
 const val EXTRA_SWAP_MEDIA_ITEM = "zenith.swap.media_item"
 
 /** Session command used by the media notification's and the 4×1 widget's Favorite button. */
-/** How long the service may stay in the foreground, paused, while the watch plays. */
-private const val WATCH_SESSION_FOREGROUND_MS = 6 * 60 * 60 * 1000L
-
 const val ACTION_TOGGLE_FAVORITE = "com.music.zenith.action.TOGGLE_FAVORITE"
 
 /** Session command used by the media notification's and the 4×1 widget's Shuffle button. */
@@ -9283,34 +9275,6 @@ class PlaybackService : MediaLibraryService() {
             .build()
     }
 
-    private fun MediaItem.withGridStyle(): MediaItem {
-        val currentExtras = mediaMetadata.extras ?: Bundle()
-        val newExtras = Bundle(currentExtras).apply {
-            putInt(EXTRA_CONTENT_STYLE_BROWSABLE_HINT, CONTENT_STYLE_GRID_ITEM_HINT_VALUE)
-            putInt(EXTRA_CONTENT_STYLE_PLAYABLE_HINT, CONTENT_STYLE_GRID_ITEM_HINT_VALUE)
-            putInt(EXTRA_CONTENT_STYLE_BROWSABLE_HINT_AX, CONTENT_STYLE_GRID_ITEM_HINT_VALUE)
-            putInt(EXTRA_CONTENT_STYLE_PLAYABLE_HINT_AX, CONTENT_STYLE_GRID_ITEM_HINT_VALUE)
-            putInt(EXTRA_CONTENT_STYLE_BROWSABLE_HINT_LEGACY, CONTENT_STYLE_GRID_ITEM_HINT_VALUE)
-            putInt(EXTRA_CONTENT_STYLE_PLAYABLE_HINT_LEGACY, CONTENT_STYLE_GRID_ITEM_HINT_VALUE)
-            putInt("android.media.extras.CONTENT_STYLE_BROWSABLE_HINT", CONTENT_STYLE_GRID_ITEM_HINT_VALUE)
-            putInt("android.media.extras.CONTENT_STYLE_PLAYABLE_HINT", CONTENT_STYLE_GRID_ITEM_HINT_VALUE)
-            putInt("android.media.browse.CONTENT_STYLE_BROWSABLE_HINT", CONTENT_STYLE_GRID_ITEM_HINT_VALUE)
-            putInt("android.media.browse.CONTENT_STYLE_PLAYABLE_HINT", CONTENT_STYLE_GRID_ITEM_HINT_VALUE)
-            putBoolean(EXTRA_CONTENT_STYLE_SUPPORTED, true)
-            putBoolean(EXTRA_CONTENT_STYLE_SUPPORTED_AX, true)
-        }
-        return buildUpon()
-            .setMediaMetadata(
-                mediaMetadata.buildUpon()
-                    .setIsBrowsable(true)
-                    .setIsPlayable(true)
-                    .setFolderType(MediaMetadata.FOLDER_TYPE_ALBUMS)
-                    .setExtras(newExtras)
-                    .build(),
-            )
-            .build()
-    }
-
     private fun ShelfItem.toMediaItemOrNull(): MediaItem? {
         val vid = videoId
         if (vid != null) {
@@ -9395,14 +9359,6 @@ class PlaybackService : MediaLibraryService() {
         const val MAX_AUTO_PAGE_SIZE = 50
         const val MAX_AUTO_SEARCH_QUERY_CHARS = 200
         const val MAX_AUTO_SEARCH_CACHE_ENTRIES = 20
-
-        val ROOT_CHILDREN: List<String> = listOf(
-            MEDIA_QUICK_PICKS_ID,
-            MEDIA_RECENTS_ID,
-            MEDIA_PLAYLISTS_ID,
-            MEDIA_LIKED_ID,
-            MEDIA_MORE_ID,
-        )
 
         // Android Auto Content Style Hints
         const val EXTRA_CONTENT_STYLE_SUPPORTED = "android.media.browse.extra.CONTENT_STYLE_SUPPORTED"

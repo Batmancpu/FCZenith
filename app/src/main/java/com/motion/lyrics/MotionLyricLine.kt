@@ -1,9 +1,5 @@
 package com.motion.lyrics
 
-import android.os.Build
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
@@ -15,12 +11,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
-import androidx.compose.ui.graphics.TileMode
-import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.translate
@@ -43,7 +36,6 @@ import kotlinx.coroutines.delay
 import kotlin.math.abs
 import kotlin.math.PI
 import kotlin.math.floor
-import kotlin.math.min
 import kotlin.math.sin
 
 internal class MotionRuntime {
@@ -335,31 +327,6 @@ private fun DrawScope.drawMotion(
         }
         if (sw > 0.01f && rt.sparkle) {
             drawParticles(i, l + w / 2f, lay.top[i] + dy, w, rt, active, smoothstep(sw / 0.35f))
-        }
-    }
-}
-
-/** Transisi baris aktif: pakai pada item lirik yang sudah ada (tanpa mengubah auto-scroll). */
-@Composable
-fun Modifier.motionLineTransition(distanceFromActive: Int): Modifier {
-    val d = abs(distanceFromActive)
-    val soft = spring<Float>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessLow)
-    val alpha by animateFloatAsState(
-        when (d) { 0 -> 1f; 1 -> 0.55f; 2 -> 0.38f; else -> 0.28f }, soft, label = "mAlpha"
-    )
-    val scale by animateFloatAsState(if (d == 0) 1f else 0.965f, soft, label = "mScale")
-    val ty by animateFloatAsState(
-        when { distanceFromActive < 0 -> -6f; distanceFromActive > 0 -> 6f; else -> 0f }, soft, label = "mTy"
-    )
-    val blur by animateFloatAsState(min(d, 3) * 1.1f, soft, label = "mBlur")
-    val dens = LocalDensity.current.density
-    return this.graphicsLayer {
-        this.alpha = alpha
-        scaleX = scale; scaleY = scale
-        transformOrigin = TransformOrigin(0f, 0.5f)
-        translationY = ty * dens
-        if (Build.VERSION.SDK_INT >= 31 && blur > 0.1f) {
-            renderEffect = BlurEffect(blur * dens, blur * dens, TileMode.Decal)
         }
     }
 }
