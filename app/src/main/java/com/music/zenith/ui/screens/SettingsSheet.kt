@@ -1242,21 +1242,30 @@ fun SettingsScreen(
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = TextAlign.Start,
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable { AppSettings.setGlassClarity(GlassClarity.CLEAR_LEVEL) }
+                                    .padding(vertical = 4.dp),
                             )
                             Text(
                                 text = stringResource(R.string.glass_clarity_balanced),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = TextAlign.Center,
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable { AppSettings.setGlassClarity(GlassClarity.BALANCED_LEVEL) }
+                                    .padding(vertical = 4.dp),
                             )
                             Text(
                                 text = stringResource(R.string.glass_clarity_frosted),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = TextAlign.End,
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable { AppSettings.setGlassClarity(GlassClarity.FROSTED_LEVEL) }
+                                    .padding(vertical = 4.dp),
                             )
                         }
                     }
