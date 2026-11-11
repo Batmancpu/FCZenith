@@ -302,10 +302,6 @@
     <string name="customize_home">Customize Home</string>
     <string name="customize_home_subtitle">Reorder rows and choose which ones show</string>
     <string name="home_layout_description">Drag a row by its handle to move it. Untick a row to hide it from Home.</string>
-    <string name="artists_layout">Artists layout</string>
-    <string name="artists_layout_subtitle">How the Artists shelf looks in Library</string>
-    <string name="artists_layout_grid">Grid</string>
-    <string name="artists_layout_row">Row</string>
     <string name="customize_library">Customize Library</string>
     <string name="library_layout_description">Drag a row by its handle to move it. Untick a row to hide it from Library.</string>
     <string name="library_row_pinned">Pinned playlists</string>

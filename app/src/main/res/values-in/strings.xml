@@ -1128,10 +1128,6 @@
     <string name="customize_home">Atur susunan Beranda</string>
     <string name="customize_home_subtitle">Ubah urutan baris dan pilih mana yang tampil</string>
     <string name="home_layout_description">Seret baris lewat gagangnya untuk memindahkan. Hapus centang untuk menyembunyikannya dari Beranda.</string>
-    <string name="artists_layout">Tata letak Artis</string>
-    <string name="artists_layout_subtitle">Tampilan shelf Artis di Pustaka</string>
-    <string name="artists_layout_grid">Grid</string>
-    <string name="artists_layout_row">Baris</string>
     <string name="customize_library">Atur susunan Pustaka</string>
     <string name="library_layout_description">Seret baris lewat gagangnya untuk memindahkan. Hapus centang untuk menyembunyikannya dari Pustaka.</string>
     <string name="library_row_pinned">Playlist yang disematkan</string>

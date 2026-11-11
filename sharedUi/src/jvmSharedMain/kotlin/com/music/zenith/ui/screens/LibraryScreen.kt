@@ -131,6 +131,8 @@ fun LibraryScreen(
     layout: HomeLayout = HomeLayout(),
     /** Artists as one row that scrolls sideways instead of the two-across grid. */
     artistsRow: Boolean = false,
+    /** Called with true for the sideways row, false for the grid, from the Artists header. */
+    onArtistsRowChange: (Boolean) -> Unit = {},
 ) {
     val pinnedPlaylists by AppUi.host.pinnedPlaylists.collectAsStateWithLifecycle()
     val onDevice = stringResource(Res.string.on_device)
@@ -292,6 +294,9 @@ fun LibraryScreen(
                                             onItemClick = onShelfItemClick,
                                             onItemLongPress = onShelfItemLongPress,
                                             onShowAll = { onShowAll(shelf) },
+                                            headerAction = {
+                                                ArtistsLayoutToggle(row = true, onChange = onArtistsRowChange)
+                                            },
                                         )
                                     } else if (shelf.title == ARTISTS_SHELF) {
                                         LibraryTwoColumnShelf(
@@ -299,6 +304,9 @@ fun LibraryScreen(
                                             onItemClick = onShelfItemClick,
                                             onItemLongPress = onShelfItemLongPress,
                                             onShowAll = { onShowAll(shelf) },
+                                            headerAction = {
+                                                ArtistsLayoutToggle(row = false, onChange = onArtistsRowChange)
+                                            },
                                         )
                                     } else {
                                         LibraryGridShelf(
@@ -455,6 +463,8 @@ internal fun LibraryGridShelf(
     onShowAll: () -> Unit,
     leadingCards: List<@Composable (Modifier) -> Unit> = emptyList(),
     pinnedPlaylists: List<String> = emptyList(),
+    /** A small control drawn in the header, just before "Show all". */
+    headerAction: (@Composable () -> Unit)? = null,
 ) {
     val leadingCount = leadingCards.size
     val visibleItems = shelf.items.take((LIBRARY_ROW_MAX_ITEMS - leadingCount).coerceAtLeast(0))
@@ -463,6 +473,7 @@ internal fun LibraryGridShelf(
             title = shelf.title,
             subtitle = shelf.subtitle,
             onShowAll = onShowAll.takeIf { shelf.items.size + leadingCount > LIBRARY_ROW_MAX_ITEMS },
+            trailing = headerAction,
         )
         ShelfRow(
             state = rememberShelfListState("library:${shelf.title}"),
@@ -485,6 +496,21 @@ internal fun LibraryGridShelf(
     }
 }
 
+/** Tombol di header Artists: ikon grid saat sedang satu baris, ikon daftar saat sedang grid. */
+@Composable
+private fun ArtistsLayoutToggle(row: Boolean, onChange: (Boolean) -> Unit) {
+    Icon(
+        imageVector = if (row) ZenithIcons.GridView else ZenithIcons.ListView,
+        contentDescription = null,
+        tint = MaterialTheme.colorScheme.primary,
+        modifier = Modifier
+            .padding(start = 8.dp)
+            .size(32.dp)
+            .clickable { onChange(!row) }
+            .padding(5.dp),
+    )
+}
+
 /** Judul shelf Artists di Library, seperti yang dikirim YtMusicRepository. */
 private const val ARTISTS_SHELF = "Artists"
 
@@ -498,12 +524,14 @@ private fun LibraryTwoColumnShelf(
     onItemClick: (ShelfItem) -> Unit,
     onItemLongPress: (ShelfItem) -> Unit,
     onShowAll: () -> Unit,
+    headerAction: (@Composable () -> Unit)? = null,
 ) {
     Column(Modifier.padding(bottom = 26.dp)) {
         LibrarySectionHeader(
             title = shelf.title,
             subtitle = shelf.subtitle,
             onShowAll = onShowAll.takeIf { shelf.items.size > LIBRARY_ROW_MAX_ITEMS },
+            trailing = headerAction,
         )
         Column(
             modifier = Modifier
@@ -582,7 +610,12 @@ private fun LibraryRowShelf(
  * colour at the far end. Library only — Home and Explore keep [SectionHeader].
  */
 @Composable
-private fun LibrarySectionHeader(title: String, subtitle: String = "", onShowAll: (() -> Unit)? = null) {
+private fun LibrarySectionHeader(
+    title: String,
+    subtitle: String = "",
+    onShowAll: (() -> Unit)? = null,
+    trailing: (@Composable () -> Unit)? = null,
+) {
     val displayTitle = localizeShelfTitle(title)
     val displaySubtitle = localizeShelfSubtitle(subtitle)
     Row(
@@ -611,6 +644,7 @@ private fun LibrarySectionHeader(title: String, subtitle: String = "", onShowAll
                 )
             }
         }
+        trailing?.invoke()
         if (onShowAll != null) {
             Text(
                 text = stringResource(Res.string.show_all),

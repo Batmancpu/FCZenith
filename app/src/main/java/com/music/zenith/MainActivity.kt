@@ -3892,6 +3892,7 @@ private fun ZenithApp(
                                 links = libraryLinks(signedIn),
                                 deviceItems = libraryDeviceItems(downloadedReleases) + localPlaylistItems,
                                 artistsRow = libraryArtistsRow,
+                                onArtistsRowChange = AppSettings::setLibraryArtistsRow,
                                 layout = libraryLayout,
                             )
                         }
