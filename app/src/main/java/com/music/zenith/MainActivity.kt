@@ -166,6 +166,7 @@ import com.music.zenith.ui.components.CoverFlightLayer
 import com.music.zenith.ui.components.LocalCoverVisibilityScope
 import com.music.zenith.ui.navigation.AppRoute
 import com.music.zenith.ui.screens.EqualizerPresetPage
+import com.music.zenith.ui.screens.SettingsChoiceKind
 import com.music.zenith.ui.screens.SettingsChoicePage
 import com.music.zenith.ui.components.SpotifyImportAlert
 import com.music.zenith.ui.screens.AccountAndScrobblingScreen
@@ -843,6 +844,14 @@ private fun ZenithApp(
     val detailActiveShelf = artistShelfRoute?.shelf
     /** The route on screen, or null when a release page or a tab is. */
     val route = visibleEntry?.route
+    // Halaman pengaturan Kaca Cair dipakai untuk melihat hasil efek, jadi navbar
+    // dikunci di bentuk expanded: mini player tetap di atas pil tab dan tidak
+    // pernah melipat ke tengah bar saat halaman digulir.
+    val glassPreviewPage =
+        (route as? AppRoute.SettingsChoice)?.choice == SettingsChoiceKind.LIQUID_GLASS
+    LaunchedEffect(glassPreviewPage) {
+        if (glassPreviewPage) navBarScroll.expand()
+    }
     /**
      * The release page at the top of its stack, whether or not a route
      * covers it. Most things want [detail] — the one actually on screen.
@@ -3010,7 +3019,7 @@ private fun ZenithApp(
                     modifier = Modifier
                         .nestedScroll(pageScrollConnection)
                         .then(
-                            if (glassActive) {
+                            if (glassActive && !glassPreviewPage) {
                                 Modifier
                                     // Every page's scroll passes through here, so
                                     // the glass bar collapses on all of them
