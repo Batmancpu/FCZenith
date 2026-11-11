@@ -283,8 +283,11 @@ object ZenithIcons {
             pathData = addPathNodes(
                 "M154 27.24Q156 0.24 185 0.24H322Q352 0.24 353 27.24Z" +
                     "M116 87.24Q121 56.24 150 56.24H356Q385 56.24 390 87.24Z" +
-                    "M133 500.24Q66 500.24 66 434.24V187.24Q66 121.24 133 121.24H378Q446 121.24 446 187.24V434.24Q446 500.24 385 500.24Z",
+                    "M133 500.24Q66 500.24 66 434.24V187.24Q66 121.24 133 121.24H378Q446 121.24 446 187.24V434.24Q446 500.24 385 500.24Z" +
+                    // Eighth note, cut out of the front card (even-odd): stem and flag, then the head.
+                    "M236 228L262 228C270 262 322 270 326 318C322 292 290 284 262 280L262 372A38 30 0 0 1 186 372A38 30 0 0 1 236 343.5Z",
             ),
+            pathFillType = androidx.compose.ui.graphics.PathFillType.EvenOdd,
             fill = stroke,
         ).build()
     }
