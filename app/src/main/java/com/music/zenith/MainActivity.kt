@@ -231,6 +231,7 @@ import com.music.zenith.ui.components.ReorderPlaylistPage
 import com.music.zenith.ui.components.LongPressOrigin
 import com.music.zenith.ui.components.MenuAnchor
 import com.music.zenith.ui.components.menuAnchor
+import com.music.zenith.ui.components.macOSPopupMorph
 import com.music.zenith.ui.components.IosMenuPopover
 import com.music.zenith.ui.components.SongActionsMenu
 import com.music.zenith.ui.components.HeldContextMenu
@@ -6616,12 +6617,9 @@ private fun PopMenuHost(visible: Boolean, content: @Composable () -> Unit) {
     LaunchedEffect(visible) {
         if (visible) {
             present = true
-            progress.animateTo(
-                1f,
-                androidx.compose.animation.core.spring(dampingRatio = 0.62f, stiffness = 520f),
-            )
+            progress.animateTo(1f, com.music.zenith.ui.components.MacOSPopupSpec().openSpring)
         } else {
-            progress.animateTo(0f, tween(170))
+            progress.animateTo(0f, com.music.zenith.ui.components.MacOSPopupSpec().closeSpring)
             present = false
         }
     }
@@ -6661,16 +6659,9 @@ private fun FrostedMenuPanel(
             shape = shape,
             modifier = Modifier
                 .padding(top = 56.dp, end = 20.dp)
-                // Pops out of the corner the button sits in and, on the way
-                // out, folds back into it.
-                .graphicsLayer {
-                    val p = pop()
-                    val s = 0.78f + 0.22f * p
-                    scaleX = s
-                    scaleY = s
-                    alpha = (p * 1.8f).coerceIn(0f, 1f)
-                    transformOrigin = androidx.compose.ui.graphics.TransformOrigin(1f, 0f)
-                }
+                // Grows out of the button that opened it, like the alerts do,
+                // and folds back into it on the way out.
+                .macOSPopupMorph(progress = pop, cornerRadius = 28.dp)
                 .iosMenuJelly(touch, 1f, 0f)
                 .width(IntrinsicSize.Max)
                 .clip(shape)

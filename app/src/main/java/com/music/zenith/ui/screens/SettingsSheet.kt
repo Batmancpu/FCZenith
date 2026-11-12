@@ -84,7 +84,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatDelegate
 import com.music.zenith.data.lyrics.translationLanguageName
-import androidx.compose.material3.AlertDialog
+import com.music.zenith.ui.components.MacOSAlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -2241,7 +2241,7 @@ fun SettingsScreen(
 
     if (showListenBrainzTokenDialog) {
         var tokenInput by remember { mutableStateOf(listenBrainzToken) }
-        AlertDialog(
+        MacOSAlertDialog(
             onDismissRequest = { showListenBrainzTokenDialog = false },
             title = { Text(stringResource(R.string.listenbrainz_token)) },
             text = {
@@ -2274,7 +2274,7 @@ fun SettingsScreen(
         var passwordInput by remember { mutableStateOf("") }
         var lastfmError by remember { mutableStateOf<String?>(null) }
         var lastfmLoading by remember { mutableStateOf(false) }
-        AlertDialog(
+        MacOSAlertDialog(
             onDismissRequest = { if (!lastfmLoading) showLastfmLoginDialog = false },
             title = { Text(stringResource(R.string.lastfm_login)) },
             text = {
