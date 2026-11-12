@@ -703,8 +703,8 @@ internal fun GlassSelectionPill(
     val tabsBackdrop = remember(tabRow, iconTint, motion) {
         PillTabsBackdrop(tabRow, iconTint) { 1f + PILL_ICON_LIFT_SCALE * motion.material }
     }
-    val backdrop = remember(page, barGlass, fillColor, edge) {
-        SelectionPillBackdrop(page, barGlass, emptyBackdrop(), Color.Unspecified, edge) {
+    val backdrop = remember(page, barGlass, tabsBackdrop, fillColor, edge) {
+        SelectionPillBackdrop(page, barGlass, tabsBackdrop, Color.Unspecified, edge) {
             fillColor.copy(alpha = fillColor.alpha * (1f - motion.material))
         }
     }
@@ -741,17 +741,7 @@ internal fun GlassSelectionPill(
                 )
             },
         ),
-    ) {
-        Box(
-            Modifier.matchParentSize().drawBackdrop(
-                backdrop = tabsBackdrop,
-                shape = { shape },
-                effects = {},
-                highlight = null,
-                shadow = null,
-            ),
-        )
-    }
+    )
 }
 
 /**
