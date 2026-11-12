@@ -214,6 +214,8 @@
     <string name="spatial_audio">Spatial audio</string>
     <string name="spatial_audio_subtitle">Widens stereo tracks for a more immersive feel</string>
     <string name="spatial_audio_atmos_subtitle">Paused for this track — Dolby Atmos is already spatial</string>
+    <string name="spatial_audio_prefer_off">Prefer Spatial Audio Off</string>
+    <string name="spatial_audio_prefer_on">Prefer Spatial Audio On</string>
     <string name="animated_cover_cellular">Play animated cover over cellular</string>
     <string name="replay">Replay</string>
     <string name="replay_subtitle">Your top songs, artists, albums and genres</string>
@@ -856,6 +858,52 @@
     </plurals>
     <string name="biggest_day_note">Your biggest day was %1$s with %2$s of listening.</string>
     <string name="close_replay">Close Replay</string>
+    <string name="replay_brand">Zenith Replay</string>
+    <string name="replay_story_intro_a">Your year\n</string>
+    <string name="replay_story_intro_b">in music.</string>
+    <string name="replay_story_intro_sub">A year filled with the music you love.</string>
+    <string name="replay_cta_relive">Relive your year</string>
+    <string name="replay_cta_again">Replay again</string>
+    <string name="replay_story_minutes_a">Music was always </string>
+    <string name="replay_story_minutes_b">there.</string>
+    <string name="replay_story_artist_a">Your year had a </string>
+    <string name="replay_story_artist_b">favorite voice.</string>
+    <string name="replay_story_songs_a">These songs </string>
+    <string name="replay_story_songs_b">stayed with you.</string>
+    <string name="replay_story_albums_a">Albums that became </string>
+    <string name="replay_story_albums_b">part of your story.</string>
+    <string name="replay_story_personality_a">Your music </string>
+    <string name="replay_story_personality_b">personality.</string>
+    <string name="replay_story_final_a">Every song </string>
+    <string name="replay_story_final_b">tells a story.</string>
+    <string name="replay_story_final_sub">This was yours.</string>
+    <string name="replay_total_minutes">Total listening minutes</string>
+    <string name="replay_stat_hours">Hours</string>
+    <string name="replay_stat_per_day">Per day</string>
+    <string name="replay_stat_busiest">Busiest day</string>
+    <string name="replay_kicker_top_artist">Your top artist</string>
+    <string name="replay_kicker_personality">Your music personality</string>
+    <string name="replay_share_of_listening">%1$d%% of everything you played</string>
+    <string name="replay_persona_night_title">The Night Explorer</string>
+    <string name="replay_persona_night_desc">Your best listening happens after dark, when the world goes quiet and the music gets louder.</string>
+    <string name="replay_persona_dreamer_title">The Melodic Dreamer</string>
+    <string name="replay_persona_dreamer_desc">You drift through songs that feel like a place, steady and full of feeling.</string>
+    <string name="replay_persona_adventurer_title">The Sonic Adventurer</string>
+    <string name="replay_persona_adventurer_desc">You keep wandering to new artists, and no two stretches of your year sound the same.</string>
+    <string name="replay_persona_rhythm_title">The Rhythm Seeker</string>
+    <string name="replay_persona_rhythm_desc">When you find a groove, you stay in it, and your favorites earned every replay.</string>
+    <string name="replay_behavior_peak">Most active around %1$s</string>
+    <string name="replay_behavior_night">%1$d%% of your listening happens after dark</string>
+    <string name="replay_behavior_repeat">%1$s plays per song on average</string>
+    <string name="replay_behavior_day">Your biggest day was %1$s</string>
+    <string name="replay_kicker_habits">Your listening habits</string>
+    <string name="replay_stat_peak">Peak hour</string>
+    <string name="replay_stat_plays">Plays</string>
+    <string name="replay_stat_songs">Songs</string>
+    <string name="replay_stat_artists">Artists</string>
+    <string name="replay_stat_albums">Albums</string>
+    <string name="replay_stat_night">After dark</string>
+    <string name="replay_stat_repeat">Plays / song</string>
     <string name="couldnt_draw_picture">Could not create the picture</string>
     <string name="default_replay_holder">Zenith listener</string>
     <string name="different_albums">Different albums</string>
@@ -869,7 +917,6 @@
     <string name="lyrics_share_story">Make it a story</string>
     <string name="lyrics_share_story_revert">Back to the card</string>
     <string name="listening_shape">Your listening pattern</string>
-    <string name="member_since">Member since</string>
     <string name="member_since_value">Member since %1$s</string>
     <string name="midday">midday</string>
     <string name="midnight">midnight</string>
@@ -882,44 +929,18 @@
     <string name="not_enough_this_week">Play a few more songs this week to unlock your Replay.</string>
     <string name="pinned">Pinned</string>
     <string name="replay_across">Across </string>
-    <string name="replay_album_end"> held your attention.</string>
-    <string name="replay_album_focus">One album</string>
-    <string name="replay_album_start">This time, </string>
-    <string name="replay_artist_end"> kept coming back.</string>
-    <string name="replay_artist_focus">One artist</string>
-    <string name="replay_artist_start">All month, </string>
-    <string name="replay_artist_start_week">This week, </string>
     <string name="replay_empty_description">Listen a little more and Zenith will turn your history into a Replay.</string>
-    <string name="replay_genre_end"> shaped your sound.</string>
-    <string name="replay_genre_focus">Your genres</string>
-    <string name="replay_genre_start">Together, </string>
     <string name="replay_habits_middle"> from </string>
     <string name="replay_habits_start">You explored </string>
     <string name="replay_hours_across">%1$s hours</string>
-    <string name="replay_intro_end"> is ready.</string>
-    <string name="replay_intro_start">Your </string>
-    <string name="replay_minutes_end"> with music.</string>
-    <string name="replay_minutes_start">You spent </string>
-    <string name="replay_minutes_value">%1$s</string>
-    <plurals name="replay_minutes_unit">
-        <item quantity="one">%1$s minute</item>
-        <item quantity="other">%1$s minutes</item>
-    </plurals>
-    <string name="replay_mostly_around">%1$s</string>
     <string name="replay_private_counting">Built privately from your listening history on this device.</string>
     <string name="replay_share_card_description">A polished card with your main listening highlights.</string>
     <string name="replay_share_summary_description">A full picture with songs, artists, albums, genres, and habits.</string>
-    <string name="replay_songs_end"> filled your month.</string>
-    <string name="replay_songs_end_week"> filled your week.</string>
-    <string name="replay_songs_start">In total, </string>
-    <string name="replay_summary_start">Your </string>
-    <string name="replay_summary_end_week">week</string>
     <string name="saved">Saved</string>
     <string name="saved_bang">Saved!</string>
     <string name="share_my_replay">Share my Replay</string>
     <string name="share_your_lyrics">Send your lyrics card</string>
     <string name="share_your_replay">Share your Replay</string>
-    <string name="tap_share_for_picture">Tap Share to create a picture.</string>
     <string name="top_album">Top album</string>
     <string name="top_artist">Top artist</string>
     <string name="top_genre">Top genre</string>
@@ -1247,6 +1268,8 @@
     <string name="liquid_flow">LiquidFlow</string>
 
     <string name="liquid_flow_subtitle">Smooth word sweep with the Motion lyric effect. Off uses the default lyric effect</string>
+    <string name="lyrics_sparkle">Lyric sparkle</string>
+    <string name="lyrics_sparkle_subtitle">Tiny glimmers around held letters in LiquidFlow</string>
 
     <string name="advanced_options">Advanced &amp; experimental options</string>
 
@@ -1378,6 +1401,7 @@
     <string name="spotify_import_done">Imported \'%1$s\'</string>
     <string name="spotify_import_unmatched">%1$d songs weren\'t found on YouTube Music</string>
     <string name="local_playlist_subtitle">%1$d songs · On this device</string>
+    <string name="pinned_playlists">Pinned Playlists</string>
     <!-- Local Music's own playlists and folders: the offline player. -->
     <string name="folders">Folders</string>
     <string name="folder">Folder</string>
@@ -1408,6 +1432,11 @@
     <string name="song_info_unavailable">Not available</string>
     <string name="song_info_error">Some information could not be loaded.</string>
     <string name="song_info_retry">Retry</string>
+    <string name="song_info_credits">Credits</string>
+    <string name="song_info_writers">Writers</string>
+    <string name="song_info_producers">Producers</string>
+    <string name="song_info_additional_vocals">Additional vocals</string>
+    <string name="song_info_sample">Sample</string>
     <!-- Settings: Zenith for Wear OS -->
     <string name="footer_github">GitHub</string>
     <string name="footer_developer">Developer</string>

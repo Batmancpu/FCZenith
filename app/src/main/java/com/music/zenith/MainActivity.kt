@@ -3,7 +3,6 @@ package com.music.zenith
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.content.res.Configuration
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -29,6 +28,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -70,8 +71,6 @@ import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.Sort
 import androidx.compose.material.icons.rounded.Upgrade
 import com.music.zenith.data.listentogether.ServerConnectionState
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -97,7 +96,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.graphicsLayer
@@ -156,7 +154,6 @@ import com.music.zenith.ui.components.iosMenuJelly
 import com.music.zenith.ui.components.jellyMenuRow
 import com.music.zenith.ui.components.rememberJellyMenuTouch
 import com.music.zenith.ui.components.DacVolumeHud
-import com.music.zenith.ui.components.DacVolumeKeys
 import com.music.zenith.ui.components.LocalPlayingBarsMotion
 import com.music.zenith.ui.components.handleDacVolumeKey
 import com.music.zenith.ui.components.VolumeHud
@@ -254,7 +251,6 @@ import com.music.zenith.ui.components.FLOATING_BAR_MAX_WIDTH
 import com.music.zenith.ui.components.FloatingBottomBar
 import com.music.zenith.ui.components.GlassNavBar
 import com.music.zenith.ui.components.floatingtabbar.rememberFloatingTabBarScrollConnection
-import kotlinx.coroutines.flow.collectLatest
 import com.music.zenith.ui.components.FrostedTopBar
 import com.music.zenith.ui.components.LastfmLoginAlert
 import com.music.zenith.ui.components.LocalAppBackdrop
@@ -320,8 +316,6 @@ import com.music.zenith.ui.components.AddSongsDialog
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.foundation.layout.offset
-import com.music.zenith.ui.components.MiniPlayerPull
 import com.music.zenith.ui.player.PlayerPanel
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.mutableStateListOf
@@ -453,6 +447,7 @@ class MainActivity : AppCompatActivity() {
                     LocalAppBackdrop provides appBackdrop,
                     LocalMotionLyricLine provides { line, position, style, inactive, active, modifier ->
                         val motionWords = remember(line) { line.toMotionWords() }
+                        val sparkle by AppSettings.lyricsSparkle.collectAsStateWithLifecycle()
                         MotionLyricLine(
                             text = line.text,
                             words = motionWords,
@@ -461,6 +456,7 @@ class MainActivity : AppCompatActivity() {
                             inactiveColor = inactive,
                             activeColor = active,
                             modifier = modifier,
+                            sparkle = sparkle,
                         )
                     },
                 ) {
@@ -1010,6 +1006,9 @@ private fun ZenithApp(
     val detailSongSorts by AppSettings.detailSongSorts.collectAsStateWithLifecycle()
     val songSort = topDetail?.browseId?.let { detailSongSorts[it] } ?: SongSort.DEFAULT
     var songSortMenuOpen by remember { mutableStateOf(false) }
+    // Search / sort / overflow on an album or playlist page stay folded into one
+    // button until it is tapped, so the top bar is a single glass circle at rest.
+    var detailActionsExpanded by rememberSaveable(topDetail?.browseId) { mutableStateOf(false) }
     // A device folder's equivalents — its sort and whether it is a grid —
     // kept apart for Downloads and shared by every other folder, as they
     // always were. Up here because both the page and the top bar's menu read
@@ -1079,12 +1078,27 @@ private fun ZenithApp(
     }
     // Playlists imported without (or instead of) a YouTube Music account live
     // in the app's own store, and sit on the same shelf as the downloaded ones.
+    // A pinned Spotify playlist sits in no Library shelf, so its card is
+    // rebuilt from what was saved when it was pinned.
+    val pinnedCards by AppSettings.pinnedCards.collectAsStateWithLifecycle()
+    val spotifyPinnedItems = remember(pinnedCards) {
+        pinnedCards.map { (id, card) ->
+            ShelfItem(
+                title = card.title,
+                subtitle = card.subtitle,
+                thumbnailUrl = card.thumbnailUrl,
+                videoId = null,
+                browseId = id,
+            )
+        }
+    }
     val localPlaylists by com.music.zenith.data.spotify.LocalPlaylistStore.playlists.collectAsStateWithLifecycle()
     val localPlaylistItems = localPlaylists.map { playlist ->
         ShelfItem(
             title = playlist.title,
             subtitle = stringResource(R.string.local_playlist_subtitle, playlist.songs.size),
-            thumbnailUrl = playlist.songs.firstOrNull { !it.thumbnailUrl.isNullOrBlank() }?.thumbnailUrl,
+            thumbnailUrl = playlist.coverUrl
+                ?: playlist.songs.firstOrNull { !it.thumbnailUrl.isNullOrBlank() }?.thumbnailUrl,
             videoId = null,
             browseId = playlist.browseId,
         )
@@ -1097,7 +1111,7 @@ private fun ZenithApp(
     val downloadIdFor: (String?) -> String? = { id ->
         id?.let { Downloads.recordIdOf(it) ?: it }?.takeIf { it in savedCollections }
     }
-    LaunchedEffect(savedDownloads, savedCollections, topDetail?.browseId) {
+    LaunchedEffect(savedDownloads, savedCollections, topDetail?.browseId, localPlaylists) {
         val openPage = topDetail ?: return@LaunchedEffect
         val open = openPage.browseId
         // A downloaded playlist's page is a snapshot of the same folder and goes
@@ -1403,7 +1417,6 @@ private fun ZenithApp(
     // and every glass surface on them recompose once per frame for the length of
     // a fold. Keyed on the labels so a locale change still rebuilds it.
     val homeLabel = stringResource(R.string.home)
-    val playLabel = stringResource(R.string.play)
     val exploreLabel = stringResource(R.string.explore)
     val libraryLabel = stringResource(R.string.library)
     val searchLabel = stringResource(R.string.search)
@@ -2201,7 +2214,12 @@ private fun ZenithApp(
     val onBrowseLongPress: (ShelfItem) -> Unit = { item ->
         val id = item.browseId
         val type = id?.let { viewModel.browseTypeOf(it) }
-        if (id != null && type != BrowseType.ARTIST) {
+        if (id != null && id.startsWith(SPOTIFY_PAGE_PREFIX)) {
+            // Only a pinned card reaches here. The menu's queue and download
+            // rows fetch through YouTube Music and cannot read a Spotify page,
+            // so holding the card unpins it instead of raising a menu that fails.
+            if (id in AppSettings.pinnedPlaylists.value) AppSettings.togglePinnedPlaylist(id)
+        } else if (id != null && type != BrowseType.ARTIST) {
             openBrowseMenu(
                 BrowseTarget(
                     browseId = id,
@@ -3127,7 +3145,6 @@ private fun ZenithApp(
                         } else if (pageRoute == AppRoute.Replay) {
                             ReplayScreen(
                                 state = replay,
-                                holder = account?.name.orEmpty(),
                                 onPeriodChange = setReplayPeriod,
                                 onOpenStory = { replayStory = it },
                                 // A track tapped on a chart is one the user already
@@ -3455,7 +3472,20 @@ private fun ZenithApp(
                                     viewModel.openDetail(id, name, "Artist", null, BrowseType.ARTIST)
                                 },
                                 onAddSuggested = { song -> viewModel.addSuggestedSong(page.browseId, song) },
-                                onAddSongs = if (signedIn &&
+                                onAddSongs = if (localPlaylists.any { it.browseId == page.browseId }) {
+                                    {
+                                        // Kept on this device: same popup, picks go to the local store.
+                                        addSongsPlaylist = localPlaylists.firstOrNull { it.browseId == page.browseId }
+                                            ?.let { lp ->
+                                                UserPlaylist(
+                                                    playlistId = lp.id,
+                                                    title = page.title,
+                                                    subtitle = "",
+                                                    thumbnailUrl = lp.coverUrl ?: page.thumbnailUrl,
+                                                )
+                                            }
+                                    }
+                                } else if (signedIn &&
                                     page.type == BrowseType.PLAYLIST &&
                                     ownedPlaylistPages[page.browseId] == true
                                 ) {
@@ -3877,8 +3907,6 @@ private fun ZenithApp(
                                     LibraryReplayEntry(
                                         cards = replayCards,
                                         loading = replay.loading,
-                                        holder = account?.name.orEmpty(),
-                                        memberSince = replay.memberSince,
                                         onOpenReplay = { page ->
                                             replayLandingPage = page
                                             navigator.push(AppRoute.Replay)
@@ -3893,6 +3921,7 @@ private fun ZenithApp(
                                 contentPadding = listPadding,
                                 links = libraryLinks(signedIn),
                                 deviceItems = libraryDeviceItems(downloadedReleases) + localPlaylistItems,
+                                pinnedExtraItems = spotifyPinnedItems,
                                 artistsRow = libraryArtistsRow,
                                 onArtistsRowChange = AppSettings::setLibraryArtistsRow,
                                 layout = libraryLayout,
@@ -4258,7 +4287,13 @@ private fun ZenithApp(
                             // Shuffle / Play / Add.
                             if ((isReleaseDetail || isLocalDetail) && detail != null) {
                                 val releaseSongs = (detail.songs as? UiState.Success)?.data.orEmpty()
-                                if (releaseSongs.isNotEmpty()) {
+                                // An active search keeps the row open so its close button stays reachable.
+                                val actionsOpen = detailActionsExpanded || detailSearching
+                                AnimatedVisibility(
+                                    visible = actionsOpen && releaseSongs.isNotEmpty(),
+                                    enter = fadeIn(tween(180)) + expandHorizontally(tween(220)),
+                                    exit = fadeOut(tween(120)) + shrinkHorizontally(tween(200)),
+                                ) {
                                     IconButton(onClick = { detailSearching = !detailSearching }) {
                                         Icon(
                                             if (detailSearching) Icons.Rounded.Close else ZenithIcons.Search,
@@ -4273,6 +4308,11 @@ private fun ZenithApp(
                                 // with the app's other frosted overlays further
                                 // down — in the main hierarchy, where the haze
                                 // can see the content it blurs.
+                                AnimatedVisibility(
+                                    visible = actionsOpen,
+                                    enter = fadeIn(tween(180)) + expandHorizontally(tween(220)),
+                                    exit = fadeOut(tween(120)) + shrinkHorizontally(tween(200)),
+                                ) {
                                 IconButton(
                                     onClick = { if (isLocalDetail) folderMenuOpen = true else songSortMenuOpen = true },
                                 ) {
@@ -4284,7 +4324,12 @@ private fun ZenithApp(
                                         tint = MaterialTheme.colorScheme.onSurface,
                                     )
                                 }
-                                if (isReleaseDetail && releaseSongs.isNotEmpty()) {
+                                }
+                                AnimatedVisibility(
+                                    visible = actionsOpen && isReleaseDetail && releaseSongs.isNotEmpty(),
+                                    enter = fadeIn(tween(180)) + expandHorizontally(tween(220)),
+                                    exit = fadeOut(tween(120)) + shrinkHorizontally(tween(200)),
+                                ) {
                                     // The page's own tracks, in the order the page
                                     // shows them, so the sheet has them already and
                                     // Play, Shuffle and Open are the buttons beside
@@ -4320,6 +4365,23 @@ private fun ZenithApp(
                                             tint = MaterialTheme.colorScheme.onSurface,
                                         )
                                     }
+                                }
+                                // The one button left at rest, as on Apple Music: the
+                                // ellipsis (•••) to unfold the actions, an xmark to fold
+                                // them again (closing any open search on the way).
+                                IconButton(
+                                    onClick = {
+                                        detailSearching = false
+                                        detailActionsExpanded = !actionsOpen
+                                    },
+                                ) {
+                                    Icon(
+                                        if (actionsOpen) SfIcons.Close else Icons.Rounded.MoreHoriz,
+                                        contentDescription = stringResource(
+                                            if (actionsOpen) R.string.close else R.string.more,
+                                        ),
+                                        tint = MaterialTheme.colorScheme.onSurface,
+                                    )
                                 }
                             }
                             // Left of the account photo, on an artist page: iOS's
@@ -4723,6 +4785,9 @@ private fun ZenithApp(
                 value = song.localUri == null &&
                     withContext(Dispatchers.IO) { AudioCache.holds(song.videoId) }
             }
+            val trackSpatialOverrides by AppSettings.spatialAudioByTrack.collectAsStateWithLifecycle()
+            val spatialAudioGlobal by AppSettings.spatialAudio.collectAsStateWithLifecycle()
+            val spatialAudioOn = trackSpatialOverrides[song.videoId] ?: spatialAudioGlobal
             SongActionsMenu(
                 song = song,
                 signedIn = signedIn,
@@ -4772,6 +4837,7 @@ private fun ZenithApp(
                         controller?.seekToNextMediaItem()
                     }
                 },
+                canAddToPlaylist = localPlaylists.isNotEmpty(),
                 onAddToPlaylist = {
                     songActions = null
                     if (song.localUri != null && (song.videoId.startsWith("content://") || song.videoId.startsWith("file://"))) {
@@ -4787,6 +4853,16 @@ private fun ZenithApp(
                         viewModel.removeFromPlaylist(it.browseId, song)
                     }
                 } ?: detail?.browseId
+                    ?.takeIf {
+                        !fromPlayer && com.music.zenith.data.spotify.LocalPlaylistStore.getPlaylist(it) != null
+                    }
+                    ?.let { id ->
+                        {
+                            songActions = null
+                            com.music.zenith.data.spotify.LocalPlaylistStore.removeSong(id, song.videoId)
+                        }
+                    }
+                    ?: detail?.browseId
                     ?.takeIf { !fromPlayer && song.localUri != null && OfflinePlaylists.isOfflinePlaylist(it) }
                     ?.let { id ->
                         {
@@ -4932,6 +5008,12 @@ private fun ZenithApp(
                 } else {
                     null
                 },
+                onToggleSpatialAudio = if (fromPlayer && song.videoId.isNotBlank()) {
+                    { AppSettings.setSpatialAudioForTrack(song.videoId, !spatialAudioOn) }
+                } else {
+                    null
+                },
+                spatialAudioOn = spatialAudioOn,
             )
         }
         // ---- Now Playing ----
@@ -5192,8 +5274,23 @@ private fun ZenithApp(
                 playlistTarget = null
                 creatingPlaylist = false
             }
+            // Playlists kept on this device (Spotify imports) sit in the same list.
+            val localChoices = remember(localPlaylists) {
+                localPlaylists.map { lp ->
+                    UserPlaylist(
+                        playlistId = lp.id,
+                        title = lp.title,
+                        subtitle = context.resources.getQuantityString(
+                            R.plurals.song_count_plural,
+                            lp.songs.size,
+                            lp.songs.size,
+                        ),
+                        thumbnailUrl = lp.coverUrl ?: lp.songs.firstNotNullOfOrNull { it.thumbnailUrl },
+                    )
+                }
+            }
             PlaylistPickerSheet(
-                playlists = playlists,
+                playlists = playlists + localChoices,
                 loading = playlistsLoading,
                 song = target,
                 startCreating = target == null,
@@ -5431,11 +5528,22 @@ private fun ZenithApp(
             // One of the offline player's own playlists, which are the user's
             // to rename and delete — all but Liked, which is the app's.
             val offlineEditable = OfflinePlaylists.get(target.browseId)?.takeUnless { it.isLiked }
+            // A Spotify import kept on this device: the user's own to rename,
+            // re-cover and delete. Read off the collected list so the sheet
+            // follows each edit.
+            val localEditable = target.browseId?.let { id -> localPlaylists.firstOrNull { it.browseId == id } }
             BrowseActionsMenu(
                 // The live answer, not the one the target was built with.
                 target = target.copy(
                     playlist = playlist ?: offlineEditable?.let {
                         UserPlaylist(playlistId = it.id, title = it.title, subtitle = "", thumbnailUrl = null)
+                    } ?: localEditable?.let {
+                        UserPlaylist(
+                            playlistId = it.id,
+                            title = it.title,
+                            subtitle = "",
+                            thumbnailUrl = it.coverUrl ?: it.songs.firstNotNullOfOrNull { s -> s.thumbnailUrl },
+                        )
                     },
                 ),
                 onRenameInSheet = {
@@ -5516,7 +5624,15 @@ private fun ZenithApp(
                 isPinned = pinnableId != null && pinnableId in pinnedPlaylists,
                 onTogglePin = pinnableId?.let { id ->
                     {
-                        val nowPinned = AppSettings.togglePinnedPlaylist(id)
+                        val nowPinned = AppSettings.togglePinnedPlaylist(
+                            id,
+                            // A Spotify page lives in no Library shelf, so its pin carries its own card.
+                            if (id.startsWith(SPOTIFY_PAGE_PREFIX)) {
+                                AppSettings.PinnedCard(target.title, target.subtitle, target.thumbnailUrl)
+                            } else {
+                                null
+                            },
+                        )
                         if (!nowPinned && id !in pinnedPlaylists) {
                             Toast.makeText(
                                 context,
@@ -5541,9 +5657,17 @@ private fun ZenithApp(
                         OfflinePlaylists.rename(p.browseId, name)
                         viewModel.retitleDetail(p.browseId, name.trim())
                     }
+                } ?: localEditable?.let { p ->
+                    { name: String ->
+                        browseActions = null
+                        com.music.zenith.data.spotify.LocalPlaylistStore.renamePlaylist(p.browseId, name.trim())
+                        viewModel.retitleDetail(p.browseId, name.trim())
+                    }
                 },
                 onChangeCover = playlist?.let { p ->
                     { uri: android.net.Uri? -> viewModel.setPlaylistCover(p, uri) }
+                } ?: localEditable?.let { p ->
+                    { uri: android.net.Uri? -> viewModel.setLocalPlaylistCover(p.browseId, uri) }
                 },
                 onReorder = playlist?.let { p ->
                     {
@@ -5583,6 +5707,14 @@ private fun ZenithApp(
                         // Its page has nothing left to show; take it away too.
                         if (detail?.browseId == p.browseId) viewModel.closeDetail()
                         OfflinePlaylists.delete(p.browseId)
+                    }
+                } ?: localEditable?.let { p ->
+                    {
+                        browseActions = null
+                        if (detail?.browseId == p.browseId) viewModel.closeDetail()
+                        com.music.zenith.data.PlaylistCovers.remove(context, p.browseId)
+                        if (p.browseId in pinnedPlaylists) AppSettings.togglePinnedPlaylist(p.browseId)
+                        com.music.zenith.data.spotify.LocalPlaylistStore.deletePlaylist(p.browseId)
                     }
                 },
                 onDeleteDownload = target.downloadId?.let { id ->

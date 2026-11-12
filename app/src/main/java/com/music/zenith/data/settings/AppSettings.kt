@@ -513,6 +513,13 @@ object AppSettings {
     val spatialAudio = MutableStateFlow(false)
 
     /**
+     * Per-track override of [spatialAudio], keyed by media id and saved the
+     * moment the player menu's row is tapped. A track without an entry
+     * follows the global switch.
+     */
+    val spatialAudioByTrack = MutableStateFlow<Map<String, Boolean>>(emptyMap())
+
+    /**
      * The app's own equaliser, master switch.
      *
      * Separate from the system equaliser row beside it, which is still there and
@@ -639,7 +646,7 @@ object AppSettings {
     val smartVersionAlignment = MutableStateFlow(true)
 
     /** Music video diputar sebagai versi audionya — lihat [com.music.zenith.playback.MusicOnlyPlayback]. */
-    val autoMusicOnly = MutableStateFlow(false)
+    val autoMusicOnly = MutableStateFlow(true)
 
     /** Removes the Recents row from Home. */
     val hideHomeRecents = MutableStateFlow(false)
@@ -657,7 +664,7 @@ object AppSettings {
     val hideHomeMoods = MutableStateFlow(false)
 
     /** Shows every music video as a square, see [VideoThumbnails]. */
-    val squareVideoCovers = MutableStateFlow(false)
+    val squareVideoCovers = MutableStateFlow(true)
 
     /** Never plays the music video in the player: a video track shows its cover instead. */
     val stillVideoCovers = MutableStateFlow(false)
@@ -707,8 +714,20 @@ object AppSettings {
      */
     val liquidFlow = MutableStateFlow(true)
 
-    /** Positive values delay synced lyrics; negative values bring them forward. */
+    /**
+     * Partikel berkilau di sekitar huruf yang ditahan pada efek LiquidFlow.
+     * Hanya berlaku saat [liquidFlow] nyala.
+     */
+    val lyricsSparkle = MutableStateFlow(true)
+
+    /**
+     * Positive values delay synced lyrics; negative values bring them forward.
+     * This is the offset of the track now playing, saved for that track alone;
+     * [setLyricsOffsetTrack] points it at whichever track the player is on.
+     */
     val lyricsOffsetMs = MutableStateFlow(0)
+    private var lyricsOffsetByTrack: Map<String, Int> = emptyMap()
+    private var lyricsOffsetTrackId: String? = null
 
     /**
      * Which language the lyrics translate button translates *into*.
@@ -932,6 +951,15 @@ object AppSettings {
 
     /** How many playlists [pinnedPlaylists] can hold at once. */
     const val MAX_PINNED_PLAYLISTS = 6
+
+    /**
+     * What a pinned playlist's Library card is drawn from when no Library shelf
+     * holds that playlist — a Spotify account's, which lives on its own page.
+     */
+    data class PinnedCard(val title: String, val subtitle: String, val thumbnailUrl: String?)
+
+    /** The [PinnedCard] of each pin that needs one, keyed by browse id. */
+    val pinnedCards = MutableStateFlow<Map<String, PinnedCard>>(emptyMap())
 
     // ── Scrobbling ──────────────────────────────────────────────────────
 
@@ -1237,6 +1265,7 @@ object AppSettings {
             .putBoolean(KEY_LEGACY_MESH_GRADIENT, false)
             .putBoolean(KEY_LYRICS_BLUR, !lowRam)
             .putBoolean(KEY_LIQUID_FLOW, !lowRam)
+            .putBoolean(KEY_LYRICS_SPARKLE, !lowRam)
             .putBoolean(KEY_ANIMATED_CANVAS, !lowRam)
             .apply()
     }
@@ -1280,6 +1309,7 @@ object AppSettings {
         dolbyAtmos.value = prefs.getBoolean(KEY_DOLBY_ATMOS, true)
         directSourceStream.value = prefs.getBoolean(KEY_DIRECT_SOURCE_STREAM, false)
         spatialAudio.value = prefs.getBoolean(KEY_SPATIAL_AUDIO, false)
+        spatialAudioByTrack.value = readSpatialAudioByTrack()
         equalizerEnabled.value = prefs.getBoolean(KEY_EQ_ENABLED, false)
         equalizerMode.value = runCatching {
             EqualizerMode.valueOf(prefs.getString(KEY_EQ_MODE, null) ?: EqualizerMode.DYNAMIC.name)
@@ -1332,13 +1362,13 @@ object AppSettings {
         swipeToPlayNext.value = prefs.getBoolean(KEY_SWIPE_TO_PLAY_NEXT, false)
         dontRepeatSuggestions.value = prefs.getBoolean(KEY_DONT_REPEAT_SUGGESTIONS, false)
         smartVersionAlignment.value = prefs.getBoolean(KEY_SMART_VERSION_ALIGNMENT, true)
-        autoMusicOnly.value = prefs.getBoolean(KEY_AUTO_MUSIC_ONLY, false)
+        autoMusicOnly.value = prefs.getBoolean(KEY_AUTO_MUSIC_ONLY, true)
         hideHomeRecents.value = prefs.getBoolean(KEY_HIDE_HOME_RECENTS, false)
         hideHomeBranding.value = prefs.getBoolean(KEY_HIDE_HOME_BRANDING, false)
         hideHomeVideos.value = prefs.getBoolean(KEY_HIDE_HOME_VIDEOS, false)
         hideHomeTopPicks.value = prefs.getBoolean(KEY_HIDE_HOME_TOP_PICKS, false)
         hideHomeMoods.value = prefs.getBoolean(KEY_HIDE_HOME_MOODS, false)
-        squareVideoCovers.value = prefs.getBoolean(KEY_SQUARE_VIDEO_COVERS, false)
+        squareVideoCovers.value = prefs.getBoolean(KEY_SQUARE_VIDEO_COVERS, true)
         VideoThumbnails.square = squareVideoCovers.value
         stillVideoCovers.value = prefs.getBoolean(KEY_STILL_VIDEO_COVERS, false)
         homeLayout.value = HomeLayout.decode(prefs.getString(KEY_HOME_LAYOUT, null))
@@ -1369,8 +1399,8 @@ object AppSettings {
         progressiveBlur.value = prefs.getBoolean(KEY_PROGRESSIVE_BLUR, false)
         lyricsBlur.value = prefs.getBoolean(KEY_LYRICS_BLUR, true)
         liquidFlow.value = prefs.getBoolean(KEY_LIQUID_FLOW, true)
-        lyricsOffsetMs.value = prefs.getInt(KEY_LYRICS_OFFSET_MS, 0)
-            .coerceIn(MIN_LYRICS_OFFSET_MS, MAX_LYRICS_OFFSET_MS)
+        lyricsSparkle.value = prefs.getBoolean(KEY_LYRICS_SPARKLE, true)
+        lyricsOffsetByTrack = readLyricsOffsetByTrack()
         translationLanguage.value = prefs.getString(KEY_TRANSLATION_LANGUAGE, "").orEmpty()
         if (highPerformanceMode.value) {
             reduceAnimation.value = false
@@ -1448,6 +1478,7 @@ object AppSettings {
             webdavPassword.value,
         )
         pinnedPlaylists.value = readPinnedPlaylists()
+        pinnedCards.value = readPinnedCards()
         discordToken.value = authStore.discordToken.orEmpty()
         discordUsername.value = prefs.getString(KEY_DISCORD_USERNAME, "").orEmpty()
         discordName.value = prefs.getString(KEY_DISCORD_NAME, "").orEmpty()
@@ -1651,6 +1682,33 @@ object AppSettings {
         prefs.edit().putBoolean(KEY_SPATIAL_AUDIO, value).apply()
     }
 
+    /** Spatial audio for [trackId]: its own saved choice, else the global switch. */
+    fun spatialAudioFor(trackId: String?): Boolean =
+        trackId?.let { spatialAudioByTrack.value[it] } ?: spatialAudio.value
+
+    /** Saves the choice for [trackId] right away; the oldest entries drop past the cap. */
+    fun setSpatialAudioForTrack(trackId: String, value: Boolean) {
+        if (trackId.isBlank()) return
+        val next = LinkedHashMap(spatialAudioByTrack.value)
+        next.remove(trackId)
+        next[trackId] = value
+        while (next.size > MAX_SPATIAL_TRACKS) next.remove(next.keys.first())
+        spatialAudioByTrack.value = next
+        val json = org.json.JSONObject()
+        next.forEach { (id, on) -> json.put(id, on) }
+        prefs.edit().putString(KEY_SPATIAL_AUDIO_BY_TRACK, json.toString()).apply()
+    }
+
+    private fun readSpatialAudioByTrack(): Map<String, Boolean> {
+        val raw = prefs.getString(KEY_SPATIAL_AUDIO_BY_TRACK, null) ?: return emptyMap()
+        return runCatching {
+            val json = org.json.JSONObject(raw)
+            val out = LinkedHashMap<String, Boolean>()
+            json.keys().forEach { out[it] = json.getBoolean(it) }
+            out as Map<String, Boolean>
+        }.getOrDefault(emptyMap())
+    }
+
     fun setEqualizerEnabled(value: Boolean) {
         equalizerEnabled.value = value
         prefs.edit().putBoolean(KEY_EQ_ENABLED, value).apply()
@@ -1852,6 +1910,8 @@ object AppSettings {
     fun setAutoMusicOnly(value: Boolean) {
         autoMusicOnly.value = value
         prefs.edit().putBoolean(KEY_AUTO_MUSIC_ONLY, value).apply()
+        // Music-only shows covers, not video frames, so squares go with it.
+        if (value) setSquareVideoCovers(true)
     }
 
     fun setHideHomeRecents(value: Boolean) {
@@ -2000,11 +2060,43 @@ object AppSettings {
         prefs.edit().putBoolean(KEY_LIQUID_FLOW, value).apply()
     }
 
+    fun setLyricsSparkle(value: Boolean) {
+        lyricsSparkle.value = value
+        prefs.edit().putBoolean(KEY_LYRICS_SPARKLE, value).apply()
+    }
+
+    /** Saves the offset for the track now playing right away; 0 clears its entry. */
     fun setLyricsOffsetMs(value: Int) {
         val normalized = value.coerceIn(MIN_LYRICS_OFFSET_MS, MAX_LYRICS_OFFSET_MS)
         if (lyricsOffsetMs.value == normalized) return
         lyricsOffsetMs.value = normalized
-        prefs.edit().putInt(KEY_LYRICS_OFFSET_MS, normalized).apply()
+        val trackId = lyricsOffsetTrackId ?: return
+        val next = LinkedHashMap(lyricsOffsetByTrack)
+        next.remove(trackId)
+        if (normalized != 0) next[trackId] = normalized
+        while (next.size > MAX_LYRICS_OFFSET_TRACKS) next.remove(next.keys.first())
+        lyricsOffsetByTrack = next
+        val json = org.json.JSONObject()
+        next.forEach { (id, ms) -> json.put(id, ms) }
+        prefs.edit().putString(KEY_LYRICS_OFFSET_BY_TRACK, json.toString()).apply()
+    }
+
+    /** Points [lyricsOffsetMs] at [trackId]'s own saved offset, or 0 when it has none. */
+    fun setLyricsOffsetTrack(trackId: String?) {
+        lyricsOffsetTrackId = trackId?.takeIf { it.isNotBlank() }
+        lyricsOffsetMs.value = lyricsOffsetTrackId?.let { lyricsOffsetByTrack[it] } ?: 0
+    }
+
+    private fun readLyricsOffsetByTrack(): Map<String, Int> {
+        val raw = prefs.getString(KEY_LYRICS_OFFSET_BY_TRACK, null) ?: return emptyMap()
+        return runCatching {
+            val json = org.json.JSONObject(raw)
+            val out = LinkedHashMap<String, Int>()
+            json.keys().forEach {
+                out[it] = json.getInt(it).coerceIn(MIN_LYRICS_OFFSET_MS, MAX_LYRICS_OFFSET_MS)
+            }
+            out as Map<String, Int>
+        }.getOrDefault(emptyMap())
     }
 
     /** Blank restores "follow the app language"; see [translationLanguage]. */
@@ -2573,7 +2665,7 @@ object AppSettings {
      * disappears from the row without them ever having touched it, the moment
      * they pin a sixth. Unpinning always succeeds.
      */
-    fun togglePinnedPlaylist(browseId: String): Boolean {
+    fun togglePinnedPlaylist(browseId: String, card: PinnedCard? = null): Boolean {
         val current = pinnedPlaylists.value
         val updated = when {
             browseId in current -> current - browseId
@@ -2582,7 +2674,18 @@ object AppSettings {
         }
         pinnedPlaylists.value = updated
         prefs.edit().putString(KEY_PINNED_PLAYLISTS, updated.joinToString(",")).apply()
-        return browseId in updated
+        val pinned = browseId in updated
+        val cards = pinnedCards.value
+        val nextCards = when {
+            !pinned -> cards - browseId
+            card != null -> cards + (browseId to card)
+            else -> cards
+        }
+        if (nextCards != cards) {
+            pinnedCards.value = nextCards
+            prefs.edit().putString(KEY_PINNED_CARDS, encodePinnedCards(nextCards)).apply()
+        }
+        return pinned
     }
 
     private fun readDetailSongSorts(): Map<String, SongSort> =
@@ -2599,6 +2702,39 @@ object AppSettings {
     private fun readPinnedPlaylists(): List<String> {
         val stored = prefs.getString(KEY_PINNED_PLAYLISTS, null) ?: return emptyList()
         return stored.split(",").filter { it.isNotBlank() }
+    }
+
+    private fun readPinnedCards(): Map<String, PinnedCard> {
+        val raw = prefs.getString(KEY_PINNED_CARDS, null) ?: return emptyMap()
+        return runCatching {
+            val root = org.json.JSONObject(raw)
+            val cards = LinkedHashMap<String, PinnedCard>()
+            val ids = root.keys()
+            while (ids.hasNext()) {
+                val id = ids.next()
+                val entry = root.getJSONObject(id)
+                cards[id] = PinnedCard(
+                    title = entry.optString("t"),
+                    subtitle = entry.optString("s"),
+                    thumbnailUrl = entry.optString("u").takeIf { it.isNotBlank() },
+                )
+            }
+            cards as Map<String, PinnedCard>
+        }.getOrDefault(emptyMap())
+    }
+
+    private fun encodePinnedCards(cards: Map<String, PinnedCard>): String {
+        val root = org.json.JSONObject()
+        cards.forEach { (id, card) ->
+            root.put(
+                id,
+                org.json.JSONObject()
+                    .put("t", card.title)
+                    .put("s", card.subtitle)
+                    .put("u", card.thumbnailUrl ?: ""),
+            )
+        }
+        return root.toString()
     }
 
     /** Forgets the account: token and cached profile. */
@@ -2743,6 +2879,8 @@ object AppSettings {
     private const val KEY_DOLBY_ATMOS = "dolby_atmos"
     private const val KEY_DIRECT_SOURCE_STREAM = "direct_source_stream"
     private const val KEY_SPATIAL_AUDIO = "spatial_audio"
+    private const val KEY_SPATIAL_AUDIO_BY_TRACK = "spatial_audio_by_track"
+    private const val MAX_SPATIAL_TRACKS = 5000
     private const val KEY_EQ_ENABLED = "equalizer_enabled"
     private const val KEY_EQ_MODE = "equalizer_mode"
     private const val KEY_EQ_TONE_X = "equalizer_tone_x"
@@ -2807,9 +2945,11 @@ object AppSettings {
     private const val KEY_PROGRESSIVE_BLUR = "progressive_blur"
     private const val KEY_LYRICS_BLUR = "lyrics_blur"
     private const val KEY_LIQUID_FLOW = "liquid_flow_motion"
+    private const val KEY_LYRICS_SPARKLE = "lyrics_sparkle"
     private const val KEY_PLAYBACK_RATE = "playback_rate"
     private const val KEY_PLAYBACK_TEMPO = "playback_tempo"
-    private const val KEY_LYRICS_OFFSET_MS = "lyrics_offset_ms"
+    private const val KEY_LYRICS_OFFSET_BY_TRACK = "lyrics_offset_by_track"
+    private const val MAX_LYRICS_OFFSET_TRACKS = 5000
     private const val KEY_TRANSLATION_LANGUAGE = "translation_language"
     private const val KEY_ANIMATED_CANVAS = "animated_canvas"
     private const val KEY_CANVAS_OVER_CELLULAR = "canvas_over_cellular"
@@ -2844,6 +2984,7 @@ object AppSettings {
     private const val KEY_SMB_BASE_PATH = "smb_base_path"
     private const val KEY_SMB_USERNAME = "smb_username"
     private const val KEY_PINNED_PLAYLISTS = "pinned_playlists"
+    private const val KEY_PINNED_CARDS = "pinned_cards"
 
     private const val KEY_LASTFM_ENABLED = "lastfm_enabled"
     private const val KEY_LASTFM_USERNAME = "lastfm_username"

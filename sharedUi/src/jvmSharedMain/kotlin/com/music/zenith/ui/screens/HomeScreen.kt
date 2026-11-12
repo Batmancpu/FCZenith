@@ -603,6 +603,8 @@ fun HomeScreen(
     homeLayout: HomeLayout = HomeLayout(),
     /** Swaps the logo and wordmark for a plain [title], without the mark. */
     hideBranding: Boolean = false,
+    /** The listener's pinned playlists, as one row above the feed. Null or empty draws nothing. */
+    pinnedShelf: HomeShelf? = null,
 ) {
     // Top Picks' pictures and motion wait for the feed — see LocalArtworkImages.
     val feedReady = state !is UiState.Loading
@@ -659,6 +661,18 @@ fun HomeScreen(
                         onSignIn = onSignIn,
                         modifier = Modifier.padding(bottom = 8.dp),
                         motion = LocalArtworkMotion.current && !listState.isScrollInProgress,
+                    )
+                }
+            }
+            // Pinned playlists: one tap from Home instead of a trip to Library.
+            if (pinnedShelf != null && pinnedShelf.items.isNotEmpty()) {
+                item(key = "pinned-playlists") {
+                    Shelf(
+                        shelf = pinnedShelf,
+                        onItemClick = { onItemClick(it, pinnedShelf.title) },
+                        onItemLongPress = onItemLongPress,
+                        currentSong = currentSong,
+                        isPlaying = isPlaying,
                     )
                 }
             }

@@ -91,9 +91,12 @@ fun ReplayShareSheet(
     var saved by remember { mutableStateOf(false) }
 
     LaunchedEffect(summary, page) {
-        poster = runCatching { renderReplayPoster(context, summary, holder, memberSince, page) }
-            .onFailure { failed = true }
-            .getOrNull()
+        // Kartu yang sedang tampil di layar dipakai apa adanya; poster Canvas
+        // hanya jadi cadangan (recap / tombol share di halaman Replay).
+        poster = ReplayCapture.take(page)
+            ?: runCatching { renderReplayPoster(context, summary, holder, memberSince, page) }
+                .onFailure { failed = true }
+                .getOrNull()
     }
 
     Column(
@@ -332,4 +335,26 @@ internal suspend fun saveToGallery(
 }
 
 private const val MIME = "image/png"
+
+/**
+ * Tangkapan kartu story yang sedang tampil saat tombol share ditekan, supaya
+ * yang dibagikan sama persis dengan yang dilihat pengguna.
+ */
+internal object ReplayCapture {
+    private var page: ReplayStoryPage? = null
+    private var bitmap: Bitmap? = null
+
+    fun put(page: ReplayStoryPage, bitmap: Bitmap) {
+        this.page = page
+        this.bitmap = bitmap
+    }
+
+    fun take(page: ReplayStoryPage?): Bitmap? =
+        if (page != null && page == this.page) bitmap else null
+
+    fun clear() {
+        page = null
+        bitmap = null
+    }
+}
 private const val SHARE_FOLDER = "shared"

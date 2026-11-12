@@ -269,6 +269,11 @@ class ZenithApplication : Application(), SingletonImageLoader.Factory, Configura
                 // Covers filed on the SMB share; anything else falls
                 // through to Coil's own fetchers. See SmbCoverFetcher.
                 add(SmbCoverFetcher.Factory())
+                // Covers of files on the device: the tag's embedded picture,
+                // which MediaStore's legacy album-art URI no longer serves.
+                add(com.music.zenith.data.LocalArtMapper())
+                add(com.music.zenith.data.LocalArtKeyer())
+                add(com.music.zenith.data.LocalArtFetcher.Factory())
                 // Artist signatures are usually SVG, which Coil can't
                 // decode without this. See ArtistSignatureRepository.
                 add(SvgDecoder.Factory())

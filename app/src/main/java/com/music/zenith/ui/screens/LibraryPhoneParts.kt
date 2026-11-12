@@ -156,8 +156,6 @@ const val CACHE_FOLDER_BROWSE_ID = "local:cache"
 fun LibraryReplayEntry(
     cards: List<ReplayHeroCard>,
     loading: Boolean,
-    holder: String,
-    memberSince: String?,
     onOpenReplay: (ReplayStoryPage) -> Unit,
 ) {
     if (loading) {
@@ -165,8 +163,6 @@ fun LibraryReplayEntry(
     } else if (cards.isNotEmpty()) {
         ReplayCardRow(
             cards = cards,
-            holder = holder,
-            memberSince = memberSince,
             onCardClick = onOpenReplay,
             modifier = Modifier.padding(vertical = 6.dp),
             contentPadding = PaddingValues(horizontal = PAGE_GUTTER),

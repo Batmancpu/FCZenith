@@ -285,7 +285,9 @@ object ZenithIcons {
                     "M116 87.24Q121 56.24 150 56.24H356Q385 56.24 390 87.24Z" +
                     "M133 500.24Q66 500.24 66 434.24V187.24Q66 121.24 133 121.24H378Q446 121.24 446 187.24V434.24Q446 500.24 385 500.24Z" +
                     // Beamed double note, cut out of the front card (even-odd): one outline, two heads joined by a beam.
-                    "M219.8 222.5L353.1 195.8L353.1 368.5A39.9 30.5 0 1 1 334.2 342.5L334.2 237.4L238.7 256.5L238.7 394.7A39.9 30.5 0 1 1 219.8 368.8L219.8 260.3Z",
+                    // Shifted 9 left and 3 up from its bounding-box centre: the heads
+                    // sit low and to the left, so the mass reads off-centre otherwise.
+                    "M210.8 219.5L344.1 192.8L344.1 365.5A39.9 30.5 0 1 1 325.2 339.5L325.2 234.4L229.7 253.5L229.7 391.7A39.9 30.5 0 1 1 210.8 365.8L210.8 257.3Z",
             ),
             pathFillType = androidx.compose.ui.graphics.PathFillType.EvenOdd,
             fill = stroke,

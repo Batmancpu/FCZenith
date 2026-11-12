@@ -501,11 +501,6 @@ object LocalMediaRepository {
     /** Human-readable path for the folder setting without exposing provider internals. */
     fun selectedFolderLabel(treeUri: String): String? = selectedFolder(treeUri)?.label
 
-    internal fun isInSelectedFolder(path: String?, treeUri: String): Boolean {
-        if (treeUri.isBlank()) return true
-        return isInFolder(path, selectedFolder(treeUri))
-    }
-
     private fun isInFolder(path: String?, folder: SelectedFolder?): Boolean {
         if (folder == null) return false
         val candidate = path?.normalizedPath() ?: return false
@@ -617,7 +612,7 @@ object LocalMediaRepository {
             videoId = uriStr,
             title = title,
             artist = artist,
-            thumbnailUrl = scanned?.artworkUrl,
+            thumbnailUrl = scanned?.artworkUrl ?: LocalArtFetcher.trackArtUrl(uriStr),
             durationText = durationText,
             albumName = albumName ?: scanned?.albumName,
             localUri = uriStr,

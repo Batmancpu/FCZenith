@@ -316,9 +316,14 @@ object ListeningStats {
      * files, and the one being written to is flushed first so that the page
      * agrees with what has just been playing.
      */
-    suspend fun summary(period: ReplayPeriod): ReplaySummary = withContext(Dispatchers.IO) {
+    suspend fun summary(
+        period: ReplayPeriod,
+        // Any day inside the month or year to show; today unless the listener
+        // stepped back to an earlier one.
+        anchor: LocalDate = LocalDate.now(),
+    ): ReplaySummary = withContext(Dispatchers.IO) {
         flushAndAwait()
-        val today = LocalDate.now()
+        val today = anchor
         val facts = ArtistFacts.revision.value
         // Every input to the merge, so the cache cannot be stale: which months
         // are on disk and what is in them ([version]), what is known about the
@@ -746,6 +751,7 @@ object ListeningStats {
                 distinctArtists = rankedArtists.size,
                 distinctAlbums = rankedAlbums.size,
                 since = earliest,
+                anchor = today,
             )
         }
     }
@@ -1062,6 +1068,8 @@ data class ReplaySummary(
     val distinctAlbums: Int,
     /** The earliest month with anything in it, `YYYY-MM`. */
     val since: String?,
+    /** The day this month or year was read around: today, or an earlier one picked by the listener. */
+    val anchor: LocalDate = LocalDate.now(),
 ) {
     val minutes: Long get() = totalMs / 60_000
     val hours: Long get() = totalMs / 3_600_000
