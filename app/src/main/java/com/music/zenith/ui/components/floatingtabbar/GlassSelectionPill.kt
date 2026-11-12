@@ -24,18 +24,23 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.GraphicsLayerScope
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.toSize
 import androidx.compose.ui.platform.LocalDensity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.music.zenith.data.settings.AppSettings
@@ -666,6 +671,7 @@ internal fun GlassSelectionPill(
                     lens(
                         refractionHeight = LENS_HEIGHT.toPx() * motion.glassPresence,
                         refractionAmount = LENS_AMOUNT.toPx() * motion.material,
+                        depthEffect = true,
                         chromaticAberration = true,
                     )
                 }
@@ -685,8 +691,12 @@ internal fun GlassSelectionPill(
 /** The rim and its shadow are gone by the time the hand-off is 55% through. */
 private fun rimOf(presence: Float): Float = ((presence - 0.45f) / 0.55f).coerceIn(0f, 1f)
 
-private val LENS_HEIGHT = 12.dp
-private val LENS_AMOUNT = 14.dp
+private val LENS_HEIGHT = 16.dp
+private val LENS_AMOUNT = 22.dp
+
+/** The bar's own edge, drawn into what the lens refracts so the lens bends it too. */
+private val BAR_RIM_WIDTH = 1.5.dp
+private const val BAR_RIM_ALPHA = 0.45f
 
 private val PILL_SHADOW = Shadow(
     radius = 12.dp,
@@ -701,7 +711,7 @@ private val PILL_SHADOW = Shadow(
  */
 private class SelectionPillBackdrop(
     private val page: Backdrop,
-    private val bar: Backdrop,
+    private val bar: LayerBackdrop,
     private val tabs: Backdrop,
     private val fill: () -> Color,
 ) : Backdrop {
@@ -715,6 +725,7 @@ private class SelectionPillBackdrop(
     ) {
         with(page) { drawBackdrop(density, coordinates, layerBlock) }
         with(bar) { drawBackdrop(density, coordinates, layerBlock) }
+        drawBarRim(bar, coordinates)
         val color = fill()
         if (color.alpha > 0f) {
             // Past every edge: the recorded area includes the lens's padding.
@@ -725,5 +736,35 @@ private class SelectionPillBackdrop(
             )
         }
         with(tabs) { drawBackdrop(density, coordinates, layerBlock) }
+    }
+}
+
+/**
+ * The exported bar glass has no rim (it is recorded without one), so the lens
+ * would refract a bar with no visible edge. This strokes the bar's pill edge at
+ * the bar's own position, inside the pill's coordinate space, before the lens
+ * bends everything.
+ */
+private fun DrawScope.drawBarRim(bar: LayerBackdrop, coordinates: LayoutCoordinates?) {
+    val barCoordinates = bar.layerCoordinates ?: return
+    val here = coordinates ?: return
+    if (!barCoordinates.isAttached || !here.isAttached) return
+    val offset = try {
+        barCoordinates.localPositionOf(here)
+    } catch (_: Exception) {
+        here.positionInWindow() - barCoordinates.positionInWindow()
+    }
+    val barSize = barCoordinates.size.toSize()
+    if (barSize.width <= 0f || barSize.height <= 0f) return
+    val strokeWidth = BAR_RIM_WIDTH.toPx()
+    val radius = minOf(barSize.width, barSize.height) / 2f - strokeWidth / 2f
+    translate(-offset.x, -offset.y) {
+        drawRoundRect(
+            color = Color.White.copy(alpha = BAR_RIM_ALPHA),
+            topLeft = Offset(strokeWidth / 2f, strokeWidth / 2f),
+            size = Size(barSize.width - strokeWidth, barSize.height - strokeWidth),
+            cornerRadius = CornerRadius(radius, radius),
+            style = Stroke(width = strokeWidth),
+        )
     }
 }
