@@ -399,13 +399,15 @@ jobs:
             app/src/main/res/mipmap-xxxhdpi/ic_launcher.webp app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.webp
           rm -f app/src/main/res/drawable-nodpi/fc_music_icon.webp
 
-      - name: Restore the one-shot phone-speaker safeguard
+      - name: Restore the one-shot build safeguards
         if: steps.decision.outputs.should_release == 'true' && always()
         run: |
           set -euo pipefail
           git restore --worktree -- \
             app/src/main/java/com/music/zenith/playback/PlaybackService.kt \
+            app/src/main/java/com/music/zenith/MainActivity.kt \
             app/src/main/res/values-ko/strings.xml
+          rm -f app/src/main/java/com/music/zenith/TopBarActionVisibility.kt
 
       - name: Commit the upstream sync and FC version metadata to main
         if: steps.decision.outputs.should_release == 'true'

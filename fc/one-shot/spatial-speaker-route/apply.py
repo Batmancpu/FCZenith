@@ -126,5 +126,73 @@ new_apply = """    /**
     }
 """
 replace_once(service, old_apply, new_apply, "spatial audio effective state")
+
+# The upstream album action bar supplies a plain composable lambda, not a
+# RowScope receiver. These three new visibility calls otherwise bind to the
+# RowScope overload and fail Kotlin compilation. Move them through a tiny
+# top-level helper with no RowScope receiver; restore this UI file after build.
+main_activity = ROOT / "app/src/main/java/com/music/zenith/MainActivity.kt"
+replace_once(
+    main_activity,
+    """                                AnimatedVisibility(
+                                    visible = actionsOpen && releaseSongs.isNotEmpty(),""",
+    """                                TopBarActionVisibility(
+                                    visible = actionsOpen && releaseSongs.isNotEmpty(),""",
+    "album search visibility scope",
+)
+replace_once(
+    main_activity,
+    """                                AnimatedVisibility(
+                                    visible = actionsOpen,
+                                    enter = fadeIn(tween(180)) + expandHorizontally(tween(220)),""",
+    """                                TopBarActionVisibility(
+                                    visible = actionsOpen,
+                                    enter = fadeIn(tween(180)) + expandHorizontally(tween(220)),""",
+    "album sort visibility scope",
+)
+replace_once(
+    main_activity,
+    """                                AnimatedVisibility(
+                                    visible = actionsOpen && isReleaseDetail && releaseSongs.isNotEmpty(),""",
+    """                                TopBarActionVisibility(
+                                    visible = actionsOpen && isReleaseDetail && releaseSongs.isNotEmpty(),""",
+    "album overflow visibility scope",
+)
+
+helper = ROOT / "app/src/main/java/com/music/zenith/TopBarActionVisibility.kt"
+helper.write_text(
+    """package com.music.zenith
+
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.runtime.Composable
+
+/**
+ * Calls the non-scope AnimatedVisibility overload for actions supplied to
+ * FrostedTopBar. Its action slot is a plain composable lambda, not RowScope.
+ */
+@Composable
+internal fun TopBarActionVisibility(
+    visible: Boolean,
+    enter: EnterTransition,
+    exit: ExitTransition,
+    content: @Composable () -> Unit,
+) {
+    AnimatedVisibility(
+        visible = visible,
+        enter = enter,
+        exit = exit,
+    ) {
+        content()
+    }
+}
+""",
+    encoding="utf-8",
+)
+
 korean_fallbacks = ensure_korean_catalogue_complete()
-print(f"Phone-speaker route safety applied; added {korean_fallbacks} temporary Korean fallback resources.")
+print(
+    "Applied phone-speaker route safety, the album action visibility compatibility "
+    f"wrapper, and {korean_fallbacks} temporary Korean fallback resources."
+)
