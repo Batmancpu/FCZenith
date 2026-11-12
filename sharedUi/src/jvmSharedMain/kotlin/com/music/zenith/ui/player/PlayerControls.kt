@@ -688,6 +688,13 @@ internal fun PlayerActionRow(
                     highlighted = queueOpen,
                     haptic = if (queueOpen) Haptic.Tap else Haptic.Expand,
                 )
+                QueueModeBadges(
+                    shuffleEnabled = shuffleEnabled,
+                    repeatMode = repeatMode,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 3.dp, end = 3.dp),
+                )
             }
         }
     }
@@ -1253,6 +1260,56 @@ private fun rememberPartyBadge(): PartyBadge {
     return badges
         .collectAsStateWithLifecycle(initialValue = PlayerPlatform.host.party.value.badge())
         .value
+}
+
+/**
+ * Small marks on the corner of the queue glyph saying which playback modes are
+ * on — shuffle, repeat (with a 1 for repeat-one) — so the state is visible
+ * without opening the queue. Nothing at all while both are off.
+ */
+@Composable
+private fun QueueModeBadges(
+    shuffleEnabled: Boolean,
+    repeatMode: Int,
+    modifier: Modifier = Modifier,
+) {
+    if (!shuffleEnabled && repeatMode == RepeatModes.OFF) return
+    val tint = LocalPlayerTint.current
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(1.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (shuffleEnabled) {
+            Icon(
+                imageVector = ZenithIcons.Shuffle,
+                contentDescription = null,
+                tint = tint,
+                modifier = Modifier.size(12.dp),
+            )
+        }
+        if (repeatMode != RepeatModes.OFF) {
+            Box(
+                modifier = Modifier.size(12.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = ZenithIcons.Repeat,
+                    contentDescription = null,
+                    tint = tint,
+                    modifier = Modifier.size(12.dp),
+                )
+                if (repeatMode == RepeatModes.ONE) {
+                    Text(
+                        text = "1",
+                        color = tint,
+                        fontSize = 6.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            }
+        }
+    }
 }
 
 @Composable
