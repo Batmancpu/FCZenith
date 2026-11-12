@@ -783,12 +783,12 @@ private val LENS_HEIGHT = 20.dp
 private val LENS_AMOUNT = 28.dp
 
 /** The bar's own edge, drawn into what the lens refracts so the lens bends it too. */
-private val BAR_RIM_WIDTH = 3.dp
-private const val BAR_RIM_ALPHA = 0.9f
+private val BAR_RIM_WIDTH = 1.dp
+private const val BAR_RIM_ALPHA = 0.35f
 
 /** How far the bar's shadow halo reaches past its edge, and how dark it starts. */
-private val BAR_HALO_REACH = 18.dp
-private const val BAR_HALO_ALPHA = 0.40f
+private val BAR_HALO_REACH = 8.dp
+private const val BAR_HALO_ALPHA = 0.10f
 private const val BAR_HALO_STEPS = 7
 
 private val PILL_SHADOW = Shadow(
