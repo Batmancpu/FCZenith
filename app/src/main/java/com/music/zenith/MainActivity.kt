@@ -462,6 +462,7 @@ class MainActivity : AppCompatActivity() {
                         )
                     },
                 ) {
+                com.music.zenith.ui.components.PopupTapOriginTracker()
                 // The window's width, measured rather than asked for.
                 //
                 // `Configuration.screenWidthDp` is the wrong question here: in a

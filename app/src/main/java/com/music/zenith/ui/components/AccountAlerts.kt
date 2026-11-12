@@ -895,26 +895,34 @@ internal fun AlertScaffold(
      * which samples the app backdrop instead; see [InfoAlert]'s `inOwnWindow`.
      */
     frosted: Boolean = true,
+    /**
+     * The motion driving the card. By default it calls [onDismiss] once the
+     * exit has played; [GlassAlertDialog] passes its own so the window's Back
+     * and the scrim share one reverse animation.
+     */
+    motion: MacOSPopupState = rememberMacOSPopupState(onClosed = onDismiss),
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
     val shape = RoundedCornerShape(ALERT_CORNER)
+    androidx.activity.compose.BackHandler { motion.requestClose() }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(SCRIM_COLOR)
+            .macOSPopupScrim(motion, SCRIM_COLOR)
             .clickable(
                 indication = null,
                 interactionSource = remember { MutableInteractionSource() },
-                onClick = onDismiss,
+                onClick = motion::requestClose,
             ),
         contentAlignment = Alignment.Center,
     ) {
         Column(
             modifier = Modifier
                 .width(ALERT_WIDTH)
-                .jellyPopIn()
+                .macOSPopupMotion(motion)
+                .jellyPopIn(animateIn = false)
                 .clip(shape)
                 .then(
                     when {
@@ -965,8 +973,9 @@ internal fun GlassAlertDialog(
     onDismiss: () -> Unit,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val motion = rememberMacOSPopupState(onClosed = onDismiss)
     Dialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = motion::requestClose,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
         val window = (LocalView.current.parent as? DialogWindowProvider)?.window
@@ -974,7 +983,7 @@ internal fun GlassAlertDialog(
         SideEffect { window?.setDimAmount(0f) }
         // Without this the keyboard sits over the actions of an alert with a field.
         Box(Modifier.imePadding()) {
-            AlertScaffold(hazeState = null, onDismiss = onDismiss, frosted = false, content = content)
+            AlertScaffold(hazeState = null, onDismiss = onDismiss, frosted = false, motion = motion, content = content)
         }
     }
 }
