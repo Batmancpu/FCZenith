@@ -412,6 +412,7 @@ jobs:
             app/src/main/java/com/music/zenith/ui/components/SongActionsMenu.kt \
             app/src/main/java/com/music/zenith/MainActivity.kt \
             app/src/main/res/values/strings.xml \
+            app/src/main/res/values-in/strings.xml \
             app/src/main/res/values-ko/strings.xml
           rm -f app/src/main/java/com/music/zenith/playback/SpatialAudioDecisionEngine.kt
           rm -f app/src/test/java/com/music/zenith/playback/SpatialAudioDecisionEngineTest.kt

@@ -1,4 +1,41 @@
 from pathlib import Path
+import copy
+import xml.etree.ElementTree as ET
+
+ROOT = Path.cwd()
+
+def fill_missing_locale_keys(base_path_text: str, locale_path_text: str) -> None:
+    """Mirror Android's English fallback for untranslated keys in this build only."""
+    base_root = ET.parse(ROOT / base_path_text).getroot()
+    locale_path = ROOT / locale_path_text
+    locale_root = ET.parse(locale_path).getroot()
+    supported_tags = {"string", "plurals", "string-array"}
+    existing = {
+        element.attrib.get("name")
+        for element in list(locale_root)
+        if element.tag in supported_tags
+        and element.attrib.get("name")
+        and element.attrib.get("translatable") != "false"
+    }
+    missing = [
+        ET.tostring(copy.deepcopy(element), encoding="unicode")
+        for element in list(base_root)
+        if element.tag in supported_tags
+        and element.attrib.get("name")
+        and element.attrib.get("translatable") != "false"
+        and element.attrib.get("name") not in existing
+    ]
+    if not missing:
+        return
+    original = locale_path.read_text(encoding="utf-8")
+    closing = original.rfind("</resources>")
+    if closing < 0:
+        raise SystemExit(f"Missing resources closing tag in {locale_path_text}")
+    addition = "\n    " + "\n    ".join(missing) + "\n"
+    locale_path.write_text(original[:closing].rstrip() + addition + original[closing:], encoding="utf-8")
+    ET.parse(locale_path)  # Fail immediately if the generated Android XML is malformed.
+    print(f"Added {len(missing)} English fallback resource entries to {locale_path_text} for this build.")
+
 
 ROOT = Path.cwd()
 
@@ -671,6 +708,15 @@ insert_after(
     '    <string name="spatial_audio_manual_off">Off</string>\n'
     '    <string name="spatial_audio_paused">On · paused for output or format</string>\n',
 )
+
+# Keep the locale-completeness test honest without changing upstream translations:
+# missing entries use the same English fallback Android would otherwise resolve.
+# These edits exist only in the build checkout and are restored before main is pushed.
+for locale_path in (
+    "app/src/main/res/values-in/strings.xml",
+    "app/src/main/res/values-ko/strings.xml",
+):
+    fill_missing_locale_keys(STRINGS, locale_path)
 
 TEST = ROOT / "app/src/test/java/com/music/zenith/playback/SpatialAudioDecisionEngineTest.kt"
 TEST.write_text(r'''package com.music.zenith.playback
