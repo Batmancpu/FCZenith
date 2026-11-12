@@ -89,6 +89,8 @@ internal val PILL_GROW_HEIGHT = 9.dp
 internal class GlassPillMotion(
     private val scope: CoroutineScope,
     initialIndex: Int,
+    /** Time stretch for the lift and the glass hand-off: 1 is the tab pill's pace, above 1 slower and softer. */
+    private val slow: Double = 1.0,
 ) {
     /** Where the pill is drawn, in tab steps. */
     var position by mutableFloatStateOf(initialIndex.toFloat())
@@ -210,6 +212,31 @@ internal class GlassPillMotion(
         isFlat = true
     }
 
+    /**
+     * Back from a tab that has no place in this row (Search): the pill starts
+     * at [from], a step past the row where that tab sits, and travels in lifted
+     * like any other move, instead of appearing on the tab with no motion.
+     */
+    fun enterFrom(from: Double, next: Int) {
+        if (reduceMotion) {
+            snapTo(next)
+            return
+        }
+        index = next
+        dragging = false
+        releasedFromDrag = false
+        travelPos = from
+        travelVel = 0.0
+        travelFrom = from
+        travelTarget = next.toDouble()
+        travelSign = signOfTravel(travelTarget - travelFrom)
+        travelActive = true
+        lifted = true
+        isFlat = false
+        publish()
+        start()
+    }
+
     /** A finger has picked the pill up where it stands. */
     fun startDrag() {
         dragging = true
@@ -300,13 +327,13 @@ internal class GlassPillMotion(
             lifted = false
         }
         val liftTarget = if (lifted) 1.0 else 0.0
-        stepLift(liftXPos, liftXVel, liftTarget, dt, LIFT_STIFFNESS, LIFT_DAMPING_X).let {
+        stepLift(liftXPos, liftXVel, liftTarget, dt, LIFT_STIFFNESS / (slow * slow), LIFT_DAMPING_X / slow).let {
             liftXPos = it.first; liftXVel = it.second
         }
-        stepLift(liftYPos, liftYVel, liftTarget, dt, LIFT_STIFFNESS, LIFT_DAMPING_Y).let {
+        stepLift(liftYPos, liftYVel, liftTarget, dt, LIFT_STIFFNESS / (slow * slow), LIFT_DAMPING_Y / slow).let {
             liftYPos = it.first; liftYVel = it.second
         }
-        stepLift(liftPos, liftVel, liftTarget, dt, MATERIAL_STIFFNESS, MATERIAL_DAMPING).let {
+        stepLift(liftPos, liftVel, liftTarget, dt, MATERIAL_STIFFNESS / (slow * slow), MATERIAL_DAMPING / slow).let {
             liftPos = it.first; liftVel = it.second
         }
         val liftSettled = !lifted && liftXPos == 0.0 && liftYPos == 0.0 && liftPos == 0.0
@@ -335,14 +362,14 @@ internal class GlassPillMotion(
 
         // 6) The hand-off rides the same landing as the deflation.
         val handoverTarget = if (lifted) 0.0 else 1.0
-        val tau = if (handoverTarget > handover) HANDOVER_TAU else GLASS_RETURN_TAU
+        val tau = (if (handoverTarget > handover) HANDOVER_TAU else GLASS_RETURN_TAU) * slow
         handover += (handoverTarget - handover) * (1 - exp(-dt / tau))
         if (abs(handoverTarget - handover) < 0.002) handover = handoverTarget
 
         // 7) The frosted blur: off while held, back the instant a finger lets
         // go (a tap's blur returns when its lift is released on landing).
         val blurTarget = if (dragging || (lifted && !releasedFromDrag)) 0.0 else 1.0
-        val blurTau = if (blurTarget > blur) BLUR_RETURN_TAU else BLUR_OFF_TAU
+        val blurTau = (if (blurTarget > blur) BLUR_RETURN_TAU else BLUR_OFF_TAU) * slow
         blur += (blurTarget - blur) * (1 - exp(-dt / blurTau))
         if (abs(blurTarget - blur) < 0.002) blur = blurTarget
 
