@@ -531,7 +531,8 @@ fun <T : Any> IosMenuPopover(
                         backdrop = backdrop,
                         hazeState = hazeState,
                         castsShadow = false,
-                    ),
+                    )
+                    .touchGlow(),
                 propagateMinConstraints = true,
             ) {
                 // The rows in a layer of their own. The frost under them is
