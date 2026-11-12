@@ -119,6 +119,7 @@ private fun SongInfoDialogContent(song: Song, onDismiss: () -> Unit) {
                 .clip(RoundedCornerShape(ALERT_CORNER))
                 .alertGlass(RoundedCornerShape(ALERT_CORNER)),
         ) {
+            Column(Modifier.fillMaxWidth().macOSPopupContent(motion)) {
             Column(
                 Modifier
                     .fillMaxWidth()
@@ -207,6 +208,7 @@ private fun SongInfoDialogContent(song: Song, onDismiss: () -> Unit) {
                 AlertRule()
             }
             AlertAction(label = stringResource(R.string.done), emphasised = true, onClick = motion::requestClose)
+            }
         }
         }
         }
