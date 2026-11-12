@@ -286,6 +286,11 @@ jobs:
 
       - name: Run focused Spatial Audio decision tests
         if: steps.decision.outputs.should_release == 'true'
+        env:
+          FC_VERSION_CODE: ${{ steps.decision.outputs.version_code }}
+          FC_VERSION_NAME: ${{ steps.decision.outputs.version_name }}
+          LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
+          LASTFM_SECRET: ${{ secrets.LASTFM_SECRET }}
         run: |
           set -euo pipefail
           ./gradlew :app:testProdReleaseUnitTest --no-daemon --stacktrace
