@@ -22,6 +22,13 @@ import com.music.zenith.data.model.HomeLayout
 import com.music.zenith.data.sources.SourceKind
 import com.music.zenith.playback.EqLayout
 import com.music.zenith.playback.EqualizerPreset
+import com.music.zenith.playback.SpatialAudioDecision
+import com.music.zenith.playback.SpatialAudioExample
+import com.music.zenith.playback.SpatialAudioFeedback
+import com.music.zenith.playback.SpatialAudioMode
+import com.music.zenith.playback.SpatialAudioPreference
+import com.music.zenith.playback.SpatialAudioProfile
+import com.music.zenith.playback.SpatialAudioTrackRecord
 import com.music.zenith.ui.components.VideoThumbnails
 import kotlinx.coroutines.flow.MutableStateFlow
 
@@ -510,14 +517,17 @@ object AppSettings {
      * pipeline. Not true object-based spatial audio — YouTube only ever hands
      * us a stereo stream, so there's no Atmos-style source to render.
      */
+    /** Legacy Boolean mirror retained for older call sites and preference migration. */
     val spatialAudio = MutableStateFlow(false)
-
-    /**
-     * Per-track override of [spatialAudio], keyed by media id and saved the
-     * moment the player menu's row is tapped. A track without an entry
-     * follows the global switch.
-     */
+    val spatialAudioMode = MutableStateFlow(SpatialAudioMode.AUTO)
     val spatialAudioByTrack = MutableStateFlow<Map<String, Boolean>>(emptyMap())
+    val spatialAudioTrackPreferences = MutableStateFlow<Map<String, SpatialAudioPreference>>(emptyMap())
+    val spatialAudioRecords = MutableStateFlow<Map<String, SpatialAudioTrackRecord>>(emptyMap())
+    val spatialAudioOnPhoneSpeaker = MutableStateFlow(false)
+    val spatialAudioLearningEnabled = MutableStateFlow(true)
+    val spatialAudioCurrentDecision = MutableStateFlow<SpatialAudioDecision?>(null)
+    val spatialAudioCurrentTrackTitle = MutableStateFlow("")
+    val spatialAudioCurrentTrackArtist = MutableStateFlow("")
 
     /**
      * The app's own equaliser, master switch.
@@ -1224,7 +1234,10 @@ object AppSettings {
             .putBoolean(KEY_SKIP_SILENCE, true)
             .putString(KEY_OUTPUT_PCM_MODE, if (floatOk) "FLOAT_32" else "PCM_16")
             .putBoolean(KEY_DIRECT_SOURCE_STREAM, true)
-            .putBoolean(KEY_SPATIAL_AUDIO, true)
+            .putBoolean(KEY_SPATIAL_AUDIO, false)
+            .putString(KEY_SPATIAL_AUDIO_MODE, SpatialAudioMode.AUTO.name)
+            .putBoolean(KEY_SPATIAL_AUDIO_ON_PHONE_SPEAKER, false)
+            .putBoolean(KEY_SPATIAL_AUDIO_LEARNING_ENABLED, true)
             .putString(KEY_QUALITY_CELLULAR, "LOSSLESS")
             .putBoolean(KEY_WIFI_ONLY_DOWNLOADS, false)
             .putBoolean(KEY_EXPORT_DOWNLOADS, true)
@@ -1308,8 +1321,38 @@ object AppSettings {
         loudnessOffOnSpeaker.value = prefs.getBoolean(KEY_LOUDNESS_OFF_ON_SPEAKER, true)
         dolbyAtmos.value = prefs.getBoolean(KEY_DOLBY_ATMOS, true)
         directSourceStream.value = prefs.getBoolean(KEY_DIRECT_SOURCE_STREAM, false)
-        spatialAudio.value = prefs.getBoolean(KEY_SPATIAL_AUDIO, false)
+        spatialAudioMode.value = if (prefs.contains(KEY_SPATIAL_AUDIO_MODE)) {
+            runCatching {
+                SpatialAudioMode.valueOf(
+                    prefs.getString(KEY_SPATIAL_AUDIO_MODE, SpatialAudioMode.AUTO.name) ?: SpatialAudioMode.AUTO.name,
+                )
+            }.getOrDefault(SpatialAudioMode.AUTO)
+        } else if (prefs.contains(KEY_SPATIAL_AUDIO)) {
+            if (prefs.getBoolean(KEY_SPATIAL_AUDIO, false)) SpatialAudioMode.ON else SpatialAudioMode.OFF
+        } else {
+            SpatialAudioMode.AUTO
+        }
+        spatialAudio.value = spatialAudioMode.value != SpatialAudioMode.OFF
         spatialAudioByTrack.value = readSpatialAudioByTrack()
+        spatialAudioRecords.value = readSpatialAudioRecords()
+        spatialAudioTrackPreferences.value = readSpatialAudioTrackPreferences()
+        // Migrate old Boolean per-track overrides into visible feedback records.
+        val migratedRecords = LinkedHashMap(spatialAudioRecords.value)
+        spatialAudioByTrack.value.forEach { (id, enabled) ->
+            if (!migratedRecords.containsKey(id)) {
+                migratedRecords[id] = SpatialAudioTrackRecord(
+                    trackId = id,
+                    title = "",
+                    artist = "",
+                    preference = if (enabled) SpatialAudioPreference.FORCE_ON else SpatialAudioPreference.FORCE_OFF,
+                    feedback = if (enabled) SpatialAudioFeedback.ON else SpatialAudioFeedback.OFF,
+                    updatedAtMs = System.currentTimeMillis(),
+                )
+            }
+        }
+        if (migratedRecords.size != spatialAudioRecords.value.size) persistSpatialAudioRecords(migratedRecords)
+        spatialAudioOnPhoneSpeaker.value = prefs.getBoolean(KEY_SPATIAL_AUDIO_ON_PHONE_SPEAKER, false)
+        spatialAudioLearningEnabled.value = prefs.getBoolean(KEY_SPATIAL_AUDIO_LEARNING_ENABLED, true)
         equalizerEnabled.value = prefs.getBoolean(KEY_EQ_ENABLED, false)
         equalizerMode.value = runCatching {
             EqualizerMode.valueOf(prefs.getString(KEY_EQ_MODE, null) ?: EqualizerMode.DYNAMIC.name)
@@ -1678,25 +1721,289 @@ object AppSettings {
     }
 
     fun setSpatialAudio(value: Boolean) {
-        spatialAudio.value = value
-        prefs.edit().putBoolean(KEY_SPATIAL_AUDIO, value).apply()
+        setSpatialAudioMode(if (value) SpatialAudioMode.ON else SpatialAudioMode.OFF)
     }
 
-    /** Spatial audio for [trackId]: its own saved choice, else the global switch. */
-    fun spatialAudioFor(trackId: String?): Boolean =
-        trackId?.let { spatialAudioByTrack.value[it] } ?: spatialAudio.value
+    fun setSpatialAudioMode(value: SpatialAudioMode) {
+        spatialAudioMode.value = value
+        spatialAudio.value = value != SpatialAudioMode.OFF
+        prefs.edit()
+            .putString(KEY_SPATIAL_AUDIO_MODE, value.name)
+            .putBoolean(KEY_SPATIAL_AUDIO, spatialAudio.value)
+            .apply()
+    }
 
-    /** Saves the choice for [trackId] right away; the oldest entries drop past the cap. */
+    fun setSpatialAudioOnPhoneSpeaker(value: Boolean) {
+        spatialAudioOnPhoneSpeaker.value = value
+        prefs.edit().putBoolean(KEY_SPATIAL_AUDIO_ON_PHONE_SPEAKER, value).apply()
+    }
+
+    fun setSpatialAudioLearningEnabled(value: Boolean) {
+        spatialAudioLearningEnabled.value = value
+        prefs.edit().putBoolean(KEY_SPATIAL_AUDIO_LEARNING_ENABLED, value).apply()
+    }
+
+    /** Compatibility view for older callers; Auto is off until the learner has evidence. */
+    fun spatialAudioFor(trackId: String?): Boolean {
+        val preference = trackId?.let { spatialAudioTrackPreferences.value[it] } ?: SpatialAudioPreference.AUTO
+        return when {
+            spatialAudioMode.value == SpatialAudioMode.OFF -> false
+            preference == SpatialAudioPreference.FORCE_OFF -> false
+            preference == SpatialAudioPreference.FORCE_ON -> true
+            spatialAudioMode.value == SpatialAudioMode.ON -> true
+            else -> false
+        }
+    }
+
+    /** Compatibility wrapper for old Boolean call sites. */
     fun setSpatialAudioForTrack(trackId: String, value: Boolean) {
+        setSpatialAudioPreference(
+            trackId = trackId,
+            title = spatialAudioRecords.value[trackId]?.title.orEmpty(),
+            artist = spatialAudioRecords.value[trackId]?.artist.orEmpty(),
+            preference = if (value) SpatialAudioPreference.FORCE_ON else SpatialAudioPreference.FORCE_OFF,
+        )
+    }
+
+    /** Manual feedback is the only source of labels used by Auto. Auto clears an override, not its label. */
+    fun setSpatialAudioPreference(
+        trackId: String,
+        title: String,
+        artist: String,
+        preference: SpatialAudioPreference,
+    ) {
         if (trackId.isBlank()) return
-        val next = LinkedHashMap(spatialAudioByTrack.value)
-        next.remove(trackId)
-        next[trackId] = value
-        while (next.size > MAX_SPATIAL_TRACKS) next.remove(next.keys.first())
-        spatialAudioByTrack.value = next
+        val previous = spatialAudioRecords.value[trackId] ?: SpatialAudioTrackRecord(trackId, title, artist)
+        val feedback = when (preference) {
+            SpatialAudioPreference.FORCE_ON -> SpatialAudioFeedback.ON
+            SpatialAudioPreference.FORCE_OFF -> SpatialAudioFeedback.OFF
+            SpatialAudioPreference.AUTO -> previous.feedback
+        }
+        val updated = previous.copy(
+            title = title.ifBlank { previous.title },
+            artist = artist.ifBlank { previous.artist },
+            preference = preference,
+            feedback = feedback,
+            updatedAtMs = System.currentTimeMillis(),
+        )
+        val nextRecords = LinkedHashMap(spatialAudioRecords.value)
+        nextRecords[trackId] = updated
+        persistSpatialAudioRecords(nextRecords)
+
+        val nextPreferences = LinkedHashMap(spatialAudioTrackPreferences.value)
+        if (preference == SpatialAudioPreference.AUTO) nextPreferences.remove(trackId)
+        else nextPreferences[trackId] = preference
+        spatialAudioTrackPreferences.value = nextPreferences
+        val preferencesJson = org.json.JSONObject()
+        nextPreferences.forEach { (id, value) -> preferencesJson.put(id, value.name) }
+
+        // Keep the old Boolean map readable by earlier versions and existing backups.
+        val legacy = LinkedHashMap(spatialAudioByTrack.value)
+        when (preference) {
+            SpatialAudioPreference.AUTO -> legacy.remove(trackId)
+            SpatialAudioPreference.FORCE_ON -> legacy[trackId] = true
+            SpatialAudioPreference.FORCE_OFF -> legacy[trackId] = false
+        }
+        while (legacy.size > MAX_SPATIAL_TRACKS) legacy.remove(legacy.keys.first())
+        spatialAudioByTrack.value = legacy
+        val legacyJson = org.json.JSONObject()
+        legacy.forEach { (id, enabled) -> legacyJson.put(id, enabled) }
+        prefs.edit()
+            .putString(KEY_SPATIAL_AUDIO_PREFERENCES, preferencesJson.toString())
+            .putString(KEY_SPATIAL_AUDIO_BY_TRACK, legacyJson.toString())
+            .apply()
+    }
+
+    /** Called after an eight-second mix fingerprint has been computed off the audio buffer. */
+    fun setSpatialAudioProfile(
+        trackId: String,
+        title: String,
+        artist: String,
+        profile: SpatialAudioProfile,
+    ) {
+        if (trackId.isBlank() || !profile.isUsable) return
+        val previous = spatialAudioRecords.value[trackId] ?: SpatialAudioTrackRecord(trackId, title, artist)
+        val updated = previous.copy(
+            title = title.ifBlank { previous.title },
+            artist = artist.ifBlank { previous.artist },
+            profile = profile,
+            updatedAtMs = System.currentTimeMillis(),
+        )
+        val next = LinkedHashMap(spatialAudioRecords.value)
+        next[trackId] = updated
+        persistSpatialAudioRecords(next)
+    }
+
+    /** Explicit feedback and a valid local profile are both required to train Auto. */
+    fun spatialAudioExamples(): List<SpatialAudioExample> =
+        spatialAudioRecords.value.values.mapNotNull { record ->
+            val profile = record.profile?.takeIf { it.isUsable } ?: return@mapNotNull null
+            if (record.feedback == SpatialAudioFeedback.NONE) return@mapNotNull null
+            SpatialAudioExample(record.trackId, record.artist, record.feedback, profile)
+        }
+
+    private fun persistSpatialAudioRecords(records: Map<String, SpatialAudioTrackRecord>) {
+        val bounded = LinkedHashMap<String, SpatialAudioTrackRecord>()
+        records.values.sortedByDescending { it.updatedAtMs }
+            .take(MAX_SPATIAL_AUDIO_RECORDS)
+            .forEach { bounded[it.trackId] = it }
+        spatialAudioRecords.value = bounded
         val json = org.json.JSONObject()
-        next.forEach { (id, on) -> json.put(id, on) }
-        prefs.edit().putString(KEY_SPATIAL_AUDIO_BY_TRACK, json.toString()).apply()
+        bounded.forEach { (id, record) ->
+            val item = org.json.JSONObject()
+                .put("title", record.title)
+                .put("artist", record.artist)
+                .put("preference", record.preference.name)
+                .put("feedback", record.feedback.name)
+                .put("updatedAt", record.updatedAtMs)
+            record.profile?.let { profile ->
+                item.put("profile", org.json.JSONObject()
+                    .put("sampleRateHz", profile.sampleRateHz)
+                    .put("frameCount", profile.frameCount)
+                    .put("stereoWidth", profile.stereoWidth.toDouble())
+                    .put("channelCorrelation", profile.channelCorrelation.toDouble())
+                    .put("lowFrequencySideRatio", profile.lowFrequencySideRatio.toDouble())
+                    .put("highFrequencyRatio", profile.highFrequencyRatio.toDouble())
+                    .put("crestFactor", profile.crestFactor.toDouble())
+                    .put("rms", profile.rms.toDouble()))
+            }
+            json.put(id, item)
+        }
+        prefs.edit().putString(KEY_SPATIAL_AUDIO_RECORDS, json.toString()).apply()
+    }
+
+    private fun readSpatialAudioRecords(): Map<String, SpatialAudioTrackRecord> {
+        val raw = prefs.getString(KEY_SPATIAL_AUDIO_RECORDS, null)
+        val legacyRaw = prefs.getString(KEY_SPATIAL_AUDIO_LEGACY_LEARNING, null)
+        if (raw.isNullOrBlank() && legacyRaw.isNullOrBlank()) return emptyMap()
+
+        return runCatching {
+            val result = LinkedHashMap<String, SpatialAudioTrackRecord>()
+
+            // Current schema first; it always wins over any leftover one-shot data.
+            if (!raw.isNullOrBlank()) {
+                val root = org.json.JSONObject(raw)
+                val keys = root.keys()
+                while (keys.hasNext()) {
+                    val id = keys.next()
+                    val item = root.optJSONObject(id) ?: continue
+                    val preference = runCatching {
+                        SpatialAudioPreference.valueOf(item.optString("preference", SpatialAudioPreference.AUTO.name))
+                    }.getOrDefault(SpatialAudioPreference.AUTO)
+                    val feedback = runCatching {
+                        SpatialAudioFeedback.valueOf(item.optString("feedback", SpatialAudioFeedback.NONE.name))
+                    }.getOrDefault(SpatialAudioFeedback.NONE)
+                    val profileJson = item.optJSONObject("profile")
+                    val profile = profileJson?.let {
+                        SpatialAudioProfile(
+                            sampleRateHz = it.optInt("sampleRateHz", 0),
+                            frameCount = it.optLong("frameCount", 0L),
+                            stereoWidth = it.optDouble("stereoWidth", Double.NaN).toFloat(),
+                            channelCorrelation = it.optDouble("channelCorrelation", Double.NaN).toFloat(),
+                            lowFrequencySideRatio = it.optDouble("lowFrequencySideRatio", Double.NaN).toFloat(),
+                            highFrequencyRatio = it.optDouble("highFrequencyRatio", Double.NaN).toFloat(),
+                            crestFactor = it.optDouble("crestFactor", Double.NaN).toFloat(),
+                            rms = it.optDouble("rms", Double.NaN).toFloat(),
+                        ).takeIf { decoded -> decoded.isUsable }
+                    }
+                    result[id] = SpatialAudioTrackRecord(
+                        trackId = id,
+                        title = item.optString("title", ""),
+                        artist = item.optString("artist", ""),
+                        preference = preference,
+                        feedback = feedback,
+                        profile = profile,
+                        updatedAtMs = item.optLong("updatedAt", 0L),
+                    )
+                }
+            }
+
+            // Migrate the previous one-release experiment's local records. That
+            // version stored only mix statistics and explicit listener feedback.
+            if (!legacyRaw.isNullOrBlank()) {
+                val legacyRoot = org.json.JSONObject(legacyRaw)
+                val keys = legacyRoot.keys()
+                while (keys.hasNext()) {
+                    val id = keys.next()
+                    if (result.containsKey(id)) continue
+                    val item = legacyRoot.optJSONObject(id) ?: continue
+                    val preference = runCatching {
+                        SpatialAudioPreference.valueOf(item.optString("override", SpatialAudioPreference.AUTO.name))
+                    }.getOrDefault(SpatialAudioPreference.AUTO)
+                    val feedback = runCatching {
+                        SpatialAudioPreference.valueOf(item.optString("feedback", SpatialAudioPreference.AUTO.name))
+                    }.getOrDefault(SpatialAudioPreference.AUTO).let {
+                        when (it) {
+                            SpatialAudioPreference.FORCE_ON -> SpatialAudioFeedback.ON
+                            SpatialAudioPreference.FORCE_OFF -> SpatialAudioFeedback.OFF
+                            SpatialAudioPreference.AUTO -> SpatialAudioFeedback.NONE
+                        }
+                    }
+                    val samples = item.optLong("samples", 0L)
+                    val profile = if (samples > 0L) {
+                        SpatialAudioProfile(
+                            sampleRateHz = 48_000,
+                            frameCount = samples,
+                            stereoWidth = item.optDouble("width", Double.NaN).toFloat(),
+                            channelCorrelation = item.optDouble("correlation", Double.NaN).toFloat(),
+                            lowFrequencySideRatio = item.optDouble("lowSide", Double.NaN).toFloat(),
+                            highFrequencyRatio = item.optDouble("highFrequency", Double.NaN).toFloat(),
+                            crestFactor = item.optDouble("crestFactor", Double.NaN).toFloat(),
+                            rms = item.optDouble("rms", Double.NaN).toFloat(),
+                        ).takeIf { decoded -> decoded.isUsable }
+                    } else {
+                        null
+                    }
+                    result[id] = SpatialAudioTrackRecord(
+                        trackId = id,
+                        title = item.optString("title", ""),
+                        artist = item.optString("artist", ""),
+                        preference = preference,
+                        feedback = feedback,
+                        profile = profile,
+                        updatedAtMs = item.optLong("updatedAt", 0L),
+                    )
+                }
+            }
+
+            if (!legacyRaw.isNullOrBlank()) {
+                // Persist the migration before removing the old key so an
+                // interrupted process cannot discard the user's prior choices.
+                persistSpatialAudioRecords(result)
+                prefs.edit().remove(KEY_SPATIAL_AUDIO_LEGACY_LEARNING).apply()
+            }
+            result
+        }.getOrDefault(emptyMap())
+    }
+
+    private fun readSpatialAudioTrackPreferences(): Map<String, SpatialAudioPreference> {
+        val stored = prefs.getString(KEY_SPATIAL_AUDIO_PREFERENCES, null)
+        if (!stored.isNullOrBlank()) {
+            val parsed = runCatching {
+                val json = org.json.JSONObject(stored)
+                val out = LinkedHashMap<String, SpatialAudioPreference>()
+                val keys = json.keys()
+                while (keys.hasNext()) {
+                    val id = keys.next()
+                    val value = runCatching {
+                        SpatialAudioPreference.valueOf(json.optString(id))
+                    }.getOrDefault(SpatialAudioPreference.AUTO)
+                    if (value != SpatialAudioPreference.AUTO) out[id] = value
+                }
+                out
+            }.getOrNull()
+            if (parsed != null) return parsed
+        }
+        val out = LinkedHashMap<String, SpatialAudioPreference>()
+        spatialAudioRecords.value.forEach { (id, record) ->
+            if (record.preference != SpatialAudioPreference.AUTO) out[id] = record.preference
+        }
+        spatialAudioByTrack.value.forEach { (id, enabled) ->
+            if (!out.containsKey(id)) {
+                out[id] = if (enabled) SpatialAudioPreference.FORCE_ON else SpatialAudioPreference.FORCE_OFF
+            }
+        }
+        return out
     }
 
     private fun readSpatialAudioByTrack(): Map<String, Boolean> {
@@ -1704,8 +2011,12 @@ object AppSettings {
         return runCatching {
             val json = org.json.JSONObject(raw)
             val out = LinkedHashMap<String, Boolean>()
-            json.keys().forEach { out[it] = json.getBoolean(it) }
-            out as Map<String, Boolean>
+            val keys = json.keys()
+            while (keys.hasNext()) {
+                val id = keys.next()
+                out[id] = json.getBoolean(id)
+            }
+            out
         }.getOrDefault(emptyMap())
     }
 
@@ -2879,8 +3190,15 @@ object AppSettings {
     private const val KEY_DOLBY_ATMOS = "dolby_atmos"
     private const val KEY_DIRECT_SOURCE_STREAM = "direct_source_stream"
     private const val KEY_SPATIAL_AUDIO = "spatial_audio"
+    private const val KEY_SPATIAL_AUDIO_MODE = "spatial_audio_mode"
     private const val KEY_SPATIAL_AUDIO_BY_TRACK = "spatial_audio_by_track"
+    private const val KEY_SPATIAL_AUDIO_PREFERENCES = "spatial_audio_preferences_v1"
+    private const val KEY_SPATIAL_AUDIO_RECORDS = "spatial_audio_records_v1"
+    private const val KEY_SPATIAL_AUDIO_LEGACY_LEARNING = "spatial_audio_learning_v1"
+    private const val KEY_SPATIAL_AUDIO_ON_PHONE_SPEAKER = "spatial_audio_on_phone_speaker"
+    private const val KEY_SPATIAL_AUDIO_LEARNING_ENABLED = "spatial_audio_learning_enabled"
     private const val MAX_SPATIAL_TRACKS = 5000
+    private const val MAX_SPATIAL_AUDIO_RECORDS = 3000
     private const val KEY_EQ_ENABLED = "equalizer_enabled"
     private const val KEY_EQ_MODE = "equalizer_mode"
     private const val KEY_EQ_TONE_X = "equalizer_tone_x"

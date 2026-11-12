@@ -27,6 +27,200 @@ class SpatialAudioProcessor : BaseAudioProcessor() {
     @Volatile
     var enabled: Boolean = false
 
+    @Volatile
+    var currentTrackId: String? = null
+        private set
+
+    @Volatile
+    var currentTitle: String = ""
+        private set
+
+    @Volatile
+    var currentArtist: String = ""
+        private set
+
+    @Volatile
+    var onProfileReady: ((String, String, String, SpatialAudioProfile) -> Unit)? = null
+
+    private class ProfileAccumulator(
+        val trackId: String,
+        var title: String,
+        var artist: String,
+        var sampleRateHz: Int,
+        var lowpassAlpha: Double,
+        var targetFrames: Long,
+    ) {
+        var frames = 0L
+        var leftSquared = 0.0
+        var rightSquared = 0.0
+        var cross = 0.0
+        var midSquared = 0.0
+        var sideSquared = 0.0
+        var lowMidSquared = 0.0
+        var lowSideSquared = 0.0
+        var highFrequencySquared = 0.0
+        var totalEnergy = 0.0
+        var peakAmplitude = 0.0
+        var lowLeft = 0.0
+        var lowRight = 0.0
+        var completed = false
+    }
+
+    @Volatile
+    private var profileAccumulator: ProfileAccumulator? = null
+
+    @Volatile
+    private var profileLearningAllowed: Boolean = true
+
+    @Volatile
+    var learningEnabled: Boolean = true
+        set(value) {
+            field = value
+            if (!value) {
+                profileAccumulator = null
+            } else if (profileAccumulator == null && profileLearningAllowed) {
+                val id = currentTrackId
+                if (id != null) {
+                    val rate = sampleRate.takeIf { it > 0 } ?: FALLBACK_SAMPLE_RATE
+                    profileAccumulator = ProfileAccumulator(
+                        id, currentTitle, currentArtist, rate, rate.toLong() * PROFILE_SECONDS,
+                    )
+                }
+            }
+        }
+
+    /** Context belongs to this processor/player, not the session player. */
+    fun setTrackContext(
+        trackId: String?,
+        title: String?,
+        artist: String?,
+        allowProfile: Boolean = true,
+    ) {
+        val id = trackId?.takeIf { it.isNotBlank() }
+        profileLearningAllowed = allowProfile
+        if (id == currentTrackId) {
+            currentTitle = title.orEmpty()
+            currentArtist = artist.orEmpty()
+            if (!allowProfile || !learningEnabled) {
+                profileAccumulator = null
+            } else if (profileAccumulator == null && id != null) {
+                profileAccumulator = newProfileAccumulator(id, currentTitle, currentArtist)
+            } else {
+                profileAccumulator?.takeIf { !it.completed }?.let {
+                    it.title = currentTitle
+                    it.artist = currentArtist
+                }
+            }
+            return
+        }
+        currentTrackId = id
+        currentTitle = title.orEmpty()
+        currentArtist = artist.orEmpty()
+        profileAccumulator = if (id == null || !learningEnabled || !allowProfile) {
+            null
+        } else {
+            newProfileAccumulator(id, currentTitle, currentArtist)
+        }
+    }
+
+    private fun newProfileAccumulator(id: String, title: String, artist: String): ProfileAccumulator {
+        val rate = sampleRate.takeIf { it > 0 } ?: FALLBACK_SAMPLE_RATE
+        return ProfileAccumulator(
+            id, title, artist, rate, lowpassAlpha(rate), rate.toLong() * PROFILE_SECONDS,
+        )
+    }
+
+    private fun lowpassAlpha(rate: Int): Double =
+        1.0 - kotlin.math.exp(-2.0 * kotlin.math.PI * LOWPASS_HZ / rate.toDouble())
+
+    private fun observeFloatSamples(block: AudioBlock) {
+        if (!learningEnabled || !profileLearningAllowed) return
+        val accumulator = profileAccumulator ?: return
+        if (accumulator.completed || accumulator.frames >= accumulator.targetFrames) return
+        val count = minOf(
+            block.frameCount,
+            block.samples.size / 2,
+            (accumulator.targetFrames - accumulator.frames).coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
+        )
+        var index = 0
+        repeat(count) {
+            observeFrame(accumulator, block.samples[index].toDouble(), block.samples[index + 1].toDouble())
+            index += 2
+        }
+        finishProfile(accumulator)
+    }
+
+    private fun observePcm16Samples(input: java.nio.ByteBuffer) {
+        if (!learningEnabled || !profileLearningAllowed) return
+        val accumulator = profileAccumulator ?: return
+        if (accumulator.completed || accumulator.frames >= accumulator.targetFrames) return
+        val view = input.duplicate().order(ByteOrder.nativeOrder())
+        val count = minOf(
+            view.remaining() / BYTES_PER_FRAME,
+            (accumulator.targetFrames - accumulator.frames).coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
+        )
+        val scale = 1.0 / 32768.0
+        repeat(count) {
+            observeFrame(accumulator, view.short.toDouble() * scale, view.short.toDouble() * scale)
+        }
+        finishProfile(accumulator)
+    }
+
+    private fun observeFrame(accumulator: ProfileAccumulator, left: Double, right: Double) {
+        val mid = (left + right) * 0.5
+        val side = (left - right) * 0.5
+        accumulator.leftSquared += left * left
+        accumulator.rightSquared += right * right
+        accumulator.cross += left * right
+        accumulator.midSquared += mid * mid
+        accumulator.sideSquared += side * side
+
+        // One-pole low-pass is used only for the fingerprint; samples are untouched.
+        accumulator.lowLeft += accumulator.lowpassAlpha * (left - accumulator.lowLeft)
+        accumulator.lowRight += accumulator.lowpassAlpha * (right - accumulator.lowRight)
+        val lowMid = (accumulator.lowLeft + accumulator.lowRight) * 0.5
+        val lowSide = (accumulator.lowLeft - accumulator.lowRight) * 0.5
+        accumulator.lowMidSquared += lowMid * lowMid
+        accumulator.lowSideSquared += lowSide * lowSide
+        val highLeft = left - accumulator.lowLeft
+        val highRight = right - accumulator.lowRight
+        accumulator.highFrequencySquared += (highLeft * highLeft + highRight * highRight) * 0.5
+        accumulator.totalEnergy += (left * left + right * right) * 0.5
+        accumulator.peakAmplitude = maxOf(accumulator.peakAmplitude, kotlin.math.abs(left), kotlin.math.abs(right))
+        accumulator.frames++
+    }
+
+    private fun finishProfile(accumulator: ProfileAccumulator) {
+        if (accumulator.completed || accumulator.frames < accumulator.targetFrames) return
+        accumulator.completed = true
+        if (profileAccumulator === accumulator) profileAccumulator = null
+
+        val frames = accumulator.frames.toDouble()
+        val rms = kotlin.math.sqrt((accumulator.leftSquared + accumulator.rightSquared) / (2.0 * frames))
+        if (!rms.isFinite() || rms < SpatialAudioProfile.MIN_RMS) return
+        val width = kotlin.math.sqrt(accumulator.sideSquared / (accumulator.midSquared + EPSILON)).coerceIn(0.0, 20.0)
+        val correlation = (accumulator.cross /
+            kotlin.math.sqrt(accumulator.leftSquared * accumulator.rightSquared + EPSILON)).coerceIn(-1.0, 1.0)
+        val lowSide = kotlin.math.sqrt(accumulator.lowSideSquared /
+            (accumulator.lowMidSquared + EPSILON)).coerceIn(0.0, 20.0)
+        val highFrequency = (accumulator.highFrequencySquared /
+            (accumulator.totalEnergy + EPSILON)).coerceIn(0.0, 1.0)
+        val crestFactor = (accumulator.peakAmplitude / rms.coerceAtLeast(EPSILON)).coerceIn(0.0, 100.0)
+        val profile = SpatialAudioProfile(
+            sampleRateHz = accumulator.sampleRateHz,
+            frameCount = accumulator.frames,
+            stereoWidth = width.toFloat(),
+            channelCorrelation = correlation.toFloat(),
+            lowFrequencySideRatio = lowSide.toFloat(),
+            highFrequencyRatio = highFrequency.toFloat(),
+            crestFactor = crestFactor.toFloat(),
+            rms = rms.toFloat(),
+        )
+        if (profile.isUsable) {
+            onProfileReady?.invoke(accumulator.trackId, accumulator.title, accumulator.artist, profile)
+        }
+    }
+
     /**
      * Wet/dry blend: 0 = untouched, 1 = fully widened. Ramps toward [enabled]
      * over [RAMP_MS] so a mid-song toggle doesn't click. Audio thread only.
@@ -63,6 +257,13 @@ class SpatialAudioProcessor : BaseAudioProcessor() {
     fun configure(sampleRate: Int, channelCount: Int) {
         this.sampleRate = sampleRate
         this.channelCount = channelCount
+        if (sampleRate > 0) {
+            profileAccumulator?.takeIf { it.frames == 0L }?.let {
+                it.sampleRateHz = sampleRate
+                it.lowpassAlpha = lowpassAlpha(sampleRate)
+                it.targetFrames = sampleRate.toLong() * PROFILE_SECONDS
+            }
+        }
         if (channelCount != 2 || sampleRate <= 0) {
             delayLeft = FloatArray(0)
             delayRight = FloatArray(0)
@@ -88,6 +289,7 @@ class SpatialAudioProcessor : BaseAudioProcessor() {
     fun process(block: AudioBlock) {
         if (block.frameCount == 0) return
         if (block.channelCount != 2) return // Spatial widening only applies to stereo
+        observeFloatSamples(block)
 
         val delaySize = delayLeft.size
         if (delaySize == 0) return
@@ -192,6 +394,7 @@ class SpatialAudioProcessor : BaseAudioProcessor() {
     override fun queueInput(inputBuffer: java.nio.ByteBuffer) {
         val frameCount = inputBuffer.remaining() / BYTES_PER_FRAME
         if (frameCount == 0) return
+        observePcm16Samples(inputBuffer)
         val outputBuffer = replaceOutputBuffer(frameCount * BYTES_PER_FRAME)
 
         val target = if (enabled) 1f else 0f
@@ -265,5 +468,9 @@ class SpatialAudioProcessor : BaseAudioProcessor() {
         const val BYTES_PER_FRAME = 4 // stereo, 16-bit
         const val DELAY_MS = 15
         const val RAMP_MS = 300f
+        const val PROFILE_SECONDS = 8L
+        const val FALLBACK_SAMPLE_RATE = 48_000
+        const val LOWPASS_HZ = 120.0
+        const val EPSILON = 1.0e-12
     }
 }
