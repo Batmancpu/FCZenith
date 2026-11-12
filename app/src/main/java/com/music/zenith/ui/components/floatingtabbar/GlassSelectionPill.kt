@@ -56,6 +56,7 @@ import com.music.zenith.ui.components.backdrop.effects.blur
 import com.music.zenith.ui.components.backdrop.effects.colorControls
 import com.music.zenith.ui.components.backdrop.Backdrop
 import com.music.zenith.ui.components.backdrop.backdrops.LayerBackdrop
+import com.music.zenith.ui.components.backdrop.backdrops.emptyBackdrop
 import com.music.zenith.ui.components.backdrop.drawBackdrop
 import com.music.zenith.ui.components.backdrop.effects.lens
 import com.music.zenith.ui.components.backdrop.highlight.Highlight
@@ -694,10 +695,13 @@ internal fun GlassSelectionPill(
     val edge = if (darkGlass) {
         Color.White.copy(alpha = BAR_RIM_ALPHA)
     } else {
-        Color.Black.copy(alpha = BAR_RIM_ALPHA * 0.45f)
+        Color.Black.copy(alpha = BAR_RIM_ALPHA * 0.7f)
     }
-    val backdrop = remember(page, barGlass, tabRow, fillColor, iconTint, edge) {
-        SelectionPillBackdrop(page, barGlass, tabRow, iconTint, edge) {
+    // The tab row is drawn on top of the lens, not through it: refracting it
+    // stretched the glyphs and flipped the labels near the pill's edge.
+    val tabsBackdrop = remember(tabRow, iconTint) { PillTabsBackdrop(tabRow, iconTint) }
+    val backdrop = remember(page, barGlass, fillColor, edge) {
+        SelectionPillBackdrop(page, barGlass, emptyBackdrop(), Color.Unspecified, edge) {
             fillColor.copy(alpha = fillColor.alpha * (1f - motion.material))
         }
     }
@@ -734,7 +738,17 @@ internal fun GlassSelectionPill(
                 )
             },
         ),
-    )
+    ) {
+        Box(
+            Modifier.matchParentSize().drawBackdrop(
+                backdrop = tabsBackdrop,
+                shape = { shape },
+                effects = {},
+                highlight = null,
+                shadow = null,
+            ),
+        )
+    }
 }
 
 /**
@@ -869,6 +883,27 @@ private fun DrawScope.drawBarRim(bar: LayerBackdrop, coordinates: LayoutCoordina
             cornerRadius = CornerRadius(radius - strokeWidth / 2f, radius - strokeWidth / 2f),
             style = Stroke(width = strokeWidth),
         )
+    }
+}
+
+/** The tab row under the lifted pill, masked to [tint] when set, with no refraction. */
+private class PillTabsBackdrop(
+    private val tabs: Backdrop,
+    private val tint: Color,
+) : Backdrop {
+
+    override val isCoordinatesDependent: Boolean = true
+
+    override fun DrawScope.drawBackdrop(
+        density: Density,
+        coordinates: LayoutCoordinates?,
+        layerBlock: (GraphicsLayerScope.() -> Unit)?,
+    ) {
+        if (tint != Color.Unspecified) {
+            drawTinted(tint) { with(tabs) { drawBackdrop(density, coordinates, layerBlock) } }
+        } else {
+            with(tabs) { drawBackdrop(density, coordinates, layerBlock) }
+        }
     }
 }
 
