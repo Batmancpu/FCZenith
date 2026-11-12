@@ -74,6 +74,9 @@ import androidx.compose.ui.unit.max
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import com.music.zenith.R
 import com.music.zenith.data.model.Account
@@ -662,7 +665,20 @@ fun TopBarAccountButton(
         animationSpec = tween(durationMillis = if (hidden) 70 else 180),
         label = "accountButtonVisibility",
     )
-    val extraActions = LocalActionsExtraFraction.current
+    val rawExtraActions = LocalActionsExtraFraction.current
+    // Pecahan mentah melompat dalam satu frame saat aksi lain (share, unduhan)
+    // muncul, padahal pil kaca tumbuh dengan pegas. Dihaluskan dengan pegas yang
+    // sama supaya foto profil mengecil mengikuti pil, bukan loncat.
+    val extraSmooth = remember { Animatable(rawExtraActions().coerceIn(0f, 1f)) }
+    LaunchedEffect(rawExtraActions) {
+        snapshotFlow { rawExtraActions().coerceIn(0f, 1f) }.collectLatest { target ->
+            extraSmooth.animateTo(
+                target,
+                spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow),
+            )
+        }
+    }
+    val extraActions = remember { { extraSmooth.value } }
     val scope = rememberCoroutineScope()
     // Wrapped in an IconButton so it keeps the touch target, the ripple and the
     // spacing every other action in this bar has.
