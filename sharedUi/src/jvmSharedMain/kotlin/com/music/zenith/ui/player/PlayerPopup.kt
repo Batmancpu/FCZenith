@@ -33,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -50,21 +51,23 @@ internal val POPUP_SHAPE = RoundedCornerShape(30.dp)
 internal val POPUP_MAX_WIDTH = 420.dp
 
 /** How long the popup takes to leave, and so how long [PlayerPopup] waits before telling its caller. */
-private const val POPUP_EXIT_MS = 150
+private const val POPUP_EXIT_MS = 200
 
 /** Where the jelly starts: narrower and flatter than it ends up, so it swells into place. */
-private const val POPUP_ENTER_SCALE_X = 0.84f
-private const val POPUP_ENTER_SCALE_Y = 0.78f
+private const val POPUP_ENTER_SCALE_X = 0.88f
+private const val POPUP_ENTER_SCALE_Y = 0.82f
 
 /** Where it shrinks to on the way out. */
-private const val POPUP_EXIT_SCALE = 0.9f
+private const val POPUP_EXIT_SCALE_X = 0.93f
+private const val POPUP_EXIT_SCALE_Y = 0.88f
 
 /**
  * A floating card over a dimmed player, the popup counterpart of [PlayerDrawer].
  *
  * It opens like a jelly: width and height spring on their own, loosely, so the
- * card overshoots, squashes and settles rather than sliding in. It leaves the way
- * a macOS popover does — a quick shrink and fade with no bounce. Tapping outside
+ * card overshoots, squashes and settles rather than sliding in. Both ways it
+ * also moves like a macOS popover: it grows out of, and shrinks back toward, the
+ * low edge where the controls are, fading as it goes. Tapping outside
  * or pressing back closes it; the exit is played before [onDismiss] is called,
  * because the caller removes the popup from the tree the moment it runs.
  */
@@ -98,12 +101,12 @@ internal fun PlayerPopup(
 
     val popScaleX by animateFloatAsState(
         targetValue = when {
-            closing -> POPUP_EXIT_SCALE
+            closing -> POPUP_EXIT_SCALE_X
             shown -> 1f
             else -> POPUP_ENTER_SCALE_X
         },
         animationSpec = if (closing) {
-            tween(POPUP_EXIT_MS, easing = FastOutLinearInEasing)
+            spring(dampingRatio = 0.55f, stiffness = 800f)
         } else {
             spring(dampingRatio = 0.46f, stiffness = 420f)
         },
@@ -113,12 +116,12 @@ internal fun PlayerPopup(
     // card wobbles instead of just scaling.
     val popScaleY by animateFloatAsState(
         targetValue = when {
-            closing -> POPUP_EXIT_SCALE
+            closing -> POPUP_EXIT_SCALE_Y
             shown -> 1f
             else -> POPUP_ENTER_SCALE_Y
         },
         animationSpec = if (closing) {
-            tween(POPUP_EXIT_MS, easing = FastOutLinearInEasing)
+            spring(dampingRatio = 0.50f, stiffness = 650f)
         } else {
             spring(dampingRatio = 0.40f, stiffness = 300f)
         },
@@ -160,6 +163,7 @@ internal fun PlayerPopup(
                     scaleX = popScaleX
                     scaleY = popScaleY
                     alpha = popAlpha
+                    transformOrigin = TransformOrigin(0.5f, 0.9f)
                 }
                 .clip(POPUP_SHAPE)
                 .then(
