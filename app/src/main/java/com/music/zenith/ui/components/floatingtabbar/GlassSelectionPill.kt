@@ -681,8 +681,8 @@ internal fun GlassSelectionPill(
             effects = {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     lens(
-                        refractionHeight = LENS_HEIGHT.toPx() * motion.glassPresence,
-                        refractionAmount = LENS_AMOUNT.toPx() * motion.material,
+                        refractionHeight = PILL_LENS_HEIGHT.toPx() * motion.glassPresence,
+                        refractionAmount = PILL_LENS_AMOUNT.toPx() * motion.material,
                         depthEffect = true,
                         chromaticAberration = true,
                     )
@@ -703,6 +703,15 @@ internal fun GlassSelectionPill(
         ),
     )
 }
+
+/**
+ * The pill's lens, with the numbers of Kyant's Glass Bottom Bar tutorial:
+ * `lens(16dp, 32dp)`. The amount is twice the height, so the band along the
+ * edge is narrow but bends hard, which is what makes the bar's top and bottom
+ * edges visibly warp where the pill stands past them.
+ */
+private val PILL_LENS_HEIGHT = 16.dp
+private val PILL_LENS_AMOUNT = 32.dp
 
 /** The rim and its shadow are gone by the time the hand-off is 55% through. */
 private fun rimOf(presence: Float): Float = ((presence - 0.45f) / 0.55f).coerceIn(0f, 1f)

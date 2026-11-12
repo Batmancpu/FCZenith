@@ -1512,6 +1512,8 @@
     <string name="glass_preset_default_subtitle">Tampilan kaca bawaan Zenith</string>
     <string name="glass_preset_liquid">Liquid Glass</string>
     <string name="glass_preset_liquid_subtitle">Gaya Kyant0 backdrop: wadah lebih pekat, refraksi tajam tanpa pelangi</string>
+    <string name="glass_preset_bottom_bar">Glass Bottom Bar</string>
+    <string name="glass_preset_bottom_bar_subtitle">Gaya tutorial Kyant0: blur tipis, tepi melengkung kuat, permukaan 50%</string>
     <string name="glass_section_color">Blur &amp; warna</string>
     <string name="glass_section_refraction">Refraksi (pembiasan cahaya)</string>
     <string name="glass_section_edge">Tepi &amp; bayangan</string>

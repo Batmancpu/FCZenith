@@ -3501,11 +3501,13 @@ private fun LiquidGlassSettingsContent() {
 private fun GlassPreset.titleRes(): Int = when (this) {
     GlassPreset.DEFAULT -> R.string.glass_preset_default
     GlassPreset.LIQUID -> R.string.glass_preset_liquid
+    GlassPreset.BOTTOM_BAR -> R.string.glass_preset_bottom_bar
 }
 
 private fun GlassPreset.subtitleRes(): Int = when (this) {
     GlassPreset.DEFAULT -> R.string.glass_preset_default_subtitle
     GlassPreset.LIQUID -> R.string.glass_preset_liquid_subtitle
+    GlassPreset.BOTTOM_BAR -> R.string.glass_preset_bottom_bar_subtitle
 }
 
 /** Satu baris slider: judul dan nilai di atas, slider di bawah, [below] opsional di bawah slider. */

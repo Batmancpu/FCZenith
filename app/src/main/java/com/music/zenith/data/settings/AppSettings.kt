@@ -187,6 +187,27 @@ enum class GlassPreset(
             shadow = 1f,
             quality = 1.5f,
         ),
+    ),
+
+    /**
+     * Mengikuti tutorial Glass Bottom Bar Kyant0: vibrancy, blur 4dp (0.4 dari
+     * 10dp), lens(16dp, 32dp) (lebar 16/24, kekuatan 32/24 dari 24dp bawaan),
+     * permukaan 50% (0.5 / 0.30 bawaan), tanpa pelangi dan depth.
+     */
+    BOTTOM_BAR(
+        level = GlassClarity.BALANCED_LEVEL,
+        custom = GlassCustom(
+            blur = 0.4f,
+            saturation = 1f,
+            tint = 5f / 3f,
+            refraction = 4f / 3f,
+            refractionWidth = 2f / 3f,
+            depth = false,
+            rainbow = 0f,
+            rim = 1f,
+            shadow = 1f,
+            quality = 1.5f,
+        ),
     );
 
     fun matches(level: Float, custom: GlassCustom, frosted: Boolean): Boolean =
