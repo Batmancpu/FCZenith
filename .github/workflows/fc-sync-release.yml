@@ -451,25 +451,39 @@ jobs:
             app/src/main/res/mipmap-xxxhdpi/ic_launcher.webp app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.webp
           rm -f app/src/main/res/drawable-nodpi/fc_music_icon.webp
 
-      - name: Restore the one-shot build safeguards
+      - name: Restore one-shot app changes to the upstream source
         if: steps.decision.outputs.should_release == 'true' && always()
+        env:
+          UPSTREAM_COMMIT: ${{ steps.upstream.outputs.commit }}
+        shell: bash
         run: |
           set -euo pipefail
-          git restore --worktree -- \
-            app/src/main/java/com/music/zenith/data/settings/AppSettings.kt \
-            app/src/main/java/com/music/zenith/playback/PlaybackService.kt \
-            app/src/main/java/com/music/zenith/playback/SpatialAudioLearning.kt \
-            app/src/main/java/com/music/zenith/playback/SpatialAudioProcessor.kt \
-            app/src/main/java/com/music/zenith/ui/components/SongActionsMenu.kt \
-            app/src/main/java/com/music/zenith/MainActivity.kt \
-            app/src/main/java/com/music/zenith/ui/screens/SettingsSheet.kt \
-            app/src/main/res/values/strings.xml \
-            app/src/main/res/values-in/strings.xml \
-            app/src/main/res/values-ko/strings.xml \
+          restore_paths=(
+            app/src/main/java/com/music/zenith/MainActivity.kt
+            app/src/main/java/com/music/zenith/data/settings/AppSettings.kt
+            app/src/main/java/com/music/zenith/playback/PlaybackService.kt
+            app/src/main/java/com/music/zenith/playback/SpatialAudioProcessor.kt
+            app/src/main/java/com/music/zenith/ui/components/SongActionsMenu.kt
+            app/src/main/java/com/music/zenith/ui/screens/SettingsSheet.kt
+            app/src/main/res/values/strings.xml
+            app/src/main/res/values-in/strings.xml
+            app/src/main/res/values-ko/strings.xml
+            app/src/main/java/com/music/zenith/playback/SpatialAudioLearning.kt
+            app/src/main/java/com/music/zenith/playback/SpatialAudioPreference.kt
+            app/src/main/java/com/music/zenith/playback/SpatialAudioDecisionEngine.kt
+            app/src/main/java/com/music/zenith/TopBarActionVisibility.kt
             app/src/test/java/com/music/zenith/playback/SpatialAudioLearningTest.kt
-          rm -f app/src/main/java/com/music/zenith/playback/SpatialAudioDecisionEngine.kt
-          rm -f app/src/test/java/com/music/zenith/playback/SpatialAudioDecisionEngineTest.kt
-          rm -f app/src/main/java/com/music/zenith/TopBarActionVisibility.kt
+            app/src/test/java/com/music/zenith/playback/SpatialAudioPreferenceTest.kt
+            app/src/test/java/com/music/zenith/playback/SpatialAudioDecisionEngineTest.kt
+          )
+          for path in "${restore_paths[@]}"; do
+            if git cat-file -e "${UPSTREAM_COMMIT}:${path}" 2>/dev/null; then
+              git restore --source="${UPSTREAM_COMMIT}" --staged --worktree -- "${path}"
+            else
+              git rm --cached --ignore-unmatch -- "${path}" >/dev/null 2>&1 || true
+              rm -f "${path}"
+            fi
+          done
 
       - name: Commit the upstream sync and FC version metadata to main
         if: steps.decision.outputs.should_release == 'true'
@@ -537,8 +551,8 @@ jobs:
             exit 1
           fi
           rm -rf "$overlay"
-          rm -f app/src/main/java/com/music/zenith/playback/SpatialAudioPreference.kt
-          rm -f app/src/test/java/com/music/zenith/playback/SpatialAudioPreferenceTest.kt
-          git add -A fc/one-shot/spatial-audio app/src/main/java/com/music/zenith/playback/SpatialAudioPreference.kt app/src/test/java/com/music/zenith/playback/SpatialAudioPreferenceTest.kt
-          git commit -m "chore(fc): retire delivered one-shot Spatial Audio learner"
-          git push origin HEAD:main
+          git add -A fc/one-shot/spatial-audio
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(fc): retire delivered one-shot Spatial Audio overlay"
+            git push origin HEAD:main
+          fi

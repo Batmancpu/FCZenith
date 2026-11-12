@@ -3425,47 +3425,16 @@ class PlaybackService : MediaLibraryService() {
         filter: TransitionFilterProcessor,
         loudness: LoudnessProcessor,
         ownsSession: Boolean,
-    ): ExoPlayer {
-        spatial.onProfileReady = { trackId, title, artist, profile ->
-            // JSON persistence and feature-index rebuilding never run on the
-            // audio callback or UI thread.
-            scope.launch(Dispatchers.IO) {
-                AppSettings.setSpatialAudioProfile(trackId, title, artist, profile)
-            }
-        }
-        val built = ExoPlayer.Builder(this)
-            .setRenderersFactory(silenceSkippingRenderers(spatial, equalizer, filter, loudness))
-            .setMediaSourceFactory(requireNotNull(mediaSourceFactory))
-            .setLoadControl(farBufferingLoadControl())
-            .setAudioAttributes(AUDIO_ATTRIBUTES, /* handleAudioFocus = */ ownsSession)
-            .setHandleAudioBecomingNoisy(ownsSession)
-            // Back restarts the track once you're this far into it; only a
-            // press before that steps to the previous one.
-            .setMaxSeekToPreviousPositionMs(BACK_RESTARTS_AFTER_MS)
-            .build()
-
-        // Each player's processor owns its own current track. During a crossfade
-        // both players can render different tracks simultaneously.
-        built.addListener(object : Player.Listener {
-            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-                val song = mediaItem?.toSong()
-                val trackId = mediaItem?.mediaId?.takeIf { it.isNotBlank() }
-                    ?: song?.videoId?.takeIf { it.isNotBlank() }
-                val isAtmos = trackId?.let { NerdStats.declaredFormat(it)?.isDolbyAtmos == true } == true
-                val alreadyProfiled = trackId?.let {
-                    AppSettings.spatialAudioRecords.value[it]?.profile?.isUsable == true
-                } == true
-                spatial.setTrackContext(
-                    trackId = trackId,
-                    title = song?.title,
-                    artist = song?.artist,
-                    allowProfile = !isAtmos && !alreadyProfiled,
-                )
-                applySpatialAudioEnabled(trackId)
-            }
-        })
-        return built
-    }
+    ): ExoPlayer = ExoPlayer.Builder(this)
+        .setRenderersFactory(silenceSkippingRenderers(spatial, equalizer, filter, loudness))
+        .setMediaSourceFactory(requireNotNull(mediaSourceFactory))
+        .setLoadControl(farBufferingLoadControl())
+        .setAudioAttributes(AUDIO_ATTRIBUTES, /* handleAudioFocus = */ ownsSession)
+        .setHandleAudioBecomingNoisy(ownsSession)
+        // Back restarts the track once you're this far into it; only a
+        // press before that steps to the previous one.
+        .setMaxSeekToPreviousPositionMs(BACK_RESTARTS_AFTER_MS)
+        .build()
 
     /**
      * Moves the session onto the player the crossfade has just started the
@@ -7257,16 +7226,9 @@ class PlaybackService : MediaLibraryService() {
         }
         scope.launch {
             combine(
-                AppSettings.spatialAudioMode,
-                AppSettings.spatialAudioTrackPreferences,
-                AppSettings.spatialAudioRecords,
-                AppSettings.spatialAudioTrainingExamples,
-            ) { _, _, _, _ -> Unit }
-                .combine(AppSettings.spatialAudioOnPhoneSpeaker) { _, _ -> Unit }
-                .combine(AppSettings.spatialAudioLearningEnabled) { _, _ -> Unit }
-                .combine(
-                    AudioOutputStatus.current.map { it.routeKind to it.dspAvailable }.distinctUntilChanged(),
-                ) { _, _ -> Unit }
+                AppSettings.spatialAudio,
+                AppSettings.spatialAudioByTrack,
+            ) { global, perTrack -> global to perTrack }
                 .collect { applySpatialAudioEnabled() }
         }
         scope.launch {
@@ -7333,69 +7295,18 @@ class PlaybackService : MediaLibraryService() {
     }
 
     /**
-     * Resolve each renderer independently. During crossfades the two player
-     * processors may be on different tracks and must never share one decision.
+     * The effective spatial-audio state: the user's toggle, unless the
+     * active player's decoder is currently on a Dolby Atmos (E-AC-3 JOC)
+     * stream, in which case it's forced off. [activeTrackIsDolbyAtmos] only
+     * ever describes the active player — see [formatListener] — so both
+     * processors are kept in lockstep rather than tracking a role swap.
      */
     private fun applySpatialAudioEnabled(
         mediaId: String? = player?.currentMediaItem?.mediaId,
     ) {
-        val route = AudioOutputStatus.current.value.routeKind
-        val dspAvailable = AudioOutputStatus.current.value.dspAvailable
-        val examples = AppSettings.spatialAudioExamples()
-        val mode = AppSettings.spatialAudioMode.value
-        val allowPhoneSpeaker = AppSettings.spatialAudioOnPhoneSpeaker.value
-        val learningEnabled = AppSettings.spatialAudioLearningEnabled.value
-
-        fun resolve(processor: SpatialAudioProcessor): SpatialAudioDecision? {
-            if (processor.learningEnabled != learningEnabled) {
-                processor.learningEnabled = learningEnabled
-            }
-            val trackId = processor.currentTrackId ?: return null
-            val preference = AppSettings.spatialAudioTrackPreferences.value[trackId]
-                ?: SpatialAudioPreference.AUTO
-            val record = AppSettings.spatialAudioRecords.value[trackId]
-            val activeMediaId = player?.currentMediaItem?.mediaId
-            val atmos = NerdStats.declaredFormat(trackId)?.isDolbyAtmos == true ||
-                (trackId == activeMediaId && activeTrackIsDolbyAtmos)
-            if (atmos) {
-                // A late format report can identify Atmos after item transition.
-                // Stop profiling that stream rather than storing its decoded mix
-                // as an ordinary stereo preference example.
-                processor.setTrackContext(trackId, processor.currentTitle, processor.currentArtist, allowProfile = false)
-            }
-            return SpatialAudioLearner.decide(
-                mode = mode,
-                preference = preference,
-                profile = record?.profile,
-                artist = processor.currentArtist,
-                examples = examples,
-                learningEnabled = learningEnabled,
-                isPhoneSpeaker = route == AudioRouting.Kind.PHONE,
-                allowOnPhoneSpeaker = allowPhoneSpeaker,
-                isDolbyAtmos = atmos,
-                dspAvailable = dspAvailable,
-            )
-        }
-
-        val decisionA = resolve(spatialAudioProcessorA)
-        val decisionB = resolve(spatialAudioProcessorB)
-        spatialAudioProcessorA.enabled = decisionA?.enabled == true
-        spatialAudioProcessorB.enabled = decisionB?.enabled == true
-
-        val activeId = player?.currentMediaItem?.mediaId ?: mediaId
-        val activeProcessor = when (activeId) {
-            spatialAudioProcessorA.currentTrackId -> spatialAudioProcessorA
-            spatialAudioProcessorB.currentTrackId -> spatialAudioProcessorB
-            else -> null
-        }
-        val activeDecision = when (activeProcessor) {
-            spatialAudioProcessorA -> decisionA
-            spatialAudioProcessorB -> decisionB
-            else -> null
-        }
-        AppSettings.spatialAudioCurrentTrackTitle.value = activeProcessor?.currentTitle.orEmpty()
-        AppSettings.spatialAudioCurrentTrackArtist.value = activeProcessor?.currentArtist.orEmpty()
-        AppSettings.spatialAudioCurrentDecision.value = activeDecision
+        val enabled = AppSettings.spatialAudioFor(mediaId) && !activeTrackIsDolbyAtmos
+        spatialAudioProcessorA.enabled = enabled
+        spatialAudioProcessorB.enabled = enabled
     }
 
     /**

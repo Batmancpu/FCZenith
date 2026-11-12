@@ -68,7 +68,6 @@ import com.music.zenith.data.webdav.WebDavUploads
 import com.music.zenith.download.DownloadState
 import com.music.zenith.download.Downloads
 import com.music.zenith.playback.SleepTimer
-import com.music.zenith.playback.SpatialAudioPreference
 import com.music.zenith.ui.components.thumbnailBorder
 import com.music.zenith.ui.theme.ArtworkPalette
 import kotlinx.coroutines.delay
@@ -177,9 +176,9 @@ fun SongActionsMenu(
      * Flips spatial audio for the playing track and saves the choice for it.
      * Null hides the row; only the player's menu offers it.
      */
-    onSetSpatialAudioPreference: ((SpatialAudioPreference) -> Unit)? = null,
-    /** The track-level override; Auto clears its override but keeps prior feedback. */
-    spatialAudioPreference: SpatialAudioPreference = SpatialAudioPreference.AUTO,
+    onToggleSpatialAudio: (() -> Unit)? = null,
+    /** The track's effective spatial-audio state, so the row offers the opposite. */
+    spatialAudioOn: Boolean = false,
     /**
      * True while a lookup for this track's album/artist ids is still in
      * flight, so it isn't yet known whether "Open album" and "Open artist"
@@ -390,7 +389,7 @@ fun SongActionsMenu(
 
         // The player's own: about the track playing right now rather than
         // about the song as a thing in a library.
-        if (showSleepTimer || onLyricsOffset != null || onCopyLog != null || onSetSpatialAudioPreference != null) {
+        if (showSleepTimer || onLyricsOffset != null || onCopyLog != null || onToggleSpatialAudio != null) {
             if (startsGroup()) IosMenuSeparator()
             if (showSleepTimer) {
                 ActionRow(
@@ -408,25 +407,16 @@ fun SongActionsMenu(
                     accent = palette.accent,
                 ) { pickingSleepTimer = true }
             }
-            // Per-track Auto / On / Off; it never changes the global preference.
-            onSetSpatialAudioPreference?.let { setPreference ->
-                val nextPreference = when (spatialAudioPreference) {
-                    SpatialAudioPreference.AUTO -> SpatialAudioPreference.FORCE_ON
-                    SpatialAudioPreference.FORCE_ON -> SpatialAudioPreference.FORCE_OFF
-                    SpatialAudioPreference.FORCE_OFF -> SpatialAudioPreference.AUTO
-                }
+            // Stays open after a tap: the label flips in place and the change
+            // is audible at once, so the two settings can be compared by ear.
+            onToggleSpatialAudio?.let {
                 ActionRow(
                     icon = SfIcons.SurroundSound,
-                    label = stringResource(R.string.spatial_audio),
-                    value = stringResource(
-                        when (spatialAudioPreference) {
-                            SpatialAudioPreference.AUTO -> R.string.spatial_audio_mode_auto
-                            SpatialAudioPreference.FORCE_ON -> R.string.spatial_audio_mode_on
-                            SpatialAudioPreference.FORCE_OFF -> R.string.spatial_audio_mode_off
-                        },
+                    label = stringResource(
+                        if (spatialAudioOn) R.string.spatial_audio_prefer_off else R.string.spatial_audio_prefer_on,
                     ),
                     accent = palette.accent,
-                    onClick = { setPreference(nextPreference) },
+                    onClick = it,
                 )
             }
             // Local files and completed downloads use the same player lyric

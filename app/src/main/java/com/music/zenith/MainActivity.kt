@@ -216,7 +216,6 @@ import com.music.zenith.playback.toggleShuffle
 import com.music.zenith.playback.upgradeQuality
 import com.music.zenith.playback.revertToOriginal
 import com.music.zenith.playback.swapToVersion
-import com.music.zenith.playback.SpatialAudioPreference
 import com.music.zenith.playback.smart.VersionAudioAligner
 import com.music.zenith.download.DownloadStore
 import com.music.zenith.download.MediaTagger
@@ -4793,8 +4792,9 @@ private fun ZenithApp(
                 value = song.localUri == null &&
                     withContext(Dispatchers.IO) { AudioCache.holds(song.videoId) }
             }
-            val trackSpatialPreferences by AppSettings.spatialAudioTrackPreferences.collectAsStateWithLifecycle()
-            val spatialAudioPreference = trackSpatialPreferences[song.videoId] ?: SpatialAudioPreference.AUTO
+            val trackSpatialOverrides by AppSettings.spatialAudioByTrack.collectAsStateWithLifecycle()
+            val spatialAudioGlobal by AppSettings.spatialAudio.collectAsStateWithLifecycle()
+            val spatialAudioOn = trackSpatialOverrides[song.videoId] ?: spatialAudioGlobal
             SongActionsMenu(
                 song = song,
                 signedIn = signedIn,
@@ -5015,19 +5015,12 @@ private fun ZenithApp(
                 } else {
                     null
                 },
-                onSetSpatialAudioPreference = if (fromPlayer && song.videoId.isNotBlank()) {
-                    { preference ->
-                        AppSettings.setSpatialAudioPreference(
-                            trackId = song.videoId,
-                            title = song.title,
-                            artist = song.artist,
-                            preference = preference,
-                        )
-                    }
+                onToggleSpatialAudio = if (fromPlayer && song.videoId.isNotBlank()) {
+                    { AppSettings.setSpatialAudioForTrack(song.videoId, !spatialAudioOn) }
                 } else {
                     null
                 },
-                spatialAudioPreference = spatialAudioPreference,
+                spatialAudioOn = spatialAudioOn,
             )
         }
         // ---- Now Playing ----

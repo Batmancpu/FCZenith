@@ -170,9 +170,6 @@ import com.music.zenith.data.settings.GlassIndicator
 import com.music.zenith.data.settings.GlassPreset
 import com.music.zenith.data.settings.BitPerfectMode
 import com.music.zenith.playback.AudioOutputStatus
-import com.music.zenith.playback.SpatialAudioFeedback
-import com.music.zenith.playback.SpatialAudioMode
-import com.music.zenith.playback.SpatialAudioDecisionReason
 import com.music.zenith.playback.audio.bitperfect.BitPerfectOutput
 import com.music.zenith.data.settings.AutomixPerformanceMode
 import com.music.zenith.R
@@ -262,7 +259,7 @@ fun SettingsScreen(
     // against a key that can never change — see [DeviceCodecs.playsDolbyAtmos],
     // which caches the codec-list walk for the life of the process.
     val dolbyAtmosSupported = DeviceCodecs.playsDolbyAtmos
-    val spatialAudioMode by AppSettings.spatialAudioMode.collectAsStateWithLifecycle()
+    val spatialAudio by AppSettings.spatialAudio.collectAsStateWithLifecycle()
     val nerdStats by AppSettings.showNerdStats.collectAsStateWithLifecycle()
     val listenTogetherButton by AppSettings.showListenTogetherButton.collectAsStateWithLifecycle()
     val listenTogetherTab by AppSettings.showListenTogetherTab.collectAsStateWithLifecycle()
@@ -1014,25 +1011,31 @@ fun SettingsScreen(
                 }
             }
             val spatialAudioTitle = stringResource(R.string.spatial_audio)
-            val spatialAudioModeLabel = stringResource(
-                when (spatialAudioMode) {
-                    SpatialAudioMode.AUTO -> R.string.spatial_audio_mode_auto
-                    SpatialAudioMode.ON -> R.string.spatial_audio_mode_on
-                    SpatialAudioMode.OFF -> R.string.spatial_audio_mode_off
-                },
-            )
-            row(spatialAudioTitle, "surround", "3d", "spatial audio preference", "learning") {
+            row(spatialAudioTitle, "surround", "3d") {
                 BypassedByBitPerfect(bitPerfectReady) {
                     SettingsRow(
                         icon = SfIcons.SurroundSound,
                         title = spatialAudioTitle,
+                        // Widening a JOC stream would fight the object-based mix
+                        // Dolby has already spatialized, so the service holds this
+                        // off for the duration of an Atmos track — see
+                        // `PlaybackService.applySpatialAudioEnabled`. Said on the
+                        // row because the switch stays where the listener left it,
+                        // and a switch reading "on" over an effect that is not
+                        // running is the same silent lie the equaliser screen used
+                        // to tell.
                         subtitle = if (playingDolbyAtmos) {
                             stringResource(R.string.spatial_audio_atmos_subtitle)
                         } else {
-                            stringResource(R.string.spatial_audio_settings_subtitle)
+                            stringResource(R.string.spatial_audio_subtitle)
                         },
-                        value = spatialAudioModeLabel,
-                        onClick = { onOpenChoice(SettingsChoiceKind.SPATIAL_AUDIO) },
+                        trailing = {
+                            IosSwitch(
+                                checked = spatialAudio,
+                                onCheckedChange = AppSettings::setSpatialAudio,
+                            )
+                        },
+                        onClick = { AppSettings.setSpatialAudio(!spatialAudio) },
                     )
                 }
             }
@@ -3222,7 +3225,6 @@ enum class SettingsChoiceKind(@param:StringRes val title: Int) {
     DOWNLOAD_QUALITY(R.string.download_quality),
     AUTOMIX_PERFORMANCE(R.string.automix_performance),
     BIT_PERFECT(R.string.bit_perfect_output),
-    SPATIAL_AUDIO(R.string.spatial_audio),
     FONT(R.string.font),
     ACCENT(R.string.accent_color),
     COVER_ANIMATION(R.string.cover_slide_animation),
@@ -3234,330 +3236,6 @@ enum class SettingsChoiceKind(@param:StringRes val title: Int) {
  * refraksi, pelangi, tepi, bayangan, kualitas) punya slider sendiri, dikelompokkan
  * per efek. 100% = tampilan bawaan; slider ditumpuk di atas preset kejernihan.
  */
-
-/** A transparent view of Spatial Audio's local controls, evidence and learned labels. */
-@Composable
-private fun SpatialAudioSettingsContent() {
-    val mode by AppSettings.spatialAudioMode.collectAsStateWithLifecycle()
-    val allowOnPhoneSpeaker by AppSettings.spatialAudioOnPhoneSpeaker.collectAsStateWithLifecycle()
-    val learningEnabled by AppSettings.spatialAudioLearningEnabled.collectAsStateWithLifecycle()
-    val records by AppSettings.spatialAudioRecords.collectAsStateWithLifecycle()
-    val currentDecision by AppSettings.spatialAudioCurrentDecision.collectAsStateWithLifecycle()
-    val currentTrackTitle by AppSettings.spatialAudioCurrentTrackTitle.collectAsStateWithLifecycle()
-    val currentTrackArtist by AppSettings.spatialAudioCurrentTrackArtist.collectAsStateWithLifecycle()
-    var showAllOn by rememberSaveable { mutableStateOf(false) }
-    var showAllOff by rememberSaveable { mutableStateOf(false) }
-
-    val onRecords = remember(records) {
-        records.values.filter { it.feedback == SpatialAudioFeedback.ON }
-            .sortedByDescending { it.updatedAtMs }
-    }
-    val offRecords = remember(records) {
-        records.values.filter { it.feedback == SpatialAudioFeedback.OFF }
-            .sortedByDescending { it.updatedAtMs }
-    }
-    val profileCount = remember(records) { records.values.count { it.profile?.isUsable == true } }
-    val trainingExampleCount = remember(records) {
-        records.values.count { it.feedback != SpatialAudioFeedback.NONE && it.profile?.isUsable == true }
-    }
-    val onArtists = remember(onRecords) {
-        onRecords.filter { it.artist.isNotBlank() }
-            .groupBy { it.artist.trim() }
-            .map { it.key to it.value.size }
-            .sortedByDescending { it.second }
-            .take(5)
-    }
-    val offArtists = remember(offRecords) {
-        offRecords.filter { it.artist.isNotBlank() }
-            .groupBy { it.artist.trim() }
-            .map { it.key to it.value.size }
-            .sortedByDescending { it.second }
-            .take(5)
-    }
-    val modeIndex = when (mode) {
-        SpatialAudioMode.AUTO -> 0
-        SpatialAudioMode.ON -> 1
-        SpatialAudioMode.OFF -> 2
-    }
-    val similarTrackNames = remember(currentDecision, records) {
-        currentDecision?.similarTrackIds.orEmpty().map { id ->
-            records[id]?.let { it.title.ifBlank { it.artist }.ifBlank { id } } ?: id
-        }
-    }
-    val decisionDescription = when (currentDecision?.reason) {
-        SpatialAudioDecisionReason.GLOBAL_OFF -> stringResource(R.string.spatial_audio_decision_global_off)
-        SpatialAudioDecisionReason.GLOBAL_ON -> stringResource(R.string.spatial_audio_decision_global_on)
-        SpatialAudioDecisionReason.TRACK_ON -> stringResource(R.string.spatial_audio_decision_track_on)
-        SpatialAudioDecisionReason.TRACK_OFF -> stringResource(R.string.spatial_audio_decision_track_off)
-        SpatialAudioDecisionReason.PHONE_SPEAKER_BLOCKED -> stringResource(R.string.spatial_audio_decision_phone_speaker)
-        SpatialAudioDecisionReason.DOLBY_ATMOS_BYPASS -> stringResource(R.string.spatial_audio_decision_atmos)
-        SpatialAudioDecisionReason.DSP_UNAVAILABLE -> stringResource(R.string.spatial_audio_decision_dsp)
-        SpatialAudioDecisionReason.AUTO_DISABLED -> stringResource(R.string.spatial_audio_decision_learning_disabled)
-        SpatialAudioDecisionReason.AUTO_NO_PROFILE -> stringResource(R.string.spatial_audio_decision_no_profile)
-        SpatialAudioDecisionReason.AUTO_INSUFFICIENT_EVIDENCE -> stringResource(
-            R.string.spatial_audio_decision_insufficient,
-            currentDecision?.similarTrackCount ?: 0,
-        )
-        SpatialAudioDecisionReason.AUTO_LOW_INDEPENDENT_EVIDENCE -> stringResource(
-            R.string.spatial_audio_decision_low_independent_evidence,
-            currentDecision?.effectiveSampleCount ?: 0f,
-        )
-        SpatialAudioDecisionReason.AUTO_UNCERTAIN -> stringResource(
-            R.string.spatial_audio_decision_uncertain,
-            currentDecision?.onVotes ?: 0,
-            currentDecision?.offVotes ?: 0,
-            currentDecision?.similarTrackCount ?: 0,
-        )
-        SpatialAudioDecisionReason.AUTO_LEARNED_ON -> stringResource(
-            R.string.spatial_audio_decision_auto_on,
-            currentDecision?.similarTrackCount ?: 0,
-            currentDecision?.onVotes ?: 0,
-            currentDecision?.offVotes ?: 0,
-            (((currentDecision?.confidence ?: 0f) * 100f).toInt()),
-        )
-        SpatialAudioDecisionReason.AUTO_LEARNED_OFF -> stringResource(
-            R.string.spatial_audio_decision_auto_off,
-            currentDecision?.similarTrackCount ?: 0,
-            currentDecision?.onVotes ?: 0,
-            currentDecision?.offVotes ?: 0,
-            (((currentDecision?.confidence ?: 0f) * 100f).toInt()),
-        )
-        null -> null
-    }
-
-    Column(Modifier.fillMaxWidth()) {
-        SettingsGroup(
-            header = stringResource(R.string.spatial_audio_mode_title),
-            footer = stringResource(R.string.spatial_audio_mode_footer),
-        ) {
-            SegmentedControl(
-                options = listOf(
-                    stringResource(R.string.spatial_audio_mode_auto),
-                    stringResource(R.string.spatial_audio_mode_on),
-                    stringResource(R.string.spatial_audio_mode_off),
-                ),
-                selectedIndex = modeIndex,
-                onSelect = { index ->
-                    AppSettings.setSpatialAudioMode(
-                        when (index) {
-                            1 -> SpatialAudioMode.ON
-                            2 -> SpatialAudioMode.OFF
-                            else -> SpatialAudioMode.AUTO
-                        },
-                    )
-                },
-                modifier = Modifier.padding(horizontal = ROW_INSET, vertical = 12.dp),
-            )
-        }
-
-        SettingsGroup(header = stringResource(R.string.spatial_audio_current_decision_header)) {
-            if (currentDecision == null) {
-                Text(
-                    text = stringResource(R.string.spatial_audio_no_current_track),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = ROW_INSET, vertical = 14.dp),
-                )
-            } else {
-                SettingsRow(
-                    title = currentTrackTitle.ifBlank { stringResource(R.string.spatial_audio_current_track) },
-                    subtitle = currentTrackArtist,
-                    trailing = {
-                        Text(
-                            stringResource(
-                                if (currentDecision?.enabled == true) R.string.spatial_audio_mode_on
-                                else R.string.spatial_audio_mode_off,
-                            ),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    },
-                )
-                Text(
-                    text = decisionDescription.orEmpty(),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = ROW_INSET, vertical = 10.dp),
-                )
-                if (similarTrackNames.isNotEmpty()) {
-                    Text(
-                        text = stringResource(
-                            R.string.spatial_audio_similar_tracks,
-                            similarTrackNames.joinToString(", "),
-                        ),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = ROW_INSET, vertical = 8.dp),
-                    )
-                }
-            }
-        }
-
-        SettingsGroup(
-            header = stringResource(R.string.spatial_audio_output_header),
-            footer = stringResource(R.string.spatial_audio_phone_speaker_footer),
-        ) {
-            SettingsRow(
-                icon = SfIcons.SurroundSound,
-                title = stringResource(R.string.spatial_audio_phone_speaker),
-                subtitle = stringResource(R.string.spatial_audio_phone_speaker_subtitle),
-                trailing = {
-                    IosSwitch(
-                        checked = allowOnPhoneSpeaker,
-                        onCheckedChange = AppSettings::setSpatialAudioOnPhoneSpeaker,
-                    )
-                },
-                onClick = { AppSettings.setSpatialAudioOnPhoneSpeaker(!allowOnPhoneSpeaker) },
-            )
-        }
-
-        SettingsGroup(
-            header = stringResource(R.string.spatial_audio_learning_header),
-            footer = stringResource(R.string.spatial_audio_learning_body),
-        ) {
-            SettingsRow(
-                icon = SfIcons.AutoAwesome,
-                title = stringResource(R.string.spatial_audio_learning_enabled),
-                subtitle = stringResource(R.string.spatial_audio_learning_enabled_subtitle),
-                trailing = {
-                    IosSwitch(
-                        checked = learningEnabled,
-                        onCheckedChange = AppSettings::setSpatialAudioLearningEnabled,
-                    )
-                },
-                onClick = { AppSettings.setSpatialAudioLearningEnabled(!learningEnabled) },
-            )
-        }
-
-        SettingsGroup(header = stringResource(R.string.spatial_audio_stats_header)) {
-            SettingsRow(
-                title = stringResource(R.string.spatial_audio_stats_on),
-                trailing = { Text(onRecords.size.toString(), color = MaterialTheme.colorScheme.onSurfaceVariant) },
-            )
-            RowDivider()
-            SettingsRow(
-                title = stringResource(R.string.spatial_audio_stats_off),
-                trailing = { Text(offRecords.size.toString(), color = MaterialTheme.colorScheme.onSurfaceVariant) },
-            )
-            RowDivider()
-            SettingsRow(
-                title = stringResource(R.string.spatial_audio_stats_profiles),
-                trailing = { Text(profileCount.toString(), color = MaterialTheme.colorScheme.onSurfaceVariant) },
-            )
-            RowDivider()
-            SettingsRow(
-                title = stringResource(R.string.spatial_audio_stats_examples),
-                trailing = { Text(trainingExampleCount.toString(), color = MaterialTheme.colorScheme.onSurfaceVariant) },
-            )
-        }
-
-        SettingsGroup(header = stringResource(R.string.spatial_audio_learned_on_header)) {
-            if (onRecords.isEmpty()) {
-                Text(
-                    text = stringResource(R.string.spatial_audio_no_on),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = ROW_INSET, vertical = 14.dp),
-                )
-            } else {
-                onRecords.take(if (showAllOn) onRecords.size else 12).forEachIndexed { index, record ->
-                    if (index > 0) RowDivider()
-                    SettingsRow(
-                        icon = SfIcons.SurroundSound,
-                        title = record.title.ifBlank { record.trackId },
-                        subtitle = record.artist,
-                        trailing = {
-                            Text(
-                                stringResource(
-                                    if (record.profile?.isUsable == true) R.string.spatial_audio_track_profiled
-                                    else R.string.spatial_audio_track_not_profiled,
-                                ),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        },
-                    )
-                }
-            }
-            if (onRecords.size > 12) {
-                SettingsRow(
-                    title = if (showAllOn) stringResource(R.string.spatial_audio_show_less)
-                    else stringResource(R.string.spatial_audio_show_all, onRecords.size),
-                    onClick = { showAllOn = !showAllOn },
-                )
-            }
-            if (onArtists.isNotEmpty()) {
-                RowDivider()
-                Text(
-                    text = stringResource(R.string.spatial_audio_artists_on_header),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = ROW_INSET, top = 12.dp, bottom = 4.dp),
-                )
-                onArtists.forEach { (artist, count) ->
-                    SettingsRow(
-                        title = artist,
-                        trailing = { Text(count.toString(), color = MaterialTheme.colorScheme.onSurfaceVariant) },
-                    )
-                }
-            }
-        }
-
-        SettingsGroup(header = stringResource(R.string.spatial_audio_learned_off_header)) {
-            if (offRecords.isEmpty()) {
-                Text(
-                    text = stringResource(R.string.spatial_audio_no_off),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = ROW_INSET, vertical = 14.dp),
-                )
-            } else {
-                offRecords.take(if (showAllOff) offRecords.size else 12).forEachIndexed { index, record ->
-                    if (index > 0) RowDivider()
-                    SettingsRow(
-                        icon = SfIcons.SurroundSound,
-                        title = record.title.ifBlank { record.trackId },
-                        subtitle = record.artist,
-                        trailing = {
-                            Text(
-                                stringResource(
-                                    if (record.profile?.isUsable == true) R.string.spatial_audio_track_profiled
-                                    else R.string.spatial_audio_track_not_profiled,
-                                ),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        },
-                    )
-                }
-            }
-            if (offRecords.size > 12) {
-                SettingsRow(
-                    title = if (showAllOff) stringResource(R.string.spatial_audio_show_less)
-                    else stringResource(R.string.spatial_audio_show_all, offRecords.size),
-                    onClick = { showAllOff = !showAllOff },
-                )
-            }
-            if (offArtists.isNotEmpty()) {
-                RowDivider()
-                Text(
-                    text = stringResource(R.string.spatial_audio_artists_off_header),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = ROW_INSET, top = 12.dp, bottom = 4.dp),
-                )
-                offArtists.forEach { (artist, count) ->
-                    SettingsRow(
-                        title = artist,
-                        trailing = { Text(count.toString(), color = MaterialTheme.colorScheme.onSurfaceVariant) },
-                    )
-                }
-            }
-        }
-
-        Spacer(Modifier.height(32.dp))
-    }
-}
-
 @Composable
 private fun LiquidGlassSettingsContent() {
     val liquidGlass by AppSettings.liquidGlass.collectAsStateWithLifecycle()
@@ -4328,8 +4006,6 @@ fun SettingsChoicePage(
             }
 
             SettingsChoiceKind.LIQUID_GLASS -> LiquidGlassSettingsContent()
-
-            SettingsChoiceKind.SPATIAL_AUDIO -> SpatialAudioSettingsContent()
 
             SettingsChoiceKind.FONT -> {
                 val selected by AppSettings.appFont.collectAsStateWithLifecycle()
