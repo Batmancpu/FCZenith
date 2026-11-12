@@ -50,6 +50,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.music.zenith.data.settings.AppSettings
 import com.music.zenith.ui.components.LocalAppBackdrop
+import com.music.zenith.ui.components.glassContentColor
 import com.music.zenith.ui.components.isGlassSupported
 import com.music.zenith.ui.components.backdrop.effects.blur
 import com.music.zenith.ui.components.backdrop.effects.colorControls
@@ -68,7 +69,7 @@ import kotlin.math.roundToInt
 import kotlin.math.sign
 
 /** How much taller than the bar the pill stands while it is lifted. */
-internal val PILL_GROW_HEIGHT = 14.dp
+internal val PILL_GROW_HEIGHT = 18.dp
 
 /**
  * The selection pill's physics, owned by the tab bar and handed to whichever
@@ -668,8 +669,16 @@ internal fun GlassSelectionPill(
 ) {
     val page = LocalAppBackdrop.current
     val shape = remember { RoundedCornerShape(percent = 50) }
-    val backdrop = remember(page, barGlass, tabRow, fillColor, iconTint) {
-        SelectionPillBackdrop(page, barGlass, tabRow, iconTint) {
+    // White rim on a dark bar, dark rim on a light one: a white edge over a
+    // light page is invisible, so the lens would have nothing to bend.
+    val darkGlass = glassContentColor() == Color.White
+    val edge = if (darkGlass) {
+        Color.White.copy(alpha = BAR_RIM_ALPHA)
+    } else {
+        Color.Black.copy(alpha = BAR_RIM_ALPHA * 0.45f)
+    }
+    val backdrop = remember(page, barGlass, tabRow, fillColor, iconTint, edge) {
+        SelectionPillBackdrop(page, barGlass, tabRow, iconTint, edge) {
             fillColor.copy(alpha = fillColor.alpha * (1f - motion.material))
         }
     }
@@ -716,12 +725,17 @@ private val PILL_LENS_AMOUNT = 32.dp
 /** The rim and its shadow are gone by the time the hand-off is 55% through. */
 private fun rimOf(presence: Float): Float = ((presence - 0.45f) / 0.55f).coerceIn(0f, 1f)
 
-private val LENS_HEIGHT = 16.dp
-private val LENS_AMOUNT = 22.dp
+private val LENS_HEIGHT = 20.dp
+private val LENS_AMOUNT = 28.dp
 
 /** The bar's own edge, drawn into what the lens refracts so the lens bends it too. */
 private val BAR_RIM_WIDTH = 2.dp
 private const val BAR_RIM_ALPHA = 0.9f
+
+/** How far the bar's shadow halo reaches past its edge, and how dark it starts. */
+private val BAR_HALO_REACH = 14.dp
+private const val BAR_HALO_ALPHA = 0.18f
+private const val BAR_HALO_STEPS = 7
 
 private val PILL_SHADOW = Shadow(
     radius = 12.dp,
@@ -739,6 +753,7 @@ private class SelectionPillBackdrop(
     private val bar: LayerBackdrop,
     private val tabs: Backdrop,
     private val tint: Color,
+    private val edge: Color,
     private val fill: () -> Color,
 ) : Backdrop {
 
@@ -751,7 +766,7 @@ private class SelectionPillBackdrop(
     ) {
         with(page) { drawBackdrop(density, coordinates, layerBlock) }
         with(bar) { drawBackdrop(density, coordinates, layerBlock) }
-        drawBarRim(bar, coordinates)
+        drawBarRim(bar, coordinates, edge)
         val color = fill()
         if (color.alpha > 0f) {
             // Past every edge: the recorded area includes the lens's padding.
@@ -777,7 +792,7 @@ private class SelectionPillBackdrop(
  * the bar's own position, inside the pill's coordinate space, before the lens
  * bends everything.
  */
-private fun DrawScope.drawBarRim(bar: LayerBackdrop, coordinates: LayoutCoordinates?) {
+private fun DrawScope.drawBarRim(bar: LayerBackdrop, coordinates: LayoutCoordinates?, edge: Color) {
     val barCoordinates = bar.layerCoordinates ?: return
     val here = coordinates ?: return
     if (!barCoordinates.isAttached || !here.isAttached) return
@@ -789,26 +804,36 @@ private fun DrawScope.drawBarRim(bar: LayerBackdrop, coordinates: LayoutCoordina
     val barSize = barCoordinates.size.toSize()
     if (barSize.width <= 0f || barSize.height <= 0f) return
     val strokeWidth = BAR_RIM_WIDTH.toPx()
-    val radius = minOf(barSize.width, barSize.height) / 2f - strokeWidth / 2f
-    // Bright along the top and bottom edges, dim between, like the bar's own
-    // directional highlight that Kyant records into the lens backdrop.
+    val radius = minOf(barSize.width, barSize.height) / 2f
+    val haloReach = BAR_HALO_REACH.toPx()
+    val ring = haloReach / BAR_HALO_STEPS
+    // Bright along the top and bottom edges, dim between.
     val rim = Brush.verticalGradient(
-        colors = listOf(
-            Color.White.copy(alpha = BAR_RIM_ALPHA),
-            Color.White.copy(alpha = BAR_RIM_ALPHA * 0.3f),
-            Color.White.copy(alpha = BAR_RIM_ALPHA),
-        ),
+        colors = listOf(edge, edge.copy(alpha = edge.alpha * 0.3f), edge),
         startY = 0f,
         endY = barSize.height,
     )
     translate(-offset.x, -offset.y) {
+        // The bar's soft shadow, which the exported glass leaves out: a dark
+        // halo fading outward from the edge, so the pill's lens has something
+        // to bend on the far side of the edge as well as on the near side.
+        for (i in 1..BAR_HALO_STEPS) {
+            val t = i / BAR_HALO_STEPS.toFloat()
+            val grow = haloReach * t
+            drawRoundRect(
+                color = Color.Black.copy(alpha = BAR_HALO_ALPHA * (1f - t)),
+                topLeft = Offset(-grow, -grow),
+                size = Size(barSize.width + grow * 2f, barSize.height + grow * 2f),
+                cornerRadius = CornerRadius(radius + grow, radius + grow),
+                style = Stroke(width = ring),
+            )
+        }
         drawRoundRect(
             brush = rim,
             topLeft = Offset(strokeWidth / 2f, strokeWidth / 2f),
             size = Size(barSize.width - strokeWidth, barSize.height - strokeWidth),
-            cornerRadius = CornerRadius(radius, radius),
+            cornerRadius = CornerRadius(radius - strokeWidth / 2f, radius - strokeWidth / 2f),
             style = Stroke(width = strokeWidth),
-            blendMode = BlendMode.Plus,
         )
     }
 }
