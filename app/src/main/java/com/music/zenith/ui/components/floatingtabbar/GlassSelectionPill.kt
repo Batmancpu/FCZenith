@@ -53,6 +53,7 @@ import com.music.zenith.ui.components.backdrop.backdrops.LayerBackdrop
 import com.music.zenith.ui.components.backdrop.drawBackdrop
 import com.music.zenith.ui.components.backdrop.effects.lens
 import com.music.zenith.ui.components.backdrop.highlight.Highlight
+import com.music.zenith.ui.components.backdrop.shadow.InnerShadow
 import com.music.zenith.ui.components.backdrop.shadow.Shadow
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -62,7 +63,7 @@ import kotlin.math.roundToInt
 import kotlin.math.sign
 
 /** How much taller than the bar the pill stands while it is lifted. */
-internal val PILL_GROW_HEIGHT = 9.dp
+internal val PILL_GROW_HEIGHT = 14.dp
 
 /**
  * The selection pill's physics, owned by the tab bar and handed to whichever
@@ -683,6 +684,10 @@ internal fun GlassSelectionPill(
             shadow = {
                 val alpha = motion.material * rimOf(motion.glassPresence)
                 if (alpha > 0f) PILL_SHADOW.copy(alpha = alpha) else null
+            },
+            innerShadow = {
+                val alpha = motion.material * rimOf(motion.glassPresence)
+                if (alpha > 0f) InnerShadow(radius = 8.dp * alpha, alpha = alpha) else null
             },
         ),
     )

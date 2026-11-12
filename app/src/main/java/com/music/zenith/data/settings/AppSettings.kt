@@ -157,6 +157,43 @@ data class GlassCustom(
 }
 
 /**
+ * Preset Liquid Glass siap pakai: [level], [custom] dan [frosted] diterapkan
+ * sekaligus lewat [AppSettings.applyGlassPreset].
+ */
+enum class GlassPreset(
+    val level: Float,
+    val custom: GlassCustom,
+    val frosted: Boolean = false,
+) {
+    /** Tampilan bawaan Zenith. */
+    DEFAULT(GlassClarity.BALANCED_LEVEL, GlassCustom()),
+
+    /**
+     * Mengikuti LiquidBottomTabs dari Kyant0/backdrop: vibrancy 1.5, blur 8dp
+     * (0.8 dari 10dp), lensa 24dp/24dp tanpa pelangi dan depth, kontainer 40%
+     * (0.4 dari 0.30 bawaan), resolusi setinggi yang diizinkan.
+     */
+    LIQUID(
+        level = GlassClarity.BALANCED_LEVEL,
+        custom = GlassCustom(
+            blur = 0.8f,
+            saturation = 1f,
+            tint = 4f / 3f,
+            refraction = 1f,
+            refractionWidth = 1f,
+            depth = false,
+            rainbow = 0f,
+            rim = 1f,
+            shadow = 1f,
+            quality = 1.5f,
+        ),
+    );
+
+    fun matches(level: Float, custom: GlassCustom, frosted: Boolean): Boolean =
+        this.level == level && this.custom == custom && this.frosted == frosted
+}
+
+/**
  * Which exclusive output, if any, a track is sent to unchanged. Declared in
  * the order the settings picker lists them; persisted by name, so the order
  * can change freely.
@@ -2023,6 +2060,12 @@ object AppSettings {
             .putFloat(KEY_GLASS_SHADOW, v.shadow)
             .putFloat(KEY_GLASS_QUALITY, v.quality)
             .apply()
+    }
+
+    fun applyGlassPreset(preset: GlassPreset) {
+        setGlassClarity(preset.level)
+        setGlassCustom(preset.custom)
+        setFrostedGlass(preset.frosted)
     }
 
     fun setProgressiveBlur(value: Boolean) {

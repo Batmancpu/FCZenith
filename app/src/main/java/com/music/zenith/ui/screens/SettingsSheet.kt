@@ -166,6 +166,7 @@ import com.music.zenith.data.settings.AppSettings
 import com.music.zenith.data.settings.OutputPcmMode
 import com.music.zenith.data.settings.GlassClarity
 import com.music.zenith.data.settings.GlassCustom
+import com.music.zenith.data.settings.GlassPreset
 import com.music.zenith.data.settings.BitPerfectMode
 import com.music.zenith.playback.AudioOutputStatus
 import com.music.zenith.playback.audio.bitperfect.BitPerfectOutput
@@ -3316,6 +3317,31 @@ private fun LiquidGlassSettingsContent() {
         }
     }
 
+    SettingsGroup(
+        header = stringResource(R.string.glass_section_ready_presets),
+        footer = stringResource(R.string.glass_footer_ready_presets),
+    ) {
+        GlassPreset.values().forEachIndexed { index, preset ->
+            if (index > 0) RowDivider()
+            val selected = preset.matches(clarity.level, custom, frosted)
+            SettingsRow(
+                title = stringResource(preset.titleRes()),
+                subtitle = stringResource(preset.subtitleRes()),
+                enabled = active,
+                trailing = {
+                    if (selected) {
+                        Text(
+                            text = "\u2713",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                },
+                onClick = { AppSettings.applyGlassPreset(preset) },
+            )
+        }
+    }
+
     SettingsGroup(header = stringResource(R.string.glass_section_color)) {
         GlassSliderRow(
             title = stringResource(R.string.glass_blur),
@@ -3470,6 +3496,16 @@ private fun LiquidGlassSettingsContent() {
         )
     }
     Spacer(Modifier.height(24.dp))
+}
+
+private fun GlassPreset.titleRes(): Int = when (this) {
+    GlassPreset.DEFAULT -> R.string.glass_preset_default
+    GlassPreset.LIQUID -> R.string.glass_preset_liquid
+}
+
+private fun GlassPreset.subtitleRes(): Int = when (this) {
+    GlassPreset.DEFAULT -> R.string.glass_preset_default_subtitle
+    GlassPreset.LIQUID -> R.string.glass_preset_liquid_subtitle
 }
 
 /** Satu baris slider: judul dan nilai di atas, slider di bawah, [below] opsional di bawah slider. */
