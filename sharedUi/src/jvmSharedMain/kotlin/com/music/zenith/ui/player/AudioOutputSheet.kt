@@ -2,6 +2,21 @@ package com.music.zenith.ui.player
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
+import coil3.compose.AsyncImage
+import com.music.zenith.data.model.Song
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -90,6 +105,8 @@ import kotlin.math.roundToInt
 internal fun AudioOutputSheet(
     hazeState: HazeState,
     accountName: String?,
+    song: Song,
+    artworkUrl: String?,
     onDismiss: () -> Unit,
     onOpenPipeline: () -> Unit,
     onOpenCast: () -> Unit,
@@ -108,19 +125,31 @@ internal fun AudioOutputSheet(
         modifier = modifier,
         titleGap = 10.dp,
     ) {
-        // The playing output is the lit pill; the rest sit flat beside it.
+        NowPlayingInfo(song = song, artworkUrl = artworkUrl)
+        Spacer(Modifier.height(10.dp))
+        val volumeInPill = outputs.any { it.isActive }
+        // The playing output is the lit pill and carries the volume itself;
+        // the rest sit flat beside it.
         Column(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            outputs.forEach { device ->
-                OutputItem(
-                    icon = iconFor(device),
-                    title = outputLabel(device, accountName),
-                    subtitle = if (device.isActive) stringResource(Res.string.audio_output_playing) else null,
-                    active = device.isActive,
-                    onClick = { PlayerPlatform.host.selectAudioOutput(device.id) },
-                )
+            outputs.sortedByDescending { it.isActive }.forEach { device ->
+                if (device.isActive) {
+                    ActiveVolumePill(
+                        icon = iconFor(device),
+                        title = outputLabel(device, accountName),
+                        routeKey = outputs,
+                    )
+                } else {
+                    OutputItem(
+                        icon = iconFor(device),
+                        title = outputLabel(device, accountName),
+                        subtitle = null,
+                        active = false,
+                        onClick = { PlayerPlatform.host.selectAudioOutput(device.id) },
+                    )
+                }
             }
             // The watch, when one with Zenith on it is in reach: picked
             // directly, since there is only ever the one.
@@ -155,8 +184,11 @@ internal fun AudioOutputSheet(
             }
         }
 
-        Spacer(Modifier.height(16.dp))
-        VolumeRow(routeKey = outputs)
+        // Only when no phone-side output is lit to carry the slider (casting, watch).
+        if (!volumeInPill) {
+            Spacer(Modifier.height(16.dp))
+            VolumeRow(routeKey = outputs)
+        }
 
         Spacer(Modifier.height(12.dp))
         Box(
@@ -231,6 +263,190 @@ private fun AudioPipelineRow(onClick: () -> Unit) {
 
 /** Dark ink for text and glyphs on the lit (white) pill. */
 private val OUTPUT_INK = Color(0xFF1C1C1E)
+
+/** The song that is playing: its cover, title and artist, above the outputs. */
+@Composable
+private fun NowPlayingInfo(song: Song, artworkUrl: String?) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier
+                .size(48.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(Color.White.copy(alpha = 0.12f)),
+        ) {
+            AsyncImage(
+                model = artworkUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = song.title,
+                color = Color.White,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = song.artist,
+                color = Color.White.copy(alpha = 0.55f),
+                fontSize = 13.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+/**
+ * The playing output as one pill that is also the volume slider: the white
+ * fill is the level, and dragging anywhere across the pill moves it. The
+ * content is drawn twice, light over the empty part and dark over the fill,
+ * with the fill layer clipped to the level.
+ */
+@Composable
+private fun ActiveVolumePill(
+    icon: ImageVector,
+    title: String,
+    routeKey: Any,
+) {
+    val system = PlayerPlatform.host.volume
+    val systemLevel by system.level.collectAsStateWithLifecycle()
+    var level by remember(system) { mutableFloatStateOf(systemLevel) }
+    var dragging by remember { mutableStateOf(false) }
+    var pillWidth by remember { mutableFloatStateOf(0f) }
+
+    // Hardware keys move the system level; follow it, but never over a finger.
+    LaunchedEffect(systemLevel) {
+        if (!dragging) level = systemLevel
+    }
+    LaunchedEffect(routeKey) {
+        repeat(VOLUME_REREADS) {
+            if (!dragging) system.refresh()
+            delay(VOLUME_REREAD_GAP_MS)
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp)
+            .clip(CircleShape)
+            .onSizeChanged { pillWidth = it.width.toFloat() }
+            .pointerInput(system) {
+                detectHorizontalDragGestures(
+                    onDragStart = { dragging = true },
+                    onDragEnd = { dragging = false },
+                    onDragCancel = { dragging = false },
+                ) { change, dragAmount ->
+                    change.consume()
+                    if (pillWidth > 0f) {
+                        level = (level + dragAmount / pillWidth).coerceIn(0f, 1f)
+                        system.set(level)
+                    }
+                }
+            },
+    ) {
+        Box(
+            Modifier
+                .matchParentSize()
+                .background(Color.White.copy(alpha = 0.16f)),
+        ) {
+            VolumePillContent(icon = icon, title = title, level = level, ink = Color.White)
+        }
+        Box(
+            Modifier
+                .matchParentSize()
+                .drawWithContent {
+                    clipRect(right = size.width * level) {
+                        this@drawWithContent.drawContent()
+                    }
+                }
+                .background(Color.White),
+        ) {
+            VolumePillContent(icon = icon, title = title, level = level, ink = OUTPUT_INK)
+        }
+    }
+}
+
+@Composable
+private fun VolumePillContent(
+    icon: ImageVector,
+    title: String,
+    level: Float,
+    ink: Color,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 20.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = ink,
+            modifier = Modifier.size(22.dp),
+        )
+        Spacer(Modifier.width(14.dp))
+        Text(
+            text = title,
+            color = ink,
+            fontSize = 16.sp,
+            letterSpacing = (-0.2).sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        VolumeGlyph(level = level, tint = ink, modifier = Modifier.size(24.dp))
+    }
+}
+
+/**
+ * A speaker whose waves follow the level: each of the three arcs grows in and
+ * fades up as the level passes its third, and shrinks away as it falls back.
+ */
+@Composable
+private fun VolumeGlyph(level: Float, tint: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier) {
+        val u = size.minDimension / 24f
+        val body = Path().apply {
+            moveTo(3f * u, 9f * u)
+            lineTo(7f * u, 9f * u)
+            lineTo(12f * u, 5f * u)
+            lineTo(12f * u, 19f * u)
+            lineTo(7f * u, 15f * u)
+            lineTo(3f * u, 15f * u)
+            close()
+        }
+        drawPath(body, tint)
+        for (i in 0 until 3) {
+            val frac = (level * 3f - i).coerceIn(0f, 1f)
+            if (frac > 0f) {
+                val r = (5f + i * 3f) * u
+                drawArc(
+                    color = tint.copy(alpha = frac),
+                    startAngle = -40f * frac,
+                    sweepAngle = 80f * frac,
+                    useCenter = false,
+                    topLeft = Offset(11f * u - r, 12f * u - r),
+                    size = Size(r * 2f, r * 2f),
+                    style = Stroke(width = 1.9f * u, cap = StrokeCap.Round),
+                )
+            }
+        }
+    }
+}
 
 /**
  * One place the music can go. The playing one is a lit white pill with a

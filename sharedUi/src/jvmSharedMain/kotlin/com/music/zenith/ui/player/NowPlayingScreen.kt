@@ -2028,6 +2028,8 @@ fun NowPlayingScreen(
             AudioOutputSheet(
                 hazeState = playerHaze,
                 accountName = accountName,
+                song = song,
+                artworkUrl = remoteArt,
                 onDismiss = { showAudioOutput = false },
                 onOpenPipeline = { showAudioPipeline = true },
                 onOpenCast = { showCast = true },
