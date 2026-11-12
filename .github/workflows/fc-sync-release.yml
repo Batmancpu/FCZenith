@@ -42,15 +42,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          marker="fc/one-shot/spatial-audio/target-version"
+          marker="fc/one-shot/spatial-speaker-route/target-version"
           if [[ -f "$marker" ]]; then
             target="$(tr -d '[:space:]' < "$marker")"
             asset="Music-v${target}.apk"
             assets="$(gh release view "v${target}" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' 2>/dev/null || true)"
             if grep -Fxq "$asset" <<< "$assets"; then
               echo "Target APK already published; completing one-shot source cleanup."
-              rm -rf fc/one-shot/spatial-audio
-              git add -A fc/one-shot/spatial-audio
+              rm -rf fc/one-shot/spatial-speaker-route
+              git add -A fc/one-shot/spatial-speaker-route
               git commit -m "chore(fc): retire delivered one-shot Spatial Audio overlay"
               git push origin HEAD:main
             fi
@@ -157,8 +157,8 @@ jobs:
       - name: Preserve FCZenith-owned GitHub Actions workflows
         run: |
           set -euo pipefail
-          # The app source follows upstream stable tags, but CI/CD ownership
-          # stays with FCZenith. Do not import upstream workflow files.
+          # The app source follows the selected stable tag or pinned main snapshot;
+          # CI/CD ownership stays with FCZenith. Do not import upstream workflows.
           git rm -r --ignore-unmatch .github/workflows
           git checkout "${{ steps.upstream.outputs.base_sha }}" -- .github/workflows
 
@@ -267,14 +267,14 @@ jobs:
           FC_VERSION_NAME: ${{ steps.decision.outputs.version_name }}
         run: python3 fc/apply-overlay.py
 
-      - name: Apply the one-release Spatial Audio overlay
+      - name: Apply the one-release phone-speaker Spatial Audio safeguard
         if: steps.decision.outputs.should_release == 'true'
         env:
           FC_VERSION_NAME: ${{ steps.decision.outputs.version_name }}
         shell: bash
         run: |
           set -euo pipefail
-          overlay="fc/one-shot/spatial-audio"
+          overlay="fc/one-shot/spatial-speaker-route"
           if [[ -d "$overlay" ]]; then
             target="$(tr -d '[:space:]' < "$overlay/target-version")"
             if [[ "$FC_VERSION_NAME" != "$target" ]]; then
@@ -284,7 +284,7 @@ jobs:
             python3 "$overlay/apply.py"
           fi
 
-      - name: Run focused Spatial Audio decision tests
+      - name: Run production unit tests
         if: steps.decision.outputs.should_release == 'true'
         env:
           FC_VERSION_CODE: ${{ steps.decision.outputs.version_code }}
@@ -399,19 +399,13 @@ jobs:
             app/src/main/res/mipmap-xxxhdpi/ic_launcher.webp app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.webp
           rm -f app/src/main/res/drawable-nodpi/fc_music_icon.webp
 
-      - name: Restore the one-shot Spatial Audio source overlay
+      - name: Restore the one-shot phone-speaker safeguard
         if: steps.decision.outputs.should_release == 'true' && always()
         run: |
           set -euo pipefail
           git restore --worktree -- \
-            app/src/main/java/com/music/zenith/data/settings/AppSettings.kt \
             app/src/main/java/com/music/zenith/playback/PlaybackService.kt \
-            app/src/main/java/com/music/zenith/playback/SpatialAudioProcessor.kt \
-            app/src/main/java/com/music/zenith/ui/components/SongActionsMenu.kt \
-            app/src/main/java/com/music/zenith/ui/screens/SettingsSheet.kt \
-            app/src/main/res/values/strings.xml
-          rm -f app/src/main/java/com/music/zenith/playback/SpatialAudioDecisionEngine.kt
-          rm -f app/src/test/java/com/music/zenith/playback/SpatialAudioDecisionEngineTest.kt
+            app/src/main/res/values-ko/strings.xml
 
       - name: Commit the upstream sync and FC version metadata to main
         if: steps.decision.outputs.should_release == 'true'
@@ -450,21 +444,21 @@ jobs:
             - Includes ${{ steps.upstream.outputs.commits_ahead }} upstream commits beyond the stable baseline when built as a main snapshot.
             - This is an FC-branded upstream-main development snapshot; future automatic syncs return to published stable releases.
             - The same FC signing certificate is checked before publishing.
-            - Spatial Audio customisation is a one-release FC overlay and is removed from main after this APK is published.
+            - The built-in phone speaker bypasses Zenith stereo widening; Bluetooth, wired, USB and HDMI retain the upstream per-track Spatial Audio choice.
 
             Obtainium source: https://github.com/Batmancpu/FCZenith
           files: dist/Music-v${{ steps.decision.outputs.version_name }}.apk
           fail_on_unmatched_files: true
           make_latest: true
 
-      - name: Retire the one-shot Spatial Audio overlay after successful publication
+      - name: Retire the one-shot phone-speaker safeguard after successful publication
         if: steps.decision.outputs.should_release == 'true' && success()
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          overlay="fc/one-shot/spatial-audio"
+          overlay="fc/one-shot/spatial-speaker-route"
           [[ -f "$overlay/target-version" ]] || exit 0
           target="$(tr -d '[:space:]' < "$overlay/target-version")"
           asset="Music-v${target}.apk"
@@ -474,6 +468,6 @@ jobs:
             exit 1
           fi
           rm -rf "$overlay"
-          git add -A fc/one-shot/spatial-audio
+          git add -A fc/one-shot/spatial-speaker-route
           git commit -m "chore(fc): retire delivered one-shot Spatial Audio overlay"
           git push origin HEAD:main
