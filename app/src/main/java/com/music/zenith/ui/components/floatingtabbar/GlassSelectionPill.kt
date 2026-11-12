@@ -37,6 +37,7 @@ import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.positionInWindow
@@ -699,7 +700,9 @@ internal fun GlassSelectionPill(
     }
     // The tab row is drawn on top of the lens, not through it: refracting it
     // stretched the glyphs and flipped the labels near the pill's edge.
-    val tabsBackdrop = remember(tabRow, iconTint) { PillTabsBackdrop(tabRow, iconTint) }
+    val tabsBackdrop = remember(tabRow, iconTint, motion) {
+        PillTabsBackdrop(tabRow, iconTint) { 1f + PILL_ICON_LIFT_SCALE * motion.material }
+    }
     val backdrop = remember(page, barGlass, fillColor, edge) {
         SelectionPillBackdrop(page, barGlass, emptyBackdrop(), Color.Unspecified, edge) {
             fillColor.copy(alpha = fillColor.alpha * (1f - motion.material))
@@ -757,8 +760,11 @@ internal fun GlassSelectionPill(
  * edge is narrow but bends hard, which is what makes the bar's top and bottom
  * edges visibly warp where the pill stands past them.
  */
-private val PILL_LENS_HEIGHT = 28.dp
-private val PILL_LENS_AMOUNT = 60.dp
+private val PILL_LENS_HEIGHT = 16.dp
+private val PILL_LENS_AMOUNT = 32.dp
+
+/** Ikon dan label di dalam pill terangkat membesar sebesar ini pada material penuh (Kyant: 1 -> 1.2). */
+private const val PILL_ICON_LIFT_SCALE = 0.2f
 
 /**
  * Rainbow fringe of the lifted pill, a fraction of the shader's full strength.
@@ -886,10 +892,16 @@ private fun DrawScope.drawBarRim(bar: LayerBackdrop, coordinates: LayoutCoordina
     }
 }
 
-/** The tab row under the lifted pill, masked to [tint] when set, with no refraction. */
+/**
+ * The tab row under the lifted pill, masked to [tint] when set, with no
+ * refraction. Digambar diperbesar terhadap pusat pill sebesar [iconScale],
+ * jadi ikon dan label di dalam lens ikut membesar saat pill terangkat,
+ * seperti LiquidBottomTab Kyant (1 -> 1.2 mengikuti tekanan).
+ */
 private class PillTabsBackdrop(
     private val tabs: Backdrop,
     private val tint: Color,
+    private val iconScale: () -> Float = { 1f },
 ) : Backdrop {
 
     override val isCoordinatesDependent: Boolean = true
@@ -899,11 +911,13 @@ private class PillTabsBackdrop(
         coordinates: LayoutCoordinates?,
         layerBlock: (GraphicsLayerScope.() -> Unit)?,
     ) {
-        if (tint != Color.Unspecified) {
-            drawTinted(tint) { with(tabs) { drawBackdrop(density, coordinates, layerBlock) } }
-        } else {
-            with(tabs) { drawBackdrop(density, coordinates, layerBlock) }
+        val s = iconScale()
+        val draw: DrawScope.() -> Unit = {
+            scale(s, pivot = center) {
+                with(tabs) { drawBackdrop(density, coordinates, layerBlock) }
+            }
         }
+        if (tint != Color.Unspecified) drawTinted(tint, draw) else draw()
     }
 }
 
