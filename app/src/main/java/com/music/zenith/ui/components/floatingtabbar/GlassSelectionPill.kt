@@ -69,7 +69,7 @@ import kotlin.math.roundToInt
 import kotlin.math.sign
 
 /** How much taller than the bar the pill stands while it is lifted. */
-internal val PILL_GROW_HEIGHT = 18.dp
+internal val PILL_GROW_HEIGHT = 22.dp
 
 /**
  * The selection pill's physics, owned by the tab bar and handed to whichever
@@ -743,8 +743,8 @@ internal fun GlassSelectionPill(
  * edge is narrow but bends hard, which is what makes the bar's top and bottom
  * edges visibly warp where the pill stands past them.
  */
-private val PILL_LENS_HEIGHT = 22.dp
-private val PILL_LENS_AMOUNT = 40.dp
+private val PILL_LENS_HEIGHT = 28.dp
+private val PILL_LENS_AMOUNT = 60.dp
 
 /**
  * Rainbow fringe of the lifted pill, a fraction of the shader's full strength.
@@ -768,7 +768,7 @@ private const val BAR_RIM_ALPHA = 0.9f
 
 /** How far the bar's shadow halo reaches past its edge, and how dark it starts. */
 private val BAR_HALO_REACH = 18.dp
-private const val BAR_HALO_ALPHA = 0.30f
+private const val BAR_HALO_ALPHA = 0.40f
 private const val BAR_HALO_STEPS = 7
 
 private val PILL_SHADOW = Shadow(
