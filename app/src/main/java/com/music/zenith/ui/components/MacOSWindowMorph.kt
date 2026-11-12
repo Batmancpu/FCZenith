@@ -17,8 +17,17 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.LocalTextStyle
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.graphics.GraphicsLayerScope
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -326,7 +335,10 @@ internal fun Modifier.macOSPopupMotion(
 
         // Apparent radius, from the trigger's own curvature to the card's.
         val apparent = lerp(min(o.width, o.height) / 2f, cornerRadius.toPx(), p.coerceIn(0f, 1f))
-        clip = true
+        // Clip only while the card is still growing out of its trigger. Once it
+        // is open the layer must not clip, or the jelly stretch of the popup
+        // inside it is cut off at the card's resting edges.
+        clip = p < 1f
         shape = MorphRoundedShape(apparent / sx, apparent / sy)
 
         cameraDistance = 16f * density
@@ -341,6 +353,133 @@ internal fun Modifier.macOSPopupContent(state: MacOSPopupState): Modifier = grap
     val spec = state.spec
     val span = (spec.contentFadeEnd - spec.contentFadeStart).coerceAtLeast(0.01f)
     alpha = ((state.progress.value - spec.contentFadeStart) / span).coerceIn(0f, 1f)
+}
+
+/**
+ * The window morph of [macOSPopupMotion] for a popup that places its own
+ * layer, such as [IosMenuPopover]. [origin] and [card] share one coordinate
+ * space and [p] is the open progress: 0 is the trigger, 1 the open card.
+ * With [clipToShape] the layer is clipped to a rounded rect whose radius runs
+ * from the trigger's to [cornerRadius]; pass false for a layer that casts a shadow.
+ */
+internal fun GraphicsLayerScope.applyMacOSMorph(
+    spec: MacOSPopupSpec,
+    p: Float,
+    origin: Rect,
+    card: Rect,
+    cornerRadius: Float,
+    clipToShape: Boolean,
+) {
+    if (card.width <= 0f || card.height <= 0f) return
+    val pw = p.coerceAtLeast(0f)
+    val ph = pw.pow(spec.heightLag)
+
+    val rawX = (origin.width / card.width).coerceIn(spec.minScale, 1f)
+    val rawY = (origin.height / card.height).coerceIn(spec.minScale, 1f)
+    val uniform = sqrt(rawX * rawY)
+    val sx = lerp(lerp(rawX, uniform, spec.uniformity), 1f, pw)
+    val sy = lerp(lerp(rawY, uniform, spec.uniformity), 1f, ph)
+    scaleX = sx
+    scaleY = sy
+
+    val rest = (1f - p).coerceAtLeast(0f)
+    val dx = origin.center.x - card.center.x
+    val dy = origin.center.y - card.center.y
+    translationX = dx * rest
+    translationY = dy * rest
+
+    alpha = (p * spec.alphaRamp).coerceIn(0f, 1f)
+
+    if (clipToShape) {
+        val apparent = lerp(min(origin.width, origin.height) / 2f, cornerRadius, p.coerceIn(0f, 1f))
+        clip = p < 1f
+        shape = MorphRoundedShape(apparent / sx, apparent / sy)
+    }
+
+    cameraDistance = 16f * density
+    rotationX = spec.foldTilt * rest * (dy / (abs(dy) + card.height * 0.5f))
+}
+
+/**
+ * The window morph for a popup whose progress is owned elsewhere ([progress]
+ * is read at draw time). It grows out of the last tap, which is the button that
+ * opened it, and folds back into it. Put it after the popup's size and before
+ * its clip and background. "Reduce animation" turns it into a plain fade.
+ */
+@Composable
+internal fun Modifier.macOSPopupMorph(
+    progress: () -> Float,
+    cornerRadius: Dp = ALERT_CORNER,
+    spec: MacOSPopupSpec = MacOSPopupSpec(),
+): Modifier {
+    val reduce by AppSettings.reduceAnimation.collectAsState()
+    val tap = remember { PopupTapOrigin.take() }
+    var card by remember { mutableStateOf(Rect.Zero) }
+    return this
+        .onGloballyPositioned { c ->
+            if (c.isAttached) card = Rect(c.localToScreen(Offset.Zero), c.size.toSize())
+        }
+        .graphicsLayer {
+            val b = card
+            val p = progress()
+            if (b.width <= 0f || b.height <= 0f) {
+                alpha = 0f
+                return@graphicsLayer
+            }
+            if (reduce) {
+                alpha = p.coerceIn(0f, 1f)
+                return@graphicsLayer
+            }
+            val half = spec.tapOriginSize.toPx() / 2f
+            val origin = tap?.let { Rect(it.x - half, it.y - half, it.x + half, it.y + half) }
+                ?: Rect(
+                    b.center.x - b.width * 0.3f,
+                    b.center.y - b.height * 0.3f,
+                    b.center.x + b.width * 0.3f,
+                    b.center.y + b.height * 0.3f,
+                )
+            applyMacOSMorph(spec, p, origin, b, cornerRadius.toPx(), true)
+        }
+}
+
+/**
+ * A drop-in for Material's `AlertDialog` that opens with the same macOS morph
+ * as the app's other alerts, in a window of its own ([GlassAlertDialog]).
+ */
+@Composable
+internal fun MacOSAlertDialog(
+    onDismissRequest: () -> Unit,
+    confirmButton: @Composable () -> Unit,
+    dismissButton: (@Composable () -> Unit)? = null,
+    title: (@Composable () -> Unit)? = null,
+    text: (@Composable () -> Unit)? = null,
+) {
+    GlassAlertDialog(onDismiss = onDismissRequest) {
+        CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 12.dp),
+            ) {
+                if (title != null) {
+                    CompositionLocalProvider(LocalTextStyle provides MaterialTheme.typography.titleLarge) {
+                        title()
+                    }
+                    Spacer(Modifier.height(12.dp))
+                }
+                text?.invoke()
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(top = 12.dp),
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    dismissButton?.invoke()
+                    confirmButton()
+                }
+            }
+        }
+    }
 }
 
 /** The dim behind the card, fading with the same progress as the card. */

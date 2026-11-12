@@ -74,6 +74,9 @@ import androidx.compose.ui.unit.max
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import com.music.zenith.R
 import com.music.zenith.data.model.Account
@@ -662,7 +665,20 @@ fun TopBarAccountButton(
         animationSpec = tween(durationMillis = if (hidden) 70 else 180),
         label = "accountButtonVisibility",
     )
-    val extraActions = LocalActionsExtraFraction.current
+    val rawExtraActions = LocalActionsExtraFraction.current
+    // Pecahan mentah melompat dalam satu frame saat aksi lain (share, unduhan)
+    // muncul, padahal pil kaca tumbuh dengan pegas. Dihaluskan dengan pegas yang
+    // sama supaya foto profil mengecil mengikuti pil, bukan loncat.
+    val extraSmooth = remember { Animatable(rawExtraActions().coerceIn(0f, 1f)) }
+    LaunchedEffect(rawExtraActions) {
+        snapshotFlow { rawExtraActions().coerceIn(0f, 1f) }.collectLatest { target ->
+            extraSmooth.animateTo(
+                target,
+                spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow),
+            )
+        }
+    }
+    val extraActions = remember { { extraSmooth.value } }
     val scope = rememberCoroutineScope()
     // Wrapped in an IconButton so it keeps the touch target, the ripple and the
     // spacing every other action in this bar has.
@@ -700,7 +716,7 @@ fun TopBarAccountButton(
                 contentDescription = stringResource(R.string.switch_account),
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
-                    .size(AVATAR_SIZE)
+                    .size(TOP_CONTROL_SIZE)
                     .avatarFill(extraActions)
                     .clip(CircleShape)
                     .thumbnailBorder(CircleShape),
@@ -708,7 +724,7 @@ fun TopBarAccountButton(
         } else {
             Box(
                 modifier = Modifier
-                    .size(AVATAR_SIZE)
+                    .size(TOP_CONTROL_SIZE)
                     .avatarFill(extraActions)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.surfaceVariant)
@@ -719,7 +735,7 @@ fun TopBarAccountButton(
                     Icons.Rounded.Person,
                     contentDescription = stringResource(R.string.switch_account),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp),
+                    modifier = Modifier.size(28.dp),
                 )
             }
         }
@@ -771,8 +787,10 @@ private val LocalActionsExtraFraction =
  * beside it. A draw-time scale, so the layout never shifts.
  */
 private fun Modifier.avatarFill(extraActions: () -> Float): Modifier = graphicsLayer {
-    val fill = TOP_CONTROL_SIZE.value / AVATAR_SIZE.value
-    val scale = fill + (1f - fill) * extraActions().coerceIn(0f, 1f)
+    // The photo is laid out at the full circle size and only shrunk when other
+    // actions share the pill, so alone it is never an upscaled 28dp image.
+    val small = AVATAR_SIZE.value / TOP_CONTROL_SIZE.value
+    val scale = small + (1f - small) * (1f - extraActions().coerceIn(0f, 1f))
     scaleX = scale
     scaleY = scale
 }

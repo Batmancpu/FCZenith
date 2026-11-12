@@ -55,7 +55,10 @@ import com.music.zenith.ui.components.MessageState
 import com.music.zenith.ui.components.PAGE_GUTTER
 import com.music.zenith.ui.components.PullToRefresh
 import com.music.zenith.ui.components.EditorialShelfSkeleton
+import com.music.zenith.ui.components.SectionHeaderSkeleton
+import com.music.zenith.ui.components.ShelfSkeleton
 import com.music.zenith.ui.components.ShimmerBox
+import com.music.zenith.ui.components.SongRowSkeleton
 import com.music.zenith.ui.components.feedSkeleton
 import com.music.zenith.ui.components.instantPressClickable
 
@@ -154,6 +157,15 @@ fun ExploreScreen(
                 when (chartsState) {
                     UiState.Loading -> {
                         if (editorial == null) item(key = "charts-skeleton") { EditorialShelfSkeleton() }
+                        // Bagian di bawah shelf editorial (Latest songs dan kartu chart)
+                        // belum datang: tahan tempatnya supaya halaman tidak kosong.
+                        item(key = "charts-skeleton-latest") {
+                            Column(Modifier.padding(bottom = 26.dp)) {
+                                SectionHeaderSkeleton()
+                                repeat(4) { index -> SongRowSkeleton(index = index) }
+                            }
+                        }
+                        item(key = "charts-skeleton-shelf") { ShelfSkeleton(index = 1) }
                     }
                     is UiState.Error -> {
                         if (editorial == null) item(key = "charts-error") {

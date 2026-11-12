@@ -28,11 +28,11 @@ import kotlinx.coroutines.launch
  * "Reduce animation" mematikannya.
  */
 @Composable
-internal fun Modifier.jellyPopIn(animateIn: Boolean = true): Modifier {
+internal fun Modifier.jellyPopIn(animateIn: Boolean = true, startAt: Float = 0f): Modifier {
     val reduce by AppSettings.reduceAnimation.collectAsState()
     // animateIn = false keeps only the rubber-band pull; the entrance is then
     // owned by MacOSPopupState (see MacOSInspiredPopup.kt).
-    val progress = remember { Animatable(if (reduce || !animateIn) 1f else 0f) }
+    val progress = remember { Animatable(if (reduce || !animateIn) 1f else startAt) }
     LaunchedEffect(reduce, animateIn) {
         if (reduce || !animateIn) {
             progress.snapTo(1f)
