@@ -286,6 +286,56 @@ jobs:
             python3 "$overlay/apply.py"
           fi
 
+      - name: Fill missing Android locale fallbacks for this build
+        if: steps.decision.outputs.should_release == 'true'
+        run: |
+          python3 - <<'PY'
+          import copy
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+
+          base_path = Path("app/src/main/res/values/strings.xml")
+          base_root = ET.parse(base_path).getroot()
+          supported = {"string", "plurals", "string-array"}
+          base_entries = {}
+          for element in list(base_root):
+              name = element.attrib.get("name")
+              if (element.tag in supported and name
+                      and element.attrib.get("translatable") != "false"):
+                  if name in base_entries:
+                      raise SystemExit(f"Duplicate base Android resource: {name}")
+                  base_entries[name] = element
+
+          for qualifier in ("values-in", "values-ko"):
+              locale_path = Path("app/src/main/res") / qualifier / "strings.xml"
+              locale_tree = ET.parse(locale_path)
+              locale_root = locale_tree.getroot()
+              locale_entries = {}
+              for element in list(locale_root):
+                  name = element.attrib.get("name")
+                  if element.tag in supported and name:
+                      locale_entries.setdefault(name, []).append(element)
+
+              added = 0
+              for name, base_element in base_entries.items():
+                  existing = locale_entries.get(name, [])
+                  if any(item.attrib.get("translatable") != "false" for item in existing):
+                      continue
+
+                  # Replace a locale-specific translatable=false placeholder if one
+                  # exists; otherwise append the same English fallback Android
+                  # would resolve at runtime. Existing translations are untouched.
+                  for item in existing:
+                      locale_root.remove(item)
+                  locale_root.append(copy.deepcopy(base_element))
+                  added += 1
+
+              if added:
+                  locale_tree.write(locale_path, encoding="utf-8", xml_declaration=True)
+                  ET.parse(locale_path)  # Fail here if generated XML is malformed.
+              print(f"{qualifier}: added {added} English fallback entries for this build.")
+          PY
+
       - name: Run production unit tests
         if: steps.decision.outputs.should_release == 'true'
         env:
