@@ -63,6 +63,7 @@ class SpatialAudioProcessor : BaseAudioProcessor() {
         var peakAmplitude = 0.0
         var lowLeft = 0.0
         var lowRight = 0.0
+        var nextFrameOffset = 0
         var completed = false
     }
 
@@ -82,9 +83,10 @@ class SpatialAudioProcessor : BaseAudioProcessor() {
                 val id = currentTrackId
                 if (id != null) {
                     val rate = sampleRate.takeIf { it > 0 } ?: FALLBACK_SAMPLE_RATE
+                    val analysisRate = analysisSampleRate(rate)
                     profileAccumulator = ProfileAccumulator(
-                        id, currentTitle, currentArtist, rate, lowpassAlpha(rate),
-                        rate.toLong() * PROFILE_SECONDS,
+                        id, currentTitle, currentArtist, analysisRate, lowpassAlpha(analysisRate),
+                        analysisRate.toLong() * PROFILE_SECONDS,
                     )
                 }
             }
@@ -125,29 +127,38 @@ class SpatialAudioProcessor : BaseAudioProcessor() {
     }
 
     private fun newProfileAccumulator(id: String, title: String, artist: String): ProfileAccumulator {
-        val rate = sampleRate.takeIf { it > 0 } ?: FALLBACK_SAMPLE_RATE
+        val sourceRate = sampleRate.takeIf { it > 0 } ?: FALLBACK_SAMPLE_RATE
+        val analysisRate = analysisSampleRate(sourceRate)
         return ProfileAccumulator(
-            id, title, artist, rate, lowpassAlpha(rate), rate.toLong() * PROFILE_SECONDS,
+            id, title, artist, analysisRate, lowpassAlpha(analysisRate),
+            analysisRate.toLong() * PROFILE_SECONDS,
         )
     }
+
+    /** 6 kHz analysis at 48 kHz source: enough for mix texture, 8x fewer samples. */
+    private fun analysisSampleRate(sourceRate: Int): Int =
+        (sourceRate / PROFILE_SAMPLE_STRIDE).coerceAtLeast(1)
 
     private fun lowpassAlpha(rate: Int): Double =
         1.0 - kotlin.math.exp(-2.0 * kotlin.math.PI * LOWPASS_HZ / rate.toDouble())
 
+    /**
+     * Feature sampling is intentionally decimated. The audio thread performs
+     * one lightweight profile update per eight frames, not a second full-rate
+     * analysis pass; the DSP output loop remains unchanged.
+     */
     private fun observeFloatSamples(block: AudioBlock) {
         if (!learningEnabled || !profileLearningAllowed) return
         val accumulator = profileAccumulator ?: return
         if (accumulator.completed || accumulator.frames >= accumulator.targetFrames) return
-        val count = minOf(
-            block.frameCount,
-            block.samples.size / 2,
-            (accumulator.targetFrames - accumulator.frames).coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
-        )
-        var index = 0
-        repeat(count) {
+        val availableFrames = minOf(block.frameCount, block.samples.size / 2)
+        var frame = accumulator.nextFrameOffset
+        while (frame < availableFrames && accumulator.frames < accumulator.targetFrames) {
+            val index = frame * 2
             observeFrame(accumulator, block.samples[index].toDouble(), block.samples[index + 1].toDouble())
-            index += 2
+            frame += PROFILE_SAMPLE_STRIDE
         }
+        accumulator.nextFrameOffset = (frame - availableFrames).coerceAtLeast(0)
         finishProfile(accumulator)
     }
 
@@ -156,14 +167,16 @@ class SpatialAudioProcessor : BaseAudioProcessor() {
         val accumulator = profileAccumulator ?: return
         if (accumulator.completed || accumulator.frames >= accumulator.targetFrames) return
         val view = input.duplicate().order(ByteOrder.nativeOrder())
-        val count = minOf(
-            view.remaining() / BYTES_PER_FRAME,
-            (accumulator.targetFrames - accumulator.frames).coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
-        )
+        val start = view.position()
+        val availableFrames = view.remaining() / BYTES_PER_FRAME
+        var frame = accumulator.nextFrameOffset
         val scale = 1.0 / 32768.0
-        repeat(count) {
+        while (frame < availableFrames && accumulator.frames < accumulator.targetFrames) {
+            view.position(start + frame * BYTES_PER_FRAME)
             observeFrame(accumulator, view.short.toDouble() * scale, view.short.toDouble() * scale)
+            frame += PROFILE_SAMPLE_STRIDE
         }
+        accumulator.nextFrameOffset = (frame - availableFrames).coerceAtLeast(0)
         finishProfile(accumulator)
     }
 
@@ -260,9 +273,10 @@ class SpatialAudioProcessor : BaseAudioProcessor() {
         this.channelCount = channelCount
         if (sampleRate > 0) {
             profileAccumulator?.takeIf { it.frames == 0L }?.let {
-                it.sampleRateHz = sampleRate
-                it.lowpassAlpha = lowpassAlpha(sampleRate)
-                it.targetFrames = sampleRate.toLong() * PROFILE_SECONDS
+                val analysisRate = analysisSampleRate(sampleRate)
+                it.sampleRateHz = analysisRate
+                it.lowpassAlpha = lowpassAlpha(analysisRate)
+                it.targetFrames = analysisRate.toLong() * PROFILE_SECONDS
             }
         }
         if (channelCount != 2 || sampleRate <= 0) {
@@ -290,7 +304,6 @@ class SpatialAudioProcessor : BaseAudioProcessor() {
     fun process(block: AudioBlock) {
         if (block.frameCount == 0) return
         if (block.channelCount != 2) return // Spatial widening only applies to stereo
-        observeFloatSamples(block)
 
         val delaySize = delayLeft.size
         if (delaySize == 0) return
@@ -300,9 +313,17 @@ class SpatialAudioProcessor : BaseAudioProcessor() {
             mix = target
             snapMix = false
         }
-        if (mix == 0f && target == 0f) return
+        if (mix == 0f && target == 0f) {
+            observeFloatSamples(block)
+            return
+        }
         val step = rampStep()
 
+        val profile = profileAccumulator?.takeIf {
+            learningEnabled && profileLearningAllowed &&
+                !it.completed && it.frames < it.targetFrames
+        }
+        var profileFrameOffset = profile?.nextFrameOffset ?: 0
         val totalSamples = block.frameCount * 2
         var idx = 0
         var dIdx = delayIndex
@@ -312,6 +333,14 @@ class SpatialAudioProcessor : BaseAudioProcessor() {
         while (idx < totalSamples) {
             val left = block.samples[idx]
             val right = block.samples[idx + 1]
+
+            if (profile != null && profile.frames < profile.targetFrames) {
+                if (profileFrameOffset == 0) {
+                    observeFrame(profile, left.toDouble(), right.toDouble())
+                    profileFrameOffset = PROFILE_SAMPLE_STRIDE
+                }
+                profileFrameOffset--
+            }
 
             val mid = (left + right) * 0.5f
             val side = (left - right) * 0.5f * widthGain
@@ -343,6 +372,10 @@ class SpatialAudioProcessor : BaseAudioProcessor() {
         delayIndex = dIdx
         lowpassLeft = lpL
         lowpassRight = lpR
+        if (profile != null) {
+            profile.nextFrameOffset = profileFrameOffset
+            finishProfile(profile)
+        }
     }
 
     /**
@@ -395,7 +428,6 @@ class SpatialAudioProcessor : BaseAudioProcessor() {
     override fun queueInput(inputBuffer: java.nio.ByteBuffer) {
         val frameCount = inputBuffer.remaining() / BYTES_PER_FRAME
         if (frameCount == 0) return
-        observePcm16Samples(inputBuffer)
         val outputBuffer = replaceOutputBuffer(frameCount * BYTES_PER_FRAME)
 
         val target = if (enabled) 1f else 0f
@@ -404,6 +436,7 @@ class SpatialAudioProcessor : BaseAudioProcessor() {
             snapMix = false
         }
         if (mix == 0f && target == 0f) {
+            observePcm16Samples(inputBuffer)
             outputBuffer.put(inputBuffer)
             outputBuffer.flip()
             return
@@ -424,10 +457,23 @@ class SpatialAudioProcessor : BaseAudioProcessor() {
         var lpL = lowpassLeft
         var lpR = lowpassRight
         val invScale = 1.0f / 32768.0f
+        val profile = profileAccumulator?.takeIf {
+            learningEnabled && profileLearningAllowed &&
+                !it.completed && it.frames < it.targetFrames
+        }
+        var profileFrameOffset = profile?.nextFrameOffset ?: 0
 
         repeat(frameCount) {
             val left = inputBuffer.short.toFloat() * invScale
             val right = inputBuffer.short.toFloat() * invScale
+
+            if (profile != null && profile.frames < profile.targetFrames) {
+                if (profileFrameOffset == 0) {
+                    observeFrame(profile, left.toDouble(), right.toDouble())
+                    profileFrameOffset = PROFILE_SAMPLE_STRIDE
+                }
+                profileFrameOffset--
+            }
 
             val mid = (left + right) * 0.5f
             val side = (left - right) * 0.5f * widthGain
@@ -457,6 +503,10 @@ class SpatialAudioProcessor : BaseAudioProcessor() {
         delayIndex = dIdx
         lowpassLeft = lpL
         lowpassRight = lpR
+        if (profile != null) {
+            profile.nextFrameOffset = profileFrameOffset
+            finishProfile(profile)
+        }
 
         outputBuffer.flip()
     }
@@ -471,6 +521,7 @@ class SpatialAudioProcessor : BaseAudioProcessor() {
         const val RAMP_MS = 300f
         const val PROFILE_SECONDS = 8L
         const val FALLBACK_SAMPLE_RATE = 48_000
+        const val PROFILE_SAMPLE_STRIDE = 8
         const val LOWPASS_HZ = 120.0
         const val EPSILON = 1.0e-12
     }

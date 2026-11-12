@@ -1608,7 +1608,7 @@
     <string name="spatial_audio_learning_header">Pembelajaran pribadi</string>
     <string name="spatial_audio_learning_enabled">Pelajari pilihan saya</string>
     <string name="spatial_audio_learning_enabled_subtitle">Hanya menggunakan pilihan Aktif/Nonaktif per trek dan pengukuran campuran stereo lokal.</string>
-    <string name="spatial_audio_learning_body">Mode Otomatis mengukur delapan detik pertama audio stereo yang memenuhi syarat. Aplikasi hanya menyimpan statistik campuran, bukan audio. Sedikitnya tiga trek serupa dan kesesuaian 78% diperlukan sebelum efek diaktifkan otomatis. Trek dengan bukti yang tidak pasti tetap nonaktif. Genre atau data populasi tidak ditebak.</string>
+    <string name="spatial_audio_learning_body">Mode Otomatis mengukur delapan detik pertama audio stereo yang memenuhi syarat. Aplikasi hanya menyimpan statistik campuran, bukan audio. Sedikitnya empat trek serupa dan kesesuaian 82% diperlukan sebelum efek diaktifkan otomatis. Trek dengan bukti yang tidak pasti tetap nonaktif. Genre atau data populasi tidak ditebak.</string>
     <string name="spatial_audio_stats_header">Ringkasan pembelajaran</string>
     <string name="spatial_audio_stats_on">Trek yang Anda tandai Aktif</string>
     <string name="spatial_audio_stats_off">Trek yang Anda tandai Nonaktif</string>
@@ -1630,7 +1630,7 @@
     <string name="spatial_audio_decision_auto_on">Mode Otomatis mengaktifkan trek ini berdasarkan %1$d trek serupa (%2$d Aktif, %3$d Nonaktif; kesesuaian berbobot %4$d%%).</string>
     <string name="spatial_audio_decision_auto_off">Mode Otomatis membiarkan trek ini nonaktif berdasarkan %1$d trek serupa (%2$d Aktif, %3$d Nonaktif; kesesuaian berbobot untuk Nonaktif %4$d%%).</string>
     <string name="spatial_audio_decision_uncertain">Mode Otomatis tetap nonaktif karena masukan bercampur (%1$d Aktif dan %2$d Nonaktif dari %3$d trek serupa).</string>
-    <string name="spatial_audio_decision_insufficient">Mode Otomatis tetap nonaktif: hanya %1$d trek berlabel serupa yang ditemukan; diperlukan sedikitnya 3.</string>
+    <string name="spatial_audio_decision_insufficient">Mode Otomatis tetap nonaktif: hanya %1$d trek berlabel serupa yang ditemukan; diperlukan sedikitnya 4.</string>
     <string name="spatial_audio_decision_no_profile">Mode Otomatis tetap nonaktif karena profil campuran stereo yang valid untuk trek ini belum tersedia.</string>
     <string name="spatial_audio_decision_learning_disabled">Pembelajaran pribadi dijeda, jadi Mode Otomatis tetap nonaktif.</string>
     <string name="spatial_audio_decision_phone_speaker">Audio Spasial diblokir pada speaker bawaan ponsel oleh pengaturan keluaran Anda.</string>
@@ -1641,4 +1641,5 @@
     <string name="spatial_audio_decision_global_on">Mode Audio Spasial global Aktif.</string>
     <string name="spatial_audio_decision_global_off">Mode Audio Spasial global Nonaktif.</string>
     <string name="spatial_audio_similar_tracks">Trek serupa yang digunakan sebagai bukti: %1$s.</string>
+    <string name="spatial_audio_decision_low_independent_evidence">Mode Otomatis tetap nonaktif karena satu atau dua kecocokan yang sangat dekat mendominasi penilaian (dukungan efektif %.1f; diperlukan sedikitnya 3,0).</string>
 </resources>

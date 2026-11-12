@@ -49,11 +49,12 @@ class SpatialAudioLearningTest {
     }
 
     @Test
-    fun threeSimilarExplicitOnChoicesCanTeachAuto() {
+    fun fourSimilarExplicitOnChoicesCanTeachAuto() {
         val result = decide(examples = listOf(
             example("one", SpatialAudioFeedback.ON),
             example("two", SpatialAudioFeedback.ON),
             example("three", SpatialAudioFeedback.ON),
+            example("four", SpatialAudioFeedback.ON),
         ))
         assertTrue(result.enabled)
         assertEquals(SpatialAudioDecisionReason.AUTO_LEARNED_ON, result.reason)
@@ -61,11 +62,12 @@ class SpatialAudioLearningTest {
     }
 
     @Test
-    fun threeSimilarExplicitOffChoicesTeachAutoToStayOff() {
+    fun fourSimilarExplicitOffChoicesTeachAutoToStayOff() {
         val result = decide(examples = listOf(
             example("one", SpatialAudioFeedback.OFF),
             example("two", SpatialAudioFeedback.OFF),
             example("three", SpatialAudioFeedback.OFF),
+            example("four", SpatialAudioFeedback.OFF),
         ))
         assertFalse(result.enabled)
         assertEquals(SpatialAudioDecisionReason.AUTO_LEARNED_OFF, result.reason)
@@ -81,6 +83,41 @@ class SpatialAudioLearningTest {
         ))
         assertFalse(result.enabled)
         assertEquals(SpatialAudioDecisionReason.AUTO_UNCERTAIN, result.reason)
+    }
+
+    @Test
+    fun fourOfFiveChoicesDoNotCrossTheEightyTwoPercentConfidenceGate() {
+        val result = decide(examples = listOf(
+            example("one", SpatialAudioFeedback.ON),
+            example("two", SpatialAudioFeedback.ON),
+            example("three", SpatialAudioFeedback.ON),
+            example("four", SpatialAudioFeedback.ON),
+            example("five", SpatialAudioFeedback.OFF),
+        ))
+        assertFalse(result.enabled)
+        assertEquals(SpatialAudioDecisionReason.AUTO_UNCERTAIN, result.reason)
+    }
+
+    @Test
+    fun aSingleVeryCloseTrackCannotOutvoteSeveralWeakerMatches() {
+        val farther = profile(width = 1.7f, correlation = 0.6f, lowSide = 0.75f, high = 0.5f, crest = 4.5f)
+        val result = decide(examples = listOf(
+            example("near", SpatialAudioFeedback.ON),
+            example("far-one", SpatialAudioFeedback.OFF, "Other A").copy(profile = farther),
+            example("far-two", SpatialAudioFeedback.OFF, "Other B").copy(profile = farther),
+            example("far-three", SpatialAudioFeedback.OFF, "Other C").copy(profile = farther),
+        ))
+        assertFalse(result.enabled)
+        assertEquals(SpatialAudioDecisionReason.AUTO_LOW_INDEPENDENT_EVIDENCE, result.reason)
+    }
+
+    @Test
+    fun decimatedSixKilohertzProfilesRemainUsableAndOldFullRateProfilesStayValid() {
+        val decimated = profile().copy(sampleRateHz = 6_000, frameCount = 6_000L * 8L)
+        assertTrue(decimated.isUsable)
+        val tooShort = decimated.copy(frameCount = 6_000L * 3L)
+        assertFalse(tooShort.isUsable)
+        assertTrue(profile().isUsable)
     }
 
     @Test

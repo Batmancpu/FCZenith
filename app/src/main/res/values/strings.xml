@@ -1491,7 +1491,7 @@
     <string name="spatial_audio_learning_header">Personal learning</string>
     <string name="spatial_audio_learning_enabled">Learn from my choices</string>
     <string name="spatial_audio_learning_enabled_subtitle">Uses only explicit per-track On/Off choices and local stereo mix measurements.</string>
-    <string name="spatial_audio_learning_body">Auto measures the first eight seconds of eligible stereo audio. It stores mix statistics, not audio. At least three similar tracks and 78% agreement are needed before Auto turns widening on. Uncertain tracks stay off. No genre or population data is guessed.</string>
+    <string name="spatial_audio_learning_body">Auto measures the first eight seconds of eligible stereo audio. It stores mix statistics, not audio. At least four similar tracks and 82% agreement are needed before Auto turns widening on. Uncertain tracks stay off. No genre or population data is guessed.</string>
     <string name="spatial_audio_stats_header">Learning summary</string>
     <string name="spatial_audio_stats_on">Tracks you marked On</string>
     <string name="spatial_audio_stats_off">Tracks you marked Off</string>
@@ -1513,7 +1513,7 @@
     <string name="spatial_audio_decision_auto_on">Auto enabled this track using %1$d similar tracks (%2$d On, %3$d Off; %4$d%% weighted agreement).</string>
     <string name="spatial_audio_decision_auto_off">Auto kept this track off using %1$d similar tracks (%2$d On, %3$d Off; %4$d%% weighted agreement for Off).</string>
     <string name="spatial_audio_decision_uncertain">Auto stayed off because feedback was mixed (%1$d On and %2$d Off across %3$d similar tracks).</string>
-    <string name="spatial_audio_decision_insufficient">Auto stayed off: only %1$d similar labelled tracks were found; at least 3 are required.</string>
+    <string name="spatial_audio_decision_insufficient">Auto stayed off: only %1$d similar labelled tracks were found; at least 4 are required.</string>
     <string name="spatial_audio_decision_no_profile">Auto stayed off because this track does not yet have a valid stereo mix profile.</string>
     <string name="spatial_audio_decision_learning_disabled">Personal learning is paused, so Auto stays off.</string>
     <string name="spatial_audio_decision_phone_speaker">Spatial Audio is blocked on the built-in speaker by your output setting.</string>
@@ -1524,4 +1524,5 @@
     <string name="spatial_audio_decision_global_on">Global Spatial Audio mode is On.</string>
     <string name="spatial_audio_decision_global_off">Global Spatial Audio mode is Off.</string>
     <string name="spatial_audio_similar_tracks">Similar tracks used as evidence: %1$s.</string>
+    <string name="spatial_audio_decision_low_independent_evidence">Auto stayed off because one or two very close matches dominated the vote (effective support %.1f; at least 3.0 is required).</string>
 </resources>

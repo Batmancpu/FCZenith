@@ -31,6 +31,7 @@ import com.music.zenith.playback.SpatialAudioProfile
 import com.music.zenith.playback.SpatialAudioTrackRecord
 import com.music.zenith.ui.components.VideoThumbnails
 import kotlinx.coroutines.flow.MutableStateFlow
+import java.util.concurrent.Executors
 
 
 /**
@@ -305,6 +306,16 @@ enum class SongSort {
  * no restart, no rebinding.
  */
 object AppSettings {
+    /**
+     * Serial background writer: JSON encoding and feature-vector rebuilding can
+     * touch thousands of local records, so neither runs on the audio or UI path.
+     * A single executor also preserves write order if a profile and manual
+     * preference arrive almost simultaneously.
+     */
+    private val spatialAudioIoExecutor = Executors.newSingleThreadExecutor { task ->
+        Thread(task, "SpatialAudioPrefs").apply { isDaemon = true }
+    }
+
 
     private lateinit var prefs: SharedPreferences
 
@@ -523,6 +534,8 @@ object AppSettings {
     val spatialAudioByTrack = MutableStateFlow<Map<String, Boolean>>(emptyMap())
     val spatialAudioTrackPreferences = MutableStateFlow<Map<String, SpatialAudioPreference>>(emptyMap())
     val spatialAudioRecords = MutableStateFlow<Map<String, SpatialAudioTrackRecord>>(emptyMap())
+    /** Precomputed personal training examples; rebuilt only when local records change. */
+    val spatialAudioTrainingExamples = MutableStateFlow<List<SpatialAudioExample>>(emptyList())
     val spatialAudioOnPhoneSpeaker = MutableStateFlow(false)
     val spatialAudioLearningEnabled = MutableStateFlow(true)
     val spatialAudioCurrentDecision = MutableStateFlow<SpatialAudioDecision?>(null)
@@ -1351,6 +1364,10 @@ object AppSettings {
             }
         }
         if (migratedRecords.size != spatialAudioRecords.value.size) persistSpatialAudioRecords(migratedRecords)
+        val initialRecords = spatialAudioRecords.value
+        spatialAudioIoExecutor.execute {
+            spatialAudioTrainingExamples.value = buildSpatialAudioExamples(initialRecords)
+        }
         spatialAudioOnPhoneSpeaker.value = prefs.getBoolean(KEY_SPATIAL_AUDIO_ON_PHONE_SPEAKER, false)
         spatialAudioLearningEnabled.value = prefs.getBoolean(KEY_SPATIAL_AUDIO_LEARNING_ENABLED, true)
         equalizerEnabled.value = prefs.getBoolean(KEY_EQ_ENABLED, false)
@@ -1766,6 +1783,7 @@ object AppSettings {
     }
 
     /** Manual feedback is the only source of labels used by Auto. Auto clears an override, not its label. */
+    @Synchronized
     fun setSpatialAudioPreference(
         trackId: String,
         title: String,
@@ -1794,9 +1812,6 @@ object AppSettings {
         if (preference == SpatialAudioPreference.AUTO) nextPreferences.remove(trackId)
         else nextPreferences[trackId] = preference
         spatialAudioTrackPreferences.value = nextPreferences
-        val preferencesJson = org.json.JSONObject()
-        nextPreferences.forEach { (id, value) -> preferencesJson.put(id, value.name) }
-
         // Keep the old Boolean map readable by earlier versions and existing backups.
         val legacy = LinkedHashMap(spatialAudioByTrack.value)
         when (preference) {
@@ -1806,15 +1821,22 @@ object AppSettings {
         }
         while (legacy.size > MAX_SPATIAL_TRACKS) legacy.remove(legacy.keys.first())
         spatialAudioByTrack.value = legacy
-        val legacyJson = org.json.JSONObject()
-        legacy.forEach { (id, enabled) -> legacyJson.put(id, enabled) }
-        prefs.edit()
-            .putString(KEY_SPATIAL_AUDIO_PREFERENCES, preferencesJson.toString())
-            .putString(KEY_SPATIAL_AUDIO_BY_TRACK, legacyJson.toString())
-            .apply()
+        val preferencesSnapshot = nextPreferences.toMap()
+        val legacySnapshot = legacy.toMap()
+        spatialAudioIoExecutor.execute {
+            val preferencesJson = org.json.JSONObject()
+            preferencesSnapshot.forEach { (id, value) -> preferencesJson.put(id, value.name) }
+            val legacyJson = org.json.JSONObject()
+            legacySnapshot.forEach { (id, enabled) -> legacyJson.put(id, enabled) }
+            prefs.edit()
+                .putString(KEY_SPATIAL_AUDIO_PREFERENCES, preferencesJson.toString())
+                .putString(KEY_SPATIAL_AUDIO_BY_TRACK, legacyJson.toString())
+                .apply()
+        }
     }
 
     /** Called after an eight-second mix fingerprint has been computed off the audio buffer. */
+    @Synchronized
     fun setSpatialAudioProfile(
         trackId: String,
         title: String,
@@ -1835,41 +1857,52 @@ object AppSettings {
     }
 
     /** Explicit feedback and a valid local profile are both required to train Auto. */
-    fun spatialAudioExamples(): List<SpatialAudioExample> =
-        spatialAudioRecords.value.values.mapNotNull { record ->
+    fun spatialAudioExamples(): List<SpatialAudioExample> = spatialAudioTrainingExamples.value
+
+    private fun buildSpatialAudioExamples(
+        records: Map<String, SpatialAudioTrackRecord>,
+    ): List<SpatialAudioExample> =
+        records.values.mapNotNull { record ->
             val profile = record.profile?.takeIf { it.isUsable } ?: return@mapNotNull null
             if (record.feedback == SpatialAudioFeedback.NONE) return@mapNotNull null
             SpatialAudioExample(record.trackId, record.artist, record.feedback, profile)
         }
 
     private fun persistSpatialAudioRecords(records: Map<String, SpatialAudioTrackRecord>) {
-        val bounded = LinkedHashMap<String, SpatialAudioTrackRecord>()
-        records.values.sortedByDescending { it.updatedAtMs }
-            .take(MAX_SPATIAL_AUDIO_RECORDS)
-            .forEach { bounded[it.trackId] = it }
-        spatialAudioRecords.value = bounded
-        val json = org.json.JSONObject()
-        bounded.forEach { (id, record) ->
-            val item = org.json.JSONObject()
-                .put("title", record.title)
-                .put("artist", record.artist)
-                .put("preference", record.preference.name)
-                .put("feedback", record.feedback.name)
-                .put("updatedAt", record.updatedAtMs)
-            record.profile?.let { profile ->
-                item.put("profile", org.json.JSONObject()
-                    .put("sampleRateHz", profile.sampleRateHz)
-                    .put("frameCount", profile.frameCount)
-                    .put("stereoWidth", profile.stereoWidth.toDouble())
-                    .put("channelCorrelation", profile.channelCorrelation.toDouble())
-                    .put("lowFrequencySideRatio", profile.lowFrequencySideRatio.toDouble())
-                    .put("highFrequencyRatio", profile.highFrequencyRatio.toDouble())
-                    .put("crestFactor", profile.crestFactor.toDouble())
-                    .put("rms", profile.rms.toDouble()))
-            }
-            json.put(id, item)
+        val bounded = LinkedHashMap(records)
+        if (bounded.size > MAX_SPATIAL_AUDIO_RECORDS) {
+            val oldest = bounded.values.minByOrNull { it.updatedAtMs }
+            oldest?.let { bounded.remove(it.trackId) }
         }
-        prefs.edit().putString(KEY_SPATIAL_AUDIO_RECORDS, json.toString()).apply()
+        spatialAudioRecords.value = bounded
+
+        // This serial executor keeps JSON encoding and the O(n) feature-index
+        // rebuild off Main and off the real-time audio callback.
+        spatialAudioIoExecutor.execute {
+            spatialAudioTrainingExamples.value = buildSpatialAudioExamples(bounded)
+            val json = org.json.JSONObject()
+            bounded.forEach { (id, record) ->
+                val item = org.json.JSONObject()
+                    .put("title", record.title)
+                    .put("artist", record.artist)
+                    .put("preference", record.preference.name)
+                    .put("feedback", record.feedback.name)
+                    .put("updatedAt", record.updatedAtMs)
+                record.profile?.let { profile ->
+                    item.put("profile", org.json.JSONObject()
+                        .put("sampleRateHz", profile.sampleRateHz)
+                        .put("frameCount", profile.frameCount)
+                        .put("stereoWidth", profile.stereoWidth.toDouble())
+                        .put("channelCorrelation", profile.channelCorrelation.toDouble())
+                        .put("lowFrequencySideRatio", profile.lowFrequencySideRatio.toDouble())
+                        .put("highFrequencyRatio", profile.highFrequencyRatio.toDouble())
+                        .put("crestFactor", profile.crestFactor.toDouble())
+                        .put("rms", profile.rms.toDouble()))
+                }
+                json.put(id, item)
+            }
+            prefs.edit().putString(KEY_SPATIAL_AUDIO_RECORDS, json.toString()).apply()
+        }
     }
 
     private fun readSpatialAudioRecords(): Map<String, SpatialAudioTrackRecord> {

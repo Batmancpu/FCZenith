@@ -3296,6 +3296,10 @@ private fun SpatialAudioSettingsContent() {
             R.string.spatial_audio_decision_insufficient,
             currentDecision?.similarTrackCount ?: 0,
         )
+        SpatialAudioDecisionReason.AUTO_LOW_INDEPENDENT_EVIDENCE -> stringResource(
+            R.string.spatial_audio_decision_low_independent_evidence,
+            currentDecision?.effectiveSampleCount ?: 0f,
+        )
         SpatialAudioDecisionReason.AUTO_UNCERTAIN -> stringResource(
             R.string.spatial_audio_decision_uncertain,
             currentDecision?.onVotes ?: 0,

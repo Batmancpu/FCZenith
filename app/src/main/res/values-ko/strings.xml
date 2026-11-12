@@ -1261,7 +1261,7 @@
     <string name="spatial_audio_learning_header">개인 학습</string>
     <string name="spatial_audio_learning_enabled">내 선택으로 학습</string>
     <string name="spatial_audio_learning_enabled_subtitle">트랙별 명시적 켜기/끄기 선택과 기기 내 스테레오 믹스 측정값만 사용합니다.</string>
-    <string name="spatial_audio_learning_body">자동 모드는 지원되는 스테레오 오디오의 처음 8초를 측정합니다. 오디오는 저장하지 않고 믹스 통계만 저장합니다. 유사한 트랙이 최소 3개이고 일치율이 78% 이상이어야 자동으로 효과를 켭니다. 불확실한 트랙은 꺼진 상태로 유지됩니다. 장르나 전체 사용자 데이터는 추측하지 않습니다.</string>
+    <string name="spatial_audio_learning_body">자동 모드는 지원되는 스테레오 오디오의 처음 8초를 측정합니다. 오디오는 저장하지 않고 믹스 통계만 저장합니다. 유사한 트랙이 최소 4개이고 일치율이 82% 이상이어야 자동으로 효과를 켭니다. 불확실한 트랙은 꺼진 상태로 유지됩니다. 장르나 전체 사용자 데이터는 추측하지 않습니다.</string>
     <string name="spatial_audio_stats_header">학습 요약</string>
     <string name="spatial_audio_stats_on">켜기로 표시한 트랙</string>
     <string name="spatial_audio_stats_off">끄기로 표시한 트랙</string>
@@ -1283,7 +1283,7 @@
     <string name="spatial_audio_decision_auto_on">자동 모드는 유사한 트랙 %1$d개를 바탕으로 이 트랙을 켰습니다(켜기 %2$d개, 끄기 %3$d개; 가중 일치율 %4$d%%).</string>
     <string name="spatial_audio_decision_auto_off">자동 모드는 유사한 트랙 %1$d개를 바탕으로 이 트랙을 꺼 두었습니다(켜기 %2$d개, 끄기 %3$d개; 끄기 가중 일치율 %4$d%%).</string>
     <string name="spatial_audio_decision_uncertain">유사한 트랙의 피드백이 엇갈려 자동 모드는 꺼진 상태를 유지했습니다(켜기 %1$d개, 끄기 %2$d개, 유사 트랙 %3$d개).</string>
-    <string name="spatial_audio_decision_insufficient">자동 모드는 꺼진 상태를 유지했습니다. 유사한 라벨 트랙이 %1$d개뿐이며 최소 3개가 필요합니다.</string>
+    <string name="spatial_audio_decision_insufficient">자동 모드는 꺼진 상태를 유지했습니다. 유사한 라벨 트랙이 %1$d개뿐이며 최소 4개가 필요합니다.</string>
     <string name="spatial_audio_decision_no_profile">이 트랙에 유효한 스테레오 믹스 프로필이 아직 없어 자동 모드는 꺼져 있습니다.</string>
     <string name="spatial_audio_decision_learning_disabled">개인 학습이 일시 중지되어 자동 모드는 꺼진 상태를 유지합니다.</string>
     <string name="spatial_audio_decision_phone_speaker">출력 설정에 따라 내장 스피커에서는 공간 오디오가 차단됩니다.</string>
@@ -1294,4 +1294,5 @@
     <string name="spatial_audio_decision_global_on">전역 공간 오디오 모드가 켜져 있습니다.</string>
     <string name="spatial_audio_decision_global_off">전역 공간 오디오 모드가 꺼져 있습니다.</string>
     <string name="spatial_audio_similar_tracks">판단 근거로 사용된 유사 트랙: %1$s.</string>
+    <string name="spatial_audio_decision_low_independent_evidence">매우 가까운 소수의 유사 트랙이 판단을 지배해 자동 모드는 꺼진 상태를 유지했습니다(유효 근거 %.1f, 최소 3.0 필요).</string>
 </resources>

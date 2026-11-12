@@ -3427,7 +3427,9 @@ class PlaybackService : MediaLibraryService() {
         ownsSession: Boolean,
     ): ExoPlayer {
         spatial.onProfileReady = { trackId, title, artist, profile ->
-            android.os.Handler(android.os.Looper.getMainLooper()).post {
+            // JSON persistence and feature-index rebuilding never run on the
+            // audio callback or UI thread.
+            scope.launch(Dispatchers.IO) {
                 AppSettings.setSpatialAudioProfile(trackId, title, artist, profile)
             }
         }
@@ -3447,13 +3449,19 @@ class PlaybackService : MediaLibraryService() {
         built.addListener(object : Player.Listener {
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 val song = mediaItem?.toSong()
+                val trackId = mediaItem?.mediaId?.takeIf { it.isNotBlank() }
+                    ?: song?.videoId?.takeIf { it.isNotBlank() }
+                val isAtmos = trackId?.let { NerdStats.declaredFormat(it)?.isDolbyAtmos == true } == true
+                val alreadyProfiled = trackId?.let {
+                    AppSettings.spatialAudioRecords.value[it]?.profile?.isUsable == true
+                } == true
                 spatial.setTrackContext(
-                    trackId = mediaItem?.mediaId,
+                    trackId = trackId,
                     title = song?.title,
                     artist = song?.artist,
-                    allowProfile = NerdStats.declaredFormat(mediaItem?.mediaId)?.isDolbyAtmos != true,
+                    allowProfile = !isAtmos && !alreadyProfiled,
                 )
-                applySpatialAudioEnabled(mediaItem?.mediaId)
+                applySpatialAudioEnabled(trackId)
             }
         })
         return built
@@ -7252,7 +7260,8 @@ class PlaybackService : MediaLibraryService() {
                 AppSettings.spatialAudioMode,
                 AppSettings.spatialAudioTrackPreferences,
                 AppSettings.spatialAudioRecords,
-            ) { _, _, _ -> Unit }
+                AppSettings.spatialAudioTrainingExamples,
+            ) { _, _, _, _ -> Unit }
                 .combine(AppSettings.spatialAudioOnPhoneSpeaker) { _, _ -> Unit }
                 .combine(AppSettings.spatialAudioLearningEnabled) { _, _ -> Unit }
                 .combine(
@@ -7348,6 +7357,12 @@ class PlaybackService : MediaLibraryService() {
             val activeMediaId = player?.currentMediaItem?.mediaId
             val atmos = NerdStats.declaredFormat(trackId)?.isDolbyAtmos == true ||
                 (trackId == activeMediaId && activeTrackIsDolbyAtmos)
+            if (atmos) {
+                // A late format report can identify Atmos after item transition.
+                // Stop profiling that stream rather than storing its decoded mix
+                // as an ordinary stereo preference example.
+                processor.setTrackContext(trackId, processor.currentTitle, processor.currentArtist, allowProfile = false)
+            }
             return SpatialAudioLearner.decide(
                 mode = mode,
                 preference = preference,
