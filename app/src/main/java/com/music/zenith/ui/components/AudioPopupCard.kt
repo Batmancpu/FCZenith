@@ -106,6 +106,8 @@ internal fun AudioPopupCard(
                     onClick = {},
                 ),
         ) {
+            // The children fade in once the card has grown out of its trigger.
+            Column(Modifier.fillMaxWidth().macOSPopupContent(popup)) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -144,6 +146,7 @@ internal fun AudioPopupCard(
             // icon lane, which left this one sitting right of centre.
             PipelineRule(Modifier)
             PipelineDoneAction(label = doneLabel, onClick = popup::requestClose)
+            }
         }
     }
 }

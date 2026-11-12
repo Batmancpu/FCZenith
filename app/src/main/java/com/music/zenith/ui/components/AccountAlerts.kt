@@ -939,7 +939,10 @@ internal fun AlertScaffold(
                     interactionSource = remember { MutableInteractionSource() },
                     onClick = {},
                 ),
-            content = content,
+            content = {
+                // The rows fade in once the card has grown out of its trigger.
+                Column(Modifier.fillMaxWidth().macOSPopupContent(motion)) { content() }
+            },
         )
     }
 }
