@@ -75,7 +75,8 @@ import kotlin.math.roundToInt
  * is the only routing decision the app owns and the one that actually takes
  * effect — see [AudioRouting].
  *
- * A [PlayerDrawer] off the bottom edge, as the rest of the app's sheets are.
+ * A floating [PlayerPopup] over the player, which swells in like jelly and
+ * shrinks away like a macOS popover.
  * Outputs come first and volume follows. Every available device stays visible:
  * on a phone there are usually two, so a disclosure would cost a tap merely to
  * reveal a single row.
@@ -95,7 +96,7 @@ internal fun AudioOutputSheet(
     // A watch comes and goes; ask again each time the drawer opens.
     LaunchedEffect(Unit) { PlayerPlatform.host.refreshWatchOutput() }
 
-    PlayerDrawer(
+    PlayerPopup(
         hazeState = hazeState,
         title = stringResource(Res.string.audio_output),
         onDismiss = onDismiss,
