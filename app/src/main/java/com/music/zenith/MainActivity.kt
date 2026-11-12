@@ -414,6 +414,7 @@ class MainActivity : AppCompatActivity() {
                 ThemeMode.LIGHT -> false
                 ThemeMode.DARK -> true
             }
+            LaunchedEffect(darkTheme) { AppSettings.syncGlassPresetTheme(darkTheme) }
             ZenithTheme(darkTheme = darkTheme, font = appFont, accent = accentColor) {
                 // The glass surfaces sample this layer, and a layer records only
                 // what is drawn into it — which, for Zenith, is a page that

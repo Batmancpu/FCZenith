@@ -216,6 +216,8 @@ enum class GlassPreset(
     val level: Float,
     val custom: GlassCustom,
     val indicator: GlassIndicator,
+    val darkCustom: GlassCustom,
+    val darkIndicator: GlassIndicator,
     val frosted: Boolean = false,
 ) {
     /** Tampilan bawaan Zenith. */
@@ -253,10 +255,51 @@ enum class GlassPreset(
             iconLift = 0.19f,
             squash = 0.39f,
         ),
+        darkCustom = GlassCustom(
+            blur = 0.66f,
+            saturation = 1f,
+            tint = 1.67f,
+            refraction = 0.99f,
+            refractionWidth = 0.36f,
+            depth = true,
+            rainbow = 0f,
+            rim = 0.57f,
+            shadow = 1.68f,
+            quality = 1f,
+        ),
+        darkIndicator = GlassIndicator(
+            restLens = true,
+            restRefraction = 1.13f,
+            restRefractionWidth = 0.66f,
+            liftRefraction = 0.93f,
+            liftRefractionWidth = 0.48f,
+            rainbow = 1.3f,
+            depth = true,
+            blur = 0.43f,
+            saturation = 0.63f,
+            brightness = 1.57f,
+            fill = 0.45f,
+            rim = 0.75f,
+            innerShadow = 2f,
+            innerRadius = 1.01f,
+            shadow = 1.01f,
+            lift = 0.79f,
+            iconLift = 0.19f,
+            squash = 0.39f,
+        ),
     );
 
+    /** Nilai custom preset ini untuk tema terang atau gelap. */
+    fun customFor(dark: Boolean): GlassCustom = if (dark) darkCustom else custom
+
+    /** Nilai indikator preset ini untuk tema terang atau gelap. */
+    fun indicatorFor(dark: Boolean): GlassIndicator = if (dark) darkIndicator else indicator
+
+    /** True bila pengaturan saat ini sama dengan preset ini, di tema terang maupun gelap. */
     fun matches(level: Float, custom: GlassCustom, indicator: GlassIndicator, frosted: Boolean): Boolean =
-        this.level == level && this.custom == custom && this.indicator == indicator && this.frosted == frosted
+        this.level == level && this.frosted == frosted &&
+            ((custom == this.custom && indicator == this.indicator) ||
+                (custom == darkCustom && indicator == darkIndicator))
 }
 
 /**
@@ -2180,11 +2223,23 @@ object AppSettings {
             .apply()
     }
 
+    /** Tema gelap yang sedang aktif, dipakai preset yang punya nilai terang dan gelap. */
+    private var glassDarkTheme = false
+
     fun applyGlassPreset(preset: GlassPreset) {
         setGlassClarity(preset.level)
-        setGlassCustom(preset.custom)
-        setGlassIndicator(preset.indicator)
+        setGlassCustom(preset.customFor(glassDarkTheme))
+        setGlassIndicator(preset.indicatorFor(glassDarkTheme))
         setFrostedGlass(preset.frosted)
+    }
+
+    /** Tema berganti: kalau masih memakai preset Zenith, nilainya ikut tema baru. */
+    fun syncGlassPresetTheme(dark: Boolean) {
+        glassDarkTheme = dark
+        val preset = GlassPreset.DEFAULT
+        if (preset.matches(glassClarity.value.level, glassCustom.value, glassIndicator.value, frostedGlass.value)) {
+            applyGlassPreset(preset)
+        }
     }
 
     fun setProgressiveBlur(value: Boolean) {
