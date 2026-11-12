@@ -60,12 +60,18 @@ private fun rubberBand(rawDistance: Float, containerPx: Float): Float {
  * It replaces Android's stretch/glow with a UIScrollView-like rubber band during a
  * drag, then critically damps the content back to its resting position on release.
  */
+/** An [OverscrollEffect] that also says how far the content is pulled down right now. */
+interface PullDownOverscrollEffect : OverscrollEffect {
+    /** Pixels the content sits below its resting place; 0 when idle or pushed up. Snapshot-observable. */
+    val pullDownPx: Float
+}
+
 private class IosOverscrollEffect(
     // Batas tarikan ke bawah (px). 0 = tanpa batas, ikut tinggi kontainer.
     private val maxPullDownPx: Float = 0f,
     // Batas tarikan ke segala arah (px), dipakai panel menu. 0 = tanpa batas.
     private val maxPullPx: Float = 0f,
-) : OverscrollEffect {
+) : PullDownOverscrollEffect {
     private val rawPullX = mutableFloatStateOf(0f)
     private val rawPullY = mutableFloatStateOf(0f)
     private var containerWidthPx = 0f
@@ -169,6 +175,22 @@ private class IosOverscrollEffect(
         }
     }
 
+    private fun currentOffsetY(): Float {
+        val raw = rawPullY.floatValue
+        // Tarikan ke bawah dibatasi supaya tidak pernah melewati batas yang
+        // diminta pemakainya. Tarikan ke atas tetap memakai kurva biasa.
+        return if (maxPullPx > 0f) {
+            rubberBand(raw, maxPullPx * rubberBandConstant)
+        } else if (maxPullDownPx > 0f && raw > 0f) {
+            rubberBand(raw, maxPullDownPx * rubberBandConstant)
+        } else {
+            rubberBand(raw, containerHeightPx)
+        }
+    }
+
+    override val pullDownPx: Float
+        get() = currentOffsetY().coerceAtLeast(0f)
+
     override val node: DelegatableNode = IosOverscrollNode(
         offsetX = {
             if (maxPullPx > 0f) {
@@ -177,18 +199,7 @@ private class IosOverscrollEffect(
                 rubberBand(rawPullX.floatValue, containerWidthPx)
             }
         },
-        offsetY = {
-            val raw = rawPullY.floatValue
-            // Tarikan ke bawah dibatasi supaya tidak pernah melewati seni ekstra
-            // di atas hero. Tarikan ke atas tetap memakai kurva biasa.
-            if (maxPullPx > 0f) {
-                rubberBand(raw, maxPullPx * rubberBandConstant)
-            } else if (maxPullDownPx > 0f && raw > 0f) {
-                rubberBand(raw, maxPullDownPx * rubberBandConstant)
-            } else {
-                rubberBand(raw, containerHeightPx)
-            }
-        },
+        offsetY = { currentOffsetY() },
         onMeasured = { width, height ->
             containerWidthPx = width
             containerHeightPx = height
@@ -254,7 +265,7 @@ fun rememberIosMenuOverscrollFactory(maxPull: Dp = 36.dp): OverscrollFactory {
 
 /** Efek iOS yang tarikan ke bawahnya tidak pernah melewati [maxPullDown]. */
 @Composable
-fun rememberIosOverscrollEffect(maxPullDown: Dp): OverscrollEffect {
+fun rememberIosOverscrollEffect(maxPullDown: Dp): PullDownOverscrollEffect {
     val density = LocalDensity.current
     return remember(density, maxPullDown) {
         IosOverscrollEffect(with(density) { maxPullDown.toPx() })

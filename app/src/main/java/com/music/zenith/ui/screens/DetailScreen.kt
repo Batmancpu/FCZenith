@@ -84,6 +84,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.rememberOverscrollEffect
+import com.music.zenith.ui.utils.PullDownOverscrollEffect
 import com.music.zenith.ui.utils.rememberIosOverscrollEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -682,6 +683,7 @@ fun DetailScreen(
                         palette = palette,
                         sleeveSize = sleeveSize,
                         heroHeight = artHeight * 0.92f,
+                        pull = { (listOverscroll as? PullDownOverscrollEffect)?.pullDownPx ?: 0f },
                         albumGenre = albumInfo?.genre,
                         canvas = canvas,
                         songs = songs,
@@ -1055,6 +1057,8 @@ private fun ReleaseHeader(
     heroHeight: Dp = sleeveSize * 1.2f,
     /** Genre yang Apple catat untuk album ini; tampil menggantikan label "Album". */
     albumGenre: String? = null,
+    /** How far the list is pulled past its top right now, in px; the hero zooms by it. */
+    pull: () -> Float = { 0f },
 ) {
     val (credit, listMeta) = page.headerLines(songs.size, songs.playtime())
     // Apple Music: "Jazz • 2023". Jumlah lagu dan durasi pindah ke kaki halaman.
@@ -1081,13 +1085,19 @@ private fun ReleaseHeader(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         if (page.covers.isNotEmpty()) {
-            MostPlayedHero(page = page, palette = palette, height = heroHeight * 1.3f)
+            MostPlayedHero(
+                page = page,
+                palette = palette,
+                height = heroHeight * 1.3f,
+                modifier = Modifier.zoomOnPull(pull),
+            )
         } else if (page.isFolderCover()) {
             FolderCoverHero(
                 page = page,
                 palette = palette,
                 songs = songs,
                 height = heroHeight,
+                modifier = Modifier.zoomOnPull(pull),
             )
         } else if (albumHero) {
             AlbumHero(
@@ -1098,6 +1108,7 @@ private fun ReleaseHeader(
                 palette = palette.copy(background = palette.wash),
                 canvas = canvas,
                 height = heroHeight * ALBUM_HERO_HEIGHT_SCALE,
+                modifier = Modifier.zoomOnPull(pull),
             )
         } else if (mixHero) {
             MixHero(
@@ -1105,6 +1116,7 @@ private fun ReleaseHeader(
                 // Sama seperti AlbumHero: kaki hero dan wash target terbang memakai warna halaman.
                 palette = palette.copy(background = palette.wash),
                 height = heroHeight * ALBUM_HERO_HEIGHT_SCALE,
+                modifier = Modifier.zoomOnPull(pull),
             )
         } else if (fullBleed) {
             LikedMusicHero(
@@ -1112,6 +1124,7 @@ private fun ReleaseHeader(
                 palette = palette,
                 songs = songs,
                 height = heroHeight,
+                modifier = Modifier.zoomOnPull(pull),
             )
         } else Box(
             Modifier
@@ -3387,8 +3400,28 @@ private val MOST_PLAYED_COLORS = listOf(Color(0xFF1B2FB0), Color(0xFF6A33CC), Co
  */
 private val LIKED_OVERSCROLL = 48.dp
 
-/** Batas tarikan ke bawah halaman Liked Music; harus lebih kecil dari [LIKED_OVERSCROLL]. */
-private val LIKED_MAX_PULL = 40.dp
+/**
+ * Batas tarikan ke bawah halaman dengan hero full-bleed. Tarikan itu tidak
+ * menyeret seni hero turun, melainkan memperbesarnya: lihat [zoomOnPull].
+ */
+private val LIKED_MAX_PULL = 140.dp
+
+/**
+ * Menarik daftar melewati puncaknya memperbesar seni hero seperti Apple Music,
+ * bukan menyeretnya turun. Daftar tetap bergeser sejauh tarikan, jadi hero
+ * digeser balik ke puncak layar dan diskalakan dari tepi atasnya sehingga
+ * kakinya tetap menempel pada konten di bawahnya.
+ */
+private fun Modifier.zoomOnPull(pull: () -> Float): Modifier = graphicsLayer {
+    val p = pull()
+    if (p > 0f && size.height > 0f) {
+        val scale = 1f + p / size.height
+        transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 0f)
+        scaleX = scale
+        scaleY = scale
+        translationY = -p
+    }
+}
 
 /**
  * Header Liked Music: full-bleed sampai di bawah bar, isinya mosaik abstrak
