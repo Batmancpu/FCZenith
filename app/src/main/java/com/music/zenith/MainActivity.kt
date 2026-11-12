@@ -30,6 +30,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -1124,6 +1126,14 @@ private fun ZenithApp(
             (folder == "local:downloads" || folder == CACHE_FOLDER_BROWSE_ID || Downloads.recordIdOf(open) != null ||
                 com.music.zenith.data.spotify.LocalPlaylistStore.getPlaylist(open) != null)
         ) {
+            viewModel.reloadLocalDetail(open)
+        }
+    }
+    // Tracks copied into the downloads folder from a file manager while the app
+    // was in the background show up as soon as the page is back in front.
+    androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+        val open = topDetail?.browseId ?: return@LifecycleEventEffect
+        if (open == "local:downloads" || LocalGroups.folderOf(open) == "local:downloads") {
             viewModel.reloadLocalDetail(open)
         }
     }
@@ -4289,11 +4299,7 @@ private fun ZenithApp(
                                 val releaseSongs = (detail.songs as? UiState.Success)?.data.orEmpty()
                                 // An active search keeps the row open so its close button stays reachable.
                                 val actionsOpen = detailActionsExpanded || detailSearching
-                                AnimatedVisibility(
-                                    visible = actionsOpen && releaseSongs.isNotEmpty(),
-                                    enter = fadeIn(tween(180)) + expandHorizontally(tween(220)),
-                                    exit = fadeOut(tween(120)) + shrinkHorizontally(tween(200)),
-                                ) {
+                                ActionReveal(visible = actionsOpen && releaseSongs.isNotEmpty()) {
                                     IconButton(onClick = { detailSearching = !detailSearching }) {
                                         Icon(
                                             if (detailSearching) Icons.Rounded.Close else ZenithIcons.Search,
@@ -4308,11 +4314,7 @@ private fun ZenithApp(
                                 // with the app's other frosted overlays further
                                 // down — in the main hierarchy, where the haze
                                 // can see the content it blurs.
-                                AnimatedVisibility(
-                                    visible = actionsOpen,
-                                    enter = fadeIn(tween(180)) + expandHorizontally(tween(220)),
-                                    exit = fadeOut(tween(120)) + shrinkHorizontally(tween(200)),
-                                ) {
+                                ActionReveal(visible = actionsOpen) {
                                 IconButton(
                                     onClick = { if (isLocalDetail) folderMenuOpen = true else songSortMenuOpen = true },
                                 ) {
@@ -4325,11 +4327,10 @@ private fun ZenithApp(
                                     )
                                 }
                                 }
-                                AnimatedVisibility(
-                                    visible = actionsOpen && isReleaseDetail && releaseSongs.isNotEmpty(),
-                                    enter = fadeIn(tween(180)) + expandHorizontally(tween(220)),
-                                    exit = fadeOut(tween(120)) + shrinkHorizontally(tween(200)),
-                                ) {
+                                // The same ••• is both the unfold button at rest and the
+                                // overflow once open: the bar grows to its left, so it
+                                // simply slides into place while the xmark bounces in.
+                                ActionReveal(visible = !actionsOpen || (isReleaseDetail && releaseSongs.isNotEmpty())) {
                                     // The page's own tracks, in the order the page
                                     // shows them, so the sheet has them already and
                                     // Play, Shuffle and Open are the buttons beside
@@ -4341,7 +4342,7 @@ private fun ZenithApp(
                                     IconButton(
                                         modifier = Modifier.menuAnchor(),
                                         onClick = {
-                                            openBrowseMenu(BrowseTarget(
+                                            if (!actionsOpen) detailActionsExpanded = true else openBrowseMenu(BrowseTarget(
                                                 browseId = detail.browseId,
                                                 title = detail.title,
                                                 subtitle = detail.subtitle,
@@ -4366,22 +4367,20 @@ private fun ZenithApp(
                                         )
                                     }
                                 }
-                                // The one button left at rest, as on Apple Music: the
-                                // ellipsis (•••) to unfold the actions, an xmark to fold
-                                // them again (closing any open search on the way).
-                                IconButton(
-                                    onClick = {
-                                        detailSearching = false
-                                        detailActionsExpanded = !actionsOpen
-                                    },
-                                ) {
-                                    Icon(
-                                        if (actionsOpen) SfIcons.Close else Icons.Rounded.MoreHoriz,
-                                        contentDescription = stringResource(
-                                            if (actionsOpen) R.string.close else R.string.more,
-                                        ),
-                                        tint = MaterialTheme.colorScheme.onSurface,
-                                    )
+                                // Folds the actions again, closing any open search.
+                                ActionReveal(visible = actionsOpen, bounce = true) {
+                                    IconButton(
+                                        onClick = {
+                                            detailSearching = false
+                                            detailActionsExpanded = false
+                                        },
+                                    ) {
+                                        Icon(
+                                            SfIcons.Close,
+                                            contentDescription = stringResource(R.string.close),
+                                            tint = MaterialTheme.colorScheme.onSurface,
+                                        )
+                                    }
                                 }
                             }
                             // Left of the account photo, on an artist page: iOS's
@@ -6476,6 +6475,28 @@ private fun LibrarySort.localizedLabel(): String = when (this) {
     LibrarySort.DEFAULT -> stringResource(R.string.sort_default)
     LibrarySort.TITLE_ASC -> stringResource(R.string.sort_title_ascending)
     LibrarySort.TITLE_DESC -> stringResource(R.string.sort_title_descending)
+}
+
+/**
+ * Folds a top bar action in and out. A top-level wrapper on purpose: called from
+ * inside the bar's Row it would resolve to RowScope.AnimatedVisibility, which the
+ * compiler rejects from that nested scope.
+ */
+@Composable
+private fun ActionReveal(visible: Boolean, bounce: Boolean = false, content: @Composable () -> Unit) {
+    AnimatedVisibility(
+        visible = visible,
+        enter = if (bounce) {
+            fadeIn(tween(140)) +
+                expandHorizontally(spring(dampingRatio = 0.55f, stiffness = 420f)) +
+                scaleIn(spring(dampingRatio = 0.35f, stiffness = 380f), initialScale = 0.3f)
+        } else {
+            fadeIn(tween(180)) + expandHorizontally(tween(220))
+        },
+        exit = fadeOut(tween(120)) + shrinkHorizontally(tween(200)),
+    ) {
+        content()
+    }
 }
 
 /**
