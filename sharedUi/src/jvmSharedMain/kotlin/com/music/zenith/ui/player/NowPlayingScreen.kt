@@ -237,6 +237,14 @@ internal const val SEEK_SETTLE_TIMEOUT_MS = 4_000L
 private val THUMB_SIZE = 54.dp
 private val HEADER_HEIGHT = 60.dp
 private val ART_TITLE_GAP = 20.dp
+
+/**
+ * How far the title and artist move down on a full-bleed cover when the lyric
+ * line is switched off, so they sit closer to the progress bar. The cover's
+ * banner and its blur are lengthened by the same amount, which keeps the title
+ * inside the blur instead of over the picture.
+ */
+private val HERO_TITLE_DROP = 32.dp
 /**
  * How long the sleeve takes to travel the whole way between the full player and
  * the queue's header.
@@ -1852,6 +1860,7 @@ fun NowPlayingScreen(
     // own geometry is known. Zero until the first measure, which is fine: there
     // is nothing to show that early either.
     var heroHeight by remember { mutableStateOf(0.dp) }
+    val heroTitleDrop = if (heroMode && !lyricStripEnabled) HERO_TITLE_DROP else 0.dp
     var playerBounds by remember { mutableStateOf(IntSize.Zero) }
     // The bottom of a top-aligned, contained clip in the full-player view.
     // Use measured pixels and the decoded display aspect, never screen constants.
@@ -1867,7 +1876,7 @@ fun NowPlayingScreen(
     // Match the old hero's fade height in physical pixels, not its much larger
     // percentage of a portrait video. The mask ends at the real video bottom.
     val clipFadeFraction = if (clipBottom > 0.dp) {
-        (heroHeight.value * HERO_FADE_FRACTION / clipBottom.value).coerceIn(0f, 1f)
+        ((heroHeight - heroTitleDrop).value * HERO_FADE_FRACTION / clipBottom.value).coerceIn(0f, 1f)
     } else 0f
     heroClipGeometry.portrait = clipPortrait
     heroClipGeometry.bannerHeightPx = with(density) { heroHeight.toPx() }
@@ -2226,7 +2235,7 @@ fun NowPlayingScreen(
     fun stillFadeFraction(): Float {
         val bottom = stillBottomPx()
         if (bottom <= 0f) return HERO_FADE_FRACTION
-        return (with(density) { heroHeight.toPx() } * HERO_FADE_FRACTION / bottom).coerceIn(0f, 1f)
+        return (with(density) { (heroHeight - heroTitleDrop).toPx() } * HERO_FADE_FRACTION / bottom).coerceIn(0f, 1f)
     }
     // Where a clip starts, read once as it mounts — see each — from its still,
     // so the first frame it paints is the one already on screen.
@@ -3498,7 +3507,8 @@ fun NowPlayingScreen(
                         // player and has to be centred in it; collapsed, it belongs
                         // hard against the left edge with the credits beside it.
                         fun artStart(): Dp = lerp((maxWidth - fullArt) / 2, 0.dp, p())
-                        fun regularTitleTop(): Dp = lerp(groupTop + slotArt + ART_TITLE_GAP, 0.dp, p())
+                        fun regularTitleTop(): Dp =
+                            lerp(groupTop + slotArt + ART_TITLE_GAP + heroTitleDrop, 0.dp, p())
                         // Once Spotify's control deck has left, keep the only remaining
                         // player chrome against the bottom edge instead of stranding it
                         // where the artwork's title normally sits near mid-screen.
@@ -3531,7 +3541,7 @@ fun NowPlayingScreen(
                         // screen's top and this box's own top is fixed padding, so it
                         // can simply be added back up rather than measured.
                         val bannerBottom = statusBarTop + topStrip + ART_BOX_TOP_PAD +
-                            groupTop + slotArt + ART_TITLE_GAP / 2
+                            groupTop + slotArt + ART_TITLE_GAP / 2 + heroTitleDrop
                         // Frozen while lyrics are up. The controls now retain their full
                         // footprint across the transition, so this answer is identical
                         // on both sides; avoiding writes during the panel keeps the
