@@ -32,8 +32,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -137,6 +144,39 @@ internal fun PlayerPopup(
         label = "playerPopupScrim",
     )
 
+    // Where a finger is on the card, and the light that follows it, like the
+    // touch glow in Apple Music. Watched in the Initial pass without consuming
+    // anything, so rows, the volume slider and scrolling all keep working.
+    var touch by remember { mutableStateOf(Offset.Zero) }
+    var touching by remember { mutableStateOf(false) }
+    var cardSize by remember { mutableStateOf(IntSize.Zero) }
+    val glowAlpha by animateFloatAsState(
+        targetValue = if (touching && !closing) 1f else 0f,
+        animationSpec = tween(if (touching) 90 else 420),
+        label = "playerPopupGlow",
+    )
+    // The card leans toward the finger on a loose spring and wobbles back when
+    // it lifts: the jelly answering the touch.
+    val leanX by animateFloatAsState(
+        targetValue = if (touching && cardSize.width > 0) {
+            ((touch.x / cardSize.width - 0.5f) * 2f).coerceIn(-1f, 1f)
+        } else {
+            0f
+        },
+        animationSpec = spring(dampingRatio = 0.45f, stiffness = 260f),
+        label = "playerPopupLeanX",
+    )
+    val leanY by animateFloatAsState(
+        targetValue = if (touching && cardSize.height > 0) {
+            ((touch.y / cardSize.height - 0.5f) * 2f).coerceIn(-1f, 1f)
+        } else {
+            0f
+        },
+        animationSpec = spring(dampingRatio = 0.45f, stiffness = 260f),
+        label = "playerPopupLeanY",
+    )
+    val leanMax = 5.dp
+
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -163,6 +203,8 @@ internal fun PlayerPopup(
                     scaleY = popScaleY
                     alpha = popAlpha
                     transformOrigin = TransformOrigin(0.5f, 0.9f)
+                    translationX = leanX * leanMax.toPx()
+                    translationY = leanY * leanMax.toPx()
                 }
                 .clip(POPUP_SHAPE)
                 .then(
@@ -177,6 +219,37 @@ internal fun PlayerPopup(
                     },
                 )
                 .border(0.5.dp, Color.White.copy(alpha = 0.10f), POPUP_SHAPE)
+                .onSizeChanged { cardSize = it }
+                .pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent(PointerEventPass.Initial)
+                            val finger = event.changes.firstOrNull { it.pressed }
+                            if (finger != null) {
+                                touch = finger.position
+                                touching = true
+                            } else {
+                                touching = false
+                            }
+                        }
+                    }
+                }
+                .drawWithContent {
+                    drawContent()
+                    if (glowAlpha > 0.01f) {
+                        drawRect(
+                            brush = Brush.radialGradient(
+                                colors = listOf(
+                                    Color.White.copy(alpha = 0.24f * glowAlpha),
+                                    Color.White.copy(alpha = 0.08f * glowAlpha),
+                                    Color.Transparent,
+                                ),
+                                center = touch,
+                                radius = 170.dp.toPx(),
+                            ),
+                        )
+                    }
+                }
                 // Taps on the card are the card's, not the scrim's.
                 .clickable(
                     indication = null,
