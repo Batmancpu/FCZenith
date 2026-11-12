@@ -3483,8 +3483,12 @@ fun NowPlayingScreen(
                         // screens is nothing.
                         val groupTop = (maxHeight - slotArt - ART_TITLE_GAP - HEADER_HEIGHT)
                             .coerceAtLeast(0.dp) / 2
-                        val cardArtDrop = if (!heroMode && !videoMode) CARD_ART_DROP else 0.dp
-                        val cardTitleDrop = if (!heroMode && !videoMode) CARD_TITLE_DROP else 0.dp
+                        // The lyric strip sits right under the credits row, so the
+                        // extra drop would push the artist into it.
+                        val cardArtDrop =
+                            if (!heroMode && !videoMode && !lyricStripEnabled) CARD_ART_DROP else 0.dp
+                        val cardTitleDrop =
+                            if (!heroMode && !videoMode && !lyricStripEnabled) CARD_TITLE_DROP else 0.dp
                         // Functions of the collapse, called at placement and measure
                         // — see [p]. Composition never reads them.
                         fun artSize(): Dp = lerp(fullArt, THUMB_SIZE, p())
