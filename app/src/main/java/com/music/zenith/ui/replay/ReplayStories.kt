@@ -1,5 +1,24 @@
+@file:OptIn(ExperimentalLayoutApi::class)
+
 package com.music.zenith.ui.replay
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.navigationBarsIgnoringVisibility
+import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import com.music.zenith.ui.theme.HideStatusBar
+import com.music.zenith.ui.theme.HideSystemBars
+import kotlinx.coroutines.delay
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -165,6 +184,12 @@ fun ReplayStories(
 
     DisposableEffect(Unit) { onDispose { ReplayCapture.clear() } }
 
+    // Story memenuhi seluruh layar: status bar dan navigation bar disembunyikan
+    // (swipe dari tepi memunculkannya sebentar), cutout ditangani, dan konfigurasi
+    // sebelumnya dipulihkan otomatis saat Replay ditutup.
+    HideStatusBar(true)
+    HideSystemBars(true)
+
     ReplayBacksound(
         summary = summary,
         silenced = held || paused,
@@ -211,46 +236,28 @@ fun ReplayStories(
         if (current == pages.lastIndex) onClose() else goTo(current + 1, animate = true)
     }
 
-    Box(
-        Modifier
-            .fillMaxSize()
-            .background(Color.Black)
-            .statusBarsPadding()
-            .navigationBarsPadding(),
-        contentAlignment = Alignment.Center,
-    ) {
-        StoryFrame {
-            Stage(
-                pages = pages,
-                pagerState = pagerState,
-                summary = summary,
-                current = current,
-                progress = progress,
-                motion = motion,
-                onHold = { held = it },
-                onStep = ::step,
-                onClose = onClose,
-                onShare = onShare,
-                onRestart = { goTo(0, animate = true) },
-            )
-        }
+    // Akar masalah area kosong: Box ini dulu memakai statusBarsPadding +
+    // navigationBarsPadding di atas latar hitam, lalu StoryFrame mengunci 9:16
+    // (letterbox). Keduanya dihapus; latar kini menembus system bars dan insets
+    // diterapkan hanya pada konten dan header di dalam Stage.
+    Box(Modifier.fillMaxSize().background(Color.Black)) {
+        Stage(
+            pages = pages,
+            pagerState = pagerState,
+            summary = summary,
+            current = current,
+            progress = progress,
+            motion = motion,
+            onHold = { held = it },
+            onStep = ::step,
+            onClose = onClose,
+            onShare = onShare,
+            onRestart = { goTo(0, animate = true) },
+        )
     }
 }
 
-/** Menahan story di 9:16 apa pun bentuk layarnya (letterbox, bukan crop). */
-@Composable
-private fun StoryFrame(content: @Composable () -> Unit) {
-    BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        val fitsByWidth = maxWidth / maxHeight < STORY_ASPECT
-        Box(
-            Modifier
-                .then(if (fitsByWidth) Modifier.fillMaxWidth() else Modifier.fillMaxHeight())
-                .aspectRatio(STORY_ASPECT),
-        ) {
-            content()
-        }
-    }
-}
+// Frame 9:16 dihapus: story kini edge-to-edge dan menyesuaikan tinggi layar.
 
 @Composable
 private fun Stage(
@@ -271,6 +278,23 @@ private fun Stage(
     val step by rememberUpdatedState(onStep)
     val drift = rememberDrift(motion)
     val layer = rememberGraphicsLayer()
+    // Area aman untuk konten dan header; latar tetap menembus seluruh layar.
+    val safe = WindowInsets.statusBarsIgnoringVisibility
+        .union(WindowInsets.displayCutout)
+        .union(WindowInsets.navigationBarsIgnoringVisibility)
+    val bgIn = remember { Animatable(0f) }
+    val chromeIn = remember { Animatable(0f) }
+    LaunchedEffect(motion) {
+        if (!motion) {
+            bgIn.snapTo(1f)
+            chromeIn.snapTo(1f)
+            return@LaunchedEffect
+        }
+        // 0-300 ms latar muncul, 300-600 ms header masuk.
+        launch { bgIn.animateTo(1f, tween(300, easing = FastOutSlowInEasing)) }
+        delay(300)
+        chromeIn.animateTo(1f, tween(300, easing = FastOutSlowInEasing))
+    }
     val captureScope = rememberCoroutineScope()
     var capturing by remember { mutableStateOf(false) }
     val shareCard: (ReplayStoryPage) -> Unit = { card ->
@@ -334,9 +358,37 @@ private fun Stage(
                         pages[pagerState.targetPage.coerceIn(0, pages.lastIndex)] in FluidPages
                     ),
             )
+            val introAt = pages.indexOf(ReplayStoryPage.INTRO)
+            if (introAt >= 0) {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            val pos = pagerState.currentPage + pagerState.currentPageOffsetFraction
+                            alpha = (1f - abs(pos - introAt)).coerceIn(0f, 1f)
+                        },
+                ) {
+                    IntroAtmosphere(
+                        modifier = Modifier.fillMaxSize(),
+                        active = motion && (shown == introAt || pagerState.targetPage == introAt),
+                    )
+                }
+            }
             FilmGrain()
+            // Fade-in latar: tinta menutup lalu memudar, digambar tanpa layer.
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .drawBehind {
+                        val a = 1f - bgIn.value
+                        if (a > 0f) drawRect(Color(0xFF0E0E10), alpha = a)
+                    },
+            )
 
-            HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { index ->
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize().windowInsetsPadding(safe),
+            ) { index ->
                 StoryPage(
                     page = pages[index],
                     summary = summary,
@@ -355,15 +407,18 @@ private fun Stage(
             }
         }
 
-        StoryChrome(
-            label = summary.localizedLabel(LocalContext.current),
-            count = pages.size,
-            current = current,
-            shown = shown,
-            progress = { progress.value },
-            onClose = onClose,
-            onShare = { shareCard(pages[shown.coerceIn(0, pages.lastIndex)]) },
-        )
+        Box(Modifier.fillMaxWidth().windowInsetsPadding(safe)) {
+            StoryChrome(
+                label = summary.localizedLabel(LocalContext.current),
+                count = pages.size,
+                current = current,
+                shown = shown,
+                progress = { progress.value },
+                onClose = onClose,
+                onShare = { shareCard(pages[shown.coerceIn(0, pages.lastIndex)]) },
+                enter = { chromeIn.value },
+            )
+        }
     }
 }
 
@@ -525,10 +580,20 @@ private fun StoryChrome(
     progress: () -> Float,
     onClose: () -> Unit,
     onShare: () -> Unit,
+    enter: () -> Float = { 1f },
 ) {
-    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp)
+            .graphicsLayer {
+                val e = ease(enter())
+                alpha = e
+                translationY = (1f - e) * -14.dp.toPx()
+            },
+    ) {
         Spacer(Modifier.height(10.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             repeat(count) { index ->
                 Segment(
                     fraction = {
@@ -595,9 +660,14 @@ private fun StoryChrome(
 private fun ChromeButton(onClick: () -> Unit, content: @Composable () -> Unit) {
     Box(
         Modifier
-            .size(30.dp)
+            .size(34.dp)
             .clip(CircleShape)
-            .background(Color.White.copy(alpha = 0.20f))
+            .background(
+                Brush.verticalGradient(
+                    listOf(Color.White.copy(alpha = 0.30f), Color.White.copy(alpha = 0.14f)),
+                ),
+            )
+            .border(0.7.dp, Color.White.copy(alpha = 0.28f), CircleShape)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) { content() }
@@ -607,9 +677,9 @@ private fun ChromeButton(onClick: () -> Unit, content: @Composable () -> Unit) {
 private fun Segment(fraction: () -> Float, modifier: Modifier = Modifier) {
     Box(
         modifier
-            .height(2.dp)
-            .clip(RoundedCornerShape(2.dp))
-            .background(Color.White.copy(alpha = 0.26f))
+            .height(3.dp)
+            .clip(RoundedCornerShape(50))
+            .background(Color.White.copy(alpha = 0.28f))
             .drawBehind {
                 drawRect(
                     color = Color.White,
@@ -715,14 +785,24 @@ private fun StoryPage(
     ) {
         if (page == ReplayStoryPage.SUMMARY) RecapGlow(colors)
         if (page == ReplayStoryPage.ARTISTS) ArtistPortraitBackdrop(summary, reveal, pageOffset, motion)
-        Column(
+        if (page == ReplayStoryPage.INTRO) {
+            IntroPage(
+                summary = summary,
+                headline = headline,
+                drift = drift,
+                pageOffset = pageOffset,
+                onNext = onNext,
+                motion = motion,
+                capturing = capturing,
+            )
+        } else Column(
             Modifier
                 .fillMaxSize()
                 .padding(horizontal = 20.dp)
                 .padding(top = CHROME_HEIGHT, bottom = 18.dp),
         ) {
             when (page) {
-                ReplayStoryPage.INTRO -> IntroStory(summary, headline, reveal, drift, pageOffset, onNext)
+                ReplayStoryPage.INTRO -> Unit
                 ReplayStoryPage.MINUTES -> MinutesStory(summary, headline, reveal, drift, pageOffset)
                 ReplayStoryPage.ARTISTS -> ArtistsStory(summary, headline, reveal, pageOffset)
                 ReplayStoryPage.SONGS -> SongsStory(summary, headline, reveal)
@@ -744,6 +824,8 @@ private fun Headline(
     modifier: Modifier = Modifier,
     textSize: Int = 32,
     family: FontFamily = FontFamily.Default,
+    lineHeightScale: Float = 1.1f,
+    tracking: Float = -0.5f,
 ) {
     Text(
         text = buildAnnotatedString {
@@ -759,8 +841,8 @@ private fun Headline(
         style = MaterialTheme.typography.displayLarge,
         fontFamily = family,
         fontSize = textSize.sp,
-        lineHeight = (textSize * 1.1f).sp,
-        letterSpacing = (-0.5f).sp,
+        lineHeight = (textSize * lineHeightScale).sp,
+        letterSpacing = tracking.sp,
         modifier = modifier.fillMaxWidth(),
     )
 }
@@ -806,104 +888,274 @@ private fun PillButton(
 // ── 01 · Intro ──────────────────────────────────────────────────────────────
 
 @Composable
-private fun ColumnScope.IntroStory(
+private fun IntroPage(
     summary: ReplaySummary,
     headline: List<HeadlineRun>,
-    reveal: Animatable<Float, *>,
     drift: () -> Float,
     pageOffset: () -> Float,
     onNext: () -> Unit,
+    motion: Boolean,
+    capturing: Boolean,
 ) {
     val context = LocalContext.current
-    Kicker(stringResource(R.string.replay_brand), Modifier.staged(reveal, 0f))
-    MaskReveal(reveal, 0.04f) {
-        Text(
-            text = summary.localizedLabel(context),
-            style = MaterialTheme.typography.displayMedium,
-            fontWeight = FontWeight.W300,
-            color = Color.White,
-        )
+    val scope = rememberCoroutineScope()
+    // Satu jam 0..1 selama 2 dtk; tiap elemen memakai jendela waktunya sendiri
+    // (label 900-1200, tahun 1100-1400, headline 1300-1650, teks 1550-1800,
+    // CTA 1750-2000 ms) supaya semuanya terasa satu koreografi.
+    val reveal = remember { Animatable(0f) }
+    val exit = remember { Animatable(0f) }
+    LaunchedEffect(motion) {
+        if (motion) {
+            reveal.animateTo(1f, tween(INTRO_TIMELINE_MS, easing = LinearEasing))
+        } else {
+            reveal.snapTo(1f)
+        }
     }
-    Box(Modifier.weight(1f).fillMaxWidth()) {
-        ArtworkCollage(summary, reveal, drift, pageOffset, Modifier.fillMaxSize())
+    LaunchedEffect(capturing) { if (capturing) reveal.snapTo(1f) }
+
+    val label = remember(summary) { summary.localizedLabel(context) }
+    val yearSize = when {
+        label.length <= 4 -> 92.sp
+        label.length <= 9 -> 56.sp
+        else -> 38.sp
     }
-    MaskReveal(reveal, 0.55f, span = 0.4f) {
-        Headline(headline, textSize = 54)
+
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val headlineSize = when {
+            maxHeight < 560.dp -> 44
+            maxHeight < 680.dp -> 52
+            else -> 60
+        }
+        Column(
+            Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    // Transisi keluar ke Story 02: konten terangkat dan meredup.
+                    val x = exit.value
+                    alpha = 1f - 0.45f * x
+                    translationY = -x * 22.dp.toPx()
+                }
+                .padding(horizontal = 24.dp)
+                .padding(top = CHROME_HEIGHT + 6.dp, bottom = 20.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.replay_brand).uppercase(Locale.ROOT),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.W700,
+                letterSpacing = 4.sp,
+                color = Color.White.copy(alpha = 0.88f),
+                modifier = Modifier.staged(reveal, 0.45f, 0.15f, 10.dp),
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.displayLarge,
+                fontSize = yearSize,
+                lineHeight = yearSize * 0.98f,
+                fontWeight = FontWeight.W200,
+                letterSpacing = (-3).sp,
+                color = Color.White,
+                maxLines = 1,
+                softWrap = false,
+                modifier = Modifier.popped(reveal, 0.55f, 0.15f, 0.9f),
+            )
+            Box(Modifier.weight(1f).fillMaxWidth()) {
+                IntroCollage(
+                    summary = summary,
+                    drift = drift,
+                    pageOffset = pageOffset,
+                    motion = motion,
+                    capturing = capturing,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+            MaskReveal(reveal, 0.65f, span = 0.175f) {
+                Headline(headline, textSize = headlineSize, lineHeightScale = 1.02f, tracking = -1.6f)
+            }
+            Spacer(Modifier.height(10.dp))
+            Text(
+                text = stringResource(R.string.replay_story_intro_sub),
+                style = MaterialTheme.typography.bodyLarge,
+                fontFamily = FontFamily.Serif,
+                fontStyle = FontStyle.Italic,
+                color = Color.White.copy(alpha = 0.78f),
+                modifier = Modifier.staged(reveal, 0.775f, 0.125f),
+            )
+            Spacer(Modifier.height(22.dp))
+            RelivePill(
+                text = stringResource(R.string.replay_cta_relive),
+                onClick = {
+                    if (exit.value == 0f && !exit.isRunning) {
+                        scope.launch {
+                            exit.animateTo(1f, tween(170, easing = FastOutSlowInEasing))
+                            onNext()
+                        }
+                    }
+                },
+                modifier = Modifier.staged(reveal, 0.875f, 0.125f, 18.dp),
+            )
+        }
     }
-    Spacer(Modifier.height(8.dp))
-    Text(
-        text = stringResource(R.string.replay_story_intro_sub),
-        style = MaterialTheme.typography.bodyLarge,
-        fontFamily = FontFamily.Serif,
-        fontStyle = FontStyle.Italic,
-        color = Color.White.copy(alpha = 0.78f),
-        modifier = Modifier.staged(reveal, 0.70f),
-    )
-    Spacer(Modifier.height(16.dp))
-    PillButton(
-        text = stringResource(R.string.replay_cta_relive),
-        filled = true,
-        onClick = onNext,
-        modifier = Modifier.staged(reveal, 0.82f, 0.18f),
-    )
 }
 
-private class Slot(val x: Float, val y: Float, val s: Float, val angle: Float, val depth: Float)
+/** Tombol putih besar: skala menekan dengan pegas, haptic ringan. */
+@Composable
+private fun RelivePill(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val source = remember { MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
+    val scale = animateFloatAsState(
+        targetValue = if (pressed) 0.955f else 1f,
+        animationSpec = spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMedium),
+        label = "pillScale",
+    )
+    val haptics = LocalHapticFeedback.current
+    Box(
+        modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                scaleX = scale.value
+                scaleY = scale.value
+            }
+            .clip(CircleShape)
+            .background(Color.White)
+            .clickable(interactionSource = source, indication = null) {
+                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onClick()
+            }
+            .padding(horizontal = 32.dp, vertical = 19.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = text.uppercase(Locale.ROOT),
+            fontSize = 15.sp,
+            fontWeight = FontWeight.W800,
+            letterSpacing = 1.8.sp,
+            color = Color(0xFF0E0E10),
+        )
+    }
+}
 
-private val CollageSlots = listOf(
-    Slot(0.28f, 0.16f, 0.52f, -3f, 1.0f),
-    Slot(0.00f, 0.02f, 0.30f, -9f, 0.6f),
-    Slot(0.66f, 0.00f, 0.28f, 7f, 0.7f),
-    Slot(0.62f, 0.50f, 0.34f, 6f, 1.4f),
-    Slot(0.02f, 0.56f, 0.30f, -6f, 1.2f),
-    Slot(0.38f, 0.70f, 0.22f, 4f, 0.8f),
-    Slot(0.82f, 0.30f, 0.20f, -4f, 0.5f),
+private const val INTRO_TIMELINE_MS = 2000
+private val IntroTau = (2.0 * PI).toFloat()
+
+/**
+ * Satu keping kolase. [cx], [cy] adalah pusat (pecahan lebar/tinggi area),
+ * [size] pecahan satuan, [fromX]/[fromY] arah masuk, [freq] kelipatan periode
+ * melayang supaya tiap cover bergerak sendiri-sendiri.
+ */
+private class IntroSlot(
+    val cx: Float,
+    val cy: Float,
+    val size: Float,
+    val angle: Float,
+    val depth: Float,
+    val fromX: Float,
+    val fromY: Float,
+    val corner: Dp,
+    val delayMs: Long,
+    val freq: Int,
+    val phase: Float,
+    val hero: Boolean = false,
 )
 
-/** Kolase artwork berlapis: ukuran beragam, rotasi halus, kedalaman, melayang pelan. */
+private val IntroSlots = listOf(
+    IntroSlot(0.50f, 0.50f, 0.60f, -2f, 1.0f, 0.0f, 1.0f, 22.dp, 780L, 1, 0.0f, hero = true),
+    IntroSlot(0.17f, 0.20f, 0.29f, -9f, 0.6f, -1.0f, -0.7f, 14.dp, 450L, 2, 1.1f),
+    IntroSlot(0.85f, 0.15f, 0.26f, 8f, 0.7f, 1.0f, -0.8f, 14.dp, 520L, 3, 2.3f),
+    IntroSlot(0.86f, 0.72f, 0.30f, 7f, 1.3f, 1.0f, 0.6f, 14.dp, 590L, 2, 3.4f),
+    IntroSlot(0.13f, 0.78f, 0.27f, -6f, 1.2f, -1.0f, 0.8f, 14.dp, 660L, 3, 4.5f),
+    IntroSlot(0.60f, 0.92f, 0.19f, 4f, 0.8f, 0.4f, 1.0f, 12.dp, 730L, 1, 5.6f),
+)
+
+/** Urutan gambar: yang di belakang dulu, hero di tengah, dua cover depan terakhir. */
+private val IntroOrder = intArrayOf(1, 2, 4, 0, 3, 5)
+
+/** Kolase artwork nyata dari data Replay: satu hero di tengah, lima pendamping. */
 @Composable
-private fun ArtworkCollage(
+private fun IntroCollage(
     summary: ReplaySummary,
-    reveal: Animatable<Float, *>,
     drift: () -> Float,
     pageOffset: () -> Float,
+    motion: Boolean,
+    capturing: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val covers = remember(summary) {
         (summary.songs.mapNotNull { it.song.thumbnailUrl } + summary.albums.mapNotNull { it.artworkUrl })
             .distinct()
-            .take(CollageSlots.size)
+            .take(IntroSlots.size)
     }
     if (covers.isEmpty()) return
     BoxWithConstraints(modifier) {
         val w = maxWidth
         val h = maxHeight
-        val unit = minOf(w, h * 1.05f)
-        covers.forEachIndexed { index, url ->
-            val slot = CollageSlots[index]
-            Cover(
+        val unit = minOf(w, h * 1.08f)
+        IntroOrder.forEach { index ->
+            val url = covers.getOrNull(index) ?: return@forEach
+            IntroCover(
                 url = url,
-                fallbackText = "",
-                size = unit * slot.s,
-                shape = RoundedCornerShape(10.dp),
-                px = CARD_ART_PX,
-                modifier = Modifier
-                    .offset(x = w * slot.x, y = h * slot.y)
-                    .graphicsLayer {
-                        val e = ease((reveal.value - 0.08f - index * 0.07f) / 0.45f)
-                        val phase = drift() * 2f * PI.toFloat() * 6f + index * 1.3f
-                        alpha = e
-                        val s = 0.8f + 0.2f * e
-                        scaleX = s
-                        scaleY = s
-                        translationY = (1f - e) * 40.dp.toPx() + sin(phase) * 5.dp.toPx()
-                        translationX = pageOffset() * 120.dp.toPx() * slot.depth
-                        rotationZ = slot.angle + sin(phase * 0.5f) * 0.9f
-                    }
-                    .border(0.6.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(10.dp)),
+                slot = IntroSlots[index],
+                w = w,
+                h = h,
+                unit = unit,
+                drift = drift,
+                pageOffset = pageOffset,
+                motion = motion,
+                capturing = capturing,
             )
         }
     }
+}
+
+@Composable
+private fun IntroCover(
+    url: String,
+    slot: IntroSlot,
+    w: Dp,
+    h: Dp,
+    unit: Dp,
+    drift: () -> Float,
+    pageOffset: () -> Float,
+    motion: Boolean,
+    capturing: Boolean,
+) {
+    val enter = remember { Animatable(0f) }
+    LaunchedEffect(motion, capturing) {
+        if (!motion || capturing) {
+            enter.snapTo(1f)
+            return@LaunchedEffect
+        }
+        delay(slot.delayMs)
+        // Hero masuk terakhir dengan pegas lembut; pendamping hampir tanpa pantulan.
+        enter.animateTo(
+            1f,
+            if (slot.hero) spring(0.68f, Spring.StiffnessLow) else spring(1f, 130f),
+        )
+    }
+    val size = unit * slot.size
+    val shape = RoundedCornerShape(slot.corner)
+    Cover(
+        url = url,
+        fallbackText = "",
+        size = size,
+        shape = shape,
+        px = CARD_ART_PX,
+        elevated = true,
+        modifier = Modifier
+            .offset(x = w * slot.cx - size / 2, y = h * slot.cy - size / 2)
+            .graphicsLayer {
+                val e = enter.value
+                val back = 1f - e
+                val t = drift() * IntroTau * slot.freq + slot.phase
+                alpha = (e * 2.2f).coerceIn(0f, 1f)
+                val s = 0.80f + 0.20f * e
+                scaleX = s
+                scaleY = s
+                translationX = back * slot.fromX * 140.dp.toPx() + pageOffset() * 60.dp.toPx() * slot.depth
+                translationY = back * slot.fromY * 140.dp.toPx() + sin(t) * 3.dp.toPx()
+                rotationZ = slot.angle * (0.5f + 0.5f * e) + back * slot.fromX * 10f + sin(t * 0.7f) * 0.5f
+            }
+            .border(0.6.dp, Color.White.copy(alpha = 0.16f), shape),
+    )
 }
 
 // ── 02 · Menit mendengarkan ─────────────────────────────────────────────────
