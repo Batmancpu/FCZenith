@@ -335,7 +335,10 @@ internal fun Modifier.macOSPopupMotion(
 
         // Apparent radius, from the trigger's own curvature to the card's.
         val apparent = lerp(min(o.width, o.height) / 2f, cornerRadius.toPx(), p.coerceIn(0f, 1f))
-        clip = true
+        // Clip only while the card is still growing out of its trigger. Once it
+        // is open the layer must not clip, or the jelly stretch of the popup
+        // inside it is cut off at the card's resting edges.
+        clip = p < 1f
         shape = MorphRoundedShape(apparent / sx, apparent / sy)
 
         cameraDistance = 16f * density
