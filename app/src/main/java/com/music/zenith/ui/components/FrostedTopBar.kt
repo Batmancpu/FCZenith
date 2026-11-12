@@ -700,7 +700,7 @@ fun TopBarAccountButton(
                 contentDescription = stringResource(R.string.switch_account),
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
-                    .size(AVATAR_SIZE)
+                    .size(TOP_CONTROL_SIZE)
                     .avatarFill(extraActions)
                     .clip(CircleShape)
                     .thumbnailBorder(CircleShape),
@@ -708,7 +708,7 @@ fun TopBarAccountButton(
         } else {
             Box(
                 modifier = Modifier
-                    .size(AVATAR_SIZE)
+                    .size(TOP_CONTROL_SIZE)
                     .avatarFill(extraActions)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.surfaceVariant)
@@ -719,7 +719,7 @@ fun TopBarAccountButton(
                     Icons.Rounded.Person,
                     contentDescription = stringResource(R.string.switch_account),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp),
+                    modifier = Modifier.size(28.dp),
                 )
             }
         }
@@ -771,8 +771,10 @@ private val LocalActionsExtraFraction =
  * beside it. A draw-time scale, so the layout never shifts.
  */
 private fun Modifier.avatarFill(extraActions: () -> Float): Modifier = graphicsLayer {
-    val fill = TOP_CONTROL_SIZE.value / AVATAR_SIZE.value
-    val scale = fill + (1f - fill) * extraActions().coerceIn(0f, 1f)
+    // The photo is laid out at the full circle size and only shrunk when other
+    // actions share the pill, so alone it is never an upscaled 28dp image.
+    val small = AVATAR_SIZE.value / TOP_CONTROL_SIZE.value
+    val scale = small + (1f - small) * (1f - extraActions().coerceIn(0f, 1f))
     scaleX = scale
     scaleY = scale
 }
