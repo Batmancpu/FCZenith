@@ -42,16 +42,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          marker="fc/one-shot/spatial-speaker-route/target-version"
+          marker="fc/one-shot/spatial-audio/target-version"
           if [[ -f "$marker" ]]; then
             target="$(tr -d '[:space:]' < "$marker")"
             asset="Music-v${target}.apk"
             assets="$(gh release view "v${target}" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' 2>/dev/null || true)"
             if grep -Fxq "$asset" <<< "$assets"; then
               echo "Target APK already published; completing one-shot source cleanup."
-              rm -rf fc/one-shot/spatial-speaker-route
-              git add -A fc/one-shot/spatial-speaker-route
-              git commit -m "chore(fc): retire delivered one-shot Spatial Audio overlay"
+              rm -rf fc/one-shot/spatial-audio
+              rm -f app/src/main/java/com/music/zenith/playback/SpatialAudioPreference.kt
+              rm -f app/src/test/java/com/music/zenith/playback/SpatialAudioPreferenceTest.kt
+              git add -A fc/one-shot/spatial-audio app/src/main/java/com/music/zenith/playback/SpatialAudioPreference.kt app/src/test/java/com/music/zenith/playback/SpatialAudioPreferenceTest.kt
+              git commit -m "chore(fc): retire delivered one-shot Spatial Audio learner"
               git push origin HEAD:main
             fi
           fi
@@ -267,14 +269,14 @@ jobs:
           FC_VERSION_NAME: ${{ steps.decision.outputs.version_name }}
         run: python3 fc/apply-overlay.py
 
-      - name: Apply the one-release phone-speaker Spatial Audio safeguard
+      - name: Apply the one-release Spatial Audio learner and phone-speaker safeguard
         if: steps.decision.outputs.should_release == 'true'
         env:
           FC_VERSION_NAME: ${{ steps.decision.outputs.version_name }}
         shell: bash
         run: |
           set -euo pipefail
-          overlay="fc/one-shot/spatial-speaker-route"
+          overlay="fc/one-shot/spatial-audio"
           if [[ -d "$overlay" ]]; then
             target="$(tr -d '[:space:]' < "$overlay/target-version")"
             if [[ "$FC_VERSION_NAME" != "$target" ]]; then
@@ -404,9 +406,15 @@ jobs:
         run: |
           set -euo pipefail
           git restore --worktree -- \
+            app/src/main/java/com/music/zenith/data/settings/AppSettings.kt \
             app/src/main/java/com/music/zenith/playback/PlaybackService.kt \
+            app/src/main/java/com/music/zenith/playback/SpatialAudioProcessor.kt \
+            app/src/main/java/com/music/zenith/ui/components/SongActionsMenu.kt \
             app/src/main/java/com/music/zenith/MainActivity.kt \
+            app/src/main/res/values/strings.xml \
             app/src/main/res/values-ko/strings.xml
+          rm -f app/src/main/java/com/music/zenith/playback/SpatialAudioDecisionEngine.kt
+          rm -f app/src/test/java/com/music/zenith/playback/SpatialAudioDecisionEngineTest.kt
           rm -f app/src/main/java/com/music/zenith/TopBarActionVisibility.kt
 
       - name: Commit the upstream sync and FC version metadata to main
@@ -446,21 +454,24 @@ jobs:
             - Includes ${{ steps.upstream.outputs.commits_ahead }} upstream commits beyond the stable baseline when built as a main snapshot.
             - This is an FC-branded upstream-main development snapshot; future automatic syncs return to published stable releases.
             - The same FC signing certificate is checked before publishing.
-            - The built-in phone speaker bypasses Zenith stereo widening; Bluetooth, wired, USB and HDMI retain the upstream per-track Spatial Audio choice.
+            - Spatial Audio Auto learns only from explicit per-track On/Off choices and on-device stereo-mix profiles; cold-start or uncertain tracks stay unchanged.
+            - The first eight seconds of a stereo track are measured locally; at least three similar labelled tracks and 75% weighted agreement are required before Auto widens it.
+            - The built-in phone speaker is always bypassed. Bluetooth, wired, USB and HDMI keep the per-track Spatial Audio option.
+            - The learner is a one-release experiment; its app code and local model integration are removed from main after this exact APK is attached.
 
             Obtainium source: https://github.com/Batmancpu/FCZenith
           files: dist/Music-v${{ steps.decision.outputs.version_name }}.apk
           fail_on_unmatched_files: true
           make_latest: true
 
-      - name: Retire the one-shot phone-speaker safeguard after successful publication
+      - name: Retire the one-shot Spatial Audio learner after successful publication
         if: steps.decision.outputs.should_release == 'true' && success()
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          overlay="fc/one-shot/spatial-speaker-route"
+          overlay="fc/one-shot/spatial-audio"
           [[ -f "$overlay/target-version" ]] || exit 0
           target="$(tr -d '[:space:]' < "$overlay/target-version")"
           asset="Music-v${target}.apk"
@@ -470,6 +481,8 @@ jobs:
             exit 1
           fi
           rm -rf "$overlay"
-          git add -A fc/one-shot/spatial-speaker-route
-          git commit -m "chore(fc): retire delivered one-shot Spatial Audio overlay"
+          rm -f app/src/main/java/com/music/zenith/playback/SpatialAudioPreference.kt
+          rm -f app/src/test/java/com/music/zenith/playback/SpatialAudioPreferenceTest.kt
+          git add -A fc/one-shot/spatial-audio app/src/main/java/com/music/zenith/playback/SpatialAudioPreference.kt app/src/test/java/com/music/zenith/playback/SpatialAudioPreferenceTest.kt
+          git commit -m "chore(fc): retire delivered one-shot Spatial Audio learner"
           git push origin HEAD:main
