@@ -582,6 +582,11 @@ private fun ZenithApp(
         // The Search tab's categories come from the same feed Explore loads.
         if (selectedTab == TAB_EXPLORE || selectedTab == TAB_SEARCH) viewModel.onExploreShown()
     }
+    // Charts New dibaca di latar sesaat setelah Home, jadi tab terbuka sudah berisi.
+    LaunchedEffect(Unit) {
+        delay(3_000)
+        viewModel.prefetchExploreCharts()
+    }
     /**
      * Whether the player's sheet is up. The player is always a full-screen
      * take-over raised over the page, on every window size — the library
