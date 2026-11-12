@@ -30,6 +30,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -4317,7 +4319,10 @@ private fun ZenithApp(
                                     )
                                 }
                                 }
-                                ActionReveal(visible = actionsOpen && isReleaseDetail && releaseSongs.isNotEmpty()) {
+                                // The same ••• is both the unfold button at rest and the
+                                // overflow once open: the bar grows to its left, so it
+                                // simply slides into place while the xmark bounces in.
+                                ActionReveal(visible = !actionsOpen || (isReleaseDetail && releaseSongs.isNotEmpty())) {
                                     // The page's own tracks, in the order the page
                                     // shows them, so the sheet has them already and
                                     // Play, Shuffle and Open are the buttons beside
@@ -4329,7 +4334,7 @@ private fun ZenithApp(
                                     IconButton(
                                         modifier = Modifier.menuAnchor(),
                                         onClick = {
-                                            openBrowseMenu(BrowseTarget(
+                                            if (!actionsOpen) detailActionsExpanded = true else openBrowseMenu(BrowseTarget(
                                                 browseId = detail.browseId,
                                                 title = detail.title,
                                                 subtitle = detail.subtitle,
@@ -4354,22 +4359,20 @@ private fun ZenithApp(
                                         )
                                     }
                                 }
-                                // The one button left at rest, as on Apple Music: the
-                                // ellipsis (•••) to unfold the actions, an xmark to fold
-                                // them again (closing any open search on the way).
-                                IconButton(
-                                    onClick = {
-                                        detailSearching = false
-                                        detailActionsExpanded = !actionsOpen
-                                    },
-                                ) {
-                                    Icon(
-                                        if (actionsOpen) SfIcons.Close else Icons.Rounded.MoreHoriz,
-                                        contentDescription = stringResource(
-                                            if (actionsOpen) R.string.close else R.string.more,
-                                        ),
-                                        tint = MaterialTheme.colorScheme.onSurface,
-                                    )
+                                // Folds the actions again, closing any open search.
+                                ActionReveal(visible = actionsOpen, bounce = true) {
+                                    IconButton(
+                                        onClick = {
+                                            detailSearching = false
+                                            detailActionsExpanded = false
+                                        },
+                                    ) {
+                                        Icon(
+                                            SfIcons.Close,
+                                            contentDescription = stringResource(R.string.close),
+                                            tint = MaterialTheme.colorScheme.onSurface,
+                                        )
+                                    }
                                 }
                             }
                             // Left of the account photo, on an artist page: iOS's
@@ -6472,10 +6475,16 @@ private fun LibrarySort.localizedLabel(): String = when (this) {
  * compiler rejects from that nested scope.
  */
 @Composable
-private fun ActionReveal(visible: Boolean, content: @Composable () -> Unit) {
+private fun ActionReveal(visible: Boolean, bounce: Boolean = false, content: @Composable () -> Unit) {
     AnimatedVisibility(
         visible = visible,
-        enter = fadeIn(tween(180)) + expandHorizontally(tween(220)),
+        enter = if (bounce) {
+            fadeIn(tween(140)) +
+                expandHorizontally(spring(dampingRatio = 0.55f, stiffness = 420f)) +
+                scaleIn(spring(dampingRatio = 0.35f, stiffness = 380f), initialScale = 0.3f)
+        } else {
+            fadeIn(tween(180)) + expandHorizontally(tween(220))
+        },
         exit = fadeOut(tween(120)) + shrinkHorizontally(tween(200)),
     ) {
         content()
