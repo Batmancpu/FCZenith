@@ -609,8 +609,15 @@ internal fun FlatSelectionPill(
                 colorControls(brightness = INDICATOR_BRIGHTNESS, saturation = INDICATOR_SATURATION)
                 blur(blurPx)
             },
-            highlight = null,
+            highlight = { Highlight.Ambient.copy(width = 1.dp, alpha = REST_RIM_ALPHA) },
             shadow = null,
+            innerShadow = {
+                InnerShadow(
+                    radius = REST_INNER_RADIUS,
+                    offset = DpOffset(0.dp, 0.dp),
+                    alpha = REST_INNER_ALPHA,
+                )
+            },
             onDrawSurface = { drawRect(color = color, size = size) },
         ),
     )
@@ -624,6 +631,18 @@ private const val INDICATOR_SATURATION = 2.4f
 
 /** A small lift so the blurred backdrop under the indicator reads brighter than the bar. */
 private const val INDICATOR_BRIGHTNESS = 0.05f
+
+/**
+ * The resting indicator's edge: an even rim and a soft inner shadow, so its top
+ * and bottom read as curving inward even when no lens is running. The lifted
+ * pill fades down to exactly these values, so the hand-off has no jump.
+ */
+private const val REST_RIM_ALPHA = 0.45f
+private val REST_INNER_RADIUS = 5.dp
+private const val REST_INNER_ALPHA = 0.55f
+
+/** Inner shadow radius of the lifted pill at full material. */
+private val LIFT_INNER_RADIUS = 10.dp
 
 /** What the resting indicator blurs: the page, then the bar's own glass over it. */
 private class PageAndBarBackdrop(
@@ -694,20 +713,25 @@ internal fun GlassSelectionPill(
                         refractionAmount = PILL_LENS_AMOUNT.toPx() * motion.material,
                         depthEffect = true,
                         chromaticAberration = true,
+                        chromaticStrength = PILL_CHROMATIC_STRENGTH,
                     )
                 }
             },
             highlight = {
-                val alpha = motion.material * rimOf(motion.glassPresence)
-                if (alpha > 0f) Highlight.Default.copy(alpha = alpha) else null
+                val live = motion.material * rimOf(motion.glassPresence)
+                Highlight.Ambient.copy(width = 1.dp, alpha = restBlend(REST_RIM_ALPHA, live))
             },
             shadow = {
                 val alpha = motion.material * rimOf(motion.glassPresence)
                 if (alpha > 0f) PILL_SHADOW.copy(alpha = alpha) else null
             },
             innerShadow = {
-                val alpha = motion.material * rimOf(motion.glassPresence)
-                if (alpha > 0f) InnerShadow(radius = 8.dp * alpha, alpha = alpha) else null
+                val live = motion.material * rimOf(motion.glassPresence)
+                InnerShadow(
+                    radius = REST_INNER_RADIUS + (LIFT_INNER_RADIUS - REST_INNER_RADIUS) * live,
+                    offset = DpOffset(0.dp, 0.dp),
+                    alpha = restBlend(REST_INNER_ALPHA, live),
+                )
             },
         ),
     )
@@ -719,22 +743,32 @@ internal fun GlassSelectionPill(
  * edge is narrow but bends hard, which is what makes the bar's top and bottom
  * edges visibly warp where the pill stands past them.
  */
-private val PILL_LENS_HEIGHT = 16.dp
-private val PILL_LENS_AMOUNT = 32.dp
+private val PILL_LENS_HEIGHT = 22.dp
+private val PILL_LENS_AMOUNT = 40.dp
+
+/**
+ * Rainbow fringe of the lifted pill, a fraction of the shader's full strength.
+ * At 1 the dispersion paints a thick rainbow around the corners; this keeps
+ * only a faint hint of it.
+ */
+private const val PILL_CHROMATIC_STRENGTH = 0.15f
 
 /** The rim and its shadow are gone by the time the hand-off is 55% through. */
 private fun rimOf(presence: Float): Float = ((presence - 0.45f) / 0.55f).coerceIn(0f, 1f)
+
+/** [rest] at `live` 0, up to 1 at `live` 1. */
+private fun restBlend(rest: Float, live: Float): Float = (rest + (1f - rest) * live).coerceIn(0f, 1f)
 
 private val LENS_HEIGHT = 20.dp
 private val LENS_AMOUNT = 28.dp
 
 /** The bar's own edge, drawn into what the lens refracts so the lens bends it too. */
-private val BAR_RIM_WIDTH = 2.dp
+private val BAR_RIM_WIDTH = 3.dp
 private const val BAR_RIM_ALPHA = 0.9f
 
 /** How far the bar's shadow halo reaches past its edge, and how dark it starts. */
-private val BAR_HALO_REACH = 14.dp
-private const val BAR_HALO_ALPHA = 0.18f
+private val BAR_HALO_REACH = 18.dp
+private const val BAR_HALO_ALPHA = 0.30f
 private const val BAR_HALO_STEPS = 7
 
 private val PILL_SHADOW = Shadow(
