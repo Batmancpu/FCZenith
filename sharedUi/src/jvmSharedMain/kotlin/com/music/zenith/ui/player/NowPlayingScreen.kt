@@ -245,6 +245,10 @@ private val ART_TITLE_GAP = 20.dp
  * inside the blur instead of over the picture.
  */
 private val HERO_TITLE_DROP = 32.dp
+/** Card (non full-bleed) mode: how far the cover sits lower, as in Apple Music. */
+private val CARD_ART_DROP = 27.dp
+/** Card (non full-bleed) mode: how far the title, artist, like and more row sits lower. */
+private val CARD_TITLE_DROP = 49.dp
 /**
  * How long the sleeve takes to travel the whole way between the full player and
  * the queue's header.
@@ -3499,16 +3503,18 @@ fun NowPlayingScreen(
                         // screens is nothing.
                         val groupTop = (maxHeight - slotArt - ART_TITLE_GAP - HEADER_HEIGHT)
                             .coerceAtLeast(0.dp) / 2
+                        val cardArtDrop = if (!heroMode && !videoMode) CARD_ART_DROP else 0.dp
+                        val cardTitleDrop = if (!heroMode && !videoMode) CARD_TITLE_DROP else 0.dp
                         // Functions of the collapse, called at placement and measure
                         // — see [p]. Composition never reads them.
                         fun artSize(): Dp = lerp(fullArt, THUMB_SIZE, p())
-                        fun artTop(): Dp = lerp(groupTop + (slotArt - fullArt), 0.dp, p())
+                        fun artTop(): Dp = lerp(groupTop + (slotArt - fullArt) + cardArtDrop, 0.dp, p())
                         // Expanded and height-bound, the sleeve is narrower than the
                         // player and has to be centred in it; collapsed, it belongs
                         // hard against the left edge with the credits beside it.
                         fun artStart(): Dp = lerp((maxWidth - fullArt) / 2, 0.dp, p())
                         fun regularTitleTop(): Dp =
-                            lerp(groupTop + slotArt + ART_TITLE_GAP + heroTitleDrop, 0.dp, p())
+                            lerp(groupTop + slotArt + ART_TITLE_GAP + heroTitleDrop + cardTitleDrop, 0.dp, p())
                         // Once Spotify's control deck has left, keep the only remaining
                         // player chrome against the bottom edge instead of stranding it
                         // where the artwork's title normally sits near mid-screen.
