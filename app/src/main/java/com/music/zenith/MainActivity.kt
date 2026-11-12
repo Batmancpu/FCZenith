@@ -4289,11 +4289,7 @@ private fun ZenithApp(
                                 val releaseSongs = (detail.songs as? UiState.Success)?.data.orEmpty()
                                 // An active search keeps the row open so its close button stays reachable.
                                 val actionsOpen = detailActionsExpanded || detailSearching
-                                AnimatedVisibility(
-                                    visible = actionsOpen && releaseSongs.isNotEmpty(),
-                                    enter = fadeIn(tween(180)) + expandHorizontally(tween(220)),
-                                    exit = fadeOut(tween(120)) + shrinkHorizontally(tween(200)),
-                                ) {
+                                ActionReveal(visible = actionsOpen && releaseSongs.isNotEmpty()) {
                                     IconButton(onClick = { detailSearching = !detailSearching }) {
                                         Icon(
                                             if (detailSearching) Icons.Rounded.Close else ZenithIcons.Search,
@@ -4308,11 +4304,7 @@ private fun ZenithApp(
                                 // with the app's other frosted overlays further
                                 // down — in the main hierarchy, where the haze
                                 // can see the content it blurs.
-                                AnimatedVisibility(
-                                    visible = actionsOpen,
-                                    enter = fadeIn(tween(180)) + expandHorizontally(tween(220)),
-                                    exit = fadeOut(tween(120)) + shrinkHorizontally(tween(200)),
-                                ) {
+                                ActionReveal(visible = actionsOpen) {
                                 IconButton(
                                     onClick = { if (isLocalDetail) folderMenuOpen = true else songSortMenuOpen = true },
                                 ) {
@@ -4325,11 +4317,7 @@ private fun ZenithApp(
                                     )
                                 }
                                 }
-                                AnimatedVisibility(
-                                    visible = actionsOpen && isReleaseDetail && releaseSongs.isNotEmpty(),
-                                    enter = fadeIn(tween(180)) + expandHorizontally(tween(220)),
-                                    exit = fadeOut(tween(120)) + shrinkHorizontally(tween(200)),
-                                ) {
+                                ActionReveal(visible = actionsOpen && isReleaseDetail && releaseSongs.isNotEmpty()) {
                                     // The page's own tracks, in the order the page
                                     // shows them, so the sheet has them already and
                                     // Play, Shuffle and Open are the buttons beside
@@ -6476,6 +6464,22 @@ private fun LibrarySort.localizedLabel(): String = when (this) {
     LibrarySort.DEFAULT -> stringResource(R.string.sort_default)
     LibrarySort.TITLE_ASC -> stringResource(R.string.sort_title_ascending)
     LibrarySort.TITLE_DESC -> stringResource(R.string.sort_title_descending)
+}
+
+/**
+ * Folds a top bar action in and out. A top-level wrapper on purpose: called from
+ * inside the bar's Row it would resolve to RowScope.AnimatedVisibility, which the
+ * compiler rejects from that nested scope.
+ */
+@Composable
+private fun ActionReveal(visible: Boolean, content: @Composable () -> Unit) {
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(tween(180)) + expandHorizontally(tween(220)),
+        exit = fadeOut(tween(120)) + shrinkHorizontally(tween(200)),
+    ) {
+        content()
+    }
 }
 
 /**
