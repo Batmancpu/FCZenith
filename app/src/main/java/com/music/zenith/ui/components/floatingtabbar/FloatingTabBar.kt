@@ -893,6 +893,7 @@ private fun SharedTransitionScope.StandaloneTabBody(
                     barGlass = barGlass,
                     tabRow = iconLayer,
                     modifier = pillModifier,
+                    iconTint = colors.selectedContentColor,
                 )
             } else {
                 FlatSelectionPill(
@@ -1368,6 +1369,7 @@ private fun SharedTransitionScope.ExpandedTabs(
                 fillColor = colors.indicatorColor,
                 barGlass = barGlass,
                 tabRow = tabRow,
+                iconTint = colors.selectedContentColor,
                 modifier = Modifier
                     .matchParentSize()
                     .pillPlacement(
@@ -1607,6 +1609,8 @@ data class FloatingTabBarColors(
     val backgroundColor: Color,
     val accessoryBackgroundColor: Color,
     val indicatorColor: Color,
+    /** Colour the tab row is masked to inside the lifted glass pill; Unspecified keeps each tab's own colour. */
+    val selectedContentColor: Color = Color.Unspecified,
 )
 
 /**
@@ -1659,10 +1663,12 @@ object FloatingTabBarDefaults {
         backgroundColor: Color = MaterialTheme.colorScheme.surfaceContainerHigh,
         accessoryBackgroundColor: Color = MaterialTheme.colorScheme.surfaceContainerHigh,
         indicatorColor: Color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f),
+        selectedContentColor: Color = Color.Unspecified,
     ): FloatingTabBarColors = FloatingTabBarColors(
         backgroundColor = backgroundColor,
         accessoryBackgroundColor = accessoryBackgroundColor,
         indicatorColor = indicatorColor,
+        selectedContentColor = selectedContentColor,
     )
 
     /**

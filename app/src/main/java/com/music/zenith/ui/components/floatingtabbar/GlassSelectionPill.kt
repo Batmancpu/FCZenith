@@ -26,9 +26,14 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.GraphicsLayerScope
+import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -654,11 +659,17 @@ internal fun GlassSelectionPill(
     barGlass: LayerBackdrop,
     tabRow: LayerBackdrop,
     modifier: Modifier,
+    /**
+     * Colour the tab row is masked to inside the pill: the accent copy of the
+     * row that Kyant's LiquidBottomTabs records for its lens. Unspecified keeps
+     * the row's own colours.
+     */
+    iconTint: Color = Color.Unspecified,
 ) {
     val page = LocalAppBackdrop.current
     val shape = remember { RoundedCornerShape(percent = 50) }
-    val backdrop = remember(page, barGlass, tabRow, fillColor) {
-        SelectionPillBackdrop(page, barGlass, tabRow) {
+    val backdrop = remember(page, barGlass, tabRow, fillColor, iconTint) {
+        SelectionPillBackdrop(page, barGlass, tabRow, iconTint) {
             fillColor.copy(alpha = fillColor.alpha * (1f - motion.material))
         }
     }
@@ -700,8 +711,8 @@ private val LENS_HEIGHT = 16.dp
 private val LENS_AMOUNT = 22.dp
 
 /** The bar's own edge, drawn into what the lens refracts so the lens bends it too. */
-private val BAR_RIM_WIDTH = 1.5.dp
-private const val BAR_RIM_ALPHA = 0.45f
+private val BAR_RIM_WIDTH = 2.dp
+private const val BAR_RIM_ALPHA = 0.9f
 
 private val PILL_SHADOW = Shadow(
     radius = 12.dp,
@@ -718,6 +729,7 @@ private class SelectionPillBackdrop(
     private val page: Backdrop,
     private val bar: LayerBackdrop,
     private val tabs: Backdrop,
+    private val tint: Color,
     private val fill: () -> Color,
 ) : Backdrop {
 
@@ -740,7 +752,13 @@ private class SelectionPillBackdrop(
                 size = Size(size.width * 3, size.height * 3),
             )
         }
-        with(tabs) { drawBackdrop(density, coordinates, layerBlock) }
+        if (tint != Color.Unspecified) {
+            // The tab row, masked to one colour: what the pill shows of the
+            // tabs under it, refracted by the lens.
+            drawTinted(tint) { with(tabs) { drawBackdrop(density, coordinates, layerBlock) } }
+        } else {
+            with(tabs) { drawBackdrop(density, coordinates, layerBlock) }
+        }
     }
 }
 
@@ -763,13 +781,34 @@ private fun DrawScope.drawBarRim(bar: LayerBackdrop, coordinates: LayoutCoordina
     if (barSize.width <= 0f || barSize.height <= 0f) return
     val strokeWidth = BAR_RIM_WIDTH.toPx()
     val radius = minOf(barSize.width, barSize.height) / 2f - strokeWidth / 2f
+    // Bright along the top and bottom edges, dim between, like the bar's own
+    // directional highlight that Kyant records into the lens backdrop.
+    val rim = Brush.verticalGradient(
+        colors = listOf(
+            Color.White.copy(alpha = BAR_RIM_ALPHA),
+            Color.White.copy(alpha = BAR_RIM_ALPHA * 0.3f),
+            Color.White.copy(alpha = BAR_RIM_ALPHA),
+        ),
+        startY = 0f,
+        endY = barSize.height,
+    )
     translate(-offset.x, -offset.y) {
         drawRoundRect(
-            color = Color.White.copy(alpha = BAR_RIM_ALPHA),
+            brush = rim,
             topLeft = Offset(strokeWidth / 2f, strokeWidth / 2f),
             size = Size(barSize.width - strokeWidth, barSize.height - strokeWidth),
             cornerRadius = CornerRadius(radius, radius),
             style = Stroke(width = strokeWidth),
+            blendMode = BlendMode.Plus,
         )
     }
+}
+
+/** Draws [block] and recolours everything it painted to [tint], keeping its alpha. */
+private fun DrawScope.drawTinted(tint: Color, block: DrawScope.() -> Unit) {
+    val paint = Paint().apply { colorFilter = ColorFilter.tint(tint, BlendMode.SrcIn) }
+    val canvas = drawContext.canvas
+    canvas.saveLayer(Rect(-size.width, -size.height, size.width * 2f, size.height * 2f), paint)
+    block()
+    canvas.restore()
 }
