@@ -215,55 +215,48 @@ data class GlassIndicator(
 enum class GlassPreset(
     val level: Float,
     val custom: GlassCustom,
+    val indicator: GlassIndicator,
     val frosted: Boolean = false,
 ) {
     /** Tampilan bawaan Zenith. */
-    DEFAULT(GlassClarity.BALANCED_LEVEL, GlassCustom()),
-
-    /**
-     * Mengikuti LiquidBottomTabs dari Kyant0/backdrop: vibrancy 1.5, blur 8dp
-     * (0.8 dari 10dp), lensa 24dp/24dp tanpa pelangi dan depth, kontainer 40%
-     * (0.4 dari 0.30 bawaan), resolusi setinggi yang diizinkan.
-     */
-    LIQUID(
-        level = GlassClarity.BALANCED_LEVEL,
+    DEFAULT(
+        level = 0.13f,
         custom = GlassCustom(
-            blur = 0.8f,
+            blur = 0.66f,
             saturation = 1f,
-            tint = 4f / 3f,
-            refraction = 1f,
-            refractionWidth = 1f,
-            depth = false,
+            tint = 1.67f,
+            refraction = 0.99f,
+            refractionWidth = 0.36f,
+            depth = true,
             rainbow = 0f,
             rim = 1f,
             shadow = 1f,
-            quality = 1.5f,
+            quality = 1f,
         ),
-    ),
-
-    /**
-     * Mengikuti tutorial Glass Bottom Bar Kyant0: vibrancy, blur 4dp (0.4 dari
-     * 10dp), lens(16dp, 32dp) (lebar 16/24, kekuatan 32/24 dari 24dp bawaan),
-     * permukaan 50% (0.5 / 0.30 bawaan), tanpa pelangi dan depth.
-     */
-    BOTTOM_BAR(
-        level = GlassClarity.BALANCED_LEVEL,
-        custom = GlassCustom(
-            blur = 0.4f,
-            saturation = 1f,
-            tint = 5f / 3f,
-            refraction = 4f / 3f,
-            refractionWidth = 2f / 3f,
-            depth = false,
-            rainbow = 0f,
+        indicator = GlassIndicator(
+            restLens = true,
+            restRefraction = 2.5f,
+            restRefractionWidth = 2.13f,
+            liftRefraction = 0.93f,
+            liftRefractionWidth = 0.46f,
+            rainbow = 1f,
+            depth = true,
+            blur = 1f,
+            saturation = 2.16f,
+            brightness = 1f,
+            fill = 1f,
             rim = 1f,
+            innerShadow = 1f,
+            innerRadius = 1f,
             shadow = 1f,
-            quality = 1.5f,
+            lift = 0.79f,
+            iconLift = 0.19f,
+            squash = 0.39f,
         ),
     );
 
-    fun matches(level: Float, custom: GlassCustom, frosted: Boolean): Boolean =
-        this.level == level && this.custom == custom && this.frosted == frosted
+    fun matches(level: Float, custom: GlassCustom, indicator: GlassIndicator, frosted: Boolean): Boolean =
+        this.level == level && this.custom == custom && this.indicator == indicator && this.frosted == frosted
 }
 
 /**
@@ -802,13 +795,13 @@ object AppSettings {
     val frostedGlass = MutableStateFlow(false)
 
     /** Kejernihan Liquid Glass sebagai slider (Clear ... Balanced ... Frosted). Hanya berlaku saat [liquidGlass] aktif. */
-    val glassClarity = MutableStateFlow(GlassClarity.BALANCED)
+    val glassClarity = MutableStateFlow(GlassClarity(GlassPreset.DEFAULT.level))
 
     /** Pengaturan manual tiap efek Liquid Glass (blur, refraksi, pelangi, tepi, bayangan, kualitas). */
-    val glassCustom = MutableStateFlow(GlassCustom())
+    val glassCustom = MutableStateFlow(GlassPreset.DEFAULT.custom)
 
     /** Pengaturan indikator pilihan pada tab bar (lengkung saat diam, refraksi, tepi, bayangan, gerak). */
-    val glassIndicator = MutableStateFlow(GlassIndicator())
+    val glassIndicator = MutableStateFlow(GlassPreset.DEFAULT.indicator)
 
     /**
      * Blurs what scrolls under the status bar and the top controls, easing out
@@ -1490,26 +1483,29 @@ object AppSettings {
         reduceDynamicBlur.value = prefs.getBoolean(KEY_REDUCE_BLUR, false)
         liquidGlass.value = prefs.getBoolean(KEY_LIQUID_GLASS, false)
         frostedGlass.value = prefs.getBoolean(KEY_FROSTED_GLASS, false)
+        val glassDefault = GlassPreset.DEFAULT
         glassClarity.value = GlassClarity(
             if (prefs.contains(KEY_GLASS_CLARITY_LEVEL)) {
-                prefs.getFloat(KEY_GLASS_CLARITY_LEVEL, GlassClarity.BALANCED_LEVEL)
+                prefs.getFloat(KEY_GLASS_CLARITY_LEVEL, glassDefault.level)
             } else {
-                GlassClarity.levelForLegacyName(prefs.getString(KEY_GLASS_CLARITY, null))
+                prefs.getString(KEY_GLASS_CLARITY, null)
+                    ?.let { GlassClarity.levelForLegacyName(it) }
+                    ?: glassDefault.level
             },
         )
         glassCustom.value = GlassCustom(
-            blur = prefs.getFloat(KEY_GLASS_BLUR, 1f),
-            saturation = prefs.getFloat(KEY_GLASS_SATURATION, 1f),
-            tint = prefs.getFloat(KEY_GLASS_TINT, 1f),
-            refraction = prefs.getFloat(KEY_GLASS_REFRACTION, 1f),
-            refractionWidth = prefs.getFloat(KEY_GLASS_REFRACTION_WIDTH, 1f),
-            depth = prefs.getBoolean(KEY_GLASS_DEPTH, true),
-            rainbow = prefs.getFloat(KEY_GLASS_RAINBOW, GlassCustom.RAINBOW_AUTO),
-            rim = prefs.getFloat(KEY_GLASS_RIM, 1f),
-            shadow = prefs.getFloat(KEY_GLASS_SHADOW, 1f),
-            quality = prefs.getFloat(KEY_GLASS_QUALITY, 1f),
+            blur = prefs.getFloat(KEY_GLASS_BLUR, glassDefault.custom.blur),
+            saturation = prefs.getFloat(KEY_GLASS_SATURATION, glassDefault.custom.saturation),
+            tint = prefs.getFloat(KEY_GLASS_TINT, glassDefault.custom.tint),
+            refraction = prefs.getFloat(KEY_GLASS_REFRACTION, glassDefault.custom.refraction),
+            refractionWidth = prefs.getFloat(KEY_GLASS_REFRACTION_WIDTH, glassDefault.custom.refractionWidth),
+            depth = prefs.getBoolean(KEY_GLASS_DEPTH, glassDefault.custom.depth),
+            rainbow = prefs.getFloat(KEY_GLASS_RAINBOW, glassDefault.custom.rainbow),
+            rim = prefs.getFloat(KEY_GLASS_RIM, glassDefault.custom.rim),
+            shadow = prefs.getFloat(KEY_GLASS_SHADOW, glassDefault.custom.shadow),
+            quality = prefs.getFloat(KEY_GLASS_QUALITY, glassDefault.custom.quality),
         ).coerced()
-        val gi = GlassIndicator()
+        val gi = glassDefault.indicator
         glassIndicator.value = GlassIndicator(
             restLens = prefs.getBoolean(KEY_GIND_REST_LENS, gi.restLens),
             restRefraction = prefs.getFloat(KEY_GIND_REST_REFRACTION, gi.restRefraction),
@@ -2187,6 +2183,7 @@ object AppSettings {
     fun applyGlassPreset(preset: GlassPreset) {
         setGlassClarity(preset.level)
         setGlassCustom(preset.custom)
+        setGlassIndicator(preset.indicator)
         setFrostedGlass(preset.frosted)
     }
 

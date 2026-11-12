@@ -3325,7 +3325,7 @@ private fun LiquidGlassSettingsContent() {
     ) {
         GlassPreset.values().forEachIndexed { index, preset ->
             if (index > 0) RowDivider()
-            val selected = preset.matches(clarity.level, custom, frosted)
+            val selected = preset.matches(clarity.level, custom, indicator, frosted)
             SettingsRow(
                 title = stringResource(preset.titleRes()),
                 subtitle = stringResource(preset.subtitleRes()),
@@ -3670,13 +3670,8 @@ private fun LiquidGlassSettingsContent() {
         SettingsRow(
             icon = SfIcons.Tune,
             title = stringResource(R.string.glass_reset),
-            enabled = active && (!custom.isDefault || !indicator.isDefault || clarity.level != GlassClarity.BALANCED_LEVEL || frosted),
-            onClick = {
-                AppSettings.setGlassIndicator(GlassIndicator())
-                AppSettings.setGlassCustom(GlassCustom())
-                AppSettings.setGlassClarity(GlassClarity.BALANCED_LEVEL)
-                AppSettings.setFrostedGlass(false)
-            },
+            enabled = active && !GlassPreset.DEFAULT.matches(clarity.level, custom, indicator, frosted),
+            onClick = { AppSettings.applyGlassPreset(GlassPreset.DEFAULT) },
         )
     }
     Spacer(Modifier.height(24.dp))
@@ -3684,14 +3679,10 @@ private fun LiquidGlassSettingsContent() {
 
 private fun GlassPreset.titleRes(): Int = when (this) {
     GlassPreset.DEFAULT -> R.string.glass_preset_default
-    GlassPreset.LIQUID -> R.string.glass_preset_liquid
-    GlassPreset.BOTTOM_BAR -> R.string.glass_preset_bottom_bar
 }
 
 private fun GlassPreset.subtitleRes(): Int = when (this) {
     GlassPreset.DEFAULT -> R.string.glass_preset_default_subtitle
-    GlassPreset.LIQUID -> R.string.glass_preset_liquid_subtitle
-    GlassPreset.BOTTOM_BAR -> R.string.glass_preset_bottom_bar_subtitle
 }
 
 /** Satu baris slider: judul dan nilai di atas, slider di bawah, [below] opsional di bawah slider. */
