@@ -1129,6 +1129,14 @@ private fun ZenithApp(
             viewModel.reloadLocalDetail(open)
         }
     }
+    // Tracks copied into the downloads folder from a file manager while the app
+    // was in the background show up as soon as the page is back in front.
+    androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+        val open = topDetail?.browseId ?: return@LifecycleEventEffect
+        if (open == "local:downloads" || LocalGroups.folderOf(open) == "local:downloads") {
+            viewModel.reloadLocalDetail(open)
+        }
+    }
     // An offline playlist's page is the store's, and follows it: a track
     // removed from its menu, or a like from the player, leaves no stale row.
     // Apart from the effect above so a like never re-lists the Downloads folder.
