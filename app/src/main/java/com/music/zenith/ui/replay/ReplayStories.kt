@@ -106,6 +106,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.ColorUtils
@@ -354,8 +355,8 @@ private fun Stage(
                 colors = hued[shown.coerceIn(0, hued.lastIndex)],
                 position = { pagerState.currentPage + pagerState.currentPageOffsetFraction },
                 active = motion && (
-                    pages[shown.coerceIn(0, pages.lastIndex)] in FluidPages ||
-                        pages[pagerState.targetPage.coerceIn(0, pages.lastIndex)] in FluidPages
+                    pages[shown.coerceIn(0, pages.lastIndex)].runsFluid() ||
+                        pages[pagerState.targetPage.coerceIn(0, pages.lastIndex)].runsFluid()
                     ),
             )
             val introAt = pages.indexOf(ReplayStoryPage.INTRO)
@@ -371,6 +372,24 @@ private fun Stage(
                     IntroAtmosphere(
                         modifier = Modifier.fillMaxSize(),
                         active = motion && (shown == introAt || pagerState.targetPage == introAt),
+                    )
+                }
+            }
+            // Atmosfer ungu Story 02: crossfade mengikuti posisi pager, jadi latar
+            // Intro melebur halus ke ungu tanpa potongan.
+            val minutesAt = pages.indexOf(ReplayStoryPage.MINUTES)
+            if (minutesAt >= 0) {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            val pos = pagerState.currentPage + pagerState.currentPageOffsetFraction
+                            alpha = (1f - abs(pos - minutesAt)).coerceIn(0f, 1f)
+                        },
+                ) {
+                    MinutesAtmosphere(
+                        modifier = Modifier.fillMaxSize(),
+                        active = motion && (shown == minutesAt || pagerState.targetPage == minutesAt),
                     )
                 }
             }
@@ -494,6 +513,14 @@ private fun StoryBackdrop(
 private val FluidPages = ReplayStoryPage.entries.filter { it != ReplayStoryPage.SUMMARY }.toSet()
 
 /**
+ * Intro dan Menit punya atmosfer sendiri yang menutup blob shader; saat diam di
+ * halaman itu blob tidak perlu dianimasikan (hemat GPU). Transisi ke story lain
+ * tetap menjalankannya seperti sebelumnya.
+ */
+private fun ReplayStoryPage.runsFluid(): Boolean =
+    this in FluidPages && this != ReplayStoryPage.INTRO && this != ReplayStoryPage.MINUTES
+
+/**
  * Blob shader (OrganicFluidBackground) di atas [StoryBackdrop], hanya terlihat di
  * [FluidPages] dan memudar mengikuti posisi pager. Bila shader tidak didukung
  * (API < 33 atau gagal kompilasi) tidak ada yang digambar, sehingga backdrop
@@ -595,11 +622,18 @@ private fun StoryChrome(
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             repeat(count) { index ->
+                // Segmen yang baru selesai (atau dibuka kembali) terisi/kosong
+                // dengan halus, bukan melompat saat pindah story.
+                val settled = animateFloatAsState(
+                    targetValue = if (index < shown) 1f else 0f,
+                    animationSpec = tween(260, easing = FastOutSlowInEasing),
+                    label = "segment",
+                )
                 Segment(
                     fraction = {
                         when {
-                            index < shown -> 1f
-                            index > shown -> 0f
+                            index < shown -> settled.value
+                            index > shown -> settled.value
                             shown == current -> progress()
                             else -> 0f
                         }
@@ -1169,82 +1203,194 @@ private fun ColumnScope.MinutesStory(
     pageOffset: () -> Float,
 ) {
     val context = LocalContext.current
-    MaskReveal(reveal, 0f) {
-        Headline(headline, textSize = 34, family = FontFamily.Serif)
-    }
-    Spacer(Modifier.weight(1f))
-    Kicker(stringResource(R.string.replay_total_minutes), Modifier.staged(reveal, 0.08f))
-    Spacer(Modifier.height(4.dp))
-    CountingNumber(
-        target = summary.minutes,
-        reveal = reveal,
-        modifier = Modifier
-            .fillMaxWidth()
-            .graphicsLayer {
-                translationX = pageOffset() * this.size.width * 0.40f
-                translationY = sin(drift() * 2f * PI.toFloat() * 4f) * 4.dp.toPx()
-            },
-    )
-    Spacer(Modifier.weight(1f))
-    val stats = buildList {
+    // Semua angka berasal dari ringkasan Replay; tidak ada nilai tetap.
+    val top = buildList {
         add(grouped(summary.hours) to stringResource(R.string.replay_stat_hours))
         add(formatListening(context, summary.averageMsPerDay()) to stringResource(R.string.replay_stat_per_day))
         summary.busiestDay?.let { add(formatDay(context, it) to stringResource(R.string.replay_stat_busiest)) }
     }
-    Row(
-        Modifier.fillMaxWidth().staged(reveal, 0.55f, 0.35f),
-        horizontalArrangement = Arrangement.spacedBy(20.dp),
-    ) {
-        stats.forEach { (value, label) ->
-            Column(Modifier.weight(1f)) {
-                Box(Modifier.fillMaxWidth().height(0.8.dp).background(Color.White.copy(alpha = 0.35f)))
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text = value,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.W800,
-                    color = Color.White,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = label.uppercase(Locale.ROOT),
-                    style = MaterialTheme.typography.labelSmall,
-                    letterSpacing = 2.sp,
-                    color = Color.White.copy(alpha = 0.6f),
-                )
-            }
+    val bottom = listOf(
+        grouped(summary.totalPlays.toLong()) to stringResource(R.string.replay_stat_plays),
+        grouped(summary.distinctSongs.toLong()) to stringResource(R.string.replay_stat_songs),
+        grouped(summary.distinctArtists.toLong()) to stringResource(R.string.replay_stat_artists),
+    )
+
+    // Linimasa (fraksi dari 2600 ms): headline 400-750, label 650-950, hitung
+    // 900-1900, statistik 1500-1900 dan seterusnya bergantian.
+    BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+        val compact = maxHeight < 560.dp
+        Column(Modifier.fillMaxSize()) {
+            Spacer(Modifier.height(if (compact) 2.dp else 12.dp))
+            MinutesHeadline(
+                parts = headline,
+                textSize = if (compact) 34 else 44,
+                modifier = Modifier.staged(reveal, 0.154f, 0.16f, 22.dp),
+            )
+            Spacer(Modifier.weight(1f))
+            Text(
+                text = stringResource(R.string.replay_total_minutes).uppercase(Locale.ROOT),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.W700,
+                letterSpacing = 3.5.sp,
+                color = WarmWhite.copy(alpha = 0.78f),
+                modifier = Modifier.staged(reveal, 0.25f, 0.115f, 10.dp),
+            )
+            Spacer(Modifier.height(6.dp))
+            MinutesNumber(
+                target = summary.minutes,
+                reveal = reveal,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer {
+                        translationX = pageOffset() * this.size.width * 0.30f
+                        translationY = sin(drift() * 2f * PI.toFloat() * 3f) * 3.dp.toPx()
+                    },
+            )
+            Spacer(Modifier.weight(1f))
+            MinutesStats(listOf(top, bottom), reveal, compact)
         }
     }
-    Spacer(Modifier.height(14.dp))
-    StatGrid(
-        stats = listOf(
-            grouped(summary.totalPlays.toLong()) to stringResource(R.string.replay_stat_plays),
-            grouped(summary.distinctSongs.toLong()) to stringResource(R.string.replay_stat_songs),
-            grouped(summary.distinctArtists.toLong()) to stringResource(R.string.replay_stat_artists),
-        ),
-        reveal = reveal,
-        start = 0.62f,
+}
+
+private val WarmWhite = Color(0xFFFFF4E8)
+
+/** Ease-out kubik: hitungan melambat alami menuju angka akhir. */
+private fun easeCubic(t: Float): Float {
+    val u = 1f - t.coerceIn(0f, 1f)
+    return 1f - u * u * u
+}
+
+/** Judul gaya majalah: serif, kata kunci miring tebal, putih hangat. */
+@Composable
+private fun MinutesHeadline(parts: List<HeadlineRun>, textSize: Int, modifier: Modifier = Modifier) {
+    Text(
+        text = buildAnnotatedString {
+            parts.forEach { run ->
+                withStyle(
+                    SpanStyle(
+                        fontWeight = if (run.bold) FontWeight.W700 else FontWeight.W400,
+                        fontStyle = if (run.bold) FontStyle.Italic else FontStyle.Normal,
+                        color = if (run.bold) WarmWhite else WarmWhite.copy(alpha = 0.86f),
+                    ),
+                ) { append(run.text) }
+            }
+        },
+        style = MaterialTheme.typography.displayLarge,
+        fontFamily = FontFamily.Serif,
+        fontSize = textSize.sp,
+        lineHeight = (textSize * 1.08f).sp,
+        letterSpacing = (-0.8f).sp,
+        modifier = modifier.fillMaxWidth(),
     )
 }
 
-/** Angka raksasa yang menghitung naik. Hanya composable ini yang rekomposisi per frame. */
+/** Angka monumental di atas latar, tanpa kartu; ukuran ditentukan dari lebar angka akhir. */
 @Composable
-private fun CountingNumber(target: Long, reveal: Animatable<Float, *>, modifier: Modifier = Modifier) {
-    val finalText = grouped(target)
+private fun MinutesNumber(target: Long, reveal: Animatable<Float, *>, modifier: Modifier = Modifier) {
+    val finalText = remember(target) { grouped(target) }
     BoxWithConstraints(modifier) {
-        val fontSize = minOf(150f, maxWidth.value / (finalText.length * 0.56f)).sp
-        val shown = ease((reveal.value - 0.10f) / 0.65f)
-        Text(
-            text = grouped((target * shown).toLong()),
-            style = MaterialTheme.typography.displayLarge.copy(fontFeatureSettings = "tnum"),
+        val digits = finalText.count { it.isDigit() }
+        val em = digits * 0.60f + (finalText.length - digits) * 0.30f
+        val fontSize = (maxWidth.value / em).coerceIn(48f, 176f).sp
+        MinutesCount(
+            target = target,
+            reveal = reveal,
             fontSize = fontSize,
-            lineHeight = fontSize,
-            fontWeight = FontWeight.W900,
-            letterSpacing = (-2).sp,
-            color = Color.White,
+            modifier = Modifier.graphicsLayer {
+                alpha = ease((reveal.value - 0.346f) / 0.06f)
+            },
+        )
+    }
+}
+
+/**
+ * Hanya composable ini yang rekomposisi saat menghitung, dan hanya ketika
+ * bilangan bulatnya berubah. Pada akhir hitungan nilainya persis [target].
+ */
+@Composable
+private fun MinutesCount(
+    target: Long,
+    reveal: Animatable<Float, *>,
+    fontSize: TextUnit,
+    modifier: Modifier = Modifier,
+) {
+    val shown by remember(target) {
+        derivedStateOf {
+            (target * easeCubic((reveal.value - 0.346f) / 0.385f).toDouble()).toLong().coerceIn(0L, target)
+        }
+    }
+    Text(
+        text = grouped(shown),
+        style = MaterialTheme.typography.displayLarge.copy(fontFeatureSettings = "tnum"),
+        fontSize = fontSize,
+        lineHeight = fontSize * 0.95f,
+        fontWeight = FontWeight.W800,
+        letterSpacing = (fontSize.value * -0.035f).sp,
+        color = WarmWhite,
+        maxLines = 1,
+        softWrap = false,
+        modifier = modifier,
+    )
+}
+
+/** Tiga kolom x dua baris, garis tipis di atas tiap sel, masuk bergantian. */
+@Composable
+private fun MinutesStats(
+    rows: List<List<Pair<String, String>>>,
+    reveal: Animatable<Float, *>,
+    compact: Boolean,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(if (compact) 14.dp else 22.dp)) {
+        rows.forEachIndexed { r, cells ->
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(18.dp),
+            ) {
+                cells.forEachIndexed { c, (value, label) ->
+                    MinutesStat(
+                        value = value,
+                        label = label,
+                        compact = compact,
+                        modifier = Modifier
+                            .weight(1f)
+                            .staged(reveal, 0.577f + (r * 3 + c) * 0.02f, 0.12f, 14.dp),
+                    )
+                }
+                repeat(3 - cells.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MinutesStat(value: String, label: String, compact: Boolean, modifier: Modifier = Modifier) {
+    val base = if (compact) 24f else 30f
+    // Nilai panjang (mis. "5 November") mengecil sampai muat, bukan terpotong.
+    var size by remember(value) { mutableStateOf(base) }
+    Column(modifier) {
+        Box(Modifier.fillMaxWidth().height(0.7.dp).background(Color.White.copy(alpha = 0.26f)))
+        Spacer(Modifier.height(10.dp))
+        Text(
+            text = value,
+            style = MaterialTheme.typography.headlineMedium.copy(fontFeatureSettings = "tnum"),
+            fontSize = size.sp,
+            lineHeight = (size * 1.1f).sp,
+            fontWeight = FontWeight.W800,
+            letterSpacing = (-0.5).sp,
+            color = WarmWhite,
             maxLines = 1,
             softWrap = false,
+            onTextLayout = { if (it.hasVisualOverflow && size > 14f) size *= 0.92f },
+        )
+        Spacer(Modifier.height(3.dp))
+        Text(
+            text = label.uppercase(Locale.ROOT),
+            fontSize = 10.sp,
+            lineHeight = 13.sp,
+            fontWeight = FontWeight.W600,
+            letterSpacing = 1.6.sp,
+            color = Color.White.copy(alpha = 0.62f),
+            maxLines = 2,
         )
     }
 }
