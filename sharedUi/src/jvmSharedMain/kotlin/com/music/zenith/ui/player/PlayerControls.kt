@@ -691,9 +691,10 @@ internal fun PlayerActionRow(
                 QueueModeBadges(
                     shuffleEnabled = shuffleEnabled,
                     repeatMode = repeatMode,
+                    queueOpen = queueOpen,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(top = 3.dp, end = 3.dp),
+                        .offset(x = 3.dp, y = (-6).dp),
                 )
             }
         }
@@ -1271,12 +1272,28 @@ private fun rememberPartyBadge(): PartyBadge {
 private fun QueueModeBadges(
     shuffleEnabled: Boolean,
     repeatMode: Int,
+    queueOpen: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    if (!shuffleEnabled && repeatMode == RepeatModes.OFF) return
+    val anyMode = shuffleEnabled || repeatMode != RepeatModes.OFF
+    // Fades and shrinks away as the queue page opens, and eases back in when it closes.
+    val visibility by animateFloatAsState(
+        targetValue = if (anyMode && !queueOpen) 1f else 0f,
+        animationSpec = tween(220, easing = FastOutSlowInEasing),
+        label = "queueModeBadge",
+    )
+    if (visibility <= 0.001f) return
     val tint = LocalPlayerTint.current
     Row(
-        modifier = modifier,
+        modifier = modifier
+            .graphicsLayer {
+                alpha = visibility
+                scaleX = 0.6f + 0.4f * visibility
+                scaleY = 0.6f + 0.4f * visibility
+            }
+            .clip(CircleShape)
+            .background(tint.copy(alpha = 0.28f))
+            .padding(5.dp),
         horizontalArrangement = Arrangement.spacedBy(1.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
