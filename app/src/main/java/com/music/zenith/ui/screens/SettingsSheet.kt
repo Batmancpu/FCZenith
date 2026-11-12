@@ -278,6 +278,7 @@ fun SettingsScreen(
     val fullBleedArtwork by AppSettings.fullBleedArtwork.collectAsStateWithLifecycle()
     val legacyMeshGradient by AppSettings.legacyMeshGradient.collectAsStateWithLifecycle()
     val syncedLyrics by AppSettings.syncedLyrics.collectAsStateWithLifecycle()
+    val lyricStrip by AppSettings.lyricStrip.collectAsStateWithLifecycle()
     val lyricsSources by AppSettings.lyricsSources.collectAsStateWithLifecycle()
     val translationLanguage by AppSettings.translationLanguage.collectAsStateWithLifecycle()
     val theme by AppSettings.themeMode.collectAsStateWithLifecycle()
@@ -1358,6 +1359,21 @@ fun SettingsScreen(
             // sources are third-party services being reached on the user's
             // connection — which is the part worth being able to narrow.
             if (syncedLyrics) {
+                val lyricStripTitle = stringResource(R.string.lyric_strip)
+                row(lyricStripTitle, "lyrics", "strip", "player") {
+                    SettingsRow(
+                        icon = SfIcons.Notes,
+                        title = lyricStripTitle,
+                        subtitle = stringResource(R.string.lyric_strip_subtitle),
+                        trailing = {
+                            IosSwitch(
+                                checked = lyricStrip,
+                                onCheckedChange = AppSettings::setLyricStrip,
+                            )
+                        },
+                        onClick = { AppSettings.setLyricStrip(!lyricStrip) },
+                    )
+                }
                 val lyricsBlurTitle = stringResource(R.string.blur_unfocused_lyrics)
                 row(lyricsBlurTitle, "lyrics", "blur") {
                     SettingsRow(
