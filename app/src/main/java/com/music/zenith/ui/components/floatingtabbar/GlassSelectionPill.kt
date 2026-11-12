@@ -26,12 +26,18 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.GraphicsLayerScope
+import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.positionInWindow
@@ -45,14 +51,17 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.music.zenith.data.settings.AppSettings
 import com.music.zenith.ui.components.LocalAppBackdrop
+import com.music.zenith.ui.components.glassContentColor
 import com.music.zenith.ui.components.isGlassSupported
 import com.music.zenith.ui.components.backdrop.effects.blur
 import com.music.zenith.ui.components.backdrop.effects.colorControls
 import com.music.zenith.ui.components.backdrop.Backdrop
 import com.music.zenith.ui.components.backdrop.backdrops.LayerBackdrop
+import com.music.zenith.ui.components.backdrop.backdrops.emptyBackdrop
 import com.music.zenith.ui.components.backdrop.drawBackdrop
 import com.music.zenith.ui.components.backdrop.effects.lens
 import com.music.zenith.ui.components.backdrop.highlight.Highlight
+import com.music.zenith.ui.components.backdrop.shadow.InnerShadow
 import com.music.zenith.ui.components.backdrop.shadow.Shadow
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -62,7 +71,7 @@ import kotlin.math.roundToInt
 import kotlin.math.sign
 
 /** How much taller than the bar the pill stands while it is lifted. */
-internal val PILL_GROW_HEIGHT = 9.dp
+internal val PILL_GROW_HEIGHT = 22.dp
 
 /**
  * The selection pill's physics, owned by the tab bar and handed to whichever
@@ -145,6 +154,9 @@ internal class GlassPillMotion(
 
     /** "Reduce animation": every move lands at once, with no lift. */
     var reduceMotion: Boolean = false
+
+    /** Pengali squash akselerasi dari pengaturan indikator; 1 = bawaan. */
+    var squashScale: Float = 1f
 
     private var travelPos = initialIndex.toDouble()
     private var travelVel = 0.0
@@ -427,7 +439,8 @@ internal class GlassPillMotion(
     fun liveSize(rest: Size, lifted: Size): Size {
         val w = rest.width + (lifted.width - rest.width) * liftX
         val h = rest.height + (lifted.height - rest.height) * liftY
-        return Size(w * (1 + deviation), h * (1 - deviation))
+        val d = deviation * squashScale
+        return Size(w * (1 + d), h * (1 - d))
     }
 
     private companion object {
@@ -584,12 +597,13 @@ internal fun FlatSelectionPill(
 ) {
     val shape = remember { RoundedCornerShape(percent = 50) }
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
+    val ind by AppSettings.glassIndicator.collectAsStateWithLifecycle()
     if (reduceDynamicBlur || !isGlassSupported()) {
         Box(modifier.background(color, shape))
         return
     }
     val page = LocalAppBackdrop.current
-    val blurPx = with(LocalDensity.current) { INDICATOR_BLUR.toPx() }
+    val blurPx = with(LocalDensity.current) { INDICATOR_BLUR.toPx() * ind.blur }
     val backdrop = remember(page, barGlass) { PageAndBarBackdrop(page, barGlass) }
     // Frosted: halaman dan kaca bar di bawah indikator di-blur, lalu diberi
     // warna fill indikator di atasnya. Tab digambar di atas pill ini, jadi
@@ -599,12 +613,41 @@ internal fun FlatSelectionPill(
             backdrop = backdrop,
             shape = { shape },
             effects = {
-                colorControls(brightness = INDICATOR_BRIGHTNESS, saturation = INDICATOR_SATURATION)
+                colorControls(
+                    brightness = INDICATOR_BRIGHTNESS * ind.brightness,
+                    saturation = INDICATOR_SATURATION * ind.saturation,
+                )
                 blur(blurPx)
+                // Lengkung lensa tetap ada saat indikator diam, tidak hanya saat digeser.
+                if (ind.restLens && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    lens(
+                        refractionHeight = PILL_LENS_HEIGHT.toPx() * ind.restRefractionWidth,
+                        refractionAmount = PILL_LENS_AMOUNT.toPx() * ind.restRefraction,
+                        depthEffect = ind.depth,
+                        chromaticAberration = false,
+                    )
+                }
             },
-            highlight = null,
+            highlight = {
+                Highlight.Ambient.copy(
+                    width = 1.dp,
+                    alpha = (REST_RIM_ALPHA * ind.rim).coerceIn(0f, 1f),
+                )
+            },
             shadow = null,
-            onDrawSurface = { drawRect(color = color, size = size) },
+            innerShadow = {
+                InnerShadow(
+                    radius = REST_INNER_RADIUS * ind.innerRadius,
+                    offset = DpOffset(0.dp, 0.dp),
+                    alpha = (REST_INNER_ALPHA * ind.innerShadow).coerceIn(0f, 1f),
+                )
+            },
+            onDrawSurface = {
+                drawRect(
+                    color = color.copy(alpha = (color.alpha * ind.fill).coerceIn(0f, 1f)),
+                    size = size,
+                )
+            },
         ),
     )
 }
@@ -617,6 +660,18 @@ private const val INDICATOR_SATURATION = 2.4f
 
 /** A small lift so the blurred backdrop under the indicator reads brighter than the bar. */
 private const val INDICATOR_BRIGHTNESS = 0.05f
+
+/**
+ * The resting indicator's edge: an even rim and a soft inner shadow, so its top
+ * and bottom read as curving inward even when no lens is running. The lifted
+ * pill fades down to exactly these values, so the hand-off has no jump.
+ */
+private const val REST_RIM_ALPHA = 0.45f
+private val REST_INNER_RADIUS = 5.dp
+private const val REST_INNER_ALPHA = 0.55f
+
+/** Inner shadow radius of the lifted pill at full material. */
+private val LIFT_INNER_RADIUS = 10.dp
 
 /** What the resting indicator blurs: the page, then the bar's own glass over it. */
 private class PageAndBarBackdrop(
@@ -653,12 +708,34 @@ internal fun GlassSelectionPill(
     barGlass: LayerBackdrop,
     tabRow: LayerBackdrop,
     modifier: Modifier,
+    /**
+     * Colour the tab row is masked to inside the pill: the accent copy of the
+     * row that Kyant's LiquidBottomTabs records for its lens. Unspecified keeps
+     * the row's own colours.
+     */
+    iconTint: Color = Color.Unspecified,
 ) {
     val page = LocalAppBackdrop.current
+    val ind by AppSettings.glassIndicator.collectAsStateWithLifecycle()
     val shape = remember { RoundedCornerShape(percent = 50) }
-    val backdrop = remember(page, barGlass, tabRow, fillColor) {
-        SelectionPillBackdrop(page, barGlass, tabRow) {
-            fillColor.copy(alpha = fillColor.alpha * (1f - motion.material))
+    // White rim on a dark bar, dark rim on a light one: a white edge over a
+    // light page is invisible, so the lens would have nothing to bend.
+    val darkGlass = glassContentColor() == Color.White
+    val edge = if (darkGlass) {
+        Color.White.copy(alpha = BAR_RIM_ALPHA)
+    } else {
+        Color.Black.copy(alpha = BAR_RIM_ALPHA * 0.7f)
+    }
+    // The tab row is drawn on top of the lens, not through it: refracting it
+    // stretched the glyphs and flipped the labels near the pill's edge.
+    val iconLiftMul = ind.iconLift
+    val fillMul = ind.fill
+    val tabsBackdrop = remember(tabRow, iconTint, motion, iconLiftMul) {
+        PillTabsBackdrop(tabRow, iconTint) { 1f + PILL_ICON_LIFT_SCALE * iconLiftMul * motion.material }
+    }
+    val backdrop = remember(page, barGlass, tabsBackdrop, fillColor, edge, fillMul) {
+        SelectionPillBackdrop(page, barGlass, tabsBackdrop, Color.Unspecified, edge) {
+            fillColor.copy(alpha = (fillColor.alpha * fillMul * (1f - motion.material)).coerceIn(0f, 1f))
         }
     }
     Box(
@@ -668,35 +745,80 @@ internal fun GlassSelectionPill(
             shape = { shape },
             effects = {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    // Dari lengkung saat diam ke lengkung saat terangkat, tanpa lompatan
+                    // ke pil datar yang mengambil alih sesudah mendarat.
+                    val restAmount = if (ind.restLens) PILL_LENS_AMOUNT.toPx() * ind.restRefraction else 0f
+                    val restHeight = if (ind.restLens) PILL_LENS_HEIGHT.toPx() * ind.restRefractionWidth else 0f
+                    val liftAmount = PILL_LENS_AMOUNT.toPx() * ind.liftRefraction
+                    val liftHeight = PILL_LENS_HEIGHT.toPx() * ind.liftRefractionWidth
                     lens(
-                        refractionHeight = LENS_HEIGHT.toPx() * motion.glassPresence,
-                        refractionAmount = LENS_AMOUNT.toPx() * motion.material,
-                        depthEffect = true,
-                        chromaticAberration = true,
+                        refractionHeight = restHeight + (liftHeight - restHeight) * motion.glassPresence,
+                        refractionAmount = restAmount + (liftAmount - restAmount) * motion.material,
+                        depthEffect = ind.depth,
+                        chromaticAberration = ind.rainbow > 0f,
+                        chromaticStrength = PILL_CHROMATIC_STRENGTH * ind.rainbow * motion.material,
                     )
                 }
             },
             highlight = {
-                val alpha = motion.material * rimOf(motion.glassPresence)
-                if (alpha > 0f) Highlight.Default.copy(alpha = alpha) else null
+                val live = motion.material * rimOf(motion.glassPresence)
+                Highlight.Ambient.copy(
+                    width = 1.dp,
+                    alpha = restBlend((REST_RIM_ALPHA * ind.rim).coerceIn(0f, 1f), live),
+                )
             },
             shadow = {
                 val alpha = motion.material * rimOf(motion.glassPresence)
-                if (alpha > 0f) PILL_SHADOW.copy(alpha = alpha) else null
+                if (alpha > 0f) PILL_SHADOW.copy(alpha = (alpha * ind.shadow).coerceIn(0f, 1f)) else null
+            },
+            innerShadow = {
+                val live = motion.material * rimOf(motion.glassPresence)
+                InnerShadow(
+                    radius = (REST_INNER_RADIUS + (LIFT_INNER_RADIUS - REST_INNER_RADIUS) * live) * ind.innerRadius,
+                    offset = DpOffset(0.dp, 0.dp),
+                    alpha = restBlend((REST_INNER_ALPHA * ind.innerShadow).coerceIn(0f, 1f), live),
+                )
             },
         ),
     )
 }
 
+/**
+ * The pill's lens, with the numbers of Kyant's Glass Bottom Bar tutorial:
+ * `lens(16dp, 32dp)`. The amount is twice the height, so the band along the
+ * edge is narrow but bends hard, which is what makes the bar's top and bottom
+ * edges visibly warp where the pill stands past them.
+ */
+private val PILL_LENS_HEIGHT = 16.dp
+private val PILL_LENS_AMOUNT = 32.dp
+
+/** Ikon dan label di dalam pill terangkat membesar sebesar ini pada material penuh (Kyant: 1 -> 1.2). */
+private const val PILL_ICON_LIFT_SCALE = 0.2f
+
+/**
+ * Rainbow fringe of the lifted pill, a fraction of the shader's full strength.
+ * At 1 the dispersion paints a thick rainbow around the corners; this keeps
+ * only a faint hint of it.
+ */
+private const val PILL_CHROMATIC_STRENGTH = 0.15f
+
 /** The rim and its shadow are gone by the time the hand-off is 55% through. */
 private fun rimOf(presence: Float): Float = ((presence - 0.45f) / 0.55f).coerceIn(0f, 1f)
 
-private val LENS_HEIGHT = 16.dp
-private val LENS_AMOUNT = 22.dp
+/** [rest] at `live` 0, up to 1 at `live` 1. */
+private fun restBlend(rest: Float, live: Float): Float = (rest + (1f - rest) * live).coerceIn(0f, 1f)
+
+private val LENS_HEIGHT = 20.dp
+private val LENS_AMOUNT = 28.dp
 
 /** The bar's own edge, drawn into what the lens refracts so the lens bends it too. */
-private val BAR_RIM_WIDTH = 1.5.dp
-private const val BAR_RIM_ALPHA = 0.45f
+private val BAR_RIM_WIDTH = 1.dp
+private const val BAR_RIM_ALPHA = 0.35f
+
+/** How far the bar's shadow halo reaches past its edge, and how dark it starts. */
+private val BAR_HALO_REACH = 8.dp
+private const val BAR_HALO_ALPHA = 0.10f
+private const val BAR_HALO_STEPS = 7
 
 private val PILL_SHADOW = Shadow(
     radius = 12.dp,
@@ -713,6 +835,8 @@ private class SelectionPillBackdrop(
     private val page: Backdrop,
     private val bar: LayerBackdrop,
     private val tabs: Backdrop,
+    private val tint: Color,
+    private val edge: Color,
     private val fill: () -> Color,
 ) : Backdrop {
 
@@ -725,7 +849,7 @@ private class SelectionPillBackdrop(
     ) {
         with(page) { drawBackdrop(density, coordinates, layerBlock) }
         with(bar) { drawBackdrop(density, coordinates, layerBlock) }
-        drawBarRim(bar, coordinates)
+        drawBarRim(bar, coordinates, edge)
         val color = fill()
         if (color.alpha > 0f) {
             // Past every edge: the recorded area includes the lens's padding.
@@ -735,7 +859,13 @@ private class SelectionPillBackdrop(
                 size = Size(size.width * 3, size.height * 3),
             )
         }
-        with(tabs) { drawBackdrop(density, coordinates, layerBlock) }
+        if (tint != Color.Unspecified) {
+            // The tab row, masked to one colour: what the pill shows of the
+            // tabs under it, refracted by the lens.
+            drawTinted(tint) { with(tabs) { drawBackdrop(density, coordinates, layerBlock) } }
+        } else {
+            with(tabs) { drawBackdrop(density, coordinates, layerBlock) }
+        }
     }
 }
 
@@ -745,7 +875,7 @@ private class SelectionPillBackdrop(
  * the bar's own position, inside the pill's coordinate space, before the lens
  * bends everything.
  */
-private fun DrawScope.drawBarRim(bar: LayerBackdrop, coordinates: LayoutCoordinates?) {
+private fun DrawScope.drawBarRim(bar: LayerBackdrop, coordinates: LayoutCoordinates?, edge: Color) {
     val barCoordinates = bar.layerCoordinates ?: return
     val here = coordinates ?: return
     if (!barCoordinates.isAttached || !here.isAttached) return
@@ -757,14 +887,74 @@ private fun DrawScope.drawBarRim(bar: LayerBackdrop, coordinates: LayoutCoordina
     val barSize = barCoordinates.size.toSize()
     if (barSize.width <= 0f || barSize.height <= 0f) return
     val strokeWidth = BAR_RIM_WIDTH.toPx()
-    val radius = minOf(barSize.width, barSize.height) / 2f - strokeWidth / 2f
+    val radius = minOf(barSize.width, barSize.height) / 2f
+    val haloReach = BAR_HALO_REACH.toPx()
+    val ring = haloReach / BAR_HALO_STEPS
+    // Bright along the top and bottom edges, dim between.
+    val rim = Brush.verticalGradient(
+        colors = listOf(edge, edge.copy(alpha = edge.alpha * 0.3f), edge),
+        startY = 0f,
+        endY = barSize.height,
+    )
     translate(-offset.x, -offset.y) {
+        // The bar's soft shadow, which the exported glass leaves out: a dark
+        // halo fading outward from the edge, so the pill's lens has something
+        // to bend on the far side of the edge as well as on the near side.
+        for (i in 1..BAR_HALO_STEPS) {
+            val t = i / BAR_HALO_STEPS.toFloat()
+            val grow = haloReach * t
+            drawRoundRect(
+                color = Color.Black.copy(alpha = BAR_HALO_ALPHA * (1f - t)),
+                topLeft = Offset(-grow, -grow),
+                size = Size(barSize.width + grow * 2f, barSize.height + grow * 2f),
+                cornerRadius = CornerRadius(radius + grow, radius + grow),
+                style = Stroke(width = ring),
+            )
+        }
         drawRoundRect(
-            color = Color.White.copy(alpha = BAR_RIM_ALPHA),
+            brush = rim,
             topLeft = Offset(strokeWidth / 2f, strokeWidth / 2f),
             size = Size(barSize.width - strokeWidth, barSize.height - strokeWidth),
-            cornerRadius = CornerRadius(radius, radius),
+            cornerRadius = CornerRadius(radius - strokeWidth / 2f, radius - strokeWidth / 2f),
             style = Stroke(width = strokeWidth),
         )
     }
+}
+
+/**
+ * The tab row under the lifted pill, masked to [tint] when set, with no
+ * refraction. Digambar diperbesar terhadap pusat pill sebesar [iconScale],
+ * jadi ikon dan label di dalam lens ikut membesar saat pill terangkat,
+ * seperti LiquidBottomTab Kyant (1 -> 1.2 mengikuti tekanan).
+ */
+private class PillTabsBackdrop(
+    private val tabs: Backdrop,
+    private val tint: Color,
+    private val iconScale: () -> Float = { 1f },
+) : Backdrop {
+
+    override val isCoordinatesDependent: Boolean = true
+
+    override fun DrawScope.drawBackdrop(
+        density: Density,
+        coordinates: LayoutCoordinates?,
+        layerBlock: (GraphicsLayerScope.() -> Unit)?,
+    ) {
+        val s = iconScale()
+        val draw: DrawScope.() -> Unit = {
+            scale(s, pivot = center) {
+                with(tabs) { drawBackdrop(density, coordinates, layerBlock) }
+            }
+        }
+        if (tint != Color.Unspecified) drawTinted(tint, draw) else draw()
+    }
+}
+
+/** Draws [block] and recolours everything it painted to [tint], keeping its alpha. */
+private fun DrawScope.drawTinted(tint: Color, block: DrawScope.() -> Unit) {
+    val paint = Paint().apply { colorFilter = ColorFilter.tint(tint, BlendMode.SrcIn) }
+    val canvas = drawContext.canvas
+    canvas.saveLayer(Rect(-size.width, -size.height, size.width * 2f, size.height * 2f), paint)
+    block()
+    canvas.restore()
 }

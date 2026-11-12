@@ -165,6 +165,152 @@ data class GlassCustom(
 }
 
 /**
+ * Pengaturan indikator pilihan (pil) pada tab bar Liquid Glass. Semua pengali
+ * bernilai 1f = tampilan bawaan. [restLens] menjaga lengkung lensa pada
+ * indikator saat diam, [restRefraction] dan [restRefractionWidth] mengatur
+ * kekuatan dan lebarnya.
+ */
+data class GlassIndicator(
+    val restLens: Boolean = true,
+    val restRefraction: Float = 0.6f,
+    val restRefractionWidth: Float = 0.8f,
+    val liftRefraction: Float = 1f,
+    val liftRefractionWidth: Float = 1f,
+    val rainbow: Float = 1f,
+    val depth: Boolean = true,
+    val blur: Float = 1f,
+    val saturation: Float = 1f,
+    val brightness: Float = 1f,
+    val fill: Float = 1f,
+    val rim: Float = 1f,
+    val innerShadow: Float = 1f,
+    val innerRadius: Float = 1f,
+    val shadow: Float = 1f,
+    val lift: Float = 1f,
+    val iconLift: Float = 1f,
+    val squash: Float = 1f,
+) {
+    val isDefault: Boolean get() = this == DEFAULT
+
+    fun coerced(): GlassIndicator = copy(
+        restRefraction = restRefraction.coerceIn(0f, 2.5f),
+        restRefractionWidth = restRefractionWidth.coerceIn(0.2f, 2.5f),
+        liftRefraction = liftRefraction.coerceIn(0f, 2.5f),
+        liftRefractionWidth = liftRefractionWidth.coerceIn(0.2f, 2.5f),
+        rainbow = rainbow.coerceIn(0f, 3f),
+        blur = blur.coerceIn(0f, 3f),
+        saturation = saturation.coerceIn(0f, 2.5f),
+        brightness = brightness.coerceIn(0f, 4f),
+        fill = fill.coerceIn(0f, 3f),
+        rim = rim.coerceIn(0f, 2f),
+        innerShadow = innerShadow.coerceIn(0f, 2f),
+        innerRadius = innerRadius.coerceIn(0f, 3f),
+        shadow = shadow.coerceIn(0f, 3f),
+        lift = lift.coerceIn(0f, 2f),
+        iconLift = iconLift.coerceIn(0f, 2f),
+        squash = squash.coerceIn(0f, 3f),
+    )
+
+    companion object {
+        val DEFAULT = GlassIndicator()
+    }
+}
+
+/**
+ * Preset Liquid Glass siap pakai: [level], [custom] dan [frosted] diterapkan
+ * sekaligus lewat [AppSettings.applyGlassPreset].
+ */
+enum class GlassPreset(
+    val level: Float,
+    val custom: GlassCustom,
+    val indicator: GlassIndicator,
+    val darkCustom: GlassCustom,
+    val darkIndicator: GlassIndicator,
+    val frosted: Boolean = false,
+) {
+    /** Tampilan bawaan Zenith. */
+    DEFAULT(
+        level = 0.13f,
+        custom = GlassCustom(
+            blur = 0.66f,
+            saturation = 1f,
+            tint = 1.67f,
+            refraction = 0.99f,
+            refractionWidth = 0.36f,
+            depth = true,
+            rainbow = 0f,
+            rim = 1f,
+            shadow = 1f,
+            quality = 1f,
+        ),
+        indicator = GlassIndicator(
+            restLens = true,
+            restRefraction = 2.5f,
+            restRefractionWidth = 2.13f,
+            liftRefraction = 0.93f,
+            liftRefractionWidth = 0.46f,
+            rainbow = 1f,
+            depth = true,
+            blur = 1f,
+            saturation = 2.16f,
+            brightness = 1f,
+            fill = 1f,
+            rim = 1f,
+            innerShadow = 1f,
+            innerRadius = 1f,
+            shadow = 1f,
+            lift = 0.79f,
+            iconLift = 0.19f,
+            squash = 0.39f,
+        ),
+        darkCustom = GlassCustom(
+            blur = 0.66f,
+            saturation = 1f,
+            tint = 1.67f,
+            refraction = 0.99f,
+            refractionWidth = 0.36f,
+            depth = true,
+            rainbow = 0f,
+            rim = 0.57f,
+            shadow = 1.68f,
+            quality = 1f,
+        ),
+        darkIndicator = GlassIndicator(
+            restLens = true,
+            restRefraction = 1.13f,
+            restRefractionWidth = 0.66f,
+            liftRefraction = 0.93f,
+            liftRefractionWidth = 0.48f,
+            rainbow = 1.3f,
+            depth = true,
+            blur = 0.43f,
+            saturation = 0.63f,
+            brightness = 1.57f,
+            fill = 0.45f,
+            rim = 0.75f,
+            innerShadow = 2f,
+            innerRadius = 1.01f,
+            shadow = 1.01f,
+            lift = 0.79f,
+            iconLift = 0.19f,
+            squash = 0.39f,
+        ),
+    );
+
+    /** Nilai custom preset ini untuk tema terang atau gelap. */
+    fun customFor(dark: Boolean): GlassCustom = if (dark) darkCustom else custom
+
+    /** Nilai indikator preset ini untuk tema terang atau gelap. */
+    fun indicatorFor(dark: Boolean): GlassIndicator = if (dark) darkIndicator else indicator
+
+    /** True bila pengaturan saat ini sama dengan preset ini, di tema terang maupun gelap. */
+    fun matches(level: Float, custom: GlassCustom, indicator: GlassIndicator, frosted: Boolean): Boolean =
+        this.level == level && this.frosted == frosted &&
+            ((custom == this.custom && indicator == this.indicator) ||
+                (custom == darkCustom && indicator == darkIndicator))
+}
+
+/**
  * Which exclusive output, if any, a track is sent to unchanged. Declared in
  * the order the settings picker lists them; persisted by name, so the order
  * can change freely.
@@ -715,10 +861,13 @@ object AppSettings {
     val frostedGlass = MutableStateFlow(false)
 
     /** Kejernihan Liquid Glass sebagai slider (Clear ... Balanced ... Frosted). Hanya berlaku saat [liquidGlass] aktif. */
-    val glassClarity = MutableStateFlow(GlassClarity.BALANCED)
+    val glassClarity = MutableStateFlow(GlassClarity(GlassPreset.DEFAULT.level))
 
     /** Pengaturan manual tiap efek Liquid Glass (blur, refraksi, pelangi, tepi, bayangan, kualitas). */
-    val glassCustom = MutableStateFlow(GlassCustom())
+    val glassCustom = MutableStateFlow(GlassPreset.DEFAULT.custom)
+
+    /** Pengaturan indikator pilihan pada tab bar (lengkung saat diam, refraksi, tepi, bayangan, gerak). */
+    val glassIndicator = MutableStateFlow(GlassPreset.DEFAULT.indicator)
 
     /**
      * Blurs what scrolls under the status bar and the top controls, easing out
@@ -1437,24 +1586,48 @@ object AppSettings {
         reduceDynamicBlur.value = prefs.getBoolean(KEY_REDUCE_BLUR, false)
         liquidGlass.value = prefs.getBoolean(KEY_LIQUID_GLASS, false)
         frostedGlass.value = prefs.getBoolean(KEY_FROSTED_GLASS, false)
+        val glassDefault = GlassPreset.DEFAULT
         glassClarity.value = GlassClarity(
             if (prefs.contains(KEY_GLASS_CLARITY_LEVEL)) {
-                prefs.getFloat(KEY_GLASS_CLARITY_LEVEL, GlassClarity.BALANCED_LEVEL)
+                prefs.getFloat(KEY_GLASS_CLARITY_LEVEL, glassDefault.level)
             } else {
-                GlassClarity.levelForLegacyName(prefs.getString(KEY_GLASS_CLARITY, null))
+                prefs.getString(KEY_GLASS_CLARITY, null)
+                    ?.let { GlassClarity.levelForLegacyName(it) }
+                    ?: glassDefault.level
             },
         )
         glassCustom.value = GlassCustom(
-            blur = prefs.getFloat(KEY_GLASS_BLUR, 1f),
-            saturation = prefs.getFloat(KEY_GLASS_SATURATION, 1f),
-            tint = prefs.getFloat(KEY_GLASS_TINT, 1f),
-            refraction = prefs.getFloat(KEY_GLASS_REFRACTION, 1f),
-            refractionWidth = prefs.getFloat(KEY_GLASS_REFRACTION_WIDTH, 1f),
-            depth = prefs.getBoolean(KEY_GLASS_DEPTH, true),
-            rainbow = prefs.getFloat(KEY_GLASS_RAINBOW, GlassCustom.RAINBOW_AUTO),
-            rim = prefs.getFloat(KEY_GLASS_RIM, 1f),
-            shadow = prefs.getFloat(KEY_GLASS_SHADOW, 1f),
-            quality = prefs.getFloat(KEY_GLASS_QUALITY, 1f),
+            blur = prefs.getFloat(KEY_GLASS_BLUR, glassDefault.custom.blur),
+            saturation = prefs.getFloat(KEY_GLASS_SATURATION, glassDefault.custom.saturation),
+            tint = prefs.getFloat(KEY_GLASS_TINT, glassDefault.custom.tint),
+            refraction = prefs.getFloat(KEY_GLASS_REFRACTION, glassDefault.custom.refraction),
+            refractionWidth = prefs.getFloat(KEY_GLASS_REFRACTION_WIDTH, glassDefault.custom.refractionWidth),
+            depth = prefs.getBoolean(KEY_GLASS_DEPTH, glassDefault.custom.depth),
+            rainbow = prefs.getFloat(KEY_GLASS_RAINBOW, glassDefault.custom.rainbow),
+            rim = prefs.getFloat(KEY_GLASS_RIM, glassDefault.custom.rim),
+            shadow = prefs.getFloat(KEY_GLASS_SHADOW, glassDefault.custom.shadow),
+            quality = prefs.getFloat(KEY_GLASS_QUALITY, glassDefault.custom.quality),
+        ).coerced()
+        val gi = glassDefault.indicator
+        glassIndicator.value = GlassIndicator(
+            restLens = prefs.getBoolean(KEY_GIND_REST_LENS, gi.restLens),
+            restRefraction = prefs.getFloat(KEY_GIND_REST_REFRACTION, gi.restRefraction),
+            restRefractionWidth = prefs.getFloat(KEY_GIND_REST_WIDTH, gi.restRefractionWidth),
+            liftRefraction = prefs.getFloat(KEY_GIND_LIFT_REFRACTION, gi.liftRefraction),
+            liftRefractionWidth = prefs.getFloat(KEY_GIND_LIFT_WIDTH, gi.liftRefractionWidth),
+            rainbow = prefs.getFloat(KEY_GIND_RAINBOW, gi.rainbow),
+            depth = prefs.getBoolean(KEY_GIND_DEPTH, gi.depth),
+            blur = prefs.getFloat(KEY_GIND_BLUR, gi.blur),
+            saturation = prefs.getFloat(KEY_GIND_SATURATION, gi.saturation),
+            brightness = prefs.getFloat(KEY_GIND_BRIGHTNESS, gi.brightness),
+            fill = prefs.getFloat(KEY_GIND_FILL, gi.fill),
+            rim = prefs.getFloat(KEY_GIND_RIM, gi.rim),
+            innerShadow = prefs.getFloat(KEY_GIND_INNER_SHADOW, gi.innerShadow),
+            innerRadius = prefs.getFloat(KEY_GIND_INNER_RADIUS, gi.innerRadius),
+            shadow = prefs.getFloat(KEY_GIND_SHADOW, gi.shadow),
+            lift = prefs.getFloat(KEY_GIND_LIFT, gi.lift),
+            iconLift = prefs.getFloat(KEY_GIND_ICON_LIFT, gi.iconLift),
+            squash = prefs.getFloat(KEY_GIND_SQUASH, gi.squash),
         ).coerced()
         progressiveBlur.value = prefs.getBoolean(KEY_PROGRESSIVE_BLUR, false)
         lyricsBlur.value = prefs.getBoolean(KEY_LYRICS_BLUR, true)
@@ -2367,6 +2540,50 @@ object AppSettings {
             .putFloat(KEY_GLASS_SHADOW, v.shadow)
             .putFloat(KEY_GLASS_QUALITY, v.quality)
             .apply()
+    }
+
+    fun setGlassIndicator(value: GlassIndicator) {
+        val v = value.coerced()
+        glassIndicator.value = v
+        prefs.edit()
+            .putBoolean(KEY_GIND_REST_LENS, v.restLens)
+            .putFloat(KEY_GIND_REST_REFRACTION, v.restRefraction)
+            .putFloat(KEY_GIND_REST_WIDTH, v.restRefractionWidth)
+            .putFloat(KEY_GIND_LIFT_REFRACTION, v.liftRefraction)
+            .putFloat(KEY_GIND_LIFT_WIDTH, v.liftRefractionWidth)
+            .putFloat(KEY_GIND_RAINBOW, v.rainbow)
+            .putBoolean(KEY_GIND_DEPTH, v.depth)
+            .putFloat(KEY_GIND_BLUR, v.blur)
+            .putFloat(KEY_GIND_SATURATION, v.saturation)
+            .putFloat(KEY_GIND_BRIGHTNESS, v.brightness)
+            .putFloat(KEY_GIND_FILL, v.fill)
+            .putFloat(KEY_GIND_RIM, v.rim)
+            .putFloat(KEY_GIND_INNER_SHADOW, v.innerShadow)
+            .putFloat(KEY_GIND_INNER_RADIUS, v.innerRadius)
+            .putFloat(KEY_GIND_SHADOW, v.shadow)
+            .putFloat(KEY_GIND_LIFT, v.lift)
+            .putFloat(KEY_GIND_ICON_LIFT, v.iconLift)
+            .putFloat(KEY_GIND_SQUASH, v.squash)
+            .apply()
+    }
+
+    /** Tema gelap yang sedang aktif, dipakai preset yang punya nilai terang dan gelap. */
+    private var glassDarkTheme = false
+
+    fun applyGlassPreset(preset: GlassPreset) {
+        setGlassClarity(preset.level)
+        setGlassCustom(preset.customFor(glassDarkTheme))
+        setGlassIndicator(preset.indicatorFor(glassDarkTheme))
+        setFrostedGlass(preset.frosted)
+    }
+
+    /** Tema berganti: kalau masih memakai preset Zenith, nilainya ikut tema baru. */
+    fun syncGlassPresetTheme(dark: Boolean) {
+        glassDarkTheme = dark
+        val preset = GlassPreset.DEFAULT
+        if (preset.matches(glassClarity.value.level, glassCustom.value, glassIndicator.value, frostedGlass.value)) {
+            applyGlassPreset(preset)
+        }
     }
 
     fun setProgressiveBlur(value: Boolean) {
@@ -3293,6 +3510,24 @@ object AppSettings {
     private const val KEY_GLASS_RIM = "glass_custom_rim"
     private const val KEY_GLASS_SHADOW = "glass_custom_shadow"
     private const val KEY_GLASS_QUALITY = "glass_custom_quality"
+    private const val KEY_GIND_REST_LENS = "glass_ind_rest_lens"
+    private const val KEY_GIND_REST_REFRACTION = "glass_ind_rest_refraction"
+    private const val KEY_GIND_REST_WIDTH = "glass_ind_rest_width"
+    private const val KEY_GIND_LIFT_REFRACTION = "glass_ind_lift_refraction"
+    private const val KEY_GIND_LIFT_WIDTH = "glass_ind_lift_width"
+    private const val KEY_GIND_RAINBOW = "glass_ind_rainbow"
+    private const val KEY_GIND_DEPTH = "glass_ind_depth"
+    private const val KEY_GIND_BLUR = "glass_ind_blur"
+    private const val KEY_GIND_SATURATION = "glass_ind_saturation"
+    private const val KEY_GIND_BRIGHTNESS = "glass_ind_brightness"
+    private const val KEY_GIND_FILL = "glass_ind_fill"
+    private const val KEY_GIND_RIM = "glass_ind_rim"
+    private const val KEY_GIND_INNER_SHADOW = "glass_ind_inner_shadow"
+    private const val KEY_GIND_INNER_RADIUS = "glass_ind_inner_radius"
+    private const val KEY_GIND_SHADOW = "glass_ind_shadow"
+    private const val KEY_GIND_LIFT = "glass_ind_lift"
+    private const val KEY_GIND_ICON_LIFT = "glass_ind_icon_lift"
+    private const val KEY_GIND_SQUASH = "glass_ind_squash"
     private const val KEY_PROGRESSIVE_BLUR = "progressive_blur"
     private const val KEY_LYRICS_BLUR = "lyrics_blur"
     private const val KEY_LIQUID_FLOW = "liquid_flow_motion"
