@@ -19,6 +19,12 @@ import androidx.compose.ui.unit.dp
 val LocalShareIcon = staticCompositionLocalOf { ZenithIcons.Share }
 
 /**
+ * The close glyph for floating action bars. [ZenithIcons.Close] by default; the
+ * app provides its SF Symbol one so the bars match the rest of its icons.
+ */
+val LocalCloseIcon = staticCompositionLocalOf { ZenithIcons.Close }
+
+/**
  * Thick-stroke, round-capped icons in the spirit of Telegram's modern icon set.
  * Drawn as strokes so the 2.2px weight + round joins read as a single polished
  * family. Tint is applied by [androidx.compose.material3.Icon].
@@ -613,6 +619,25 @@ object ZenithIcons {
                 close()
             }
         }.build()
+
+    /** Dismissing or cancelling: an X on the same 14-unit span as [Plus]. */
+    val Close: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "bc_close",
+            defaultWidth = 24.dp, defaultHeight = 24.dp,
+            viewportWidth = 24f, viewportHeight = 24f,
+        ).apply {
+            path(
+                stroke = stroke,
+                strokeLineWidth = STROKE,
+                strokeLineCap = StrokeCap.Round,
+                strokeLineJoin = StrokeJoin.Round,
+            ) {
+                moveTo(6f, 6f); lineTo(18f, 18f)
+                moveTo(18f, 6f); lineTo(6f, 18f)
+            }
+        }.build()
+    }
 
     /** Adding something — a new playlist, on the library shelf. */
     val Plus: ImageVector by lazy {

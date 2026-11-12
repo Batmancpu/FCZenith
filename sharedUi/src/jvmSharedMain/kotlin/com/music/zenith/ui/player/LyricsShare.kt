@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
+import com.music.zenith.ui.icons.LocalCloseIcon
 import com.music.zenith.ui.icons.LocalShareIcon
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -316,7 +317,7 @@ internal fun LyricsPickBar(
     ) {
         PickAction(
             label = stringResource(Res.string.cancel),
-            icon = Icons.Rounded.Close,
+            icon = LocalCloseIcon.current,
             accent = false,
             enabled = true,
             modifier = Modifier.weight(1f),
