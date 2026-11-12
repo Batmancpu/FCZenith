@@ -1084,29 +1084,6 @@ private fun ZenithApp(
             browseId = playlist.browseId,
         )
     }
-    // Playlists pinned from their menu, drawn as one row at the top of Home.
-    // Looked up across the account's playlists and the ones kept on this
-    // device, in the order they were pinned.
-    val homePinnedIds by AppSettings.pinnedPlaylists.collectAsStateWithLifecycle()
-    val pinnedShelfTitle = stringResource(R.string.pinned_playlists)
-    LaunchedEffect(signedIn, homePinnedIds) {
-        if (signedIn && homePinnedIds.isNotEmpty()) viewModel.loadPlaylists()
-    }
-    val pinnedHomeShelf = remember(homePinnedIds, playlists, localPlaylists, pinnedShelfTitle) {
-        val byId = HashMap<String, ShelfItem>()
-        playlists.forEach { p ->
-            byId[p.browseId] = ShelfItem(
-                title = p.title,
-                subtitle = p.subtitle,
-                thumbnailUrl = p.thumbnailUrl,
-                videoId = null,
-                browseId = p.browseId,
-            )
-        }
-        localPlaylistItems.forEach { item -> item.browseId?.let { byId[it] = item } }
-        val items = homePinnedIds.mapNotNull { byId[it] }
-        if (items.isEmpty()) null else com.music.zenith.data.model.HomeShelf(pinnedShelfTitle, items)
-    }
     // What a browse id is recorded under in Downloads.collections, when it names
     // a release downloaded whole — see BrowseTarget.downloadId. A downloaded
     // playlist's own page and its card both carry the id under the
@@ -3608,7 +3585,6 @@ private fun ZenithApp(
                                 onMoodClick = playMood.takeUnless { hideHomeMoods },
                                 onMoodsShowAll = { navigator.push(AppRoute.Moods) },
                                 homeLayout = homeLayout,
-                                pinnedShelf = pinnedHomeShelf,
                                 onPlaySongs = { songs -> play(songs, 0) },
                                 artworkMotion = artworkMotion,
                                 onTopPickLongPress = { pick ->

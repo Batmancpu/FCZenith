@@ -147,7 +147,12 @@ fun LibraryScreen(
             ?.items
             .orEmpty()
     }
-    val pinnedItems = pinnedPlaylists.mapNotNull { id -> playlistItems.firstOrNull { it.browseId == id } }
+    // A pin can name an account playlist or one kept on this device (a Spotify
+    // import), and the second kind lives on the On Device shelf, not the
+    // account's Playlists shelf, so both are searched.
+    val pinnedItems = pinnedPlaylists.mapNotNull { id ->
+        playlistItems.firstOrNull { it.browseId == id } ?: deviceItems.firstOrNull { it.browseId == id }
+    }
     PullToRefresh(
         refreshing = refreshing,
         onRefresh = onRefresh,
@@ -205,14 +210,17 @@ fun LibraryScreen(
             }
             section(LIBRARY_SLOT_REPLAY) { item(key = "replay") { replay() } }
             section(LIBRARY_SLOT_ON_DEVICE) {
-                if (deviceItems.isNotEmpty()) {
+                // What is pinned already sits in the grid above, so the shelf
+                // keeps only the rest; "Show all" still opens everything.
+                val unpinnedDevice = deviceItems.filterNot { it.browseId != null && it.browseId in pinnedPlaylists }
+                if (unpinnedDevice.isNotEmpty()) {
                     item(key = "shelf:$onDevice") {
-                        val onDeviceShelf = HomeShelf(title = onDevice, items = deviceItems)
+                        val onDeviceShelf = HomeShelf(title = onDevice, items = unpinnedDevice)
                         LibraryGridShelf(
                             shelf = onDeviceShelf,
                             onItemClick = onShelfItemClick,
                             onItemLongPress = onShelfItemLongPress,
-                            onShowAll = { onShowAll(onDeviceShelf) },
+                            onShowAll = { onShowAll(HomeShelf(title = onDevice, items = deviceItems)) },
                         )
                     }
                 }
