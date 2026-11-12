@@ -83,7 +83,8 @@ class SpatialAudioProcessor : BaseAudioProcessor() {
                 if (id != null) {
                     val rate = sampleRate.takeIf { it > 0 } ?: FALLBACK_SAMPLE_RATE
                     profileAccumulator = ProfileAccumulator(
-                        id, currentTitle, currentArtist, rate, rate.toLong() * PROFILE_SECONDS,
+                        id, currentTitle, currentArtist, rate, lowpassAlpha(rate),
+                        rate.toLong() * PROFILE_SECONDS,
                     )
                 }
             }
