@@ -1058,6 +1058,14 @@ private fun SharedTransitionScope.ExpandedTabs(
                 animatedVisibilityScope = animatedVisibilityScope,
                 zIndexInOverlay = 1f
             )
+            // The whole bar swells a little while the pill is lifted (a drag, or a
+            // tap carrying it to another tab). It rides the pill's own lift spring,
+            // so the two grow together and the bar eases back as the pill lands.
+            .graphicsLayer {
+                val swell = if (reduceAnimation) 0f else pill.liftY.coerceAtLeast(0f)
+                scaleX = 1f + 0.03f * swell
+                scaleY = 1f + 0.06f * swell
+            }
     ) {
         // The bar's glass is exported for the lens to refract.
         CompositionLocalProvider(LocalGlassExport provides barGlass) {
