@@ -79,7 +79,7 @@
     </string-array>
     <string name="lyrics_not_available">Lirik tidak tersedia</string>
     <string name="lyrics_offset">Offset lirik</string>
-    <string name="lyrics_offset_description">Nilai positif menampilkan lirik lebih lambat</string>
+    <string name="lyrics_offset_description">Nilai positif menampilkan lirik lebih lambat. Disimpan hanya untuk lagu ini.</string>
     <string name="lyrics_offset_reset">Setel ulang</string>
     <string name="lyrics_provider_current">Penyedia saat ini</string>
     <string name="lyrics_provider_fetching">Mengambil lirik…</string>

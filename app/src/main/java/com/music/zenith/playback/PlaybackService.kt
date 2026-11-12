@@ -3631,6 +3631,8 @@ class PlaybackService : MediaLibraryService() {
         // already been reported once and won't be again. The claim from
         // source resolution stands in until the decoder itself confirms or
         // corrects it — see [formatListener]'s onAudioInputFormatChanged.
+        // The lyrics offset belongs to the track, so it follows the handoff too.
+        AppSettings.setLyricsOffsetTrack(mediaItem?.mediaId)
         activeTrackIsDolbyAtmos = NerdStats.declaredFormat(mediaItem?.mediaId)?.isDolbyAtmos == true
         applySpatialAudioEnabled(mediaItem?.mediaId)
 

@@ -720,8 +720,14 @@ object AppSettings {
      */
     val lyricsSparkle = MutableStateFlow(true)
 
-    /** Positive values delay synced lyrics; negative values bring them forward. */
+    /**
+     * Positive values delay synced lyrics; negative values bring them forward.
+     * This is the offset of the track now playing, saved for that track alone;
+     * [setLyricsOffsetTrack] points it at whichever track the player is on.
+     */
     val lyricsOffsetMs = MutableStateFlow(0)
+    private var lyricsOffsetByTrack: Map<String, Int> = emptyMap()
+    private var lyricsOffsetTrackId: String? = null
 
     /**
      * Which language the lyrics translate button translates *into*.
@@ -1385,8 +1391,7 @@ object AppSettings {
         lyricsBlur.value = prefs.getBoolean(KEY_LYRICS_BLUR, true)
         liquidFlow.value = prefs.getBoolean(KEY_LIQUID_FLOW, true)
         lyricsSparkle.value = prefs.getBoolean(KEY_LYRICS_SPARKLE, true)
-        lyricsOffsetMs.value = prefs.getInt(KEY_LYRICS_OFFSET_MS, 0)
-            .coerceIn(MIN_LYRICS_OFFSET_MS, MAX_LYRICS_OFFSET_MS)
+        lyricsOffsetByTrack = readLyricsOffsetByTrack()
         translationLanguage.value = prefs.getString(KEY_TRANSLATION_LANGUAGE, "").orEmpty()
         if (highPerformanceMode.value) {
             reduceAnimation.value = false
@@ -2050,11 +2055,38 @@ object AppSettings {
         prefs.edit().putBoolean(KEY_LYRICS_SPARKLE, value).apply()
     }
 
+    /** Saves the offset for the track now playing right away; 0 clears its entry. */
     fun setLyricsOffsetMs(value: Int) {
         val normalized = value.coerceIn(MIN_LYRICS_OFFSET_MS, MAX_LYRICS_OFFSET_MS)
         if (lyricsOffsetMs.value == normalized) return
         lyricsOffsetMs.value = normalized
-        prefs.edit().putInt(KEY_LYRICS_OFFSET_MS, normalized).apply()
+        val trackId = lyricsOffsetTrackId ?: return
+        val next = LinkedHashMap(lyricsOffsetByTrack)
+        next.remove(trackId)
+        if (normalized != 0) next[trackId] = normalized
+        while (next.size > MAX_LYRICS_OFFSET_TRACKS) next.remove(next.keys.first())
+        lyricsOffsetByTrack = next
+        val json = org.json.JSONObject()
+        next.forEach { (id, ms) -> json.put(id, ms) }
+        prefs.edit().putString(KEY_LYRICS_OFFSET_BY_TRACK, json.toString()).apply()
+    }
+
+    /** Points [lyricsOffsetMs] at [trackId]'s own saved offset, or 0 when it has none. */
+    fun setLyricsOffsetTrack(trackId: String?) {
+        lyricsOffsetTrackId = trackId?.takeIf { it.isNotBlank() }
+        lyricsOffsetMs.value = lyricsOffsetTrackId?.let { lyricsOffsetByTrack[it] } ?: 0
+    }
+
+    private fun readLyricsOffsetByTrack(): Map<String, Int> {
+        val raw = prefs.getString(KEY_LYRICS_OFFSET_BY_TRACK, null) ?: return emptyMap()
+        return runCatching {
+            val json = org.json.JSONObject(raw)
+            val out = LinkedHashMap<String, Int>()
+            json.keys().forEach {
+                out[it] = json.getInt(it).coerceIn(MIN_LYRICS_OFFSET_MS, MAX_LYRICS_OFFSET_MS)
+            }
+            out as Map<String, Int>
+        }.getOrDefault(emptyMap())
     }
 
     /** Blank restores "follow the app language"; see [translationLanguage]. */
@@ -2862,7 +2894,8 @@ object AppSettings {
     private const val KEY_LYRICS_SPARKLE = "lyrics_sparkle"
     private const val KEY_PLAYBACK_RATE = "playback_rate"
     private const val KEY_PLAYBACK_TEMPO = "playback_tempo"
-    private const val KEY_LYRICS_OFFSET_MS = "lyrics_offset_ms"
+    private const val KEY_LYRICS_OFFSET_BY_TRACK = "lyrics_offset_by_track"
+    private const val MAX_LYRICS_OFFSET_TRACKS = 5000
     private const val KEY_TRANSLATION_LANGUAGE = "translation_language"
     private const val KEY_ANIMATED_CANVAS = "animated_canvas"
     private const val KEY_CANVAS_OVER_CELLULAR = "canvas_over_cellular"
