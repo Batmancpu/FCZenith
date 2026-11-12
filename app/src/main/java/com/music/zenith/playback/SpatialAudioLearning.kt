@@ -83,8 +83,10 @@ data class SpatialAudioExample(
     val artist: String,
     val feedback: SpatialAudioFeedback,
     val profile: SpatialAudioProfile,
-    val features: SpatialAudioFeatures = SpatialAudioFeatures.from(profile),
-)
+) {
+    /** Rebuilt by the constructor, including data-class copy(profile = ...). */
+    val features: SpatialAudioFeatures = SpatialAudioFeatures.from(profile)
+}
 
 enum class SpatialAudioDecisionReason {
     GLOBAL_OFF,

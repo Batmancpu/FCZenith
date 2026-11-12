@@ -58,7 +58,7 @@ class SpatialAudioLearningTest {
         ))
         assertTrue(result.enabled)
         assertEquals(SpatialAudioDecisionReason.AUTO_LEARNED_ON, result.reason)
-        assertEquals(3, result.onVotes)
+        assertEquals(4, result.onVotes)
     }
 
     @Test
