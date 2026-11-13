@@ -511,7 +511,7 @@ private const val CLIP_MIX_FADE_IN_MS = 500
  * sheet dan terlihat sebagai salinan cover ukuran penuh di belakang cover kecil
  * yang masih terbang (tampak seperti dua cover).
  */
-private const val DOCK_BACKDROP_FROM = 0.15f
+private const val DOCK_BACKDROP_FROM = 0.05f
 
 /** Seberapa jauh drag (0..1 dari mini ke penuh) saat cover sudah selebar panel dan menutup sudutnya. */
 private const val DOCK_COVER_FULL_AT = 0.6f
@@ -3832,26 +3832,30 @@ fun NowPlayingScreen(
                             } else {
                                 mini
                             }
-                            val flown = lerp(from, rect.translate(0f, -unridden), ease)
+                            val flownRaw = lerp(from, rect.translate(0f, -unridden), ease)
+                            // Cover full-bleed terbang sebagai salinan cover main player
+                            // (sudah satu set dengan blur di bawahnya) yang diskalakan
+                            // seragam: tingginya mengikuti lebar dengan rasio banner,
+                            // bukan kotak mini yang baru memanjang belakangan.
+                            val flown = if (heroMode && dock != null && rect.height > 0f) {
+                                val aspect = rect.width / rect.height
+                                val uniformH = flownRaw.width / aspect
+                                val k = dockSmooth(dockT() / 0.15f)
+                                Rect(
+                                    flownRaw.left,
+                                    flownRaw.top,
+                                    flownRaw.right,
+                                    flownRaw.top + flownRaw.height + (uniformH - flownRaw.height) * k,
+                                )
+                            } else {
+                                flownRaw
+                            }
                             // Di awal drag target cover (sleeve di atas sheet) masih lebih
                             // rendah dari mini player, jadi kurva lebar panel yang cepat
                             // menyeret cover turun lebih dulu dari panelnya. Kaki cover
                             // ditahan di kaki cover mini: ia hanya tumbuh ke atas dan ke
                             // kanan, lalu naik bersama panel. Banner full-bleed tidak berubah.
-                            if (heroMode) {
-                                // Cover full-bleed sudah panjang sejak awal drag: kakinya
-                                // (yang memudar ke blur) mengikuti dasar panel, lalu
-                                // kembali ke tinggi banner menjelang terbuka penuh.
-                                val d = dock ?: return flown
-                                val panelBottom = bannerTopPx + (
-                                    d.panelBounds(
-                                        Size(playerBounds.width.toFloat(), playerBounds.height.toFloat()),
-                                    ).bottom - dockFrame.offset
-                                    )
-                                val tall = 1f - dockSmooth((d.openFraction() - 0.5f) / 0.4f)
-                                val bottom = flown.bottom + (maxOf(flown.bottom, panelBottom) - flown.bottom) * tall
-                                return Rect(flown.left, flown.top, flown.right, bottom)
-                            }
+                            if (heroMode) return flown
                             return if (flown.bottom <= mini.bottom) {
                                 flown
                             } else {
