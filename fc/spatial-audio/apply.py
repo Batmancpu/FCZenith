@@ -537,6 +537,18 @@ replace_once(MENU,
 insert_after(MENU, "    val isOffline = song.localUri != null\n",
     "\n    var spatialPreference by remember(song.videoId) { mutableStateOf(spatialAudioPreference) }\n")
 replace_once(MENU,
+    "            // Stays open after a tap: the label flips in place and the change\n"
+    "            // is audible at once, so the two settings can be compared by ear.\n"
+    "            onToggleSpatialAudio?.let {\n"
+    "                ActionRow(\n"
+    "                    icon = SfIcons.SurroundSound,\n"
+    "                    label = stringResource(\n"
+    "                        if (spatialAudioOn) R.string.spatial_audio_prefer_off else R.string.spatial_audio_prefer_on,\n"
+    "                    ),\n"
+    "                    accent = palette.accent,\n"
+    "                    onClick = it,\n"
+    "                )\n"
+    "            }\n",
     "            // One binary per-track control. Auto is internal policy, never a third toggle.\n"
     "            onSetSpatialAudioPreference?.let { setPreference ->\n"
     "                val isAutomatic = spatialPreference == SpatialAudioPreference.AUTO &&\n"
