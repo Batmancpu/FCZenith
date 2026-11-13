@@ -59,10 +59,10 @@ private object StarPrompt {
     private const val KEY_SNOOZE_UNTIL = "snooze_until"
     private const val KEY_SNOOZES = "snoozes"
 
-    private const val MIN_LAUNCHES = 5
-    private const val MIN_AGE_MS = 3L * 24 * 60 * 60 * 1000
-    private const val SNOOZE_MS = 14L * 24 * 60 * 60 * 1000
-    private const val MAX_SNOOZES = 3
+    private const val MIN_LAUNCHES = 10
+    private const val MIN_AGE_MS = 7L * 24 * 60 * 60 * 1000
+    private const val SNOOZE_MS = 30L * 24 * 60 * 60 * 1000
+    private const val MAX_SNOOZES = 2
 
     /** One count per process start, however often the screen is recomposed. */
     @Volatile
@@ -108,15 +108,17 @@ private object StarPrompt {
 
 /** Mount once near the app root; shows the star prompt when it is time. */
 @Composable
-internal fun StarPromptHost() {
+internal fun StarPromptHost(isPlaying: Boolean) {
     val context = LocalContext.current
     var show by rememberSaveable { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) {
+    // Restarts whenever playback starts or stops, so a pending ask is dropped
+    // the moment music comes on and only counts down while it is quiet.
+    LaunchedEffect(isPlaying) {
         StarPrompt.registerLaunch(context)
-        if (show) return@LaunchedEffect
-        // Let the app settle before asking for anything.
-        delay(8_000)
+        if (show || isPlaying) return@LaunchedEffect
+        // Let playback stay stopped for a moment before asking for anything.
+        delay(10_000)
         if (StarPrompt.shouldShow(context)) show = true
     }
 
