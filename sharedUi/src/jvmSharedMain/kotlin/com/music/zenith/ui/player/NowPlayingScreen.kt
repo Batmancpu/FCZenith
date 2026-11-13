@@ -2364,8 +2364,16 @@ fun NowPlayingScreen(
                 // lebarnya mengikuti cover yang terbang. Tidak ada zoom atau crop.
                 if (dockBackdropRecorded[0] && dockFrame.recorded && size.width > 0f) {
                     val setScale = (dockFrame.sleeve.width / size.width).coerceIn(0f, 1f)
-                    translate(dockFrame.portalLeft, dockFrame.portalTop) {
-                        scale(setScale, setScale, pivot = Offset.Zero) { drawLayer(backdropLayer) }
+                    if (setScale > 0f) {
+                        // Tinggi blur di bawah cover dihitung dari satu progress drag
+                        // yang sama dengan cover, jadi keduanya selalu sinkron.
+                        val blurExtension = dockBlurExtension(dockT())
+                        val coverBottom = dockFrame.sleeve.height / setScale
+                        translate(dockFrame.portalLeft, dockFrame.portalTop) {
+                            scale(setScale, setScale, pivot = Offset.Zero) {
+                                drawDockBackdropReveal(backdropLayer, coverBottom, blurExtension)
+                            }
+                        }
                     }
                 }
             }
