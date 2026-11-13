@@ -5117,11 +5117,18 @@ Spacer(Modifier.width(12.dp))
                     Spacer(Modifier.height(0.dp + (if (heroMode) controlSpread else 0.dp) / 2))
 
                     if (!hideVolumeBar) {
+                        // Extra air only while the slider is shown, so it doesn't
+                        // crowd the transport above or the icon row below. The
+                        // hidden state keeps its old footprint. The deck is measured
+                        // at natural height, so the lyric strip on or off changes
+                        // nothing here: the artwork simply takes what is left.
+                        Spacer(Modifier.height(8.dp))
                         VolumeRow(
                             value = { volume.level.value },
                             onValueChange = onVolumeChange,
                             onValueChangeFinished = onVolumeChangeFinished,
                         )
+                        Spacer(Modifier.height(12.dp))
                     } else {
                         Spacer(Modifier.height(VOLUME_ROW_HEIGHT))
                     }
