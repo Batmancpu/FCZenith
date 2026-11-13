@@ -823,7 +823,7 @@ internal fun CircleGlyph(
                 contentDescription = contentDescription,
                 tint = LocalPlayerTint.current,
                 modifier = Modifier
-                    .size(22.dp)
+                    .size(26.dp)
                     .graphicsLayer {
                         scaleX = pop.value
                         scaleY = pop.value

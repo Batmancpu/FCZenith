@@ -629,7 +629,7 @@ object ZenithIcons {
         ).apply {
             path(
                 stroke = stroke,
-                strokeLineWidth = STROKE,
+                strokeLineWidth = 1.6f,
                 strokeLineCap = StrokeCap.Round,
                 strokeLineJoin = StrokeJoin.Round,
                 fill = if (filled) stroke else null,
