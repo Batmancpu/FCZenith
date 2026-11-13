@@ -20,6 +20,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.core.Animatable
+import com.music.zenith.ui.theme.rememberArtworkPalette
 import com.music.zenith.ui.theme.rememberPlayerTint
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.channels.Channel
@@ -1044,6 +1045,9 @@ fun NowPlayingScreen(
     // already made. Plain white until it is known, and for a sleeve with no
     // colour to give.
     val artworkTint = rememberPlayerTint(remoteArt, ART_PX) ?: Color.White
+    // Warna solid dari cover untuk latar panel selagi tumbuh dari mini player,
+    // menggantikan hitam polos.
+    val coverPanelColor = rememberArtworkPalette(remoteArt, dark = true, artPx = ART_PX).background
 
     // Media-player convention: the player always owns light status icons. The
     // top treatment below, rather than a window-flag flip per cover, provides
@@ -2162,6 +2166,7 @@ fun NowPlayingScreen(
         DisposableEffect(dock) {
             onDispose { dock.attached = false }
         }
+        SideEffect { dock.panelColor = coverPanelColor }
     }
     val dockFrame = remember { DockFrame() }
     // 1 with the player fully open, falling to 0 as the sheet reaches the mini
@@ -3716,7 +3721,30 @@ fun NowPlayingScreen(
                             // selalu ada di dalam panel, jadi centring, jarak kaki, dan tarikan
                             // "settle" yang membuat cover naik turun dihapus. Tinggal pengaman
                             // supaya cover tidak keluar dari tepi panel.
-                            val rect = rawSource
+                            // Cover (kartu maupun banner full-bleed) diletakkan di tengah tinggi
+                            // panel selagi panel masih tumbuh dari pill, lalu dilepas pelan ke
+                            // garis lurusnya, supaya tidak menempel ke tepi atas panel.
+                            val rect = if (dock == null || playerBounds.height <= 0) {
+                                rawSource
+                            } else {
+                                val open = dock.openFraction()
+                                val rise = dockSmooth(open / DOCK_CENTRE_RISE_AT)
+                                val fall = dockSmooth(
+                                    (open - DOCK_CENTRE_HOLD_TO) / (DOCK_CENTRE_END_AT - DOCK_CENTRE_HOLD_TO),
+                                )
+                                val share = rise * (1f - fall)
+                                if (share <= 0f) {
+                                    rawSource
+                                } else {
+                                    val panel = dock.panelBounds(
+                                        Size(playerBounds.width.toFloat(), playerBounds.height.toFloat()),
+                                    )
+                                    val panelTop = bannerTopPx.toFloat()
+                                    val panelHeight = panel.bottom - panel.top
+                                    val centredTop = panelTop + (panelHeight - rawSource.height) / 2f
+                                    rawSource.translate(0f, (centredTop - rawSource.top) * share)
+                                }
+                            }
                             val minTop = bannerTopPx.toFloat()
                             val minLeft = -boxLeftPx.toFloat()
                             val maxRight = (playerBounds.width - boxLeftPx).toFloat()
