@@ -2123,6 +2123,11 @@ fun NowPlayingScreen(
     // between the portrait and landscape players; only the cached bitmap
     // changes when the artwork preparation above completes for another song.
     val currentFullArtworkBlurImage = rememberUpdatedState(fullArtworkBlurImage)
+    // Where the full-bleed banner stops, so the blur can be cropped to match it. Only
+    // the portrait phone player has one; everywhere else the plain crop is kept.
+    val blurSeamPx = rememberUpdatedState(
+        if (heroMode && !landscape && !tabletArtworkBackdrop) with(density) { heroHeight.toPx() } else 0f,
+    )
     val fullArtworkBlurContent = remember {
         movableContentOf<Modifier> { backdropModifier ->
             FullArtworkBlurBackdrop(
@@ -2130,6 +2135,7 @@ fun NowPlayingScreen(
                 modifier = backdropModifier,
                 outgoing = dissolve.heldBlur,
                 progress = { dissolve.progress },
+                seam = { blurSeamPx.value },
             )
         }
     }
