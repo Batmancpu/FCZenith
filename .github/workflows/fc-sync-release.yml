@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   schedule:
-    - cron: '47 * * * *'
+    - cron: '*/15 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -35,28 +35,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-      - name: Retire a delivered one-shot overlay if cleanup was interrupted
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          marker="fc/one-shot/spatial-audio/target-version"
-          if [[ -f "$marker" ]]; then
-            target="$(tr -d '[:space:]' < "$marker")"
-            asset="Music-v${target}.apk"
-            assets="$(gh release view "v${target}" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' 2>/dev/null || true)"
-            if grep -Fxq "$asset" <<< "$assets"; then
-              echo "Target APK already published; completing one-shot source cleanup."
-              rm -rf fc/one-shot/spatial-audio
-              rm -f app/src/main/java/com/music/zenith/playback/SpatialAudioPreference.kt
-              rm -f app/src/test/java/com/music/zenith/playback/SpatialAudioPreferenceTest.kt
-              git add -A fc/one-shot/spatial-audio app/src/main/java/com/music/zenith/playback/SpatialAudioPreference.kt app/src/test/java/com/music/zenith/playback/SpatialAudioPreferenceTest.kt
-              git commit -m "chore(fc): retire delivered one-shot Spatial Audio learner"
-              git push origin HEAD:main
-            fi
-          fi
 
       - name: Fetch upstream source and latest stable release metadata
         id: upstream
@@ -269,22 +247,15 @@ jobs:
           FC_VERSION_NAME: ${{ steps.decision.outputs.version_name }}
         run: python3 fc/apply-overlay.py
 
-      - name: Apply the one-release Spatial Audio learner and phone-speaker safeguard
+      - name: Apply permanent FC Spatial Audio integration
         id: spatial_audio
         if: steps.decision.outputs.should_release == 'true'
-        env:
-          FC_VERSION_NAME: ${{ steps.decision.outputs.version_name }}
         shell: bash
         run: |
           set -euo pipefail
           echo "included=false" >> "$GITHUB_OUTPUT"
-          overlay="fc/one-shot/spatial-audio"
+          overlay="fc/spatial-audio"
           if [[ -d "$overlay" ]]; then
-            target="$(tr -d '[:space:]' < "$overlay/target-version")"
-            if [[ "$FC_VERSION_NAME" != "$target" ]]; then
-              echo "One-shot Spatial Audio overlay is pinned to $target, not $FC_VERSION_NAME; refusing to build it into another release." >&2
-              exit 1
-            fi
             python3 "$overlay/apply.py"
             echo "included=true" >> "$GITHUB_OUTPUT"
           fi
@@ -454,7 +425,7 @@ jobs:
             app/src/main/res/mipmap-xxxhdpi/ic_launcher.webp app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.webp
           rm -f app/src/main/res/drawable-nodpi/fc_music_icon.webp
 
-      - name: Restore one-shot app changes to the upstream source
+      - name: Restore temporary Spatial Audio app edits before committing upstream sync
         if: steps.decision.outputs.should_release == 'true' && always()
         env:
           UPSTREAM_COMMIT: ${{ steps.upstream.outputs.commit }}
@@ -494,7 +465,7 @@ jobs:
           VERSION_NAME: ${{ steps.decision.outputs.version_name }}
         run: |
           set -euo pipefail
-          # The overlay has already been removed from the working tree.
+          # FC integration sources remain tracked under fc/spatial-audio; generated app edits are restored.
           # A requested main snapshot is one-time; future scheduled syncs return to stable tags.
           TRACK_MODE="$(sed -n 's/^upstreamTrack=//p' fc/version.properties)"
           if [[ "$TRACK_MODE" == "main-once" ]]; then
@@ -525,32 +496,9 @@ jobs:
             - Includes ${{ steps.upstream.outputs.commits_ahead }} upstream commits beyond the stable baseline when built as a main snapshot.
             - This is an FC-branded upstream-main development snapshot; future automatic syncs return to published stable releases.
             - The same FC signing certificate is checked before publishing.
-            - Spatial Audio: ${{ steps.spatial_audio.outputs.included == 'true' && 'Includes the FC one-release stereo learner, green Auto · On status, binary per-track On/Off and phone-speaker/Atmos/DSP safety bypasses. Profiles and feedback remain on-device.' || 'Unchanged from upstream; no FC one-shot Spatial Audio overlay was applied.' }}
+            - Spatial Audio: ${{ steps.spatial_audio.outputs.included == 'true' && 'Includes the persistent FC stereo learner, binary per-track On/Off with Auto status, and phone-speaker/Atmos/DSP safety bypasses. Profiles and explicit feedback remain on-device.' || 'Not included in this build.' }}
 
             Obtainium source: https://github.com/Batmancpu/FCZenith
           files: dist/Music-v${{ steps.decision.outputs.version_name }}.apk
           fail_on_unmatched_files: true
           make_latest: true
-
-      - name: Retire any legacy one-shot Spatial Audio overlay after successful publication
-        if: steps.decision.outputs.should_release == 'true' && success()
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          overlay="fc/one-shot/spatial-audio"
-          [[ -f "$overlay/target-version" ]] || exit 0
-          target="$(tr -d '[:space:]' < "$overlay/target-version")"
-          asset="Music-v${target}.apk"
-          assets="$(gh release view "v${target}" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
-          if ! grep -Fxq "$asset" <<< "$assets"; then
-            echo "The exact target APK is not attached; keeping the one-shot overlay for safe retry." >&2
-            exit 1
-          fi
-          rm -rf "$overlay"
-          git add -A fc/one-shot/spatial-audio
-          if ! git diff --cached --quiet; then
-            git commit -m "chore(fc): retire delivered one-shot Spatial Audio overlay"
-            git push origin HEAD:main
-          fi

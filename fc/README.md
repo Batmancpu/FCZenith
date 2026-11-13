@@ -13,6 +13,28 @@ Direct upstream: **rezapranata089-bit/Zenith**
 The identity overlay runs only in the GitHub Actions build workspace. It does
 not permanently rewrite upstream app source files.
 
+## Permanent Spatial Audio integration
+
+FC Zenith keeps its Spatial Audio engine as an FC-owned, removable build
+integration under `fc/spatial-audio/`. The upstream application source remains
+clean in Git: the release workflow applies the integration to the build
+workspace, runs the normal production tests, builds and signs the APK, then
+restores generated app-source edits before committing the upstream sync.
+
+The integration is version-independent but fail-closed. It checks every source
+patch anchor, requires its reviewed upstream baseline to be in the merged
+history, and stops if upstream changes the processor implementation that FC
+adapts. A changed upstream interface must be reconciled before publishing.
+
+To remove Spatial Audio cleanly, remove `fc/spatial-audio/`, remove the
+`Apply permanent FC Spatial Audio integration` workflow step, and remove the
+Spatial Audio release-note line. No permanent edits to upstream application
+source are required.
+
+The feature is stereo widening/cross-feed virtualization, not object-based
+Dolby Atmos or HRTF binaural rendering. Personal learning uses only explicit
+per-track On/Off feedback and keeps profiles on-device.
+
 ## Obtainium and in-app updates
 
 Use this repository URL as the Obtainium source:
