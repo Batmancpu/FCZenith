@@ -302,6 +302,7 @@ import com.music.zenith.ui.components.ServerEditorHost
 import com.music.zenith.ui.components.UpdateAvailableDialog
 import com.music.zenith.ui.components.WebDavConflictAlert
 import com.music.zenith.ui.components.FieldConfig
+import com.music.zenith.ui.icons.LocalCloseIcon
 import com.music.zenith.ui.icons.LocalShareIcon
 import com.music.zenith.ui.icons.ZenithIcons
 import androidx.media3.common.Player
@@ -438,6 +439,7 @@ class MainActivity : AppCompatActivity() {
                     LocalLiquidGlassEnabled provides liquidGlassEnabled,
                     LocalSegmentedControlStyle provides AppSegmentedControlStyle,
                     LocalShareIcon provides SfIcons.Share,
+                    LocalCloseIcon provides SfIcons.Close,
                     LocalMostPlayedArt provides { covers, motion, modifier ->
                         MostPlayedArt(covers, motion, modifier)
                     },
@@ -1243,6 +1245,7 @@ private fun ZenithApp(
         }
     }
     val shuffleEnabled by QueueShuffle.enabled.collectAsStateWithLifecycle()
+    com.music.zenith.ui.components.StarPromptHost(isPlaying = player.isPlaying)
     // For the version switch's "there is no other version" notice.
     val versionContext = LocalContext.current
     // Tracks whose other cut a switch looked for and didn't find: their menu

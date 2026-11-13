@@ -237,6 +237,18 @@ internal const val SEEK_SETTLE_TIMEOUT_MS = 4_000L
 private val THUMB_SIZE = 54.dp
 private val HEADER_HEIGHT = 60.dp
 private val ART_TITLE_GAP = 20.dp
+
+/**
+ * How far the title and artist move down on a full-bleed cover when the lyric
+ * line is switched off, so they sit closer to the progress bar. The cover's
+ * banner and its blur are lengthened by the same amount, which keeps the title
+ * inside the blur instead of over the picture.
+ */
+private val HERO_TITLE_DROP = 32.dp
+/** Card (non full-bleed) mode: how far the cover sits lower, as in Apple Music. */
+private val CARD_ART_DROP = 27.dp
+/** Card (non full-bleed) mode: how far the title, artist, like and more row sits lower. */
+private val CARD_TITLE_DROP = 49.dp
 /**
  * How long the sleeve takes to travel the whole way between the full player and
  * the queue's header.
@@ -481,10 +493,10 @@ private var lastHeroSettled = false
  * the artwork arrives at the mini player: it is fully faded with this share of
  * the way still to go.
  */
-private const val DOCK_FADE_LEAD = 0.15f
+private const val DOCK_FADE_LEAD = 0.05f
 
 /** How far open the player is when the rest of it (title, controls) is fully solid. */
-private const val DOCK_FADE_FULL = 0.6f
+private const val DOCK_FADE_FULL = 0.45f
 
 /** The least the faded player is drawn at while docking — see the player's fade. */
 private const val DOCK_FADE_FLOOR = 1f / 255f
@@ -499,7 +511,7 @@ private const val CLIP_MIX_FADE_IN_MS = 500
  * sheet dan terlihat sebagai salinan cover ukuran penuh di belakang cover kecil
  * yang masih terbang (tampak seperti dua cover).
  */
-private const val DOCK_BACKDROP_FROM = 0.15f
+private const val DOCK_BACKDROP_FROM = 0.05f
 
 /** Seberapa jauh drag (0..1 dari mini ke penuh) saat cover sudah selebar panel dan menutup sudutnya. */
 private const val DOCK_COVER_FULL_AT = 0.6f
@@ -531,9 +543,18 @@ private const val DOCK_COVER_START_AT = 0.05f
  * [DOCK_CENTRE_HOLD_TO], lalu lepas bertahap sampai [DOCK_CENTRE_END_AT] ke
  * jalur terbang biasa. Di 0 pengaruhnya 0, jadi cover tidak melompat dari mini.
  */
-private const val DOCK_CENTRE_RISE_AT = 0.06f
+private const val DOCK_CENTRE_RISE_AT = 0.2f
 private const val DOCK_CENTRE_HOLD_TO = 0.30f
 private const val DOCK_CENTRE_END_AT = 0.70f
+
+/**
+ * Cover kartu tidak boleh melayang di atas posisi akhirnya relatif terhadap
+ * sheet (centring dan kaki yang ditahan di mini player mengangkatnya), lalu
+ * turun lagi di ujung. Dari [DOCK_SETTLE_FROM] sampai [DOCK_SETTLE_TO] terbuka,
+ * cover ditarik pelan ke posisi akhirnya; setelah itu ia naik bersama sheet.
+ */
+private const val DOCK_SETTLE_FROM = 0.30f
+private const val DOCK_SETTLE_TO = 0.60f
 
 private fun dockSmooth(x: Float): Float {
     val t = x.coerceIn(0f, 1f)
@@ -554,7 +575,14 @@ private fun dockEase(t: Float): Float {
  * player dan sleeve. Mengikuti kurva lebar panel, jadi cover tidak turun ke
  * mini player selagi panel masih lebar.
  */
-private fun dockFlyEase(t: Float): Float = panelWideEase(t)
+private fun dockFlyEase(t: Float): Float =
+    panelWideEase(t) * dockSmooth(t / DOCK_FLY_SOFT_START_AT)
+
+/**
+ * Drag sejauh ini cover terbang dilandaikan dulu (kemiringan 0 di awal), supaya
+ * tidak melonjak di 10% pertama drag. Setelahnya sama dengan [panelWideEase].
+ */
+private const val DOCK_FLY_SOFT_START_AT = 0.3f
 
 /**
  * The share of the sheet's travel the artwork rides on its way to the cover. All
@@ -591,12 +619,31 @@ private const val DOCK_TITLE_SOLID_SPAN = 0.15f
  * plain thumbnail the mini player's cover shows, and how much of the trip the
  * dissolve takes. Whole thumbnail by the time the cover is reached.
  */
-private const val DOCK_ART_SWAP_FROM = 0.15f
-private const val DOCK_ART_SWAP_SPAN = 0.15f
+private const val DOCK_ART_SWAP_FROM = 0.08f
+private const val DOCK_ART_SWAP_SPAN = 0.08f
 
 /** Arah membuka (mini ke big): thumbnail cepat berganti ke frame canvas selagi cover masih kecil. */
-private const val DOCK_ART_SWAP_OPEN_FROM = 0.2f
-private const val DOCK_ART_SWAP_OPEN_SPAN = 0.2f
+private const val DOCK_ART_SWAP_OPEN_FROM = 0.1f
+private const val DOCK_ART_SWAP_OPEN_SPAN = 0.1f
+
+/**
+ * Cover full-bleed: drag sejauh ini bagian bawah cover sudah memudar penuh ke
+ * latar blur, seperti Apple Music, bukan baru di pertengahan drag.
+ */
+private const val DOCK_DISSOLVE_FULL_AT = 0.25f
+
+private fun dockEarlyDissolve(t: Float): Float = dockSmooth(t / DOCK_DISSOLVE_FULL_AT)
+
+/**
+ * Cover full-bleed: drag sejauh ini cover sudah selebar panel (kiri-kanan penuh)
+ * dan set cover + blur sudah menutup latar warna solid di belakangnya.
+ */
+private const val DOCK_HERO_WIDE_AT = 0.5f
+
+private fun dockHeroWide(t: Float): Float = dockSmooth(t / DOCK_HERO_WIDE_AT)
+
+/** Drag sejauh ini latar warna solid cover sudah penuh (mini player berubah jadi warna cover). */
+private const val DOCK_SOLID_FULL_AT = 0.12f
 
 /**
  * What one frame of docking into the mini player worked out — see
@@ -1058,6 +1105,8 @@ fun NowPlayingScreen(
     val openListenTogetherMembers: () -> Unit = { showListenTogetherMembers = true }
 
     val syncedLyricsEnabled by PlayerSettings.syncedLyrics.collectAsStateWithLifecycle()
+    val lyricStripSetting by PlayerSettings.lyricStrip.collectAsStateWithLifecycle()
+    val lyricStripEnabled = syncedLyricsEnabled && lyricStripSetting
     val lyricsOffsetMs by PlayerSettings.lyricsOffsetMs.collectAsStateWithLifecycle()
     // A lambda, not a value: read by the lyric strip and panel in scopes of
     // their own, so a tick recomposes them and not the player around them.
@@ -1850,6 +1899,7 @@ fun NowPlayingScreen(
     // own geometry is known. Zero until the first measure, which is fine: there
     // is nothing to show that early either.
     var heroHeight by remember { mutableStateOf(0.dp) }
+    val heroTitleDrop = if (heroMode && !lyricStripEnabled) HERO_TITLE_DROP else 0.dp
     var playerBounds by remember { mutableStateOf(IntSize.Zero) }
     // The bottom of a top-aligned, contained clip in the full-player view.
     // Use measured pixels and the decoded display aspect, never screen constants.
@@ -1865,7 +1915,7 @@ fun NowPlayingScreen(
     // Match the old hero's fade height in physical pixels, not its much larger
     // percentage of a portrait video. The mask ends at the real video bottom.
     val clipFadeFraction = if (clipBottom > 0.dp) {
-        (heroHeight.value * HERO_FADE_FRACTION / clipBottom.value).coerceIn(0f, 1f)
+        ((heroHeight - heroTitleDrop).value * HERO_FADE_FRACTION / clipBottom.value).coerceIn(0f, 1f)
     } else 0f
     heroClipGeometry.portrait = clipPortrait
     heroClipGeometry.bannerHeightPx = with(density) { heroHeight.toPx() }
@@ -2013,6 +2063,8 @@ fun NowPlayingScreen(
             AudioOutputSheet(
                 hazeState = playerHaze,
                 accountName = accountName,
+                song = song,
+                artworkUrl = remoteArt,
                 onDismiss = { showAudioOutput = false },
                 onOpenPipeline = { showAudioPipeline = true },
                 onOpenCast = { showCast = true },
@@ -2097,6 +2149,14 @@ fun NowPlayingScreen(
     // between the portrait and landscape players; only the cached bitmap
     // changes when the artwork preparation above completes for another song.
     val currentFullArtworkBlurImage = rememberUpdatedState(fullArtworkBlurImage)
+    // Where the full-bleed banner stops, so the blur can be cropped to match it. Only
+    // the portrait phone player has one; everywhere else the plain crop is kept.
+    val blurSeamPx = rememberUpdatedState(
+        if (heroMode && !landscape && !tabletArtworkBackdrop) with(density) { heroHeight.toPx() } else 0f,
+    )
+    // A cover with a canvas keeps the smooth stretched foot below the banner;
+    // the mirrored continuation is only for the still full-bleed cover.
+    val mirrorBlurBelowSeam = rememberUpdatedState(canvas == null)
     val fullArtworkBlurContent = remember {
         movableContentOf<Modifier> { backdropModifier ->
             FullArtworkBlurBackdrop(
@@ -2104,6 +2164,8 @@ fun NowPlayingScreen(
                 modifier = backdropModifier,
                 outgoing = dissolve.heldBlur,
                 progress = { dissolve.progress },
+                seam = { blurSeamPx.value },
+                mirrorBelowSeam = { mirrorBlurBelowSeam.value },
             )
         }
     }
@@ -2224,7 +2286,7 @@ fun NowPlayingScreen(
     fun stillFadeFraction(): Float {
         val bottom = stillBottomPx()
         if (bottom <= 0f) return HERO_FADE_FRACTION
-        return (with(density) { heroHeight.toPx() } * HERO_FADE_FRACTION / bottom).coerceIn(0f, 1f)
+        return (with(density) { (heroHeight - heroTitleDrop).toPx() } * HERO_FADE_FRACTION / bottom).coerceIn(0f, 1f)
     }
     // Where a clip starts, read once as it mounts — see each — from its still,
     // so the first frame it paints is the one already on screen.
@@ -2255,6 +2317,10 @@ fun NowPlayingScreen(
 
     // The player's own end of the docking, for whichever shape it takes: where
     // it sits on screen, the fade, and the artwork drawn over that fade.
+    // Warna solid cover, latar paling belakang selama drag mini <-> main player.
+    // Digambar di luar fade, jadi set cover + blur yang tumbuh menutupinya.
+    val dockSolidBase = rememberArtworkColors(remoteArt).colors.firstOrNull() ?: Color.Black
+    val dockSolid = Color(dockSolidBase.red * 0.75f, dockSolidBase.green * 0.75f, dockSolidBase.blue * 0.75f)
     val dockHost: Modifier = Modifier
         .then(
             if (dock != null) {
@@ -2287,6 +2353,9 @@ fun NowPlayingScreen(
         // player that doesn't fade on its way to the bar. Drawn on top of
         // everything while it travels, as the one thing still moving.
         .drawWithContent {
+            if (docking()) {
+                drawRect(dockSolid.copy(alpha = (dockT() / DOCK_SOLID_FULL_AT).coerceIn(0f, 1f)))
+            }
             drawContent()
             if (docking()) {
                 // Only a copy recorded on this very draw: otherwise the sleeve
@@ -2616,7 +2685,7 @@ fun NowPlayingScreen(
                                     onOpenArtist = onOpenArtist,
                                 )
                             },
-                            lyricStrip = if (syncedLyricsEnabled) {
+                            lyricStrip = if (lyricStripEnabled) {
                                 {
                                     CurrentLyricStrip(
                                         lines = lyricsTranslation.displayedLyrics,
@@ -2824,7 +2893,24 @@ fun NowPlayingScreen(
                     )
                 }
                 fullArtworkBlurContent(
-                    Modifier.graphicsLayer { alpha = fullArtworkBackdropAlpha },
+                    Modifier.graphicsLayer {
+                        alpha = fullArtworkBackdropAlpha
+                        // Selama drag, blur ikut cover sebagai satu set: diskalakan dan
+                        // diletakkan di rect cover yang terbang, sehingga cover dan blur
+                        // bawahnya beranimasi bersama menutupi latar warna solid.
+                        if (heroMode && !lyricsOpen && !queueOpen && docking() &&
+                            dockFrame.recorded && size.width > 0f
+                        ) {
+                            val s = (dockFrame.sleeve.width / size.width).coerceIn(0f, 1f)
+                            if (s < 1f) {
+                                transformOrigin = TransformOrigin(0f, 0f)
+                                scaleX = s
+                                scaleY = s
+                                translationX = dockFrame.portalLeft
+                                translationY = dockFrame.portalTop
+                            }
+                        }
+                    },
                 )
 
                 // Mount once, behind the controls. A known portrait aspect changes the
@@ -3206,29 +3292,16 @@ fun NowPlayingScreen(
                             },
                         contentAlignment = Alignment.Center,
                     ) {
-                        // While the origin caption is present the handle belongs at
-                        // the top of the strip. As lyrics or the queue replace the
-                        // album-cover player, it glides into the now-empty strip's
-                        // vertical centre alongside the caption's fade.
+                        // Thin drag handle, Apple Music style. The strip itself hands
+                        // drags to the sheet; this only says it can be pulled down.
                         Box(
-                            Modifier
+                            modifier = Modifier
                                 .align(Alignment.TopCenter)
-                                .offset {
-                                    IntOffset(
-                                        x = 0,
-                                        y = lerp(
-                                            6.dp,
-                                            (topStrip - 5.dp).coerceAtLeast(0.dp) / 2,
-                                            p(),
-                                        ).roundToPx(),
-                                    )
-                                }
-                                .width(38.dp)
-                                .height(5.dp)
-                                .graphicsLayer { alpha = spotifyChromeAlpha }
-                                .shadow(2.dp, RoundedCornerShape(3.dp), clip = false)
-                                .clip(RoundedCornerShape(3.dp))
-                                .background(LocalPlayerTint.current.copy(alpha = 0.70f)),
+                                .padding(top = 6.dp)
+                                .size(width = 36.dp, height = 3.dp)
+                                .graphicsLayer { alpha = (1f - p()) * spotifyChromeAlpha }
+                                .clip(androidx.compose.foundation.shape.CircleShape)
+                                .background(Color.White.copy(alpha = 0.4f)),
                         )
                         // [p] is the shared album-to-panel transition. Keeping this in
                         // composition until its final frame gives the caption a real
@@ -3488,15 +3561,22 @@ fun NowPlayingScreen(
                         // screens is nothing.
                         val groupTop = (maxHeight - slotArt - ART_TITLE_GAP - HEADER_HEIGHT)
                             .coerceAtLeast(0.dp) / 2
+                        // The lyric strip sits right under the credits row, so the
+                        // extra drop would push the artist into it.
+                        val cardArtDrop =
+                            if (!heroMode && !videoMode && !lyricStripEnabled) CARD_ART_DROP else 0.dp
+                        val cardTitleDrop =
+                            if (!heroMode && !videoMode && !lyricStripEnabled) CARD_TITLE_DROP else 0.dp
                         // Functions of the collapse, called at placement and measure
                         // — see [p]. Composition never reads them.
                         fun artSize(): Dp = lerp(fullArt, THUMB_SIZE, p())
-                        fun artTop(): Dp = lerp(groupTop + (slotArt - fullArt), 0.dp, p())
+                        fun artTop(): Dp = lerp(groupTop + (slotArt - fullArt) + cardArtDrop, 0.dp, p())
                         // Expanded and height-bound, the sleeve is narrower than the
                         // player and has to be centred in it; collapsed, it belongs
                         // hard against the left edge with the credits beside it.
                         fun artStart(): Dp = lerp((maxWidth - fullArt) / 2, 0.dp, p())
-                        fun regularTitleTop(): Dp = lerp(groupTop + slotArt + ART_TITLE_GAP, 0.dp, p())
+                        fun regularTitleTop(): Dp =
+                            lerp(groupTop + slotArt + ART_TITLE_GAP + heroTitleDrop + cardTitleDrop, 0.dp, p())
                         // Once Spotify's control deck has left, keep the only remaining
                         // player chrome against the bottom edge instead of stranding it
                         // where the artwork's title normally sits near mid-screen.
@@ -3529,7 +3609,7 @@ fun NowPlayingScreen(
                         // screen's top and this box's own top is fixed padding, so it
                         // can simply be added back up rather than measured.
                         val bannerBottom = statusBarTop + topStrip + ART_BOX_TOP_PAD +
-                            groupTop + slotArt + ART_TITLE_GAP / 2
+                            groupTop + slotArt + ART_TITLE_GAP / 2 + heroTitleDrop
                         // Frozen while lyrics are up. The controls now retain their full
                         // footprint across the transition, so this answer is identical
                         // on both sides; avoiding writes during the panel keeps the
@@ -3677,7 +3757,7 @@ fun NowPlayingScreen(
                         // player: tidak lewat tepi atas panel (yang memotong bagian atas
                         // cover) dan tidak keluar dari kiri/kanan. Tepi atas panel di
                         // koordinat kotak ini adalah bannerTopPx.
-                        fun fitToPanel(rawSource: Rect, active: Boolean): Rect {
+                        fun fitToPanel(rawSource: Rect, active: Boolean, rest: Rect? = null): Rect {
                             if (!active) return rawSource
                             // Cover kartu (bukan banner full-bleed) diletakkan di tengah tinggi
                             // panel selagi panel masih tumbuh dari pill, supaya jarak atas dan
@@ -3722,10 +3802,22 @@ fun NowPlayingScreen(
                             } else {
                                 Float.MAX_VALUE
                             }
-                            val rect = if (source.bottom > panelBottom) {
-                                source.translate(0f, panelBottom - source.bottom)
-                            } else {
+                            val settledSource = if (heroMode || dock == null || rest == null) {
                                 source
+                            } else {
+                                val g = dockSmooth(
+                                    (dock.openFraction() - DOCK_SETTLE_FROM) / (DOCK_SETTLE_TO - DOCK_SETTLE_FROM),
+                                )
+                                if (g <= 0f || source.top >= rest.top) {
+                                    source
+                                } else {
+                                    source.translate(0f, (rest.top - source.top) * g)
+                                }
+                            }
+                            val rect = if (settledSource.bottom > panelBottom) {
+                                settledSource.translate(0f, panelBottom - settledSource.bottom)
+                            } else {
+                                settledSource
                             }
                             val minTop = bannerTopPx.toFloat()
                             val minLeft = -boxLeftPx.toFloat()
@@ -3754,17 +3846,70 @@ fun NowPlayingScreen(
                             } else {
                                 0f
                             }
-                            val base = dockFlyEase(dockT())
+                            // Cover full-bleed: membesar linear mengikuti drag, seperti
+                            // Apple Music, bukan lebih dulu dari panelnya.
+                            val base = if (heroMode) dockT() else dockFlyEase(dockT())
                             // Di menu lirik/queue (p = 1) cover adalah thumbnail header:
                             // ia ikut panel dulu, tidak lebih dulu terbang ke mini player.
                             val ease = base + (dockEaseThumb(dockT()) - base) * p()
-                            val flown = lerp(mini, rect.translate(0f, -unridden), ease)
+                            // Cover full-bleed berangkat dari pojok kiri atas panel dan
+                            // atasnya selalu menempel ke atas panel (jarak cover mini ke
+                            // atas pill tetap), jadi tidak naik-turun terhadap panel.
+                            val padTop = if (heroMode && dock != null) {
+                                val art = dock.miniArtOnScreen()
+                                val pill = dock.miniPillInWindow()
+                                if (art != null && pill != null) {
+                                    art.top - (pill.top + dock.windowOrigin.y)
+                                } else {
+                                    null
+                                }
+                            } else {
+                                null
+                            }
+                            val from = if (padTop != null) {
+                                mini.translate(0f, bannerTopPx + padTop - mini.top)
+                            } else {
+                                mini
+                            }
+                            val heroTarget = rect.translate(0f, -unridden)
+                            val flownRaw = if (heroMode) {
+                                // Lebar cover mendahului naiknya: kiri-kanan penuh di tengah
+                                // drag. Tinggi mengikuti lebar secara seragam (lihat `flown`).
+                                val eased = lerp(from, heroTarget, ease)
+                                val wide = dockHeroWide(dockT())
+                                Rect(
+                                    from.left + (heroTarget.left - from.left) * wide,
+                                    eased.top,
+                                    from.right + (heroTarget.right - from.right) * wide,
+                                    eased.bottom,
+                                )
+                            } else {
+                                lerp(from, heroTarget, ease)
+                            }
+                            // Cover full-bleed terbang sebagai salinan cover main player
+                            // (sudah satu set dengan blur di bawahnya) yang diskalakan
+                            // seragam: tingginya mengikuti lebar dengan rasio banner,
+                            // bukan kotak mini yang baru memanjang belakangan.
+                            val flown = if (heroMode && dock != null && rect.height > 0f) {
+                                val aspect = rect.width / rect.height
+                                val uniformH = flownRaw.width / aspect
+                                val k = dockSmooth(dockT() / 0.15f)
+                                Rect(
+                                    flownRaw.left,
+                                    flownRaw.top,
+                                    flownRaw.right,
+                                    flownRaw.top + flownRaw.height + (uniformH - flownRaw.height) * k,
+                                )
+                            } else {
+                                flownRaw
+                            }
                             // Di awal drag target cover (sleeve di atas sheet) masih lebih
                             // rendah dari mini player, jadi kurva lebar panel yang cepat
                             // menyeret cover turun lebih dulu dari panelnya. Kaki cover
                             // ditahan di kaki cover mini: ia hanya tumbuh ke atas dan ke
                             // kanan, lalu naik bersama panel. Banner full-bleed tidak berubah.
-                            return if (heroMode || flown.bottom <= mini.bottom) {
+                            if (heroMode) return flown
+                            return if (flown.bottom <= mini.bottom) {
                                 flown
                             } else {
                                 flown.translate(0f, mini.bottom - flown.bottom)
@@ -3772,7 +3917,8 @@ fun NowPlayingScreen(
                         }
                         // The banner's dissolve, firmed up into the cover's hard edge as
                         // it docks.
-                        fun sleeveShown(): Float = bannerShown() * dockEase(dockT())
+                        fun sleeveShown(): Float =
+                            bannerShown() * (if (heroMode) dockEarlyDissolve(dockT()) else dockEase(dockT()))
                         fun sleeveCorner(): Dp {
                             val corner = 8.dp * (1f - sleeveShown())
                             val t = dockT()
@@ -3818,7 +3964,7 @@ fun NowPlayingScreen(
                                     } else {
                                         dockFrame.rideShare = 1f
                                     }
-                                    val rect = fitToPanel(towardsDock(open, mini), mini != null)
+                                    val rect = fitToPanel(towardsDock(open, mini), mini != null, open)
                                     dockFrame.miniInBox = mini
                                     dockFrame.sleeve = rect
                                     val placeable = measurable.measure(
@@ -3966,6 +4112,7 @@ fun NowPlayingScreen(
                                         val card = fitToPanel(
                                             towardsDock(cardRect(), dockFrame.miniInBox),
                                             dockFrame.miniInBox != null,
+                                            cardRect(),
                                         )
                                         val sleeve = dockFrame.sleeve
                                         val placeable = measurable.measure(
@@ -4996,7 +5143,7 @@ Spacer(Modifier.width(12.dp))
                     // accompanied by a dedicated lyrics button in the bottom row. Its
                     // one-line slot remains, invisibly, so opening lyrics cannot grow
                     // the half-player merely to make room for the source label.
-                    if (!lyricsOpen && syncedLyricsEnabled) {
+                    if (!lyricsOpen && lyricStripEnabled) {
                         CurrentLyricStrip(
                             lines = lyricsTranslation.displayedLyrics,
                             trackKey = song.videoId,
@@ -5012,7 +5159,7 @@ Spacer(Modifier.width(12.dp))
                             onClick = openLyrics,
                         )
                     }
-                    if (!lyricsOpen && !syncedLyricsEnabled) {
+                    if (!lyricsOpen && !lyricStripEnabled) {
                         Text(
                             text = "\u00A0",
                             style = MaterialTheme.typography.titleMedium,
@@ -5084,11 +5231,18 @@ Spacer(Modifier.width(12.dp))
                     Spacer(Modifier.height(0.dp + (if (heroMode) controlSpread else 0.dp) / 2))
 
                     if (!hideVolumeBar) {
+                        // Extra air only while the slider is shown, so it doesn't
+                        // crowd the transport above or the icon row below. The
+                        // hidden state keeps its old footprint. The deck is measured
+                        // at natural height, so the lyric strip on or off changes
+                        // nothing here: the artwork simply takes what is left.
+                        Spacer(Modifier.height(8.dp))
                         VolumeRow(
                             value = { volume.level.value },
                             onValueChange = onVolumeChange,
                             onValueChangeFinished = onVolumeChangeFinished,
                         )
+                        Spacer(Modifier.height(12.dp))
                     } else {
                         Spacer(Modifier.height(VOLUME_ROW_HEIGHT))
                     }

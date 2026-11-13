@@ -50,6 +50,7 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.DeleteSweep
 import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FileDownload
 import androidx.compose.material.icons.rounded.FileUpload
 import androidx.compose.material.icons.rounded.FilterAlt
@@ -278,6 +279,7 @@ fun SettingsScreen(
     val fullBleedArtwork by AppSettings.fullBleedArtwork.collectAsStateWithLifecycle()
     val legacyMeshGradient by AppSettings.legacyMeshGradient.collectAsStateWithLifecycle()
     val syncedLyrics by AppSettings.syncedLyrics.collectAsStateWithLifecycle()
+    val lyricStrip by AppSettings.lyricStrip.collectAsStateWithLifecycle()
     val lyricsSources by AppSettings.lyricsSources.collectAsStateWithLifecycle()
     val translationLanguage by AppSettings.translationLanguage.collectAsStateWithLifecycle()
     val theme by AppSettings.themeMode.collectAsStateWithLifecycle()
@@ -1358,6 +1360,21 @@ fun SettingsScreen(
             // sources are third-party services being reached on the user's
             // connection — which is the part worth being able to narrow.
             if (syncedLyrics) {
+                val lyricStripTitle = stringResource(R.string.lyric_strip)
+                row(lyricStripTitle, "lyrics", "strip", "player") {
+                    SettingsRow(
+                        icon = SfIcons.Notes,
+                        title = lyricStripTitle,
+                        subtitle = stringResource(R.string.lyric_strip_subtitle),
+                        trailing = {
+                            IosSwitch(
+                                checked = lyricStrip,
+                                onCheckedChange = AppSettings::setLyricStrip,
+                            )
+                        },
+                        onClick = { AppSettings.setLyricStrip(!lyricStrip) },
+                    )
+                }
                 val lyricsBlurTitle = stringResource(R.string.blur_unfocused_lyrics)
                 row(lyricsBlurTitle, "lyrics", "blur") {
                     SettingsRow(
@@ -2018,10 +2035,43 @@ fun SettingsScreen(
         // The version line is the page's colophon, not a setting: it belongs to
         // the whole list, so it goes when the list is narrowed to a few rows.
         if (section == null && searchQuery.isBlank()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 14.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(percent = 50))
+                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f))
+                        .border(
+                            width = 0.5.dp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.14f),
+                            shape = RoundedCornerShape(percent = 50),
+                        )
+                        .clickable { context.openLink("https://saweria.co/Zeuxxi") }
+                        .padding(horizontal = 14.dp, vertical = 7.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Favorite,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(14.dp),
+                    )
+                    Text(
+                        text = "Support Zenith",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 14.dp, bottom = 4.dp),
+                    .padding(top = 10.dp, bottom = 4.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Row(
@@ -2036,7 +2086,7 @@ fun SettingsScreen(
                     Text(
                         text = stringResource(R.string.footer_github),
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = if (MaterialTheme.colorScheme.surface.luminance() > 0.5f) Color.Black else Color.White,
                         textDecoration = TextDecoration.Underline,
                         modifier = Modifier.clickable {
                             context.openLink("https://github.com/rezapranata089-bit/Zenith")
@@ -2045,7 +2095,7 @@ fun SettingsScreen(
                     Text(
                         text = stringResource(R.string.footer_developer),
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = if (MaterialTheme.colorScheme.surface.luminance() > 0.5f) Color.Black else Color.White,
                         textDecoration = TextDecoration.Underline,
                         modifier = Modifier.clickable {
                             context.openLink("https://github.com/rezapranata089-bit")
@@ -2054,10 +2104,19 @@ fun SettingsScreen(
                     Text(
                         text = "Reddit",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = if (MaterialTheme.colorScheme.surface.luminance() > 0.5f) Color.Black else Color.White,
                         textDecoration = TextDecoration.Underline,
                         modifier = Modifier.clickable {
                             context.openLink("https://www.reddit.com/r/ZenithMusic/s/gN6chb7onR")
+                        },
+                    )
+                    Text(
+                        text = "Telegram",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (MaterialTheme.colorScheme.surface.luminance() > 0.5f) Color.Black else Color.White,
+                        textDecoration = TextDecoration.Underline,
+                        modifier = Modifier.clickable {
+                            context.openLink("https://t.me/+8ECIhA8_kdkwZWU1")
                         },
                     )
                 }

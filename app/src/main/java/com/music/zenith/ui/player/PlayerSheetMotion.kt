@@ -31,7 +31,7 @@ import kotlin.math.abs
  */
 // Stiffer than before: a shorter trip puts fewer heavy frames on screen,
 // which is what made opening and closing feel slow and choppy.
-private const val SLIDE_STIFFNESS = 300f
+private const val SLIDE_STIFFNESS = 120f
 
 /** Close enough to stop, in pixels — rather than a spring's whole long tail. */
 private const val SLIDE_SETTLED_PX = 0.5f

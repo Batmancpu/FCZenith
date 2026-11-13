@@ -562,8 +562,8 @@ internal fun TransportRow(
     }
 }
 
-/** ThinSlider's fixed touch target at the volume bar's size: 10dp + 22dp. */
-internal val VOLUME_ROW_HEIGHT = 32.dp
+/** ThinSlider's fixed touch target at the volume bar's size: 6dp + 22dp. */
+internal val VOLUME_ROW_HEIGHT = 28.dp
 
 /** The volume bar between its two speaker glyphs. */
 @Composable
@@ -591,8 +591,8 @@ internal fun VolumeRow(
             value = value(),
             onValueChange = onValueChange,
             onValueChangeFinished = onValueChangeFinished,
-            idleHeight = 6.dp,
-            activeHeight = 10.dp,
+            idleHeight = 3.dp,
+            activeHeight = 6.dp,
             modifier = Modifier.weight(1f),
         )
         Spacer(Modifier.width(10.dp))
@@ -633,6 +633,16 @@ internal fun PlayerActionRow(
     val inParty = rememberPartyBadge().inParty
     // Just the output glyph in the middle.
     val compact = !showPartyButton && !inParty
+    // Shared by the badge and the cut-out it leaves in the queue glyph, so the two
+    // fade together and vanish as the queue page opens.
+    val anyMode = shuffleEnabled || repeatMode != RepeatModes.OFF
+    val badgeVisibility by animateFloatAsState(
+        targetValue = if (anyMode && !queueOpen) 1f else 0f,
+        animationSpec = tween(220, easing = FastOutSlowInEasing),
+        label = "queueModeBadge",
+    )
+    // One badge at a time: a round 22dp disc holding a single 14dp icon.
+    val badgeWidth = 22.dp
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         // Sized for the wider of the two capsules — the three-up one — whether
         // that or the output/party one is up, so the lyrics and queue glyphs
@@ -681,12 +691,46 @@ internal fun PlayerActionRow(
                     .align(Alignment.CenterEnd)
                     .offset { IntOffset(-(closeIn.toPx() * compactness.value).roundToInt(), 0) },
             ) {
-                BottomGlyph(
-                    icon = ZenithIcons.Queue,
-                    contentDescription = stringResource(Res.string.up_next),
-                    onClick = onToggleQueue,
-                    highlighted = queueOpen,
-                    haptic = if (queueOpen) Haptic.Tap else Haptic.Expand,
+                Box(
+                    modifier = Modifier
+                        .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                        .drawWithContent {
+                            drawContent()
+                            val v = badgeVisibility
+                            if (v > 0.001f) {
+                                // The badge's rect, grown by a gap, erased from the glyph.
+                                val s = 0.6f + 0.4f * v
+                                val gap = 2.dp.toPx()
+                                val halfW = (badgeWidth.toPx() / 2f + gap) * s
+                                val halfH = (11.dp.toPx() + gap) * s
+                                val cx = (BOTTOM_ACTION_SIZE - 1.dp).toPx() - badgeWidth.toPx() / 2f
+                                // The badge's centre: its 3dp drop plus half its 22dp height.
+                                val cy = 14.dp.toPx()
+                                drawRoundRect(
+                                    color = Color.Black.copy(alpha = v),
+                                    topLeft = Offset(cx - halfW, cy - halfH),
+                                    size = Size(halfW * 2f, halfH * 2f),
+                                    cornerRadius = CornerRadius(halfH, halfH),
+                                    blendMode = BlendMode.DstOut,
+                                )
+                            }
+                        },
+                ) {
+                    BottomGlyph(
+                        icon = ZenithIcons.Queue,
+                        contentDescription = stringResource(Res.string.up_next),
+                        onClick = onToggleQueue,
+                        highlighted = queueOpen,
+                        haptic = if (queueOpen) Haptic.Tap else Haptic.Expand,
+                    )
+                }
+                QueueModeBadges(
+                    shuffleEnabled = shuffleEnabled,
+                    repeatMode = repeatMode,
+                    visibility = badgeVisibility,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .offset(x = (-1).dp, y = 3.dp),
                 )
             }
         }
@@ -694,11 +738,8 @@ internal fun PlayerActionRow(
 }
 
 /**
- * Translucent circular button used for the track menu and the like control.
- *
- * [active] brightens the disc rather than only the glyph: this sits on album
- * artwork of any colour, and a white icon on a white-ish sleeve has no tint
- * change left to make. The filled star carries the state as a shape too —
+ * Plain glyph button (no disc, like Apple Music) used for the track menu and
+ * the like control. The filled star carries the liked state as a shape —
  * see [ZenithIcons.StarFilled].
  */
 @Composable
@@ -745,15 +786,12 @@ internal fun CircleGlyph(
             }
         }
     }
-    val discAlpha by animateFloatAsState(
-        targetValue = if (active) 0.34f else 0.18f,
-        label = "glyphDisc",
-    )
+
     Box(
         modifier = modifier
             .size(size)
             .clip(CircleShape)
-            .background(LocalPlayerTint.current.copy(alpha = discAlpha))
+
             .drawBehind {
                 val p = burst.value
                 if (p > 0f && p < 1f) {
@@ -783,7 +821,7 @@ internal fun CircleGlyph(
                 contentDescription = contentDescription,
                 tint = LocalPlayerTint.current,
                 modifier = Modifier
-                    .size(19.dp)
+                    .size(26.dp)
                     .graphicsLayer {
                         scaleX = pop.value
                         scaleY = pop.value
@@ -1029,6 +1067,7 @@ private fun OutputPartyPill(
         BottomGlyph(
             icon = output.icon,
             iconSize = output.size * (BOTTOM_ICON_SIZE / PILL_OUTPUT_SIZE),
+            fluidPress = true,
             contentDescription = stringResource(Res.string.audio_output),
             onClick = onOutput,
         )
@@ -1038,6 +1077,7 @@ private fun OutputPartyPill(
         PillSegment(
             icon = output.icon,
             iconSize = output.size,
+            fluidPress = true,
             contentDescription = stringResource(Res.string.audio_output),
             onClick = onOutput,
         )
@@ -1124,6 +1164,7 @@ private fun PillSegment(
     highlighted: Boolean = false,
     haptic: Haptic = Haptic.Tap,
     loading: Boolean = false,
+    fluidPress: Boolean = false,
     /** See [BottomGlyph], where the same window means the same thing. */
     tapWindowMs: Long = 0L,
     /** Per-segment override — see [OutputPartyPill]'s three-up capsule. */
@@ -1131,13 +1172,15 @@ private fun PillSegment(
 ) {
     val haptics = rememberHaptics()
     val lastTap = remember { mutableLongStateOf(-tapWindowMs) }
+    val interaction = remember { MutableInteractionSource() }
     Box(
         modifier = Modifier
             .width(width)
             .height(BOTTOM_ACTION_SIZE)
+            .then(if (fluidPress) Modifier.fluidPress(interaction) else Modifier)
             .background(if (highlighted) LocalPlayerTint.current.copy(alpha = 0.14f) else Color.Transparent)
             .clickable(
-                interactionSource = remember { MutableInteractionSource() },
+                interactionSource = interaction,
                 indication = null,
                 enabled = !loading,
             ) {
@@ -1255,6 +1298,52 @@ private fun rememberPartyBadge(): PartyBadge {
         .value
 }
 
+/**
+ * Small marks on the corner of the queue glyph saying which playback modes are
+ * on — shuffle, repeat (with a 1 for repeat-one) — so the state is visible
+ * without opening the queue. Nothing at all while both are off.
+ */
+@Composable
+private fun QueueModeBadges(
+    shuffleEnabled: Boolean,
+    repeatMode: Int,
+    visibility: Float,
+    modifier: Modifier = Modifier,
+) {
+    if (visibility <= 0.001f) return
+    val tint = LocalPlayerTint.current
+    Row(
+        modifier = modifier
+            .graphicsLayer {
+                alpha = visibility
+                scaleX = 0.6f + 0.4f * visibility
+                scaleY = 0.6f + 0.4f * visibility
+            }
+            .clip(CircleShape)
+            .background(tint.copy(alpha = 0.34f))
+            .size(22.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // Only one badge at a time. Priority: repeat-one, then shuffle,
+        // then repeat-all.
+        val badgeIcon = when {
+            repeatMode == RepeatModes.ONE -> ZenithIcons.RepeatOne
+            shuffleEnabled -> ZenithIcons.Shuffle
+            repeatMode != RepeatModes.OFF -> ZenithIcons.Repeat
+            else -> null
+        }
+        if (badgeIcon != null) {
+            Icon(
+                imageVector = badgeIcon,
+                contentDescription = null,
+                tint = tint,
+                modifier = Modifier.size(14.dp),
+            )
+        }
+    }
+}
+
 @Composable
 private fun BottomGlyph(
     icon: ImageVector?,
@@ -1263,6 +1352,7 @@ private fun BottomGlyph(
     highlighted: Boolean = false,
     haptic: Haptic = Haptic.Tap,
     label: String? = null,
+    fluidPress: Boolean = false,
     iconSize: Dp = BOTTOM_ICON_SIZE,
     /**
      * Shortest gap between taps that both reach [onClick]. A tap inside the
@@ -1279,9 +1369,11 @@ private fun BottomGlyph(
     // is never the one that gets swallowed.
     val lastTap = remember { mutableLongStateOf(-tapWindowMs) }
     val tileColor = LocalPlayerTint.current.copy(alpha = BOTTOM_ACTIVE_TILE_ALPHA)
+    val interaction = remember { MutableInteractionSource() }
     Box(
         modifier = Modifier
             .size(BOTTOM_ACTION_SIZE)
+            .then(if (fluidPress) Modifier.fluidPress(interaction) else Modifier)
             // Lit, Apple's way: a rounded tile with the glyph cut out of it, the
             // artwork showing through. The glyph is drawn first and the tile over
             // it with SrcOut, which keeps the tile only where the glyph is not.
@@ -1307,7 +1399,7 @@ private fun BottomGlyph(
                 },
             )
             .clickable(
-                interactionSource = remember { MutableInteractionSource() },
+                interactionSource = interaction,
                 indication = null,
             ) {
                 val now = uptimeMillis()
@@ -1337,6 +1429,39 @@ private fun BottomGlyph(
             )
         }
     }
+}
+
+/**
+ * Fluid press feedback: the control squishes under the finger and springs back
+ * with a little overshoot, while a soft halo blooms behind it and fades out.
+ */
+@Composable
+private fun Modifier.fluidPress(source: MutableInteractionSource): Modifier {
+    val pressed by source.collectIsPressedAsState()
+    val squish by animateFloatAsState(
+        targetValue = if (pressed) 1f else 0f,
+        animationSpec = spring(dampingRatio = 0.42f, stiffness = 420f),
+        label = "fluidPressSquish",
+    )
+    val halo by animateFloatAsState(
+        targetValue = if (pressed) 1f else 0f,
+        animationSpec = tween(if (pressed) 120 else 320, easing = FastOutSlowInEasing),
+        label = "fluidPressHalo",
+    )
+    val tint = LocalPlayerTint.current
+    return this
+        .drawBehind {
+            if (halo > 0.001f) {
+                drawCircle(
+                    color = tint.copy(alpha = 0.18f * halo),
+                    radius = size.minDimension / 2f * (0.55f + 0.45f * halo),
+                )
+            }
+        }
+        .graphicsLayer {
+            scaleX = 1f - 0.16f * squish
+            scaleY = 1f - 0.24f * squish
+        }
 }
 
 /** A credit that links somewhere, when [browseId] is known. */

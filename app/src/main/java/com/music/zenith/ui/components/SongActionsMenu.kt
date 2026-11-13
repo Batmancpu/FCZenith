@@ -1090,6 +1090,8 @@ internal fun ActionRow(
  */
 @Composable
 private fun LoadingActionRow(icon: ImageVector, label: String, palette: ArtworkPalette) {
+    // One line while the lookup runs; the menu eases taller when the name arrives
+    // (see the animateContentSize on the menu panel).
     IosMenuRow(label = label, icon = icon, onClick = null, enabled = false) {
         CircularProgressIndicator(
             color = palette.onBackgroundVariant,
