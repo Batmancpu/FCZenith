@@ -699,11 +699,11 @@ internal fun PlayerActionRow(
                             if (v > 0.001f) {
                                 // The badge's rect, grown by a gap, erased from the glyph.
                                 val s = 0.6f + 0.4f * v
-                                val gap = 3.dp.toPx()
+                                val gap = 4.dp.toPx()
                                 val halfW = (badgeWidth.toPx() / 2f + gap) * s
                                 val halfH = (11.dp.toPx() + gap) * s
-                                val cx = (BOTTOM_ACTION_SIZE + 3.dp).toPx() - badgeWidth.toPx() / 2f
-                                val cy = 5.dp.toPx()
+                                val cx = (BOTTOM_ACTION_SIZE - 1.dp).toPx() - badgeWidth.toPx() / 2f
+                                val cy = 8.dp.toPx()
                                 drawRoundRect(
                                     color = Color.Black.copy(alpha = v),
                                     topLeft = Offset(cx - halfW, cy - halfH),
@@ -728,7 +728,7 @@ internal fun PlayerActionRow(
                     visibility = badgeVisibility,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .offset(x = 3.dp, y = (-6).dp),
+                        .offset(x = (-1).dp, y = (-3).dp),
                 )
             }
         }
