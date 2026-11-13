@@ -31,6 +31,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -67,6 +68,20 @@ private object StarPrompt {
     /** One count per process start, however often the screen is recomposed. */
     @Volatile
     private var counted = false
+
+    /** The prompt is weighed once per process start, never again mid-session. */
+    @Volatile
+    private var checked = false
+
+    fun alreadyChecked(): Boolean = checked
+
+    /** True only for the first caller of this process. */
+    @Synchronized
+    fun markChecked(): Boolean {
+        if (checked) return false
+        checked = true
+        return true
+    }
 
     private fun prefs(context: Context) =
         context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -112,14 +127,17 @@ internal fun StarPromptHost(isPlaying: Boolean) {
     val context = LocalContext.current
     var show by rememberSaveable { mutableStateOf(false) }
 
-    // Restarts whenever playback starts or stops, so a pending ask is dropped
-    // the moment music comes on and only counts down while it is quiet.
-    LaunchedEffect(isPlaying) {
+    // Read at the moment of the check, not when the effect started.
+    val playing by rememberUpdatedState(isPlaying)
+
+    // One check per app launch: a few seconds after opening, and only if
+    // nothing is playing. If it doesn't qualify, it waits for the next launch.
+    LaunchedEffect(Unit) {
         StarPrompt.registerLaunch(context)
-        if (show || isPlaying) return@LaunchedEffect
-        // Let playback stay stopped for a moment before asking for anything.
-        delay(10_000)
-        if (StarPrompt.shouldShow(context)) show = true
+        if (show || StarPrompt.alreadyChecked()) return@LaunchedEffect
+        delay(6_000)
+        if (!StarPrompt.markChecked()) return@LaunchedEffect
+        if (!playing && StarPrompt.shouldShow(context)) show = true
     }
 
     if (show) {
