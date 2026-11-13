@@ -174,7 +174,7 @@ private const val PULL_BIAS = 1.5f
 private val PULL_LIFT_EASE = 72.dp
 
 /** The bar's rise per pixel of finger as a pull starts. */
-private const val PULL_LIFT_RATE = 0.5f
+private const val PULL_LIFT_RATE = 0f
 
 /** Seberapa jauh bar boleh bergeser ke samping saat di-swipe (batas lembut). */
 private val JELLY_MAX_OFFSET = 36.dp

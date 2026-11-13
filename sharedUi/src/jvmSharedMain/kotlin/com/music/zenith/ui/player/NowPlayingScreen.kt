@@ -3799,11 +3799,32 @@ fun NowPlayingScreen(
                             } else {
                                 0f
                             }
-                            val base = dockFlyEase(dockT())
+                            // Cover full-bleed: membesar linear mengikuti drag, seperti
+                            // Apple Music, bukan lebih dulu dari panelnya.
+                            val base = if (heroMode) dockT() else dockFlyEase(dockT())
                             // Di menu lirik/queue (p = 1) cover adalah thumbnail header:
                             // ia ikut panel dulu, tidak lebih dulu terbang ke mini player.
                             val ease = base + (dockEaseThumb(dockT()) - base) * p()
-                            val flown = lerp(mini, rect.translate(0f, -unridden), ease)
+                            // Cover full-bleed berangkat dari pojok kiri atas panel dan
+                            // atasnya selalu menempel ke atas panel (jarak cover mini ke
+                            // atas pill tetap), jadi tidak naik-turun terhadap panel.
+                            val padTop = if (heroMode && dock != null) {
+                                val art = dock.miniArtOnScreen()
+                                val pill = dock.miniPillInWindow()
+                                if (art != null && pill != null) {
+                                    art.top - (pill.top + dock.windowOrigin.y)
+                                } else {
+                                    null
+                                }
+                            } else {
+                                null
+                            }
+                            val from = if (padTop != null) {
+                                mini.translate(0f, bannerTopPx + padTop - mini.top)
+                            } else {
+                                mini
+                            }
+                            val flown = lerp(from, rect.translate(0f, -unridden), ease)
                             // Di awal drag target cover (sleeve di atas sheet) masih lebih
                             // rendah dari mini player, jadi kurva lebar panel yang cepat
                             // menyeret cover turun lebih dulu dari panelnya. Kaki cover
