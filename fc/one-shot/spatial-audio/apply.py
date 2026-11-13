@@ -151,7 +151,7 @@ replace_once(
     "        spatialAudioLearningEnabled.value = prefs.getBoolean(KEY_SPATIAL_AUDIO_LEARNING_ENABLED, true)\n",
 )
 SPATIAL_METHODS = r'''
-    /** Compatibility setter: the legacy Boolean means explicit global On or Off. */
+    /** Master switch: On selects the Auto policy; Off disables Spatial Audio. */
     fun setSpatialAudio(value: Boolean) {
         setSpatialAudioMode(if (value) SpatialAudioMode.AUTO else SpatialAudioMode.OFF)
     }
@@ -600,7 +600,7 @@ insert_after(UI, "    val spatialAudio by AppSettings.spatialAudio.collectAsStat
 
     "    val spatialAudioOnPhoneSpeaker by AppSettings.spatialAudioOnPhoneSpeaker.collectAsStateWithLifecycle()\n"
     "    val spatialAudioLearningEnabled by AppSettings.spatialAudioLearningEnabled.collectAsStateWithLifecycle()\n")
-// Keep the upstream two-state IosSwitch; true maps to Auto and false to Off.
+# Keep the upstream two-state IosSwitch; true maps to Auto and false to Off.
 insert_after(UI,
     "            }\n            // The system panel is not listed here as well. A device with a\n",
     "\n"
