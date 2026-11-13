@@ -513,9 +513,9 @@ private class SeamAlignedBlurPainter(
 
 /** The shade over the blurred cover, deepening toward the controls at the foot. */
 private val FullArtworkScrim = Brush.verticalGradient(
-    0f to Color.Black.copy(alpha = 0.34f),
-    0.55f to Color.Black.copy(alpha = 0.48f),
-    1f to Color.Black.copy(alpha = 0.64f),
+    0f to Color.Black.copy(alpha = 0.16f),
+    0.55f to Color.Black.copy(alpha = 0.28f),
+    1f to Color.Black.copy(alpha = 0.44f),
 )
 
 /** Drawn only until an artwork has been read — never a colour anyone chose. */
