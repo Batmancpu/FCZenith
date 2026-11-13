@@ -522,12 +522,7 @@ jobs:
             - Includes ${{ steps.upstream.outputs.commits_ahead }} upstream commits beyond the stable baseline when built as a main snapshot.
             - This is an FC-branded upstream-main development snapshot; future automatic syncs return to published stable releases.
             - The same FC signing certificate is checked before publishing.
-            - Spatial Audio uses the upstream stereo-widening processor; this release includes a one-release, On-favouring Auto policy overlay that is retired from main after the APK is published. It is not Dolby Atmos or object-based rendering.
-            - Auto builds a local mix fingerprint from one stereo frame in eight during the first eight seconds; it stores derived statistics only, never audio samples.
-            - Auto favours On when evidence is sparse or mixed. Three similar labelled tracks and at least two effective independent neighbours are required; 66% weighted agreement can override the default. Explicit per-track On/Off choices always take priority.
-            - Similarity uses stereo width, channel correlation, low-frequency side energy, high-frequency energy and crest factor. Cached features and bounded top-nine matching run off the audio/UI hot paths.
-            - No cloud model, population dataset, telemetry or audio upload is used. Per-track preferences and derived profiles remain local.
-            - The built-in phone speaker is blocked by default but can be explicitly allowed in Spatial Audio settings. Bluetooth, wired, USB and HDMI remain eligible; Atmos, non-stereo and unavailable-DSP paths are bypassed.
+            - Spatial Audio is unchanged from upstream in this release. FC-specific Auto learning, confidence scoring and output-route changes are deferred to a separate explicitly requested test release.
 
             Obtainium source: https://github.com/Batmancpu/FCZenith
           files: dist/Music-v${{ steps.decision.outputs.version_name }}.apk
