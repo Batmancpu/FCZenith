@@ -2154,6 +2154,9 @@ fun NowPlayingScreen(
     val blurSeamPx = rememberUpdatedState(
         if (heroMode && !landscape && !tabletArtworkBackdrop) with(density) { heroHeight.toPx() } else 0f,
     )
+    // A cover with a canvas keeps the smooth stretched foot below the banner;
+    // the mirrored continuation is only for the still full-bleed cover.
+    val mirrorBlurBelowSeam = rememberUpdatedState(canvas == null)
     val fullArtworkBlurContent = remember {
         movableContentOf<Modifier> { backdropModifier ->
             FullArtworkBlurBackdrop(
@@ -2162,6 +2165,7 @@ fun NowPlayingScreen(
                 outgoing = dissolve.heldBlur,
                 progress = { dissolve.progress },
                 seam = { blurSeamPx.value },
+                mirrorBelowSeam = { mirrorBlurBelowSeam.value },
             )
         }
     }

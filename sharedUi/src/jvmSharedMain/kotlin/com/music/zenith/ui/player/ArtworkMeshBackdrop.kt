@@ -161,10 +161,18 @@ fun FullArtworkBlurBackdrop(
      * draw phase.
      */
     seam: () -> Float = { 0f },
+    /**
+     * Whether the rows below the seam carry on as a mirror image of the blurred
+     * cover. Off for a cover with a canvas, where the mirror shows up as blobs of
+     * the cover's colours instead of a smooth continuation of the banner's foot.
+     */
+    mirrorBelowSeam: () -> Boolean = { true },
 ) {
     Box(modifier = modifier.fillMaxSize().background(FallbackBackdrop)) {
         if (outgoing != null) {
-            val outgoingPainter = remember(outgoing, seam) { SeamAlignedBlurPainter(outgoing, seam) }
+            val outgoingPainter = remember(outgoing, seam, mirrorBelowSeam) {
+                SeamAlignedBlurPainter(outgoing, seam, mirrorBelowSeam)
+            }
             Image(
                 painter = outgoingPainter,
                 contentDescription = null,
@@ -187,7 +195,9 @@ fun FullArtworkBlurBackdrop(
                 label = "preparedBackdropImage",
             ) { bitmap ->
                 if (bitmap != null) {
-                    val painter = remember(bitmap, seam) { SeamAlignedBlurPainter(bitmap, seam) }
+                    val painter = remember(bitmap, seam, mirrorBelowSeam) {
+                        SeamAlignedBlurPainter(bitmap, seam, mirrorBelowSeam)
+                    }
                     Image(
                         painter = painter,
                         contentDescription = null,
@@ -473,6 +483,7 @@ private fun DrawScope.drawMesh(mesh: ArtworkMesh, seamY: Float, alpha: Float) {
 private class SeamAlignedBlurPainter(
     private val image: ImageBitmap,
     private val seam: () -> Float,
+    private val mirror: () -> Boolean = { true },
 ) : androidx.compose.ui.graphics.painter.Painter() {
     override val intrinsicSize: androidx.compose.ui.geometry.Size =
         androidx.compose.ui.geometry.Size.Unspecified
@@ -511,7 +522,9 @@ private class SeamAlignedBlurPainter(
             // Below the seam the blurred cover carries on as its own mirror image,
             // so the area under the banner has the cover's colours instead of
             // one flat colour. It meets the banner's last row exactly at the seam.
-            withTransform({
+            // Skipped for a cover with a canvas: the stretched last rows above
+            // are then the whole continuation, which stays smooth.
+            if (mirror()) withTransform({
                 scale(
                     scaleX = 1f,
                     scaleY = -1f,
