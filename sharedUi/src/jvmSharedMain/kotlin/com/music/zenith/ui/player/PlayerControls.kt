@@ -740,11 +740,8 @@ internal fun PlayerActionRow(
 }
 
 /**
- * Translucent circular button used for the track menu and the like control.
- *
- * [active] brightens the disc rather than only the glyph: this sits on album
- * artwork of any colour, and a white icon on a white-ish sleeve has no tint
- * change left to make. The filled star carries the state as a shape too —
+ * Plain glyph button (no disc, like Apple Music) used for the track menu and
+ * the like control. The filled star carries the liked state as a shape —
  * see [ZenithIcons.StarFilled].
  */
 @Composable
@@ -791,15 +788,12 @@ internal fun CircleGlyph(
             }
         }
     }
-    val discAlpha by animateFloatAsState(
-        targetValue = if (active) 0.34f else 0.18f,
-        label = "glyphDisc",
-    )
+
     Box(
         modifier = modifier
             .size(size)
             .clip(CircleShape)
-            .background(LocalPlayerTint.current.copy(alpha = discAlpha))
+
             .drawBehind {
                 val p = burst.value
                 if (p > 0f && p < 1f) {
@@ -829,7 +823,7 @@ internal fun CircleGlyph(
                 contentDescription = contentDescription,
                 tint = LocalPlayerTint.current,
                 modifier = Modifier
-                    .size(19.dp)
+                    .size(22.dp)
                     .graphicsLayer {
                         scaleX = pop.value
                         scaleY = pop.value
