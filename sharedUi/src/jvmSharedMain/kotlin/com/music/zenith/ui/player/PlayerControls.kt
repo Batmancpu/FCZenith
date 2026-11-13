@@ -1067,6 +1067,7 @@ private fun OutputPartyPill(
         BottomGlyph(
             icon = output.icon,
             iconSize = output.size * (BOTTOM_ICON_SIZE / PILL_OUTPUT_SIZE),
+            fluidPress = true,
             contentDescription = stringResource(Res.string.audio_output),
             onClick = onOutput,
         )
@@ -1076,6 +1077,7 @@ private fun OutputPartyPill(
         PillSegment(
             icon = output.icon,
             iconSize = output.size,
+            fluidPress = true,
             contentDescription = stringResource(Res.string.audio_output),
             onClick = onOutput,
         )
@@ -1162,6 +1164,7 @@ private fun PillSegment(
     highlighted: Boolean = false,
     haptic: Haptic = Haptic.Tap,
     loading: Boolean = false,
+    fluidPress: Boolean = false,
     /** See [BottomGlyph], where the same window means the same thing. */
     tapWindowMs: Long = 0L,
     /** Per-segment override — see [OutputPartyPill]'s three-up capsule. */
@@ -1169,13 +1172,15 @@ private fun PillSegment(
 ) {
     val haptics = rememberHaptics()
     val lastTap = remember { mutableLongStateOf(-tapWindowMs) }
+    val interaction = remember { MutableInteractionSource() }
     Box(
         modifier = Modifier
             .width(width)
             .height(BOTTOM_ACTION_SIZE)
+            .then(if (fluidPress) Modifier.fluidPress(interaction) else Modifier)
             .background(if (highlighted) LocalPlayerTint.current.copy(alpha = 0.14f) else Color.Transparent)
             .clickable(
-                interactionSource = remember { MutableInteractionSource() },
+                interactionSource = interaction,
                 indication = null,
                 enabled = !loading,
             ) {
@@ -1347,6 +1352,7 @@ private fun BottomGlyph(
     highlighted: Boolean = false,
     haptic: Haptic = Haptic.Tap,
     label: String? = null,
+    fluidPress: Boolean = false,
     iconSize: Dp = BOTTOM_ICON_SIZE,
     /**
      * Shortest gap between taps that both reach [onClick]. A tap inside the
@@ -1363,9 +1369,11 @@ private fun BottomGlyph(
     // is never the one that gets swallowed.
     val lastTap = remember { mutableLongStateOf(-tapWindowMs) }
     val tileColor = LocalPlayerTint.current.copy(alpha = BOTTOM_ACTIVE_TILE_ALPHA)
+    val interaction = remember { MutableInteractionSource() }
     Box(
         modifier = Modifier
             .size(BOTTOM_ACTION_SIZE)
+            .then(if (fluidPress) Modifier.fluidPress(interaction) else Modifier)
             // Lit, Apple's way: a rounded tile with the glyph cut out of it, the
             // artwork showing through. The glyph is drawn first and the tile over
             // it with SrcOut, which keeps the tile only where the glyph is not.
@@ -1391,7 +1399,7 @@ private fun BottomGlyph(
                 },
             )
             .clickable(
-                interactionSource = remember { MutableInteractionSource() },
+                interactionSource = interaction,
                 indication = null,
             ) {
                 val now = uptimeMillis()
@@ -1421,6 +1429,39 @@ private fun BottomGlyph(
             )
         }
     }
+}
+
+/**
+ * Fluid press feedback: the control squishes under the finger and springs back
+ * with a little overshoot, while a soft halo blooms behind it and fades out.
+ */
+@Composable
+private fun Modifier.fluidPress(source: MutableInteractionSource): Modifier {
+    val pressed by source.collectIsPressedAsState()
+    val squish by animateFloatAsState(
+        targetValue = if (pressed) 1f else 0f,
+        animationSpec = spring(dampingRatio = 0.42f, stiffness = 420f),
+        label = "fluidPressSquish",
+    )
+    val halo by animateFloatAsState(
+        targetValue = if (pressed) 1f else 0f,
+        animationSpec = tween(if (pressed) 120 else 320, easing = FastOutSlowInEasing),
+        label = "fluidPressHalo",
+    )
+    val tint = LocalPlayerTint.current
+    return this
+        .drawBehind {
+            if (halo > 0.001f) {
+                drawCircle(
+                    color = tint.copy(alpha = 0.18f * halo),
+                    radius = size.minDimension / 2f * (0.55f + 0.45f * halo),
+                )
+            }
+        }
+        .graphicsLayer {
+            scaleX = 1f - 0.16f * squish
+            scaleY = 1f - 0.24f * squish
+        }
 }
 
 /** A credit that links somewhere, when [browseId] is known. */
