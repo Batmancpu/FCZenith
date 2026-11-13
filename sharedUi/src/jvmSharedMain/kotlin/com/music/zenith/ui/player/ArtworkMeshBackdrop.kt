@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.layout.ContentScale
 import coil3.compose.LocalPlatformContext
@@ -507,6 +508,25 @@ private class SeamAlignedBlurPainter(
                 dstSize = IntSize(w.roundToInt(), (h - seamY).roundToInt().coerceAtLeast(1)),
                 filterQuality = FilterQuality.Low,
             )
+            // Below the seam the blurred cover carries on as its own mirror image,
+            // so the area under the banner has the cover's colours instead of
+            // one flat colour. It meets the banner's last row exactly at the seam.
+            withTransform({
+                scale(
+                    scaleX = 1f,
+                    scaleY = -1f,
+                    pivot = androidx.compose.ui.geometry.Offset(0f, seamY),
+                )
+            }) {
+                drawImage(
+                    image = image,
+                    srcOffset = IntOffset(srcX, srcY),
+                    srcSize = IntSize(srcW, srcH),
+                    dstOffset = IntOffset.Zero,
+                    dstSize = IntSize(w.roundToInt(), coverH.roundToInt().coerceAtLeast(1)),
+                    filterQuality = FilterQuality.Low,
+                )
+            }
         }
     }
 }
