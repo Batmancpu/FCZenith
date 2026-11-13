@@ -3719,7 +3719,7 @@ fun NowPlayingScreen(
                             // Cover (kartu maupun banner full-bleed) diletakkan di tengah tinggi
                             // panel selagi panel masih tumbuh dari pill, lalu dilepas pelan ke
                             // garis lurusnya, supaya tidak menempel ke tepi atas panel.
-                            val rect = if (dock == null || playerBounds.height <= 0) {
+                            val centred = if (dock == null || playerBounds.height <= 0) {
                                 rawSource
                             } else {
                                 val open = dock.openFraction()
@@ -3738,6 +3738,22 @@ fun NowPlayingScreen(
                                     val panelHeight = panel.bottom - panel.top
                                     val centredTop = panelTop + (panelHeight - rawSource.height) / 2f
                                     rawSource.translate(0f, (centredTop - rawSource.top) * share)
+                                }
+                            }
+                            // Cover kartu (bukan full-bleed) tidak boleh melayang di atas posisi
+                            // akhirnya relatif terhadap panel: dari DOCK_SETTLE_FROM sampai
+                            // DOCK_SETTLE_TO terbuka ia ditarik pelan ke sana, lalu naik bersama
+                            // panel, tidak menempel ke tepi atas. Banner full-bleed tidak berubah.
+                            val rect = if (heroMode || dock == null || rest == null) {
+                                centred
+                            } else {
+                                val g = dockSmooth(
+                                    (dock.openFraction() - DOCK_SETTLE_FROM) / (DOCK_SETTLE_TO - DOCK_SETTLE_FROM),
+                                )
+                                if (g <= 0f || centred.top >= rest.top) {
+                                    centred
+                                } else {
+                                    centred.translate(0f, (rest.top - centred.top) * g)
                                 }
                             }
                             val minTop = bannerTopPx.toFloat()
