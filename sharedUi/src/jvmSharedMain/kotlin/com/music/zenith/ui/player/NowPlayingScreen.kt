@@ -547,6 +547,15 @@ private const val DOCK_CENTRE_RISE_AT = 0.06f
 private const val DOCK_CENTRE_HOLD_TO = 0.30f
 private const val DOCK_CENTRE_END_AT = 0.70f
 
+/**
+ * Cover kartu tidak boleh melayang di atas posisi akhirnya relatif terhadap
+ * sheet (centring dan kaki yang ditahan di mini player mengangkatnya), lalu
+ * turun lagi di ujung. Dari [DOCK_SETTLE_FROM] sampai [DOCK_SETTLE_TO] terbuka,
+ * cover ditarik pelan ke posisi akhirnya; setelah itu ia naik bersama sheet.
+ */
+private const val DOCK_SETTLE_FROM = 0.30f
+private const val DOCK_SETTLE_TO = 0.60f
+
 private fun dockSmooth(x: Float): Float {
     val t = x.coerceIn(0f, 1f)
     return t * t * (3f - 2f * t)
@@ -3679,7 +3688,7 @@ fun NowPlayingScreen(
                         // player: tidak lewat tepi atas panel (yang memotong bagian atas
                         // cover) dan tidak keluar dari kiri/kanan. Tepi atas panel di
                         // koordinat kotak ini adalah bannerTopPx.
-                        fun fitToPanel(rawSource: Rect, active: Boolean): Rect {
+                        fun fitToPanel(rawSource: Rect, active: Boolean, rest: Rect? = null): Rect {
                             if (!active) return rawSource
                             // Cover kartu (bukan banner full-bleed) diletakkan di tengah tinggi
                             // panel selagi panel masih tumbuh dari pill, supaya jarak atas dan
@@ -3724,10 +3733,22 @@ fun NowPlayingScreen(
                             } else {
                                 Float.MAX_VALUE
                             }
-                            val rect = if (source.bottom > panelBottom) {
-                                source.translate(0f, panelBottom - source.bottom)
-                            } else {
+                            val settledSource = if (heroMode || dock == null || rest == null) {
                                 source
+                            } else {
+                                val g = dockSmooth(
+                                    (dock.openFraction() - DOCK_SETTLE_FROM) / (DOCK_SETTLE_TO - DOCK_SETTLE_FROM),
+                                )
+                                if (g <= 0f || source.top >= rest.top) {
+                                    source
+                                } else {
+                                    source.translate(0f, (rest.top - source.top) * g)
+                                }
+                            }
+                            val rect = if (settledSource.bottom > panelBottom) {
+                                settledSource.translate(0f, panelBottom - settledSource.bottom)
+                            } else {
+                                settledSource
                             }
                             val minTop = bannerTopPx.toFloat()
                             val minLeft = -boxLeftPx.toFloat()
@@ -3820,7 +3841,7 @@ fun NowPlayingScreen(
                                     } else {
                                         dockFrame.rideShare = 1f
                                     }
-                                    val rect = fitToPanel(towardsDock(open, mini), mini != null)
+                                    val rect = fitToPanel(towardsDock(open, mini), mini != null, open)
                                     dockFrame.miniInBox = mini
                                     dockFrame.sleeve = rect
                                     val placeable = measurable.measure(
@@ -3968,6 +3989,7 @@ fun NowPlayingScreen(
                                         val card = fitToPanel(
                                             towardsDock(cardRect(), dockFrame.miniInBox),
                                             dockFrame.miniInBox != null,
+                                            cardRect(),
                                         )
                                         val sleeve = dockFrame.sleeve
                                         val placeable = measurable.measure(
