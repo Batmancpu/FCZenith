@@ -496,7 +496,9 @@ private class SeamAlignedBlurPainter(
             filterQuality = FilterQuality.Low,
         )
         if (seamY > 1f && seamY < h - 1f) {
-            val band = (srcH * 0.08f).roundToInt().coerceIn(1, srcH)
+            // Only the last row or two: the colour below the seam has to be the colour
+            // the cover ended on, or the join shows as a line across the screen.
+            val band = (srcH * 0.012f).roundToInt().coerceIn(1, srcH)
             drawImage(
                 image = image,
                 srcOffset = IntOffset(srcX, srcY + srcH - band),
