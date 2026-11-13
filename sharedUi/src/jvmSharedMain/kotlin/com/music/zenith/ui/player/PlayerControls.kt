@@ -641,9 +641,8 @@ internal fun PlayerActionRow(
         animationSpec = tween(220, easing = FastOutSlowInEasing),
         label = "queueModeBadge",
     )
-    // One badge at a time, so the capsule is always a single 10dp icon plus
-    // its 4dp padding on each side.
-    val badgeWidth = 18.dp
+    // One badge at a time: a round 22dp disc holding a single 14dp icon.
+    val badgeWidth = 22.dp
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         // Sized for the wider of the two capsules — the three-up one — whether
         // that or the output/party one is up, so the lyrics and queue glyphs
@@ -703,9 +702,9 @@ internal fun PlayerActionRow(
                                 val s = 0.6f + 0.4f * v
                                 val gap = 2.dp.toPx()
                                 val halfW = (badgeWidth.toPx() / 2f + gap) * s
-                                val halfH = (9.dp.toPx() + gap) * s
+                                val halfH = (11.dp.toPx() + gap) * s
                                 val cx = (BOTTOM_ACTION_SIZE - 1.dp).toPx() - badgeWidth.toPx() / 2f
-                                // The badge's centre: its 5dp drop plus half its 18dp height.
+                                // The badge's centre: its 3dp drop plus half its 22dp height.
                                 val cy = 14.dp.toPx()
                                 drawRoundRect(
                                     color = Color.Black.copy(alpha = v),
@@ -731,7 +730,7 @@ internal fun PlayerActionRow(
                     visibility = badgeVisibility,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .offset(x = (-1).dp, y = 5.dp),
+                        .offset(x = (-1).dp, y = 3.dp),
                 )
             }
         }
@@ -1316,9 +1315,9 @@ private fun QueueModeBadges(
                 scaleY = 0.6f + 0.4f * visibility
             }
             .clip(CircleShape)
-            .background(tint.copy(alpha = 0.28f))
-            .padding(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(1.dp),
+            .background(tint.copy(alpha = 0.34f))
+            .size(22.dp),
+        horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // Only one badge at a time. Priority: repeat-one, then shuffle,
@@ -1334,7 +1333,7 @@ private fun QueueModeBadges(
                 imageVector = badgeIcon,
                 contentDescription = null,
                 tint = tint,
-                modifier = Modifier.size(10.dp),
+                modifier = Modifier.size(14.dp),
             )
         }
     }
