@@ -6,7 +6,7 @@ import subprocess
 
 ROOT = Path.cwd()
 OVERLAY = Path(__file__).resolve().parent
-ASSETS = OVERLAY / "assets"
+ASSETS = OVERLAY
 
 def read(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
