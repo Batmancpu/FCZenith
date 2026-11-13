@@ -619,12 +619,20 @@ private const val DOCK_TITLE_SOLID_SPAN = 0.15f
  * plain thumbnail the mini player's cover shows, and how much of the trip the
  * dissolve takes. Whole thumbnail by the time the cover is reached.
  */
-private const val DOCK_ART_SWAP_FROM = 0.15f
-private const val DOCK_ART_SWAP_SPAN = 0.15f
+private const val DOCK_ART_SWAP_FROM = 0.08f
+private const val DOCK_ART_SWAP_SPAN = 0.08f
 
 /** Arah membuka (mini ke big): thumbnail cepat berganti ke frame canvas selagi cover masih kecil. */
-private const val DOCK_ART_SWAP_OPEN_FROM = 0.2f
-private const val DOCK_ART_SWAP_OPEN_SPAN = 0.2f
+private const val DOCK_ART_SWAP_OPEN_FROM = 0.1f
+private const val DOCK_ART_SWAP_OPEN_SPAN = 0.1f
+
+/**
+ * Cover full-bleed: drag sejauh ini bagian bawah cover sudah memudar penuh ke
+ * latar blur, seperti Apple Music, bukan baru di pertengahan drag.
+ */
+private const val DOCK_DISSOLVE_FULL_AT = 0.25f
+
+private fun dockEarlyDissolve(t: Float): Float = dockSmooth(t / DOCK_DISSOLVE_FULL_AT)
 
 /**
  * What one frame of docking into the mini player worked out — see
@@ -3830,7 +3838,21 @@ fun NowPlayingScreen(
                             // menyeret cover turun lebih dulu dari panelnya. Kaki cover
                             // ditahan di kaki cover mini: ia hanya tumbuh ke atas dan ke
                             // kanan, lalu naik bersama panel. Banner full-bleed tidak berubah.
-                            return if (heroMode || flown.bottom <= mini.bottom) {
+                            if (heroMode) {
+                                // Cover full-bleed sudah panjang sejak awal drag: kakinya
+                                // (yang memudar ke blur) mengikuti dasar panel, lalu
+                                // kembali ke tinggi banner menjelang terbuka penuh.
+                                val d = dock ?: return flown
+                                val panelBottom = bannerTopPx + (
+                                    d.panelBounds(
+                                        Size(playerBounds.width.toFloat(), playerBounds.height.toFloat()),
+                                    ).bottom - dockFrame.offset
+                                    )
+                                val tall = 1f - dockSmooth((d.openFraction() - 0.5f) / 0.4f)
+                                val bottom = flown.bottom + (maxOf(flown.bottom, panelBottom) - flown.bottom) * tall
+                                return Rect(flown.left, flown.top, flown.right, bottom)
+                            }
+                            return if (flown.bottom <= mini.bottom) {
                                 flown
                             } else {
                                 flown.translate(0f, mini.bottom - flown.bottom)
@@ -3838,7 +3860,8 @@ fun NowPlayingScreen(
                         }
                         // The banner's dissolve, firmed up into the cover's hard edge as
                         // it docks.
-                        fun sleeveShown(): Float = bannerShown() * dockEase(dockT())
+                        fun sleeveShown(): Float =
+                            bannerShown() * (if (heroMode) dockEarlyDissolve(dockT()) else dockEase(dockT()))
                         fun sleeveCorner(): Dp {
                             val corner = 8.dp * (1f - sleeveShown())
                             val t = dockT()
