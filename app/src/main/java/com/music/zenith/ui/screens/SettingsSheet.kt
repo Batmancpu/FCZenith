@@ -50,6 +50,7 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.DeleteSweep
 import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FileDownload
 import androidx.compose.material.icons.rounded.FileUpload
 import androidx.compose.material.icons.rounded.FilterAlt
