@@ -641,11 +641,9 @@ internal fun PlayerActionRow(
         animationSpec = tween(220, easing = FastOutSlowInEasing),
         label = "queueModeBadge",
     )
-    val badgeWidth = if (shuffleEnabled && repeatMode != RepeatModes.OFF && repeatMode != RepeatModes.ONE) {
-        29.dp
-    } else {
-        18.dp
-    }
+    // One badge at a time, so the capsule is always a single 10dp icon plus
+    // its 4dp padding on each side.
+    val badgeWidth = 18.dp
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         // Sized for the wider of the two capsules — the three-up one — whether
         // that or the output/party one is up, so the lyrics and queue glyphs
@@ -706,9 +704,9 @@ internal fun PlayerActionRow(
                                 val gap = 2.dp.toPx()
                                 val halfW = (badgeWidth.toPx() / 2f + gap) * s
                                 val halfH = (9.dp.toPx() + gap) * s
-val cx = (BOTTOM_ACTION_SIZE - 1.dp).toPx() - badgeWidth.toPx() / 2f
-// The badge's centre: its 5dp drop plus half its 22dp height.
-val cy = 16.dp.toPx()
+                                val cx = (BOTTOM_ACTION_SIZE - 1.dp).toPx() - badgeWidth.toPx() / 2f
+                                // The badge's centre: its 5dp drop plus half its 18dp height.
+                                val cy = 14.dp.toPx()
                                 drawRoundRect(
                                     color = Color.Black.copy(alpha = v),
                                     topLeft = Offset(cx - halfW, cy - halfH),
