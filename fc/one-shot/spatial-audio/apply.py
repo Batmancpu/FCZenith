@@ -95,6 +95,7 @@ insert_after(
     "    val spatialAudioOnPhoneSpeaker = MutableStateFlow(false)\n"
     "    val spatialAudioLearningEnabled = MutableStateFlow(true)\n"
     "    val spatialAudioCurrentDecision = MutableStateFlow<SpatialAudioDecision?>(null)\n"
+    "    val spatialAudioCurrentTrackId = MutableStateFlow(\"\")\n"
     "    val spatialAudioCurrentTrackTitle = MutableStateFlow(\"\")\n"
     "    val spatialAudioCurrentTrackArtist = MutableStateFlow(\"\")\n",
 )
@@ -117,9 +118,13 @@ replace_once(
     "                )\n"
     "            }.getOrDefault(SpatialAudioMode.AUTO)\n"
     "        } else if (prefs.getBoolean(KEY_SPATIAL_AUDIO, false)) {\n"
-    "            SpatialAudioMode.ON\n"
+    "            SpatialAudioMode.AUTO\n"
     "        } else {\n"
     "            SpatialAudioMode.OFF\n"
+    "        }\n"
+    "        if (spatialAudioMode.value == SpatialAudioMode.ON) {\n"
+    "            spatialAudioMode.value = SpatialAudioMode.AUTO\n"
+    "            prefs.edit().putString(KEY_SPATIAL_AUDIO_MODE, SpatialAudioMode.AUTO.name).apply()\n"
     "        }\n"
     "        spatialAudio.value = spatialAudioMode.value != SpatialAudioMode.OFF\n"
     "        spatialAudioByTrack.value = readSpatialAudioByTrack()\n"
@@ -148,7 +153,7 @@ replace_once(
 SPATIAL_METHODS = r'''
     /** Compatibility setter: the legacy Boolean means explicit global On or Off. */
     fun setSpatialAudio(value: Boolean) {
-        setSpatialAudioMode(if (value) SpatialAudioMode.ON else SpatialAudioMode.OFF)
+        setSpatialAudioMode(if (value) SpatialAudioMode.AUTO else SpatialAudioMode.OFF)
     }
 
     fun setSpatialAudioMode(value: SpatialAudioMode) {
@@ -497,6 +502,7 @@ new_apply = (
     "            spatialAudioProcessorB.currentTrackId -> spatialAudioProcessorB\n"
     "            else -> null\n"
     "        }\n"
+    "        AppSettings.spatialAudioCurrentTrackId.value = activeProcessor?.currentTrackId.orEmpty()\n"
     "        AppSettings.spatialAudioCurrentTrackTitle.value = activeProcessor?.currentTitle.orEmpty()\n"
     "        AppSettings.spatialAudioCurrentTrackArtist.value = activeProcessor?.currentArtist.orEmpty()\n"
     "        AppSettings.spatialAudioCurrentDecision.value = when (activeProcessor) {\n"
@@ -509,48 +515,59 @@ new_apply = (
 replace_once(PLAYBACK, old_apply, new_apply)
 
 MENU = "app/src/main/java/com/music/zenith/ui/components/SongActionsMenu.kt"
-insert_after(MENU, "import com.music.zenith.playback.SleepTimer\n", "import com.music.zenith.playback.SpatialAudioPreference\n")
+insert_after(MENU, "import com.music.zenith.playback.SleepTimer\n",
+    "import com.music.zenith.playback.SpatialAudioDecision\n"
+    "import com.music.zenith.playback.SpatialAudioDecisionReason\n"
+    "import com.music.zenith.playback.SpatialAudioPreference\n")
 replace_once(MENU,
     "    onToggleSpatialAudio: (() -> Unit)? = null,\n"
     "    /** The track's effective spatial-audio state, so the row offers the opposite. */\n"
     "    spatialAudioOn: Boolean = false,",
     "    onSetSpatialAudioPreference: ((SpatialAudioPreference) -> Unit)? = null,\n"
-    "    spatialAudioPreference: SpatialAudioPreference = SpatialAudioPreference.AUTO,")
+    "    spatialAudioPreference: SpatialAudioPreference = SpatialAudioPreference.AUTO,\n"
+    "    spatialAudioDecision: SpatialAudioDecision? = null,")
 insert_after(MENU, "    val isOffline = song.localUri != null\n",
     "\n    var spatialPreference by remember(song.videoId) { mutableStateOf(spatialAudioPreference) }\n")
 replace_once(MENU,
-    "            // Stays open after a tap: the label flips in place and the change\n"
-    "            // is audible at once, so the two settings can be compared by ear.\n"
-    "            onToggleSpatialAudio?.let {\n"
-    "                ActionRow(\n"
-    "                    icon = SfIcons.SurroundSound,\n"
-    "                    label = stringResource(\n"
-    "                        if (spatialAudioOn) R.string.spatial_audio_prefer_off else R.string.spatial_audio_prefer_on,\n"
-    "                    ),\n"
-    "                    accent = palette.accent,\n"
-    "                    onClick = it,\n"
-    "                )\n"
-    "            }\n",
-    "            // Per-track Auto / On / Off; global mode remains independent.\n"
+    "            // One binary per-track control. Auto is internal policy, never a third toggle.\n"
     "            onSetSpatialAudioPreference?.let { setPreference ->\n"
-    "                val nextPreference = when (spatialPreference) {\n"
-    "                    SpatialAudioPreference.AUTO -> SpatialAudioPreference.FORCE_ON\n"
-    "                    SpatialAudioPreference.FORCE_ON -> SpatialAudioPreference.FORCE_OFF\n"
-    "                    SpatialAudioPreference.FORCE_OFF -> SpatialAudioPreference.AUTO\n"
+    "                val isAutomatic = spatialPreference == SpatialAudioPreference.AUTO &&\n"
+    "                    (spatialAudioDecision == null || spatialAudioDecision.reason in setOf(\n"
+    "                        SpatialAudioDecisionReason.AUTO_DEFAULT_ON,\n"
+    "                        SpatialAudioDecisionReason.AUTO_NO_PROFILE,\n"
+    "                        SpatialAudioDecisionReason.AUTO_INSUFFICIENT_EVIDENCE,\n"
+    "                        SpatialAudioDecisionReason.AUTO_LOW_INDEPENDENT_EVIDENCE,\n"
+    "                        SpatialAudioDecisionReason.AUTO_UNCERTAIN,\n"
+    "                        SpatialAudioDecisionReason.AUTO_LEARNED_ON,\n"
+    "                        SpatialAudioDecisionReason.AUTO_LEARNED_OFF,\n"
+    "                    ))\n"
+    "                val effectiveOn = when {\n"
+    "                    spatialPreference == SpatialAudioPreference.FORCE_OFF -> false\n"
+    "                    spatialAudioDecision != null -> spatialAudioDecision.enabled\n"
+    "                    else -> true\n"
+    "                }\n"
+    "                val greenAutoOn = isAutomatic && effectiveOn\n"
+    "                val status = when {\n"
+    "                    isAutomatic && effectiveOn -> R.string.spatial_audio_auto_on\n"
+    "                    isAutomatic -> R.string.spatial_audio_auto_off\n"
+    "                    effectiveOn -> R.string.spatial_audio_mode_on\n"
+    "                    else -> R.string.spatial_audio_mode_off\n"
     "                }\n"
     "                ActionRow(\n"
     "                    icon = SfIcons.SurroundSound,\n"
     "                    label = stringResource(R.string.spatial_audio),\n"
-    "                    value = stringResource(when (spatialPreference) {\n"
-    "                        SpatialAudioPreference.AUTO -> R.string.spatial_audio_mode_auto\n"
-    "                        SpatialAudioPreference.FORCE_ON -> R.string.spatial_audio_mode_on\n"
-    "                        SpatialAudioPreference.FORCE_OFF -> R.string.spatial_audio_mode_off\n"
-    "                    }),\n"
-    "                    accent = palette.accent,\n"
-    "                    onClick = { setPreference(nextPreference); spatialPreference = nextPreference },\n"
+    "                    value = stringResource(status),\n"
+    "                    tint = if (greenAutoOn) Color(0xFF34C759) else null,\n"
+    "                    accent = if (greenAutoOn) Color(0xFF34C759) else palette.accent,\n"
+    "                    onClick = {\n"
+    "                        val nextPreference = if (effectiveOn) SpatialAudioPreference.FORCE_OFF else SpatialAudioPreference.FORCE_ON\n"
+    "                        setPreference(nextPreference)\n"
+    "                        spatialPreference = nextPreference\n"
+    "                    },\n"
     "                )\n"
     "            }\n",
 )
+replace_once(MENU, "onToggleSpatialAudio != null", "onSetSpatialAudioPreference != null")
 MAIN = "app/src/main/java/com/music/zenith/MainActivity.kt"
 insert_after(MAIN, "import com.music.zenith.data.settings.AppSettings\n", "import com.music.zenith.playback.SpatialAudioPreference\n")
 replace_once(MAIN,
@@ -558,7 +575,10 @@ replace_once(MAIN,
     "            val spatialAudioGlobal by AppSettings.spatialAudio.collectAsStateWithLifecycle()\n"
     "            val spatialAudioOn = trackSpatialOverrides[song.videoId] ?: spatialAudioGlobal\n",
     "            val trackSpatialPreferences by AppSettings.spatialAudioTrackPreferences.collectAsStateWithLifecycle()\n"
-    "            val spatialAudioPreference = trackSpatialPreferences[song.videoId] ?: SpatialAudioPreference.AUTO\n")
+    "            val spatialAudioPreference = trackSpatialPreferences[song.videoId] ?: SpatialAudioPreference.AUTO\n"
+    "            val currentSpatialAudioTrackId by AppSettings.spatialAudioCurrentTrackId.collectAsStateWithLifecycle()\n"
+    "            val currentSpatialAudioDecision by AppSettings.spatialAudioCurrentDecision.collectAsStateWithLifecycle()\n"
+    "            val spatialAudioDecision = if (fromPlayer && currentSpatialAudioTrackId == song.videoId) currentSpatialAudioDecision else null\n")
 replace_once(MAIN,
     "                onToggleSpatialAudio = if (fromPlayer && song.videoId.isNotBlank()) {\n"
     "                    { AppSettings.setSpatialAudioForTrack(song.videoId, !spatialAudioOn) }\n"
@@ -571,34 +591,16 @@ replace_once(MAIN,
     "                } else {\n"
     "                    null\n"
     "                },\n"
-    "                spatialAudioPreference = spatialAudioPreference,\n")
+    "                spatialAudioPreference = spatialAudioPreference,\n"
+    "                spatialAudioDecision = spatialAudioDecision,\n")
 
 UI = "app/src/main/java/com/music/zenith/ui/screens/SettingsSheet.kt"
-insert_after(UI, "import com.music.zenith.data.settings.AppSettings\n", "import com.music.zenith.playback.SpatialAudioMode\n")
+
 insert_after(UI, "    val spatialAudio by AppSettings.spatialAudio.collectAsStateWithLifecycle()\n",
-    "    val spatialAudioMode by AppSettings.spatialAudioMode.collectAsStateWithLifecycle()\n"
+
     "    val spatialAudioOnPhoneSpeaker by AppSettings.spatialAudioOnPhoneSpeaker.collectAsStateWithLifecycle()\n"
     "    val spatialAudioLearningEnabled by AppSettings.spatialAudioLearningEnabled.collectAsStateWithLifecycle()\n")
-replace_once(UI,
-    "                        trailing = {\n"
-    "                            IosSwitch(\n"
-    "                                checked = spatialAudio,\n"
-    "                                onCheckedChange = AppSettings::setSpatialAudio,\n"
-    "                            )\n"
-    "                        },\n"
-    "                        onClick = { AppSettings.setSpatialAudio(!spatialAudio) },\n",
-    "                        trailing = {\n"
-    "                            Text(stringResource(when (spatialAudioMode) {\n"
-    "                                SpatialAudioMode.AUTO -> R.string.spatial_audio_mode_auto\n"
-    "                                SpatialAudioMode.ON -> R.string.spatial_audio_mode_on\n"
-    "                                SpatialAudioMode.OFF -> R.string.spatial_audio_mode_off\n"
-    "                            }), color = MaterialTheme.colorScheme.onSurfaceVariant)\n"
-    "                        },\n"
-    "                        onClick = { AppSettings.setSpatialAudioMode(when (spatialAudioMode) {\n"
-    "                            SpatialAudioMode.AUTO -> SpatialAudioMode.ON\n"
-    "                            SpatialAudioMode.ON -> SpatialAudioMode.OFF\n"
-    "                            SpatialAudioMode.OFF -> SpatialAudioMode.AUTO\n"
-    "                        }) },\n")
+// Keep the upstream two-state IosSwitch; true maps to Auto and false to Off.
 insert_after(UI,
     "            }\n            // The system panel is not listed here as well. A device with a\n",
     "\n"
@@ -624,6 +626,8 @@ STRINGS = "app/src/main/res/values/strings.xml"
 insert_after(STRINGS,
     '    <string name="spatial_audio_subtitle">Widens stereo tracks for a more immersive feel</string>\n',
     '    <string name="spatial_audio_mode_auto">Auto</string>\n'
+    '    <string name="spatial_audio_auto_on">Auto · On</string>\n'
+    '    <string name="spatial_audio_auto_off">Auto · Off</string>\n'
     '    <string name="spatial_audio_mode_on">On</string>\n'
     '    <string name="spatial_audio_mode_off">Off</string>\n'
     '    <string name="spatial_audio_phone_speaker">Allow on phone speaker</string>\n'

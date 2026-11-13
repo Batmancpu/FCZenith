@@ -270,12 +270,14 @@ jobs:
         run: python3 fc/apply-overlay.py
 
       - name: Apply the one-release Spatial Audio learner and phone-speaker safeguard
+        id: spatial_audio
         if: steps.decision.outputs.should_release == 'true'
         env:
           FC_VERSION_NAME: ${{ steps.decision.outputs.version_name }}
         shell: bash
         run: |
           set -euo pipefail
+          echo "included=false" >> "$GITHUB_OUTPUT"
           overlay="fc/one-shot/spatial-audio"
           if [[ -d "$overlay" ]]; then
             target="$(tr -d '[:space:]' < "$overlay/target-version")"
@@ -284,6 +286,7 @@ jobs:
               exit 1
             fi
             python3 "$overlay/apply.py"
+            echo "included=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Fill missing Android locale fallbacks for this build
@@ -522,7 +525,7 @@ jobs:
             - Includes ${{ steps.upstream.outputs.commits_ahead }} upstream commits beyond the stable baseline when built as a main snapshot.
             - This is an FC-branded upstream-main development snapshot; future automatic syncs return to published stable releases.
             - The same FC signing certificate is checked before publishing.
-            - Spatial Audio is unchanged from upstream in this release. FC-specific Auto learning, confidence scoring and output-route changes are deferred to a separate explicitly requested test release.
+            - Spatial Audio: ${{ steps.spatial_audio.outputs.included == 'true' && 'Includes the FC one-release stereo learner, green Auto · On status, binary per-track On/Off and phone-speaker/Atmos/DSP safety bypasses. Profiles and feedback remain on-device.' || 'Unchanged from upstream; no FC one-shot Spatial Audio overlay was applied.' }}
 
             Obtainium source: https://github.com/Batmancpu/FCZenith
           files: dist/Music-v${{ steps.decision.outputs.version_name }}.apk

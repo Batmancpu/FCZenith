@@ -270,7 +270,7 @@ object SpatialAudioLearner {
         if (effectiveSamples < MIN_EFFECTIVE_NEIGHBOURS) {
             return SpatialAudioDecision(
                 enabled = true,
-                reason = SpatialAudioDecisionReason.AUTO_DEFAULT_ON,
+                reason = SpatialAudioDecisionReason.AUTO_LOW_INDEPENDENT_EVIDENCE,
                 similarTrackCount = nearest.size,
                 onVotes = onVotes,
                 offVotes = offVotes,
@@ -305,7 +305,7 @@ object SpatialAudioLearner {
         effectiveSamples: Float = 0f,
     ) = SpatialAudioDecision(
         enabled = true,
-        reason = SpatialAudioDecisionReason.AUTO_DEFAULT_ON,
+        reason = SpatialAudioDecisionReason.AUTO_INSUFFICIENT_EVIDENCE,
         similarTrackCount = nearest.size,
         onVotes = onVotes,
         offVotes = offVotes,
