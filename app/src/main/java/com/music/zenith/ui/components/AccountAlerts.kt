@@ -903,8 +903,6 @@ internal fun AlertScaffold(
     motion: MacOSPopupState = rememberMacOSPopupState(onClosed = onDismiss),
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
-    val menuColors = iosMenuColors()
     val shape = RoundedCornerShape(ALERT_CORNER)
     androidx.activity.compose.BackHandler { motion.requestClose() }
 
@@ -925,19 +923,7 @@ internal fun AlertScaffold(
                 .macOSPopupMotion(motion)
                 .jellyPopIn(animateIn = false)
                 .clip(shape)
-                .then(
-                    when {
-                        reduceDynamicBlur -> Modifier.background(menuColors.fill)
-                        !frosted || hazeState == null -> Modifier.alertGlass(shape)
-                        else -> Modifier.optimizedHazeEffect(
-                            state = hazeState,
-                            style = menuFrost(
-                                menuColors.fill,
-                                alpha = if (menuColors.dark) ALERT_FROST_ALPHA_DARK else ALERT_FROST_ALPHA_LIGHT,
-                            ),
-                        )
-                    },
-                )
+                .alertSurface(hazeState, frosted, shape)
                 .clickable(
                     indication = null,
                     interactionSource = remember { MutableInteractionSource() },
@@ -974,6 +960,34 @@ internal fun Modifier.alertGlass(shape: RoundedCornerShape): Modifier {
     } else {
         background(colors.fill, shape)
     }
+}
+
+/**
+ * The one surface every alert card is drawn on: the audio output popup's frost
+ * (backdrop frost in its own window, Haze frost in the activity window, solid
+ * under "reduce dynamic blur") plus the [touchGlow] that follows the finger.
+ * Call it after the card's clip.
+ */
+@Composable
+internal fun Modifier.alertSurface(
+    hazeState: HazeState?,
+    frosted: Boolean,
+    shape: RoundedCornerShape,
+): Modifier {
+    val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
+    val colors = iosMenuColors()
+    val surface = when {
+        reduceDynamicBlur -> background(colors.fill)
+        !frosted || hazeState == null -> alertGlass(shape)
+        else -> optimizedHazeEffect(
+            state = hazeState,
+            style = menuFrost(
+                colors.fill,
+                alpha = if (colors.dark) ALERT_FROST_ALPHA_DARK else ALERT_FROST_ALPHA_LIGHT,
+            ),
+        )
+    }
+    return surface.touchGlow()
 }
 
 /**

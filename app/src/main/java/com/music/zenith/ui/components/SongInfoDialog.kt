@@ -117,7 +117,8 @@ private fun SongInfoDialogContent(song: Song, onDismiss: () -> Unit) {
                 .macOSPopupMotion(motion)
                 .jellyPopIn(animateIn = false)
                 .clip(RoundedCornerShape(ALERT_CORNER))
-                .alertGlass(RoundedCornerShape(ALERT_CORNER)),
+                .alertGlass(RoundedCornerShape(ALERT_CORNER))
+                .touchGlow(),
         ) {
             Column(Modifier.fillMaxWidth().macOSPopupContent(motion)) {
             Column(
