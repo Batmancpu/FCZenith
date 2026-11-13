@@ -641,7 +641,11 @@ internal fun PlayerActionRow(
         animationSpec = tween(220, easing = FastOutSlowInEasing),
         label = "queueModeBadge",
     )
-    val badgeWidth = if (shuffleEnabled && repeatMode != RepeatModes.OFF) 29.dp else 18.dp
+    val badgeWidth = if (shuffleEnabled && repeatMode != RepeatModes.OFF && repeatMode != RepeatModes.ONE) {
+        29.dp
+    } else {
+        18.dp
+    }
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         // Sized for the wider of the two capsules — the three-up one — whether
         // that or the output/party one is up, so the lyrics and queue glyphs
@@ -1324,7 +1328,8 @@ private fun QueueModeBadges(
         horizontalArrangement = Arrangement.spacedBy(1.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (shuffleEnabled) {
+        // Repeat one wins: shown alone, shuffle steps aside.
+        if (shuffleEnabled && repeatMode != RepeatModes.ONE) {
             Icon(
                 imageVector = ZenithIcons.Shuffle,
                 contentDescription = null,
