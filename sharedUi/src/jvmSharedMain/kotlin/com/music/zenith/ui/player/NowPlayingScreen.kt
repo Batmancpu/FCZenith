@@ -543,7 +543,7 @@ private const val DOCK_COVER_START_AT = 0.05f
  * [DOCK_CENTRE_HOLD_TO], lalu lepas bertahap sampai [DOCK_CENTRE_END_AT] ke
  * jalur terbang biasa. Di 0 pengaruhnya 0, jadi cover tidak melompat dari mini.
  */
-private const val DOCK_CENTRE_RISE_AT = 0.06f
+private const val DOCK_CENTRE_RISE_AT = 0.2f
 private const val DOCK_CENTRE_HOLD_TO = 0.30f
 private const val DOCK_CENTRE_END_AT = 0.70f
 
@@ -575,7 +575,14 @@ private fun dockEase(t: Float): Float {
  * player dan sleeve. Mengikuti kurva lebar panel, jadi cover tidak turun ke
  * mini player selagi panel masih lebar.
  */
-private fun dockFlyEase(t: Float): Float = panelWideEase(t)
+private fun dockFlyEase(t: Float): Float =
+    panelWideEase(t) * dockSmooth(t / DOCK_FLY_SOFT_START_AT)
+
+/**
+ * Drag sejauh ini cover terbang dilandaikan dulu (kemiringan 0 di awal), supaya
+ * tidak melonjak di 10% pertama drag. Setelahnya sama dengan [panelWideEase].
+ */
+private const val DOCK_FLY_SOFT_START_AT = 0.3f
 
 /**
  * The share of the sheet's travel the artwork rides on its way to the cover. All
