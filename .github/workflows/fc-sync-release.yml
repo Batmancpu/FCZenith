@@ -103,8 +103,8 @@ jobs:
             echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "Upstream target $TARGET_SHA is already in FCZenith main."
           else
-            # Keep FC-owned workflow files, but never hide conflicts in app source.
-            if ! git merge --no-edit --no-ff "$TARGET_SHA"; then
+            # Upstream rebased its history. Prefer incoming upstream hunks in upstream-owned files; FC features are injected later through the isolated build overlay.
+            if ! git merge --no-edit --no-ff -X theirs "$TARGET_SHA"; then
               conflicts="$(git diff --name-only --diff-filter=U)"
               if [[ -z "$conflicts" ]] || grep -qv '^.github/workflows/' <<< "$conflicts"; then
                 echo "Upstream merge has conflicts outside FC-owned workflows; stopping safely." >&2
