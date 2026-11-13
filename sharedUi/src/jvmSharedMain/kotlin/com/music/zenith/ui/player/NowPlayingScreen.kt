@@ -493,10 +493,10 @@ private var lastHeroSettled = false
  * the artwork arrives at the mini player: it is fully faded with this share of
  * the way still to go.
  */
-private const val DOCK_FADE_LEAD = 0.15f
+private const val DOCK_FADE_LEAD = 0.05f
 
 /** How far open the player is when the rest of it (title, controls) is fully solid. */
-private const val DOCK_FADE_FULL = 0.6f
+private const val DOCK_FADE_FULL = 0.45f
 
 /** The least the faded player is drawn at while docking — see the player's fade. */
 private const val DOCK_FADE_FLOOR = 1f / 255f
@@ -633,6 +633,17 @@ private const val DOCK_ART_SWAP_OPEN_SPAN = 0.1f
 private const val DOCK_DISSOLVE_FULL_AT = 0.25f
 
 private fun dockEarlyDissolve(t: Float): Float = dockSmooth(t / DOCK_DISSOLVE_FULL_AT)
+
+/**
+ * Cover full-bleed: drag sejauh ini cover sudah selebar panel (kiri-kanan penuh)
+ * dan set cover + blur sudah menutup latar warna solid di belakangnya.
+ */
+private const val DOCK_HERO_WIDE_AT = 0.5f
+
+private fun dockHeroWide(t: Float): Float = dockSmooth(t / DOCK_HERO_WIDE_AT)
+
+/** Drag sejauh ini latar warna solid cover sudah penuh (mini player berubah jadi warna cover). */
+private const val DOCK_SOLID_FULL_AT = 0.12f
 
 /**
  * What one frame of docking into the mini player worked out — see
@@ -2302,6 +2313,10 @@ fun NowPlayingScreen(
 
     // The player's own end of the docking, for whichever shape it takes: where
     // it sits on screen, the fade, and the artwork drawn over that fade.
+    // Warna solid cover, latar paling belakang selama drag mini <-> main player.
+    // Digambar di luar fade, jadi set cover + blur yang tumbuh menutupinya.
+    val dockSolidBase = rememberArtworkColors(remoteArt).colors.firstOrNull() ?: Color.Black
+    val dockSolid = Color(dockSolidBase.red * 0.75f, dockSolidBase.green * 0.75f, dockSolidBase.blue * 0.75f)
     val dockHost: Modifier = Modifier
         .then(
             if (dock != null) {
@@ -2334,6 +2349,9 @@ fun NowPlayingScreen(
         // player that doesn't fade on its way to the bar. Drawn on top of
         // everything while it travels, as the one thing still moving.
         .drawWithContent {
+            if (docking()) {
+                drawRect(dockSolid.copy(alpha = (dockT() / DOCK_SOLID_FULL_AT).coerceIn(0f, 1f)))
+            }
             drawContent()
             if (docking()) {
                 // Only a copy recorded on this very draw: otherwise the sleeve
@@ -2871,7 +2889,24 @@ fun NowPlayingScreen(
                     )
                 }
                 fullArtworkBlurContent(
-                    Modifier.graphicsLayer { alpha = fullArtworkBackdropAlpha },
+                    Modifier.graphicsLayer {
+                        alpha = fullArtworkBackdropAlpha
+                        // Selama drag, blur ikut cover sebagai satu set: diskalakan dan
+                        // diletakkan di rect cover yang terbang, sehingga cover dan blur
+                        // bawahnya beranimasi bersama menutupi latar warna solid.
+                        if (heroMode && !lyricsOpen && !queueOpen && docking() &&
+                            dockFrame.recorded && size.width > 0f
+                        ) {
+                            val s = (dockFrame.sleeve.width / size.width).coerceIn(0f, 1f)
+                            if (s < 1f) {
+                                transformOrigin = TransformOrigin(0f, 0f)
+                                scaleX = s
+                                scaleY = s
+                                translationX = dockFrame.portalLeft
+                                translationY = dockFrame.portalTop
+                            }
+                        }
+                    },
                 )
 
                 // Mount once, behind the controls. A known portrait aspect changes the
@@ -3832,7 +3867,21 @@ fun NowPlayingScreen(
                             } else {
                                 mini
                             }
-                            val flownRaw = lerp(from, rect.translate(0f, -unridden), ease)
+                            val heroTarget = rect.translate(0f, -unridden)
+                            val flownRaw = if (heroMode) {
+                                // Lebar cover mendahului naiknya: kiri-kanan penuh di tengah
+                                // drag. Tinggi mengikuti lebar secara seragam (lihat `flown`).
+                                val eased = lerp(from, heroTarget, ease)
+                                val wide = dockHeroWide(dockT())
+                                Rect(
+                                    from.left + (heroTarget.left - from.left) * wide,
+                                    eased.top,
+                                    from.right + (heroTarget.right - from.right) * wide,
+                                    eased.bottom,
+                                )
+                            } else {
+                                lerp(from, heroTarget, ease)
+                            }
                             // Cover full-bleed terbang sebagai salinan cover main player
                             // (sudah satu set dengan blur di bawahnya) yang diskalakan
                             // seragam: tingginya mengikuti lebar dengan rasio banner,
