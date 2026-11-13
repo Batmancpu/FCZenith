@@ -190,7 +190,10 @@ object SpatialAudioLearner {
         artist: String,
         examples: List<SpatialAudioExample>,
     ): SpatialAudioDecision {
-        if (!target.isUsable) {
+        if (!target.isUsable || examples.none {
+                it.feedback != SpatialAudioFeedback.NONE && it.profile.isUsable
+            }
+        ) {
             return SpatialAudioDecision(true, SpatialAudioDecisionReason.AUTO_DEFAULT_ON)
         }
 
