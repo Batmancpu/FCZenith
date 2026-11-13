@@ -190,7 +190,9 @@ object SpatialAudioLearner {
         artist: String,
         examples: List<SpatialAudioExample>,
     ): SpatialAudioDecision {
-        if (!target.isUsable) {
+        if (!target.isUsable || examples.isEmpty()) {
+            // No labelled profiles means a genuine cold start: preserve the
+            // documented On default instead of reporting weak/negative evidence.
             return SpatialAudioDecision(true, SpatialAudioDecisionReason.AUTO_DEFAULT_ON)
         }
 
