@@ -3232,8 +3232,17 @@ fun NowPlayingScreen(
                             },
                         contentAlignment = Alignment.Center,
                     ) {
-                        // Drag handle pill removed (Apple Music has none). The strip
-                        // itself still hands drags to the sheet.
+                        // Thin drag handle, Apple Music style. The strip itself hands
+                        // drags to the sheet; this only says it can be pulled down.
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopCenter)
+                                .padding(top = 6.dp)
+                                .size(width = 36.dp, height = 3.dp)
+                                .graphicsLayer { alpha = (1f - p()) * spotifyChromeAlpha }
+                                .clip(androidx.compose.foundation.shape.CircleShape)
+                                .background(Color.White.copy(alpha = 0.4f)),
+                        )
                         // [p] is the shared album-to-panel transition. Keeping this in
                         // composition until its final frame gives the caption a real
                         // fade on both entry and exit, but removes its click target
