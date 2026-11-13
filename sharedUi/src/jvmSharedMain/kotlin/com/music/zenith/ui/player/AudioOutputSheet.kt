@@ -340,7 +340,7 @@ private fun ActiveVolumePill(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(56.dp)
+            .height(48.dp)
             .clip(CircleShape)
             .onSizeChanged { pillWidth = it.width.toFloat() }
             .pointerInput(system) {
@@ -389,27 +389,27 @@ private fun VolumePillContent(
     Row(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 20.dp),
+            .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
             imageVector = icon,
             contentDescription = null,
             tint = ink,
-            modifier = Modifier.size(22.dp),
+            modifier = Modifier.size(20.dp),
         )
-        Spacer(Modifier.width(14.dp))
+        Spacer(Modifier.width(12.dp))
         Text(
             text = title,
             color = ink,
-            fontSize = 16.sp,
+            fontSize = 15.sp,
             letterSpacing = (-0.2).sp,
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
-        VolumeGlyph(level = level, tint = ink, modifier = Modifier.size(24.dp))
+        VolumeGlyph(level = level, tint = ink, modifier = Modifier.size(22.dp))
     }
 }
 
