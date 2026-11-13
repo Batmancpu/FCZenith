@@ -4,6 +4,17 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -131,6 +142,87 @@ internal fun StarPromptHost() {
     }
 }
 
+/**
+ * The star in the prompt: it spins and springs in, then keeps a slow tilt and
+ * breath going with a soft halo spreading out behind it.
+ */
+@Composable
+private fun AnimatedStarBadge() {
+    val primary = MaterialTheme.colorScheme.primary
+    val entrance = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        entrance.animateTo(
+            targetValue = 1f,
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessLow,
+            ),
+        )
+    }
+    val loop = rememberInfiniteTransition(label = "starLoop")
+    val pulse by loop.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "starPulse",
+    )
+    val tilt by loop.animateFloat(
+        initialValue = -8f,
+        targetValue = 8f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2600, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "starTilt",
+    )
+    Box(
+        modifier = Modifier.size(68.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(52.dp)
+                .graphicsLayer {
+                    val s = 1f + 0.28f * pulse
+                    scaleX = s
+                    scaleY = s
+                    alpha = 0.3f * (1f - pulse) * entrance.value.coerceIn(0f, 1f)
+                }
+                .clip(CircleShape)
+                .background(primary),
+        )
+        Box(
+            modifier = Modifier
+                .size(52.dp)
+                .graphicsLayer {
+                    scaleX = entrance.value
+                    scaleY = entrance.value
+                }
+                .clip(CircleShape)
+                .background(primary.copy(alpha = 0.14f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Star,
+                contentDescription = null,
+                tint = primary,
+                modifier = Modifier
+                    .size(28.dp)
+                    .graphicsLayer {
+                        val settled = entrance.value.coerceIn(0f, 1f)
+                        val s = (0.6f + 0.4f * entrance.value) * (1f + 0.07f * pulse)
+                        scaleX = s
+                        scaleY = s
+                        rotationZ = (1f - entrance.value) * -140f + tilt * settled
+                    },
+            )
+        }
+    }
+}
+
 @Composable
 private fun StarPromptDialog(
     onStar: () -> Unit,
@@ -143,20 +235,7 @@ private fun StarPromptDialog(
                 .padding(horizontal = 20.dp, vertical = 22.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Box(
-                modifier = Modifier
-                    .size(52.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Star,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(28.dp),
-                )
-            }
+            AnimatedStarBadge()
             Text(
                 text = "Enjoying Zenith?",
                 modifier = Modifier.padding(top = 14.dp),
