@@ -3712,66 +3712,11 @@ fun NowPlayingScreen(
                         // koordinat kotak ini adalah bannerTopPx.
                         fun fitToPanel(rawSource: Rect, active: Boolean, rest: Rect? = null): Rect {
                             if (!active) return rawSource
-                            // Cover kartu (bukan banner full-bleed) diletakkan di tengah tinggi
-                            // panel selagi panel masih tumbuh dari pill, supaya jarak atas dan
-                            // bawahnya sama dan ia naik bersama panel, tidak menempel ke atas.
-                            val source = if (heroMode || dock == null || playerBounds.height <= 0) {
-                                rawSource
-                            } else {
-                                val open = dock.openFraction()
-                                val rise = dockSmooth(open / DOCK_CENTRE_RISE_AT)
-                                val fall = dockSmooth(
-                                    (open - DOCK_CENTRE_HOLD_TO) / (DOCK_CENTRE_END_AT - DOCK_CENTRE_HOLD_TO),
-                                )
-                                val share = rise * (1f - fall)
-                                if (share <= 0f) {
-                                    rawSource
-                                } else {
-                                    val panel = dock.panelBounds(
-                                        Size(playerBounds.width.toFloat(), playerBounds.height.toFloat()),
-                                    )
-                                    val panelTop = bannerTopPx.toFloat()
-                                    val panelHeight = panel.bottom - panel.top
-                                    val centredTop = panelTop + (panelHeight - rawSource.height) / 2f
-                                    rawSource.translate(0f, (centredTop - rawSource.top) * share)
-                                }
-                            }
-                            // Tepi bawah panel di koordinat kotak ini: cover diangkat supaya
-                            // bagian bawahnya tidak tertutup panel yang masih setinggi pill.
-                            val panelBottom = if (dock != null && playerBounds.height > 0) {
-                                // Cover tanpa canvas tidak boleh menempel di tepi bawah panel.
-                                // Banner full-bleed (canvas) tetap seperti semula.
-                                val gap = if (heroMode) {
-                                    0f
-                                } else {
-                                    with(density) { DOCK_PANEL_BOTTOM_GAP.toPx() } *
-                                        (dock.openFraction() / DOCK_GAP_FULL_AT).coerceIn(0f, 1f)
-                                }
-                                bannerTopPx + (
-                                    dock.panelBounds(
-                                        Size(playerBounds.width.toFloat(), playerBounds.height.toFloat()),
-                                    ).bottom - dockFrame.offset
-                                    ) - gap
-                            } else {
-                                Float.MAX_VALUE
-                            }
-                            val settledSource = if (heroMode || dock == null || rest == null) {
-                                source
-                            } else {
-                                val g = dockSmooth(
-                                    (dock.openFraction() - DOCK_SETTLE_FROM) / (DOCK_SETTLE_TO - DOCK_SETTLE_FROM),
-                                )
-                                if (g <= 0f || source.top >= rest.top) {
-                                    source
-                                } else {
-                                    source.translate(0f, (rest.top - source.top) * g)
-                                }
-                            }
-                            val rect = if (settledSource.bottom > panelBottom) {
-                                settledSource.translate(0f, panelBottom - settledSource.bottom)
-                            } else {
-                                settledSource
-                            }
+                            // Jalur cover kini garis lurus di layar (lihat [towardsDock]) dan
+                            // selalu ada di dalam panel, jadi centring, jarak kaki, dan tarikan
+                            // "settle" yang membuat cover naik turun dihapus. Tinggal pengaman
+                            // supaya cover tidak keluar dari tepi panel.
+                            val rect = rawSource
                             val minTop = bannerTopPx.toFloat()
                             val minLeft = -boxLeftPx.toFloat()
                             val maxRight = (playerBounds.width - boxLeftPx).toFloat()
@@ -3787,33 +3732,15 @@ fun NowPlayingScreen(
                         // the sheet has gone.
                         fun towardsDock(rect: Rect, mini: Rect?): Rect {
                             if (mini == null) return rect
-                            // Cover kartu ikut panel sepenuhnya (tidak ditarik ke atas) dan
-                            // membesar bertahap, supaya margin atasnya terjaga dan tidak
-                            // terpotong tepi panel. Banner full-bleed tetap seperti semula.
-                            // Di lirik/queue (p = 1) cover adalah thumbnail header yang ikut
-                            // panel sepenuhnya, jadi bagian "tidak ikut naik" ditiadakan.
-                            // Tanpa (1 - p) cover canvas ditarik ke atas dan melenceng dari
-                            // jalur terbangnya ke/dari mini player.
-                            val unridden = if (heroMode) {
-                                dockFrame.offset * (1f - dockFrame.ride) * (1f - p())
-                            } else {
-                                0f
-                            }
-                            val base = dockFlyEase(dockT())
-                            // Di menu lirik/queue (p = 1) cover adalah thumbnail header:
-                            // ia ikut panel dulu, tidak lebih dulu terbang ke mini player.
-                            val ease = base + (dockEaseThumb(dockT()) - base) * p()
-                            val flown = lerp(mini, rect.translate(0f, -unridden), ease)
-                            // Di awal drag target cover (sleeve di atas sheet) masih lebih
-                            // rendah dari mini player, jadi kurva lebar panel yang cepat
-                            // menyeret cover turun lebih dulu dari panelnya. Kaki cover
-                            // ditahan di kaki cover mini: ia hanya tumbuh ke atas dan ke
-                            // kanan, lalu naik bersama panel. Banner full-bleed tidak berubah.
-                            return if (heroMode || flown.bottom <= mini.bottom) {
-                                flown
-                            } else {
-                                flown.translate(0f, mini.bottom - flown.bottom)
-                            }
+                            // Garis lurus di layar: cover terbang dari cover mini ke posisi
+                            // akhirnya yang diam, tidak ikut naik turun bersama sheet. Kotak
+                            // ini ikut sheet, jadi tujuan digeser sebesar offset sheet (kecuali
+                            // di lirik/queue, p = 1, saat thumbnail memang ikut panel).
+                            // Progresnya linear terhadap sheet yang sudah berupa pegas mulus.
+                            val unridden = dockFrame.offset * (1f - p())
+                            val open = dockT()
+                            val ease = open + (dockEaseThumb(open) - open) * p()
+                            return lerp(mini, rect.translate(0f, -unridden), ease)
                         }
                         // The banner's dissolve, firmed up into the cover's hard edge as
                         // it docks.
