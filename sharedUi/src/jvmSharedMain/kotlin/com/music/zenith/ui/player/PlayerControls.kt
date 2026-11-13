@@ -641,7 +641,7 @@ internal fun PlayerActionRow(
         animationSpec = tween(220, easing = FastOutSlowInEasing),
         label = "queueModeBadge",
     )
-    val badgeWidth = if (shuffleEnabled && repeatMode != RepeatModes.OFF) 35.dp else 22.dp
+    val badgeWidth = if (shuffleEnabled && repeatMode != RepeatModes.OFF) 29.dp else 18.dp
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         // Sized for the wider of the two capsules — the three-up one — whether
         // that or the output/party one is up, so the lyrics and queue glyphs
@@ -701,9 +701,9 @@ internal fun PlayerActionRow(
                                 val s = 0.6f + 0.4f * v
                                 val gap = 4.dp.toPx()
                                 val halfW = (badgeWidth.toPx() / 2f + gap) * s
-                                val halfH = (11.dp.toPx() + gap) * s
+                                val halfH = (9.dp.toPx() + gap) * s
                                 val cx = (BOTTOM_ACTION_SIZE - 1.dp).toPx() - badgeWidth.toPx() / 2f
-                                val cy = 8.dp.toPx()
+                                val cy = 6.dp.toPx()
                                 drawRoundRect(
                                     color = Color.Black.copy(alpha = v),
                                     topLeft = Offset(cx - halfW, cy - halfH),
@@ -1320,7 +1320,7 @@ private fun QueueModeBadges(
             }
             .clip(CircleShape)
             .background(tint.copy(alpha = 0.28f))
-            .padding(5.dp),
+            .padding(4.dp),
         horizontalArrangement = Arrangement.spacedBy(1.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -1329,29 +1329,16 @@ private fun QueueModeBadges(
                 imageVector = ZenithIcons.Shuffle,
                 contentDescription = null,
                 tint = tint,
-                modifier = Modifier.size(12.dp),
+                modifier = Modifier.size(10.dp),
             )
         }
         if (repeatMode != RepeatModes.OFF) {
-            Box(
-                modifier = Modifier.size(12.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = ZenithIcons.Repeat,
-                    contentDescription = null,
-                    tint = tint,
-                    modifier = Modifier.size(12.dp),
-                )
-                if (repeatMode == RepeatModes.ONE) {
-                    Text(
-                        text = "1",
-                        color = tint,
-                        fontSize = 6.sp,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
-            }
+            Icon(
+                imageVector = if (repeatMode == RepeatModes.ONE) ZenithIcons.RepeatOne else ZenithIcons.Repeat,
+                contentDescription = null,
+                tint = tint,
+                modifier = Modifier.size(10.dp),
+            )
         }
     }
 }
