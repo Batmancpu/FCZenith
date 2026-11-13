@@ -633,6 +633,15 @@ internal fun PlayerActionRow(
     val inParty = rememberPartyBadge().inParty
     // Just the output glyph in the middle.
     val compact = !showPartyButton && !inParty
+    // Shared by the badge and the cut-out it leaves in the queue glyph, so the two
+    // fade together and vanish as the queue page opens.
+    val anyMode = shuffleEnabled || repeatMode != RepeatModes.OFF
+    val badgeVisibility by animateFloatAsState(
+        targetValue = if (anyMode && !queueOpen) 1f else 0f,
+        animationSpec = tween(220, easing = FastOutSlowInEasing),
+        label = "queueModeBadge",
+    )
+    val badgeWidth = if (shuffleEnabled && repeatMode != RepeatModes.OFF) 35.dp else 22.dp
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         // Sized for the wider of the two capsules — the three-up one — whether
         // that or the output/party one is up, so the lyrics and queue glyphs
@@ -681,17 +690,42 @@ internal fun PlayerActionRow(
                     .align(Alignment.CenterEnd)
                     .offset { IntOffset(-(closeIn.toPx() * compactness.value).roundToInt(), 0) },
             ) {
-                BottomGlyph(
-                    icon = ZenithIcons.Queue,
-                    contentDescription = stringResource(Res.string.up_next),
-                    onClick = onToggleQueue,
-                    highlighted = queueOpen,
-                    haptic = if (queueOpen) Haptic.Tap else Haptic.Expand,
-                )
+                Box(
+                    modifier = Modifier
+                        .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                        .drawWithContent {
+                            drawContent()
+                            val v = badgeVisibility
+                            if (v > 0.001f) {
+                                // The badge's rect, grown by a gap, erased from the glyph.
+                                val s = 0.6f + 0.4f * v
+                                val gap = 3.dp.toPx()
+                                val halfW = (badgeWidth.toPx() / 2f + gap) * s
+                                val halfH = (11.dp.toPx() + gap) * s
+                                val cx = (BOTTOM_ACTION_SIZE + 3.dp).toPx() - badgeWidth.toPx() / 2f
+                                val cy = 5.dp.toPx()
+                                drawRoundRect(
+                                    color = Color.Black.copy(alpha = v),
+                                    topLeft = Offset(cx - halfW, cy - halfH),
+                                    size = Size(halfW * 2f, halfH * 2f),
+                                    cornerRadius = CornerRadius(halfH, halfH),
+                                    blendMode = BlendMode.DstOut,
+                                )
+                            }
+                        },
+                ) {
+                    BottomGlyph(
+                        icon = ZenithIcons.Queue,
+                        contentDescription = stringResource(Res.string.up_next),
+                        onClick = onToggleQueue,
+                        highlighted = queueOpen,
+                        haptic = if (queueOpen) Haptic.Tap else Haptic.Expand,
+                    )
+                }
                 QueueModeBadges(
                     shuffleEnabled = shuffleEnabled,
                     repeatMode = repeatMode,
-                    queueOpen = queueOpen,
+                    visibility = badgeVisibility,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .offset(x = 3.dp, y = (-6).dp),
@@ -1272,16 +1306,9 @@ private fun rememberPartyBadge(): PartyBadge {
 private fun QueueModeBadges(
     shuffleEnabled: Boolean,
     repeatMode: Int,
-    queueOpen: Boolean,
+    visibility: Float,
     modifier: Modifier = Modifier,
 ) {
-    val anyMode = shuffleEnabled || repeatMode != RepeatModes.OFF
-    // Fades and shrinks away as the queue page opens, and eases back in when it closes.
-    val visibility by animateFloatAsState(
-        targetValue = if (anyMode && !queueOpen) 1f else 0f,
-        animationSpec = tween(220, easing = FastOutSlowInEasing),
-        label = "queueModeBadge",
-    )
     if (visibility <= 0.001f) return
     val tint = LocalPlayerTint.current
     Row(
