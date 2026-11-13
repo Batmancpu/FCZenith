@@ -20,7 +20,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.core.Animatable
-import com.music.zenith.ui.theme.rememberArtworkPalette
 import com.music.zenith.ui.theme.rememberPlayerTint
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.channels.Channel
@@ -544,7 +543,7 @@ private const val DOCK_COVER_START_AT = 0.05f
  * [DOCK_CENTRE_HOLD_TO], lalu lepas bertahap sampai [DOCK_CENTRE_END_AT] ke
  * jalur terbang biasa. Di 0 pengaruhnya 0, jadi cover tidak melompat dari mini.
  */
-private const val DOCK_CENTRE_RISE_AT = 0.2f
+private const val DOCK_CENTRE_RISE_AT = 0.06f
 private const val DOCK_CENTRE_HOLD_TO = 0.30f
 private const val DOCK_CENTRE_END_AT = 0.70f
 
@@ -1045,9 +1044,6 @@ fun NowPlayingScreen(
     // already made. Plain white until it is known, and for a sleeve with no
     // colour to give.
     val artworkTint = rememberPlayerTint(remoteArt, ART_PX) ?: Color.White
-    // Warna solid dari cover untuk latar panel selagi tumbuh dari mini player,
-    // menggantikan hitam polos.
-    val coverPanelColor = rememberArtworkPalette(remoteArt, dark = true, artPx = ART_PX).background
 
     // Media-player convention: the player always owns light status icons. The
     // top treatment below, rather than a window-flag flip per cover, provides
@@ -2166,7 +2162,6 @@ fun NowPlayingScreen(
         DisposableEffect(dock) {
             onDispose { dock.attached = false }
         }
-        SideEffect { dock.panelColor = coverPanelColor }
     }
     val dockFrame = remember { DockFrame() }
     // 1 with the player fully open, falling to 0 as the sheet reaches the mini
@@ -3764,10 +3759,13 @@ fun NowPlayingScreen(
                             // akhirnya yang diam, tidak ikut naik turun bersama sheet. Kotak
                             // ini ikut sheet, jadi tujuan digeser sebesar offset sheet (kecuali
                             // di lirik/queue, p = 1, saat thumbnail memang ikut panel).
-                            // Progresnya linear terhadap sheet yang sudah berupa pegas mulus.
+                            // Ukuran dan posisinya menyusul lebar panel (dockFlyEase): sudah
+                            // hampir penuh ke kanan saat panel selebar layar, tapi tetap
+                            // landai di awal drag.
                             val unridden = dockFrame.offset * (1f - p())
                             val open = dockT()
-                            val ease = open + (dockEaseThumb(open) - open) * p()
+                            val base = dockFlyEase(open)
+                            val ease = base + (dockEaseThumb(open) - base) * p()
                             return lerp(mini, rect.translate(0f, -unridden), ease)
                         }
                         // The banner's dissolve, firmed up into the cover's hard edge as
