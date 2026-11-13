@@ -2306,6 +2306,11 @@ fun NowPlayingScreen(
     val onClipResumed: () -> Unit = { CanvasStills.fresh = false }
     // The sleeve, drawn over the faded player while it docks — see the sleeve.
     val sleeveLayer = rememberGraphicsLayer()
+    // Blur yang tumbuh bersama cover sebagai satu set (cover + blur di bawahnya,
+    // rasio tetap) selama drag mini <-> main player. Direkam di sini, digambar
+    // oleh dockHost di luar fade pada skala dan posisi cover yang terbang.
+    val backdropLayer = rememberGraphicsLayer()
+    val dockBackdropRecorded = remember { BooleanArray(1) }
     // The plain thumbnail, drawn over the clip's frame while docking so the
     // flying artwork lands as the same picture the mini player's cover shows.
     val thumbLayer = rememberGraphicsLayer()
@@ -2355,6 +2360,14 @@ fun NowPlayingScreen(
         .drawWithContent {
             if (docking()) {
                 drawRect(dockSolid.copy(alpha = (dockT() / DOCK_SOLID_FULL_AT).coerceIn(0f, 1f)))
+                // Set cover + blur: diskalakan seragam dari sudut kiri atas cover,
+                // lebarnya mengikuti cover yang terbang. Tidak ada zoom atau crop.
+                if (dockBackdropRecorded[0] && dockFrame.recorded && size.width > 0f) {
+                    val setScale = (dockFrame.sleeve.width / size.width).coerceIn(0f, 1f)
+                    translate(dockFrame.portalLeft, dockFrame.portalTop) {
+                        scale(setScale, setScale, pivot = Offset.Zero) { drawLayer(backdropLayer) }
+                    }
+                }
             }
             drawContent()
             if (docking()) {
@@ -2893,24 +2906,22 @@ fun NowPlayingScreen(
                     )
                 }
                 fullArtworkBlurContent(
-                    Modifier.graphicsLayer {
-                        alpha = fullArtworkBackdropAlpha
-                        // Selama drag, blur ikut cover sebagai satu set: diskalakan dan
-                        // diletakkan di rect cover yang terbang, sehingga cover dan blur
-                        // bawahnya beranimasi bersama menutupi latar warna solid.
-                        if (heroMode && !lyricsOpen && !queueOpen && docking() &&
-                            dockFrame.recorded && size.width > 0f
-                        ) {
-                            val s = (dockFrame.sleeve.width / size.width).coerceIn(0f, 1f)
-                            if (s < 1f) {
-                                transformOrigin = TransformOrigin(0f, 0f)
-                                scaleX = s
-                                scaleY = s
-                                translationX = dockFrame.portalLeft
-                                translationY = dockFrame.portalTop
+                    Modifier
+                        .graphicsLayer { alpha = fullArtworkBackdropAlpha }
+                        .drawWithContent {
+                            // Selama drag blur tidak digambar di tempatnya: ia direkam
+                            // dan digambar dockHost bersama cover sebagai satu set.
+                            if (heroMode && !lyricsOpen && !queueOpen && docking() &&
+                                size.width > 0f && fullArtworkBackdropAlpha > 0.01f
+                            ) {
+                                dockBackdropRecorded[0] = true
+                                backdropLayer.alpha = fullArtworkBackdropAlpha
+                                backdropLayer.record { this@drawWithContent.drawContent() }
+                            } else {
+                                dockBackdropRecorded[0] = false
+                                drawContent()
                             }
-                        }
-                    },
+                        },
                 )
 
                 // Mount once, behind the controls. A known portrait aspect changes the
@@ -3893,7 +3904,9 @@ fun NowPlayingScreen(
                             val flown = if (heroMode && dock != null && rect.height > 0f) {
                                 val aspect = rect.width / rect.height
                                 val uniformH = flownRaw.width / aspect
-                                val k = dockSmooth(dockT() / 0.15f)
+                                // Banner (rasio cover + fade blur) sejak awal drag, bukan
+                                // kotak mini yang memanjang belakangan: tidak ada crop/zoom.
+                                val k = 1f
                                 Rect(
                                     flownRaw.left,
                                     flownRaw.top,
@@ -3918,7 +3931,7 @@ fun NowPlayingScreen(
                         // The banner's dissolve, firmed up into the cover's hard edge as
                         // it docks.
                         fun sleeveShown(): Float =
-                            bannerShown() * (if (heroMode) dockEarlyDissolve(dockT()) else dockEase(dockT()))
+                            bannerShown() * (if (heroMode) 1f else dockEase(dockT()))
                         fun sleeveCorner(): Dp {
                             val corner = 8.dp * (1f - sleeveShown())
                             val t = dockT()
