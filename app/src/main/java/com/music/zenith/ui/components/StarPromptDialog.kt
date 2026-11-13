@@ -43,6 +43,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
+import android.content.ContextWrapper
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 
 private const val STAR_REPO_URL = "https://github.com/rezapranata089-bit/Zenith"
 
@@ -59,40 +63,32 @@ private object StarPrompt {
     private const val KEY_FIRST_AT = "first_at"
     private const val KEY_SNOOZE_UNTIL = "snooze_until"
     private const val KEY_SNOOZES = "snoozes"
+    private const val KEY_LAST_OPEN = "last_open"
 
-    private const val MIN_LAUNCHES = 10
-    private const val MIN_AGE_MS = 7L * 24 * 60 * 60 * 1000
+    private const val MIN_LAUNCHES = 5
+    private const val MIN_AGE_MS = 2L * 24 * 60 * 60 * 1000
+    private const val MIN_OPEN_GAP_MS = 30L * 60 * 1000
     private const val SNOOZE_MS = 30L * 24 * 60 * 60 * 1000
     private const val MAX_SNOOZES = 2
-
-    /** One count per process start, however often the screen is recomposed. */
-    @Volatile
-    private var counted = false
-
-    /** The prompt is weighed once per process start, never again mid-session. */
-    @Volatile
-    private var checked = false
-
-    fun alreadyChecked(): Boolean = checked
-
-    /** True only for the first caller of this process. */
-    @Synchronized
-    fun markChecked(): Boolean {
-        if (checked) return false
-        checked = true
-        return true
-    }
 
     private fun prefs(context: Context) =
         context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
-    fun registerLaunch(context: Context) {
-        if (counted) return
-        counted = true
+    /**
+     * One count per time the app comes to the front, not per process start: the
+     * player service keeps the process alive, so process starts are rare. Opens
+     * closer together than [MIN_OPEN_GAP_MS] count as one.
+     */
+    fun registerOpen(context: Context) {
         val p = prefs(context)
-        val editor = p.edit().putInt(KEY_LAUNCHES, p.getInt(KEY_LAUNCHES, 0) + 1)
+        val now = System.currentTimeMillis()
+        val editor = p.edit()
         if (p.getLong(KEY_FIRST_AT, 0L) == 0L) {
-            editor.putLong(KEY_FIRST_AT, System.currentTimeMillis())
+            editor.putLong(KEY_FIRST_AT, now)
+        }
+        if (now - p.getLong(KEY_LAST_OPEN, 0L) >= MIN_OPEN_GAP_MS) {
+            editor.putInt(KEY_LAUNCHES, p.getInt(KEY_LAUNCHES, 0) + 1)
+            editor.putLong(KEY_LAST_OPEN, now)
         }
         editor.apply()
     }
@@ -121,23 +117,31 @@ private object StarPrompt {
     }
 }
 
+private tailrec fun Context.findLifecycleOwner(): LifecycleOwner? = when (this) {
+    is LifecycleOwner -> this
+    is ContextWrapper -> baseContext.findLifecycleOwner()
+    else -> null
+}
+
 /** Mount once near the app root; shows the star prompt when it is time. */
 @Composable
 internal fun StarPromptHost(isPlaying: Boolean) {
     val context = LocalContext.current
     var show by rememberSaveable { mutableStateOf(false) }
 
-    // Read at the moment of the check, not when the effect started.
-    val playing by rememberUpdatedState(isPlaying)
+    val owner = remember(context) { context.findLifecycleOwner() }
 
-    // One check per app launch: a few seconds after opening, and only if
-    // nothing is playing. If it doesn't qualify, it waits for the next launch.
-    LaunchedEffect(Unit) {
-        StarPrompt.registerLaunch(context)
-        if (show || StarPrompt.alreadyChecked()) return@LaunchedEffect
-        delay(6_000)
-        if (!StarPrompt.markChecked()) return@LaunchedEffect
-        if (!playing && StarPrompt.shouldShow(context)) show = true
+    // Checked every time the app comes to the front: the open is counted, then a
+    // few seconds later the prompt is shown if it qualifies. Playing music does
+    // not block it; the dialog never touches playback.
+    LaunchedEffect(owner) {
+        val lifecycleOwner = owner ?: return@LaunchedEffect
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            StarPrompt.registerOpen(context)
+            if (show) return@repeatOnLifecycle
+            delay(6_000)
+            if (StarPrompt.shouldShow(context)) show = true
+        }
     }
 
     if (show) {
