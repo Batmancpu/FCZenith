@@ -26,6 +26,8 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalDensity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.music.zenith.data.settings.AppSettings
+import com.music.zenith.data.settings.GlassClarity
+import com.music.zenith.data.settings.GlassCustom
 import com.music.zenith.ui.components.backdrop.Backdrop
 import com.music.zenith.ui.components.backdrop.backdrops.LayerBackdrop
 import com.music.zenith.ui.components.backdrop.drawBackdrop
@@ -226,12 +228,18 @@ fun Modifier.liquidGlass(
     refract: Boolean = true,
     /** Sampled in place of [LocalAppBackdrop], for glass over something the page behind is not. */
     source: Backdrop? = null,
+    /** Replaces the app-wide glass clarity for this surface only, when set. */
+    clarityOverride: GlassClarity? = null,
+    /** Replaces the app-wide custom glass values for this surface only, when set. */
+    customOverride: GlassCustom? = null,
 ): Modifier {
     if (!isGlassSupported()) return this
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
     val frosted by AppSettings.frostedGlass.collectAsStateWithLifecycle()
-    val clarity by AppSettings.glassClarity.collectAsStateWithLifecycle()
-    val custom by AppSettings.glassCustom.collectAsStateWithLifecycle()
+    val appClarity by AppSettings.glassClarity.collectAsStateWithLifecycle()
+    val appCustom by AppSettings.glassCustom.collectAsStateWithLifecycle()
+    val clarity = clarityOverride ?: appClarity
+    val custom = customOverride ?: appCustom
     if (reduceDynamicBlur) {
         return background(MaterialTheme.colorScheme.surface, shape)
             .border(GLASS_EDGE_WIDTH, GLASS_EDGE_COLOR, shape)
