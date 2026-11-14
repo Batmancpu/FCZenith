@@ -15,3 +15,15 @@ import com.music.zenith.data.lyrics.LyricLine
 val LocalMotionLyricLine = staticCompositionLocalOf<
     (@Composable (LyricLine, () -> Long, TextStyle, Color, Color, Modifier) -> Unit)?
 > { null }
+
+/**
+ * Pengait permukaan kaca untuk tombol bulat kontrol lirik (globe, terjemahan,
+ * panah kembali). Diisi oleh modul app (MainActivity) supaya tombol itu
+ * mengikuti pengaturan Liquid Glass app. Argumen: apakah tombol sedang aktif.
+ * Mengembalikan null bila kaca mati / tidak didukung / Reduce dynamic blur
+ * aktif, atau bila pengait tidak diisi (desktop): panel lalu memakai disc Haze
+ * bawaan.
+ */
+val LocalLyricsGlassDisc = staticCompositionLocalOf<
+    (@Composable (Boolean) -> Modifier?)?
+> { null }

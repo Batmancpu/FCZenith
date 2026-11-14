@@ -1604,6 +1604,17 @@ internal fun Modifier.lyricsGlassDisc(
             fallbackTint = HazeTint(Color.White.copy(alpha = 0.22f)),
         )
     }
+    // Liquid Glass app (sama dengan tombol back melayang) bila tersedia;
+    // null berarti kaca mati / Reduce dynamic blur, jadi disc Haze di bawah dipakai.
+    val appGlass = LocalLyricsGlassDisc.current?.invoke(active)
+    if (appGlass != null) {
+        return this
+            .graphicsLayer {
+                scaleX = press
+                scaleY = press
+            }
+            .then(appGlass)
+    }
     return this
         .graphicsLayer {
             scaleX = press

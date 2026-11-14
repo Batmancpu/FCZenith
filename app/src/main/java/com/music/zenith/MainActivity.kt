@@ -280,6 +280,8 @@ import com.music.zenith.ui.components.TopBarAccountButton
 import com.music.zenith.ui.screens.SegmentedControl
 import com.music.zenith.ui.screens.LocalMostPlayedArt
 import com.music.zenith.ui.player.LocalMotionLyricLine
+import com.music.zenith.ui.player.LocalLyricsGlassDisc
+import com.music.zenith.ui.components.lyricsGlassDiscSurface
 import com.motion.lyrics.MotionLyricLine
 import com.motion.lyrics.toMotionWords
 import com.music.zenith.ui.screens.LocalMixCoverBackground
@@ -451,6 +453,7 @@ class MainActivity : AppCompatActivity() {
                         )
                     },
                     LocalAppBackdrop provides appBackdrop,
+                    LocalLyricsGlassDisc provides { active -> lyricsGlassDiscSurface(active) },
                     LocalMotionLyricLine provides { line, position, style, inactive, active, modifier ->
                         val motionWords = remember(line) { line.toMotionWords() }
                         val sparkle by AppSettings.lyricsSparkle.collectAsStateWithLifecycle()
