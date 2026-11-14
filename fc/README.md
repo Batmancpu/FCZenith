@@ -45,21 +45,36 @@ Releases publish one universal APK named
 `Music-v<version>.apk`. The app's built-in updater is also configured to check
 this repository and select the Music APK asset.
 
-## Stable upstream policy
+## Automated upstream main releases
 
-Regular production builds follow the upstream developer's latest **published stable
-GitHub Release**. The explicitly requested v15.7.0.4 snapshot is a one-time exception:
-it includes upstream `main` through commit `677d992a0c6569e0ad34bcb2f2ddcfcde3d438d7`.
-After that snapshot, the automated pipeline returns to published stable releases.
+FC Zenith checks `rezapranata089-bit/Zenith` main on a 15-minute GitHub Actions
+schedule. New upstream commits are merged into the FC fork's build workspace
+while FC-owned workflows, branding, signing and the Spatial Audio integration
+remain separate. Each successful upstream source update triggers a production
+unit-test run, APK build, certificate verification and a new release in this
+repository. A failed merge, compatibility check, test, build or signing check
+does **not** publish a broken APK or commit a partial sync.
 
-Version format is:
+The upstream author's latest **published stable release** sets the FC version
+series; the code itself follows upstream `main`, including post-release fixes
+and features. The first successful FC release on stable version `15.8.0` is
+`15.8.0.1`; subsequent upstream main updates become `15.8.0.2`,
+`15.8.0.3`, etc. Once a newer stable version is published, revisions
+restart at `.1`. Android `versionCode` always increases.
 
-`<upstream-release-version>.<FC-revision>`
+## Run an upstream check on demand
 
-For example, parent release `15.6.5` becomes `15.6.5.1`. Further FC builds
-from the same parent version become `15.6.5.2`, `15.6.5.3`, and so on. When
-the parent publishes `15.6.6`, the FC sequence restarts at `15.6.6.1`.
-Android `versionCode` always increases independently and never goes backward.
+In GitHub's **Actions** tab, select **FC Zenith — upstream sync and Music
+release** and choose **Run workflow**. Alternatively, ask ChatGPT to trigger
+an update: ChatGPT can change `fc/sync-request.txt` in the repository through
+the GitHub connection, producing a `main` push that starts the same workflow.
+An on-demand run checks upstream immediately, but an APK release appears
+**only** when a new source revision exists (or the previous release asset is
+missing) and all checks pass. GitHub Actions build and signing take time.
+
+The schedule is a polling interval, not a guaranteed release deadline:
+GitHub may delay scheduled workflows, and a build may take longer than the
+interval.
 
 ## Signing
 
