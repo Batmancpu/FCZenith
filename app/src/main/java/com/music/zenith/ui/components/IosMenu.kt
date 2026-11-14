@@ -609,8 +609,12 @@ fun <T : Any> IosMenuPopover(
         } else {
             right - panel.width
         }
+        // Menu di atas tombol (AboveStart): batas kiri dihitung di ruang window, bukan
+        // di ruang overlay. Overlay yang sudah mepet tombol membuat margin 14dp
+        // mendorong menu ke kanan dari tepi kiri tombol.
+        val minX = if (above) margin - overlayOffset.x.roundToInt() else margin
         val panelX = startX
-            .coerceIn(margin, (width - margin - panel.width).coerceAtLeast(margin))
+            .coerceIn(minX, (width - margin - panel.width).coerceAtLeast(minX))
         val lowest = (bottom - panel.height).coerceAtLeast(top)
         val hangsDown = !above && anchorBounds != null && anchorBounds.center.y < height / 2f
         val panelY = when {

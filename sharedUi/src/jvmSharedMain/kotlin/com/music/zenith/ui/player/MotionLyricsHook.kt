@@ -55,5 +55,5 @@ class LyricsMenuEntry(
  * globe memakai kipas disc bawaan.
  */
 val LocalLyricsMenuPopover = staticCompositionLocalOf<
-    (@Composable (Boolean, Rect?, () -> Unit, List<LyricsMenuEntry>) -> Unit)?
+    (@Composable (Boolean, Rect?, () -> Unit, List<LyricsMenuEntry>, dev.chrisbanes.haze.HazeState?) -> Unit)?
 > { null }

@@ -462,12 +462,15 @@ class MainActivity : AppCompatActivity() {
                     LocalAppBackdrop provides appBackdrop,
                     LocalLyricsGlassDisc provides { active -> lyricsGlassDiscSurface(active, lyricsBackdrop) },
                     LocalLyricsGlassSource provides { content -> lyricsGlassSource(content, lyricsBackdrop) },
-                    LocalLyricsMenuPopover provides { open, anchor, onDismiss, entries ->
+                    LocalLyricsMenuPopover provides { open, anchor, onDismiss, entries, haze ->
                         IosMenuPopover(
                             item = if (open) Unit else null,
                             anchor = anchor,
                             onDismiss = onDismiss,
-                            backdrop = lyricsBackdrop,
+                            // Haze player (mesh + lirik) dipakai bila ada, supaya panel
+                            // benar-benar blur; rekaman lirik saja tidak memuat background.
+                            backdrop = if (haze == null) lyricsBackdrop else null,
+                            hazeState = haze,
                             placement = IosMenuPlacement.AboveStart,
                             dimBackground = false,
                         ) {

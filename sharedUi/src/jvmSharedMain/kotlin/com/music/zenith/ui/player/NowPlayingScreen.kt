@@ -2784,6 +2784,7 @@ fun NowPlayingScreen(
                             },
                             overlay = {
                                 LyricsGlobeMenuHost(
+                                    hazeState = playerHaze,
                                     menu = globeMenu,
                                     state = lyricsTranslation.romanizationState,
                                     showingRomanization = lyricsTranslation.showingRomanization,
@@ -4955,6 +4956,7 @@ Spacer(Modifier.width(12.dp))
                                 }
                             }
                             LyricsGlobeMenuHost(
+                                hazeState = playerHaze,
                                 menu = globeMenu,
                                 state = lyricsTranslation.romanizationState,
                                 showingRomanization = lyricsTranslation.showingRomanization,
