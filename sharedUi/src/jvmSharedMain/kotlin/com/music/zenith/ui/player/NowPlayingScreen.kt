@@ -2761,6 +2761,7 @@ fun NowPlayingScreen(
                                     showingRomanization = lyricsTranslation.showingRomanization,
                                     enabled = !lyrics.isNullOrEmpty(),
                                     onClick = lyricsTranslation.toggleRomanization,
+                                    onProviders = { showLyricsProviders = true },
                                 )
                             },
                             translationToggle = {
@@ -4878,6 +4879,9 @@ Spacer(Modifier.width(12.dp))
                                         showingRomanization = lyricsTranslation.showingRomanization,
                                         enabled = translateShown && !lyrics.isNullOrEmpty(),
                                         onClick = lyricsTranslation.toggleRomanization,
+                                        onProviders = { showLyricsProviders = true },
+                                        // Not tappable on the way out, like the translate disc.
+                                        menuEnabled = translateShown,
                                     )
                                 }
                                 Box(

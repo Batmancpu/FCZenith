@@ -15,8 +15,11 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
@@ -54,6 +57,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Language
+import androidx.compose.material.icons.rounded.SortByAlpha
+import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material.icons.rounded.Translate
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -1697,42 +1702,121 @@ internal fun RomanizationToggleButton(
     enabled: Boolean,
     onClick: () -> Unit,
     hazeState: HazeState? = null,
+    onProviders: () -> Unit = {},
+    menuEnabled: Boolean = true,
 ) {
-    val active = showingRomanization || state is LyricsTranslationUiState.Loading
-    val tint = when {
+    // The globe is a menu now: one tap fans two glass discs out beside it —
+    // romanize, and change the lyrics provider. It folds back after a choice,
+    // a second tap on the globe, or a few idle seconds.
+    var expanded by remember { mutableStateOf(false) }
+    LaunchedEffect(expanded, menuEnabled) {
+        if (!menuEnabled) {
+            expanded = false
+        } else if (expanded) {
+            delay(4_000)
+            expanded = false
+        }
+    }
+    val loading = state is LyricsTranslationUiState.Loading
+    val romanizeActive = showingRomanization || loading
+    val globeActive = expanded || romanizeActive
+    val globeTint = if (globeActive) LocalPlayerTint.current else LocalPlayerTint.current.copy(alpha = 0.78f)
+    val romanizeTint = when {
         !enabled || state is LyricsTranslationUiState.SameLanguage -> LocalPlayerTint.current.copy(alpha = 0.42f)
-        active -> LocalPlayerTint.current
+        romanizeActive -> LocalPlayerTint.current
         else -> LocalPlayerTint.current.copy(alpha = 0.78f)
     }
-    val glassInteraction = remember { MutableInteractionSource() }
-    Box(
-        modifier = Modifier
-            .size(34.dp)
-            .lyricsGlassDisc(active = active, interaction = glassInteraction, hazeState = hazeState)
-            .clickable(
-                enabled = enabled,
-                interactionSource = glassInteraction,
-                indication = null,
-                onClick = onClick,
-            ),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (state is LyricsTranslationUiState.Loading) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(16.dp),
-                color = tint,
-                strokeWidth = 1.7.dp,
-            )
-        } else {
-            Icon(
-                imageVector = Icons.Rounded.Language,
-                contentDescription = stringResource(
-                    if (showingRomanization) Res.string.show_original_lyrics
-                    else Res.string.romanize_lyrics,
-                ),
-                tint = tint,
-                modifier = Modifier.size(19.dp),
-            )
+    val globeInteraction = remember { MutableInteractionSource() }
+    val romanizeInteraction = remember { MutableInteractionSource() }
+    val providerInteraction = remember { MutableInteractionSource() }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            modifier = Modifier
+                .size(34.dp)
+                .lyricsGlassDisc(active = globeActive, interaction = globeInteraction, hazeState = hazeState)
+                .clickable(
+                    enabled = menuEnabled,
+                    interactionSource = globeInteraction,
+                    indication = null,
+                ) { expanded = !expanded },
+            contentAlignment = Alignment.Center,
+        ) {
+            if (loading && !expanded) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    color = globeTint,
+                    strokeWidth = 1.7.dp,
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Rounded.Language,
+                    contentDescription = null,
+                    tint = globeTint,
+                    modifier = Modifier.size(19.dp),
+                )
+            }
+        }
+        AnimatedVisibility(
+            visible = expanded,
+            enter = fadeIn(tween(160)) + expandHorizontally(tween(200)),
+            exit = fadeOut(tween(120)) + shrinkHorizontally(tween(160)),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Spacer(Modifier.width(8.dp))
+                Box(
+                    modifier = Modifier
+                        .size(34.dp)
+                        .lyricsGlassDisc(active = romanizeActive, interaction = romanizeInteraction, hazeState = hazeState)
+                        .clickable(
+                            enabled = enabled,
+                            interactionSource = romanizeInteraction,
+                            indication = null,
+                        ) {
+                            expanded = false
+                            onClick()
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (loading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            color = romanizeTint,
+                            strokeWidth = 1.7.dp,
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Rounded.SortByAlpha,
+                            contentDescription = stringResource(
+                                if (showingRomanization) Res.string.show_original_lyrics
+                                else Res.string.romanize_lyrics,
+                            ),
+                            tint = romanizeTint,
+                            modifier = Modifier.size(19.dp),
+                        )
+                    }
+                }
+                Spacer(Modifier.width(8.dp))
+                Box(
+                    modifier = Modifier
+                        .size(34.dp)
+                        .lyricsGlassDisc(active = false, interaction = providerInteraction, hazeState = hazeState)
+                        .clickable(
+                            interactionSource = providerInteraction,
+                            indication = null,
+                        ) {
+                            expanded = false
+                            onProviders()
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.SwapHoriz,
+                        contentDescription = stringResource(Res.string.lyrics_provider_current),
+                        tint = LocalPlayerTint.current.copy(alpha = 0.78f),
+                        modifier = Modifier.size(19.dp),
+                    )
+                }
+            }
         }
     }
 }
