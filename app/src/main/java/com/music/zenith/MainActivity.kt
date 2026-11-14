@@ -266,6 +266,9 @@ import com.music.zenith.ui.components.backdrop.backdrops.LayerBackdrop
 import com.music.zenith.ui.components.backdrop.backdrops.layerBackdrop
 import com.music.zenith.ui.components.backdrop.backdrops.rememberLayerBackdrop
 import com.music.zenith.ui.components.backdrop.backdrops.rememberSnapshotBackdrop
+import com.music.zenith.ui.components.backdrop.backdrops.SnapshotBackdrop
+import com.music.zenith.ui.components.backdrop.Backdrop
+import androidx.compose.runtime.staticCompositionLocalOf
 import com.music.zenith.ui.components.backdrop.backdrops.snapshotBackdropSource
 
 import com.music.zenith.ui.components.backdrop.drawPlainBackdrop
@@ -462,14 +465,33 @@ class MainActivity : AppCompatActivity() {
                     LocalAppBackdrop provides appBackdrop,
                     LocalLyricsGlassDisc provides { active -> lyricsGlassDiscSurface(active, lyricsBackdrop) },
                     LocalLyricsGlassSource provides { content -> lyricsGlassSource(content, lyricsBackdrop) },
-                    LocalLyricsMenuPopover provides { open, anchor, onDismiss, entries ->
+                    LocalLyricsMenuPopover provides { open, anchor, onDismiss, entries, haze ->
+                        // Still seluruh player (mesh + lirik), sama seperti menu ⋯, supaya
+                        // panel benar-benar blur. Haze player tidak memuat teks lirik dan
+                        // menggambar background opak, jadi panelnya tampak solid.
+                        val playerFrost = LocalPlayerMenuBackdrop.current
+                        val reduceBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
+                        var captured by remember { mutableStateOf(false) }
+                        LaunchedEffect(open, reduceBlur, playerFrost) {
+                            val still = playerFrost as? SnapshotBackdrop ?: return@LaunchedEffect
+                            if (open && !reduceBlur) {
+                                if (!still.hasStill) still.capture()
+                                captured = true
+                            } else if (captured) {
+                                delay(SNAPSHOT_RELEASE_DELAY_MS)
+                                still.release()
+                                captured = false
+                            }
+                        }
                         IosMenuPopover(
                             item = if (open) Unit else null,
                             anchor = anchor,
                             onDismiss = onDismiss,
-                            backdrop = lyricsBackdrop,
+                            backdrop = playerFrost ?: lyricsBackdrop,
+                            hazeState = haze,
                             placement = IosMenuPlacement.AboveStart,
                             dimBackground = false,
+                            frostAlpha = 0.5f,
                         ) {
                             entries.forEach { entry ->
                                 IosMenuRow(
@@ -5186,7 +5208,10 @@ private fun ZenithApp(
                         else -> Modifier.snapshotBackdropSource(playerBackdrop)
                     },
                 ) {
-                    CompositionLocalProvider(LocalPlayerDock provides activeDock) {
+                    CompositionLocalProvider(
+                        LocalPlayerDock provides activeDock,
+                        LocalPlayerMenuBackdrop provides (if (playerLiveCanvas) livePlayerBackdrop else playerBackdrop),
+                    ) {
                         nowPlaying(playerSong)
                     }
                 }
@@ -6860,6 +6885,9 @@ private const val PLAYER_SCRIM_ALPHA = 0.32f
  */
 @Composable
 private fun Isolated(content: @Composable () -> Unit) = content()
+
+/** Backdrop player (still, atau live saat Canvas) untuk popover di dalam player selain menu ⋯. */
+private val LocalPlayerMenuBackdrop = staticCompositionLocalOf<Backdrop?> { null }
 
 /** Longer than the ⋯ menu's exit, so its panel keeps its frost on the way out. */
 private const val SNAPSHOT_RELEASE_DELAY_MS = 400L

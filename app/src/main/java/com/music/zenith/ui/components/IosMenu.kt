@@ -159,13 +159,15 @@ fun Modifier.iosMenuPanel(
     rimOverride: Color? = null,
     /** False where the caller casts [iosMenuShadow] itself, apart from the panel. */
     castsShadow: Boolean = true,
+    /** Opasitas slab di atas frost (0..1); null memakai bawaan menu. */
+    frostAlpha: Float? = null,
 ): Modifier {
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
     val blurs = translucent && !reduceDynamicBlur
     val backdropFrost = blurs && backdrop != null && isGlassSupported()
     val hazeFrost = blurs && !backdropFrost && hazeState != null
     val fill = fillOverride ?: if (backdropFrost || hazeFrost) {
-        colors.fill.copy(alpha = if (colors.dark) 0.80f else 0.72f)
+        colors.fill.copy(alpha = frostAlpha ?: if (colors.dark) 0.80f else 0.72f)
     } else {
         colors.fill
     }
@@ -432,6 +434,7 @@ fun <T : Any> IosMenuPopover(
     hazeState: HazeState? = null,
     placement: IosMenuPlacement = IosMenuPlacement.Auto,
     dimBackground: Boolean = true,
+    frostAlpha: Float? = null,
     content: @Composable (T) -> Unit,
 ) {
     var last by remember { mutableStateOf<Pair<T, Rect?>?>(null) }
@@ -543,6 +546,7 @@ fun <T : Any> IosMenuPopover(
                         backdrop = backdrop,
                         hazeState = hazeState,
                         castsShadow = false,
+                        frostAlpha = frostAlpha,
                     )
                     .touchGlow(),
                 propagateMinConstraints = true,
@@ -609,8 +613,12 @@ fun <T : Any> IosMenuPopover(
         } else {
             right - panel.width
         }
+        // Menu di atas tombol (AboveStart): batas kiri dihitung di ruang window, bukan
+        // di ruang overlay. Overlay yang sudah mepet tombol membuat margin 14dp
+        // mendorong menu ke kanan dari tepi kiri tombol.
+        val minX = if (above) margin - overlayOffset.x.roundToInt() else margin
         val panelX = startX
-            .coerceIn(margin, (width - margin - panel.width).coerceAtLeast(margin))
+            .coerceIn(minX, (width - margin - panel.width).coerceAtLeast(minX))
         val lowest = (bottom - panel.height).coerceAtLeast(top)
         val hangsDown = !above && anchorBounds != null && anchorBounds.center.y < height / 2f
         val panelY = when {

@@ -1741,7 +1741,7 @@ internal fun TranslationToggleButton(
                     else Res.string.translate_lyrics,
                 ),
                 tint = tint,
-                modifier = Modifier.size(19.dp),
+                modifier = Modifier.size(22.dp),
             )
         }
     }
@@ -1812,7 +1812,7 @@ internal fun RomanizationToggleButton(
                     imageVector = Icons.Rounded.Language,
                     contentDescription = null,
                     tint = globeTint,
-                    modifier = Modifier.size(19.dp),
+                    modifier = Modifier.size(22.dp),
                 )
             }
         }
@@ -1901,6 +1901,7 @@ internal fun LyricsGlobeMenuHost(
     enabled: Boolean,
     onRomanize: () -> Unit,
     onProviders: () -> Unit,
+    hazeState: dev.chrisbanes.haze.HazeState? = null,
 ) {
     val popover = LocalLyricsMenuPopover.current
     val romanizeLabel = stringResource(
@@ -1919,7 +1920,7 @@ internal fun LyricsGlobeMenuHost(
         },
     )
     if (popover != null) {
-        popover(menu.open, menu.anchor, { menu.open = false }, entries)
+        popover(menu.open, menu.anchor, { menu.open = false }, entries, hazeState)
     } else {
         LyricsGlobeMenuFallback(menu, entries)
     }

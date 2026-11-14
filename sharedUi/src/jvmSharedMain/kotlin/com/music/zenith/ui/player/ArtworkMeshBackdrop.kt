@@ -101,9 +101,19 @@ fun rememberFullArtworkBlurImage(
     imageUrl: String?,
     artPx: Int = CARD_ART_PX,
     prepare: Boolean = true,
+    /** A frame off the playing clip; when set, the backdrop is its blur instead of the still's. */
+    liveFrame: ImageBitmap? = null,
 ): ImageBitmap? {
     val context = LocalPlatformContext.current
     var image by remember { mutableStateOf(imageUrl?.let(fullBlurCache::get)) }
+
+    // The clip's own colours, so the light under the cover follows the clip. Small
+    // frame, blurred off the main thread; the Crossfade in the backdrop eases it in.
+    LaunchedEffect(liveFrame) {
+        val frame = liveFrame ?: return@LaunchedEffect
+        if (isLikelyBlackFrame(frame)) return@LaunchedEffect
+        image = withContext(Dispatchers.Default) { frame.boxBlurred(FULL_BLUR_PASSES) }
+    }
 
     LaunchedEffect(imageUrl, artPx, prepare) {
         imageUrl?.let(fullBlurCache::get)?.let {
@@ -189,22 +199,44 @@ fun FullArtworkBlurBackdrop(
         ) {
             // Blur baru yang baru selesai di tengah dissolve ikut dilebur di sini,
             // bukan ditukar mendadak di atas lapisan yang sedang naik.
-            Crossfade(
-                targetState = image,
-                animationSpec = tween(320, easing = FastOutSlowInEasing),
-                label = "preparedBackdropImage",
-            ) { bitmap ->
-                if (bitmap != null) {
-                    val painter = remember(bitmap, seam, mirrorBelowSeam) {
-                        SeamAlignedBlurPainter(bitmap, seam, mirrorBelowSeam)
-                    }
-                    Image(
-                        painter = painter,
-                        contentDescription = null,
-                        contentScale = ContentScale.FillBounds,
-                        modifier = Modifier.fillMaxSize(),
-                    )
+            // The new blur is laid over the last one at rising alpha while the last
+            // one stays opaque beneath. A Crossfade fades both out and in together, so
+            // midway neither fully covers the dark backdrop and every refresh dipped
+            // the light: a dark pulse each second while a clip plays.
+            var base by remember { mutableStateOf(image) }
+            var incoming by remember { mutableStateOf<ImageBitmap?>(null) }
+            val incomingAlpha = remember { Animatable(0f) }
+            LaunchedEffect(image) {
+                val next = image ?: return@LaunchedEffect
+                if (next === base || next === incoming) return@LaunchedEffect
+                if (base == null) {
+                    base = next
+                    return@LaunchedEffect
                 }
+                incoming?.let { base = it }
+                incoming = next
+                incomingAlpha.snapTo(0f)
+                incomingAlpha.animateTo(1f, tween(700, easing = FastOutSlowInEasing))
+                base = next
+                incoming = null
+            }
+            base?.let { bitmap ->
+                val painter = remember(bitmap, seam) { SeamAlignedBlurPainter(bitmap, seam) }
+                Image(
+                    painter = painter,
+                    contentDescription = null,
+                    contentScale = ContentScale.FillBounds,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+            incoming?.let { bitmap ->
+                val painter = remember(bitmap, seam) { SeamAlignedBlurPainter(bitmap, seam) }
+                Image(
+                    painter = painter,
+                    contentDescription = null,
+                    contentScale = ContentScale.FillBounds,
+                    modifier = Modifier.fillMaxSize().graphicsLayer { alpha = incomingAlpha.value },
+                )
             }
         }
 

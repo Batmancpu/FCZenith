@@ -41,14 +41,17 @@ fun lyricsGlassDiscSurface(active: Boolean, source: Backdrop): Modifier? {
     val glassOn = LocalLiquidGlassEnabled.current && isGlassSupported()
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
     // Pengaturan glass tetap khusus tombol lirik, tidak mengikuti pengaturan user:
-    // preset Zenith (terang/gelap), dengan Glass clear 0%, Refraction strength 250%
-    // dan Refraction width 176% yang di-hardcode.
+    // preset Zenith (terang/gelap), Glass clear 0%. Zona lensa dibuat sempit (~9dp
+    // dari tepi, disc hanya berjari-jari 17dp) dengan pergeseran sedang, supaya
+    // teks mulai membelok tepat di pinggir tombol. Zona yang melebihi jari-jari
+    // membuat teks di rim tersampling dari luar rekaman (hilang) dan baru terlihat
+    // di tengah.
     val darkTheme = MaterialTheme.colorScheme.surface.luminance() <= 0.5f
     val lyricsClarity = remember { GlassClarity(0f) }
     val lyricsCustom = remember(darkTheme) {
         GlassPreset.DEFAULT.customFor(darkTheme).copy(
-            refraction = 2.5f,
-            refractionWidth = 1.76f,
+            refraction = 1.2f,
+            refractionWidth = 0.5f,
         )
     }
     val lift by animateFloatAsState(
