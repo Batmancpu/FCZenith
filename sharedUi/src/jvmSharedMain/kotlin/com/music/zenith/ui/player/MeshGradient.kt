@@ -36,6 +36,8 @@ import com.music.zenith.ui.graphics.toImageBitmap
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.music.zenith.ui.graphics.ColorUtils
+import com.music.zenith.ui.graphics.argbPixels
+import com.music.zenith.ui.graphics.imageBitmapOf
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.SingletonImageLoader
 import coil3.request.ImageRequest
@@ -351,7 +353,8 @@ fun artworkMeshColors(bitmap: ImageBitmap): List<Color> = paletteOf(bitmap)
  * purple. So the whole swatch list is read instead, and any shortfall is
  * derived from the art's own colours rather than borrowed.
  */
-private fun paletteOf(bitmap: ImageBitmap): List<Color> {
+private fun paletteOf(source: ImageBitmap): List<Color> {
+    val bitmap = source.bottomWeighted()
     fun swatchesOf(clearFilters: Boolean): List<Color> {
         val all = paletteSwatches(bitmap, 24, clearFilters)
             .sortedByDescending { it.population }
@@ -400,6 +403,31 @@ private fun List<Color>.expandedToFour(): List<Color> {
         step++
     }
     return out
+}
+
+/** The share of the sleeve, from its foot, that the palette leans on. */
+private const val BOTTOM_PALETTE_SHARE = 0.4f
+
+/** How many extra times that foot is counted, so the colours track where the cover meets the backdrop. */
+private const val BOTTOM_PALETTE_COPIES = 2
+
+/**
+ * The same picture with its bottom rows repeated, so the quantiser sees more of
+ * them. The backdrop meets the cover at its foot, so those are the colours that
+ * should join up; the rest of the sleeve still counts, just for less.
+ */
+private fun ImageBitmap.bottomWeighted(): ImageBitmap {
+    val w = width
+    val h = height
+    if (w < 2 || h < 8) return this
+    val pixels = argbPixels()
+    if (pixels.size != w * h) return this
+    val rows = (h * BOTTOM_PALETTE_SHARE).toInt().coerceIn(1, h)
+    val tail = pixels.copyOfRange((h - rows) * w, pixels.size)
+    val out = IntArray(pixels.size + tail.size * BOTTOM_PALETTE_COPIES)
+    pixels.copyInto(out)
+    repeat(BOTTOM_PALETTE_COPIES) { tail.copyInto(out, pixels.size + it * tail.size) }
+    return imageBitmapOf(out, w, h + rows * BOTTOM_PALETTE_COPIES)
 }
 
 private fun Color.shifted(hue: Float, lightness: Float): Color {
