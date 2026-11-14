@@ -2121,14 +2121,11 @@ fun NowPlayingScreen(
     // between the portrait and landscape players; only the cached bitmap
     // changes when the artwork preparation above completes for another song.
     val currentFullArtworkBlurImage = rememberUpdatedState(fullArtworkBlurImage)
-    // Where the full-bleed banner stops, so the blur can be cropped to match it. Only
-    // the portrait phone player has one; everywhere else the plain crop is kept.
-    // Zero while lyrics or queue cover the banner: the sharp banner is gone there, so
-    // the blur must span the whole screen instead of ending in a flat strip at the seam.
+    // Always zero: the main player uses the same full-screen centre-cropped blur as
+    // lyrics and queue. A non-zero seam cropped the blur to the banner and stretched
+    // its last row down the screen, which made the area under the cover a flat strip.
     val blurSeamPx = animateFloatAsState(
-        targetValue = if (heroMode && !landscape && !tabletArtworkBackdrop && !lyricsOpen && !queueOpen) {
-            with(density) { heroHeight.toPx() }
-        } else 0f,
+        targetValue = 0f,
         animationSpec = tween(300),
         label = "blurSeam",
     )
