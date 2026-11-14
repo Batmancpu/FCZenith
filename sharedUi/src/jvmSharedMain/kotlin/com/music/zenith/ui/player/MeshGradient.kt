@@ -183,11 +183,13 @@ fun MeshGradientBackground(
             .background(baseColor)
             .blur(blurRadius),
     ) {
+        // Most populous colours first, so they sit low where the cover fades into
+        // the backdrop; the minor ones hide behind the artwork at the top.
         val anchors = listOf(
-            Offset(0.20f, 0.25f),
+            Offset(0.25f, 0.80f),
+            Offset(0.75f, 0.75f),
             Offset(0.80f, 0.20f),
-            Offset(0.75f, 0.80f),
-            Offset(0.25f, 0.75f),
+            Offset(0.20f, 0.25f),
         )
         val speeds = listOf(1f, -0.7f, 0.85f, -1.15f)
         val drift = phase.value
@@ -345,10 +347,16 @@ fun artworkMeshColors(bitmap: ImageBitmap): List<Color> = paletteOf(bitmap)
  * derived from the art's own colours rather than borrowed.
  */
 private fun paletteOf(bitmap: ImageBitmap): List<Color> {
-    fun swatchesOf(clearFilters: Boolean): List<Color> =
-        paletteSwatches(bitmap, 24, clearFilters)
+    fun swatchesOf(clearFilters: Boolean): List<Color> {
+        val all = paletteSwatches(bitmap, 24, clearFilters)
             .sortedByDescending { it.population }
-            .map { Color(it.rgb) }
+        val total = all.sumOf { it.population }.coerceAtLeast(1)
+        // A colour covering only a sliver of the sleeve (a dress, a logo) must not
+        // get a whole blob; the backdrop follows what dominates the picture.
+        val minorShare = 0.10f
+        val major = all.filter { it.population >= total * minorShare }
+        return major.ifEmpty { all }.map { Color(it.rgb) }
+    }
 
     val found = swatchesOf(clearFilters = false).ifEmpty {
         // The default filter discards near-black and near-white, which on a
@@ -383,7 +391,7 @@ private fun List<Color>.expandedToFour(): List<Color> {
     val out = toMutableList()
     var step = 1
     while (out.size < 4) {
-        out += this[(out.size - size) % size].shifted(24f * step, 0.12f * step)
+        out += this[(out.size - size) % size].shifted(12f * step, 0.08f * step)
         step++
     }
     return out
@@ -403,7 +411,7 @@ private fun Color.hsl(): FloatArray =
 private fun Color.tuned(): Color {
     val hsl = FloatArray(3)
     ColorUtils.colorToHSL(toArgb(), hsl)
-    hsl[1] = (hsl[1] * 1.35f).coerceAtMost(1f)
+    hsl[1] = (hsl[1] * 1.12f).coerceAtMost(1f)
     hsl[2] = hsl[2].coerceIn(0.28f, 0.58f)
     return Color(ColorUtils.HSLToColor(hsl))
 }
