@@ -315,6 +315,9 @@ private const val SPOTIFY_CANVAS_RESUME_DELAY_MS = 1_000L
 /** Tinggi dek kaca Spotify Canvas sebagai bagian dari layar; sama dengan lapisan kaca hidupnya. */
 private const val SPOTIFY_DECK_HEIGHT_FRACTION = 0.56f
 
+/** Height of the seek bar that stays on screen once Spotify Canvas' control deck is hidden. */
+private val SPOTIFY_MINI_SCRUBBER_HEIGHT = 48.dp
+
 /** [image] selebar scope, rata atas, rasio aslinya tanpa crop; yang melewati tepi bawah terpotong. */
 private fun DrawScope.drawFrameTopAligned(image: ImageBitmap) {
     if (size.width <= 0f || size.height <= 0f) return
@@ -2139,8 +2142,14 @@ fun NowPlayingScreen(
     val currentFullArtworkBlurImage = rememberUpdatedState(fullArtworkBlurImage)
     // Where the full-bleed banner stops, so the blur can be cropped to match it. Only
     // the portrait phone player has one; everywhere else the plain crop is kept.
-    val blurSeamPx = rememberUpdatedState(
-        if (heroMode && !landscape && !tabletArtworkBackdrop) with(density) { heroHeight.toPx() } else 0f,
+    // Zero while lyrics or queue cover the banner: the sharp banner is gone there, so
+    // the blur must span the whole screen instead of ending in a flat strip at the seam.
+    val blurSeamPx = animateFloatAsState(
+        targetValue = if (heroMode && !landscape && !tabletArtworkBackdrop && !lyricsOpen && !queueOpen) {
+            with(density) { heroHeight.toPx() }
+        } else 0f,
+        animationSpec = tween(300),
+        label = "blurSeam",
     )
     val fullArtworkBlurContent = remember {
         movableContentOf<Modifier> { backdropModifier ->
@@ -3548,7 +3557,8 @@ fun NowPlayingScreen(
                                 .takeIf { it > 0.dp }
                                 ?: maxHeight
                             val collapsedTitleTop = (
-                                expandedTopHeight + spotifyCanvasDeckHeight - HEADER_HEIGHT
+                                expandedTopHeight + spotifyCanvasDeckHeight - HEADER_HEIGHT -
+                                    SPOTIFY_MINI_SCRUBBER_HEIGHT
                             ).coerceAtLeast(0.dp)
                             collapsedTitleTop
                         } else {
@@ -4968,6 +4978,50 @@ Spacer(Modifier.width(12.dp))
                                     onRevealPlayer = { queueControlsOpen = true },
                                     onHidePlayer = { queueControlsOpen = false },
                                     modifier = Modifier.weight(1f),
+                                )
+                            }
+                        }
+                    }
+
+                    // Spotify Canvas with its control deck hidden: keep only a seek bar
+                    // (elapsed, quality, remaining) under the title, so the song can be
+                    // skipped forward or back without opening the deck again. Its slot
+                    // grows as the deck leaves, so the two trade the same height.
+                    if (spotifyCanvasPresentation && !spotifyCanvasControlsOpen && !lyricsOpen && !queueOpen) {
+                        val miniTransitionWindow by PlayerSettings.smartTransitionWindow.collectAsStateWithLifecycle()
+                        Box(
+                            modifier = Modifier
+                                .widthIn(max = PLAYER_MAX_WIDTH)
+                                .fillMaxWidth()
+                                .padding(horizontal = 10.dp)
+                                .layout { measurable, constraints ->
+                                    val placeable = measurable.measure(constraints)
+                                    val slot = (placeable.height * (1f - playerDeckReveal.value)).toInt()
+                                    layout(placeable.width, slot) {
+                                        placeable.place(0, slot - placeable.height)
+                                    }
+                                }
+                                .height(SPOTIFY_MINI_SCRUBBER_HEIGHT)
+                                .graphicsLayer { alpha = 1f - playerDeckReveal.value },
+                            contentAlignment = Alignment.BottomCenter,
+                        ) {
+                            PlayerScrubber(
+                                shown = shown,
+                                durationMs = durationMs,
+                                loading = versionSwitching,
+                                mixing = mixing && !scrub.scrubbing,
+                                transitionWindow = miniTransitionWindow
+                                    ?.takeIf { !scrub.scrubbing && it.end > it.start }
+                                    ?.let { it.start..it.end },
+                                onScrub = onScrub,
+                                onScrubFinished = onScrubFinished,
+                            ) {
+                                PlaybackQualityLabel(
+                                    song = song,
+                                    isLoading = isLoading,
+                                    modifier = Modifier
+                                        .align(Alignment.Center)
+                                        .padding(horizontal = 8.dp),
                                 )
                             }
                         }
