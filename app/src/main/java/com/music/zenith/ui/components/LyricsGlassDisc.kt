@@ -20,7 +20,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.music.zenith.data.settings.AppSettings
 import com.music.zenith.data.settings.GlassClarity
 import com.music.zenith.data.settings.GlassPreset
-import com.music.zenith.data.settings.GlassClarity
 import com.music.zenith.ui.components.backdrop.Backdrop
 import com.music.zenith.ui.components.backdrop.backdrops.LayerBackdrop
 import com.music.zenith.ui.components.backdrop.backdrops.layerBackdrop
@@ -57,16 +56,6 @@ fun lyricsGlassDiscSurface(active: Boolean, source: Backdrop): Modifier? {
         animationSpec = tween(durationMillis = 220),
         label = "lyricsGlassDiscActive",
     )
-    // Pengaturan glass khusus tombol lirik: Glass clear 0%, Refraction strength 250%,
-    // Refraction width 176%. Nilai lain mengikuti pengaturan Liquid Glass app.
-    val lyricsClarity = remember { GlassClarity(0f) }
-    val lyricsCustom = remember(custom, clarity.chromatic) {
-        custom.copy(
-            refraction = 2.5f,
-            refractionWidth = 1.76f,
-            rainbow = custom.rainbowStrength(clarity.chromatic),
-        )
-    }
     if (!glassOn || reduceDynamicBlur) return null
 
     val shape = CircleShape
@@ -80,8 +69,6 @@ fun lyricsGlassDiscSurface(active: Boolean, source: Backdrop): Modifier? {
             clarityOverride = lyricsClarity,
             customOverride = lyricsCustom,
             frostedOverride = false,
-            clarityOverride = lyricsClarity,
-            customOverride = lyricsCustom,
         )
         .border(GLASS_EDGE_WIDTH, GLASS_EDGE_COLOR, shape)
 }

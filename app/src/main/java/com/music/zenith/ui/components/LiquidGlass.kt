@@ -28,8 +28,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.music.zenith.data.settings.AppSettings
 import com.music.zenith.data.settings.GlassClarity
 import com.music.zenith.data.settings.GlassCustom
-import com.music.zenith.data.settings.GlassClarity
-import com.music.zenith.data.settings.GlassCustom
 import com.music.zenith.ui.components.backdrop.Backdrop
 import com.music.zenith.ui.components.backdrop.backdrops.LayerBackdrop
 import com.music.zenith.ui.components.backdrop.drawBackdrop
@@ -237,21 +235,16 @@ fun Modifier.liquidGlass(
     /** Replaces the app-wide frosted setting for this surface only, when set. */
     frostedOverride: Boolean? = null,
 ): Modifier {
-    /** Replaces the app-wide glass clarity for this surface only, when set. */
-    clarityOverride: GlassClarity? = null,
-    /** Replaces the app-wide custom glass values for this surface only, when set. */
-    customOverride: GlassCustom? = null,
-): Modifier {
     if (!isGlassSupported()) return this
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
-val appFrosted by AppSettings.frostedGlass.collectAsStateWithLifecycle()
-val appClarity by AppSettings.glassClarity.collectAsStateWithLifecycle()
-val appCustom by AppSettings.glassCustom.collectAsStateWithLifecycle()
-val frosted = frostedOverride ?: appFrosted
-val clarity = clarityOverride ?: appClarity
-val custom = customOverride ?: appCustom
-if (reduceDynamicBlur) {
-    return background(MaterialTheme.colorScheme.surface, shape)
+    val appFrosted by AppSettings.frostedGlass.collectAsStateWithLifecycle()
+    val appClarity by AppSettings.glassClarity.collectAsStateWithLifecycle()
+    val appCustom by AppSettings.glassCustom.collectAsStateWithLifecycle()
+    val frosted = frostedOverride ?: appFrosted
+    val clarity = clarityOverride ?: appClarity
+    val custom = customOverride ?: appCustom
+    if (reduceDynamicBlur) {
+        return background(MaterialTheme.colorScheme.surface, shape)
             .border(GLASS_EDGE_WIDTH, GLASS_EDGE_COLOR, shape)
     }
     val backdrop = source ?: LocalAppBackdrop.current
