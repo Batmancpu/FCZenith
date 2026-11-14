@@ -296,7 +296,12 @@ fun cyclingMeshPalette(
 @Composable
 fun rememberArtworkColors(imageUrl: String?, canvasFrame: ImageBitmap? = null): MeshPalette {
     val context = LocalPlatformContext.current
-    var palette by remember(imageUrl) { mutableStateOf(MeshPalette(FallbackColors)) }
+    // Carried over from the last cover instead of reset to the stock colours, so a
+    // track change fades from one real palette to the next rather than flashing
+    // through the fallback purple and orange first.
+    val heldPalette = remember { mutableStateOf(MeshPalette(FallbackColors)) }
+    var palette by remember(imageUrl) { mutableStateOf(heldPalette.value) }
+    LaunchedEffect(palette) { heldPalette.value = palette }
 
     LaunchedEffect(imageUrl) {
         if (imageUrl == null) return@LaunchedEffect
