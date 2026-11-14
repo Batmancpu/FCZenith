@@ -562,11 +562,11 @@ private fun dockEase(t: Float): Float {
  * mini player selagi panel masih lebar.
  */
 private fun dockFlyEase(t: Float): Float {
-    // t^2 * (2 - t): never ahead of the sheet (<= t), so the cover stays inside the
-    // growing panel instead of poking above its top edge, starts softly, and has the
-    // sheet's own speed on arrival, so it lands without a hitch.
+    // Quick through the middle so the cover fills the growing panel like Apple Music
+    // (pinned top-left, growing right and down), flat at both ends: a soft start off
+    // the mini player and zero speed on arrival, so it lands smoothly.
     val x = t.coerceIn(0f, 1f)
-    return x * x * (2f - x)
+    return (1f - (1f - x) * (1f - x)) * dockSmooth(x / DOCK_FLY_SOFT_START_AT)
 }
 
 /**
