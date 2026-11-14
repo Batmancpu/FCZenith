@@ -570,6 +570,15 @@ private fun dockFlyEase(t: Float): Float {
 }
 
 /**
+ * The still card cover, Apple Music style: it stays on the mini player's cover through
+ * the first part of the drag, then rises and grows to the card together, on one curve.
+ */
+private fun dockCardEase(t: Float): Float {
+    val holdUntil = 0.15f
+    return dockSmooth((t - holdUntil) / (1f - holdUntil))
+}
+
+/**
  * Drag sejauh ini cover terbang dilandaikan dulu (kemiringan 0 di awal), supaya
  * tidak melonjak di 10% pertama drag. Setelahnya sama dengan [panelWideEase].
  */
@@ -3806,13 +3815,13 @@ fun NowPlayingScreen(
                             val cap = (mini.top + dockFrame.offset - rect.top).coerceAtLeast(0f)
                             val unridden = (dockFrame.offset - cap).coerceAtLeast(0f) * (1f - p())
                             val open = dockT()
-                            val base = dockFlyEase(open)
+                            val base = if (heroMode) dockFlyEase(open) else dockCardEase(open)
                             val ease = base + (dockEaseThumb(open) - base) * p()
                             val target = rect.translate(0f, -unridden)
                             // Vertical position leads the size a little, so the cover climbs
                             // toward the panel's top-left instead of hanging low in it. The
                             // lead is zero at both ends, so it still leaves and lands exactly.
-                            val lift = 0.25f
+                            val lift = if (heroMode) 0.25f else 0f
                             val lifted = ease + (1f - ease) * ease * lift * (1f - p())
                             val left = mini.left + (target.left - mini.left) * ease
                             val right = mini.right + (target.right - mini.right) * ease
