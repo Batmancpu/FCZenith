@@ -160,6 +160,7 @@ import com.music.zenith.ui.theme.stableStatusBarInsets
 import com.music.zenith.ui.theme.rememberArtworkTopBandLuminance
 import com.music.zenith.ui.theme.topBandScrimAlpha
 import com.music.zenith.ui.LyricsProviderState
+import com.music.zenith.ui.ManualLyricsSearchState
 import com.music.zenith.ui.haptics.Haptic
 import com.music.zenith.ui.haptics.rememberHaptics
 import com.music.zenith.ui.icons.ZenithIcons
@@ -1001,6 +1002,8 @@ fun NowPlayingScreen(
     lyricsSource: LyricsSource?,
     lyricsProviderStates: Map<LyricsSource, LyricsProviderState>,
     onSelectLyricsProvider: (LyricsSource) -> Unit,
+    manualLyricsState: ManualLyricsSearchState,
+    onSearchLyricsManually: (title: String, artist: String) -> Unit,
     lyricsUnavailable: Boolean,
     lyricsOffsetOpen: Boolean,
     onDismissLyricsOffset: () -> Unit,
@@ -2058,6 +2061,10 @@ fun NowPlayingScreen(
                 states = lyricsProviderStates,
                 onSelect = onSelectLyricsProvider,
                 onDismiss = { showLyricsProviders = false },
+                songTitle = song.title,
+                songArtist = song.artist,
+                manualState = manualLyricsState,
+                onManualSearch = onSearchLyricsManually,
             )
         }
         if (showAudioPipeline) {
