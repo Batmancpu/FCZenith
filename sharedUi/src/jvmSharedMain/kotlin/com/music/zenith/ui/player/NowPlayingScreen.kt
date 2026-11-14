@@ -3818,7 +3818,10 @@ fun NowPlayingScreen(
                                 )
                                 val openNow = dockCardEase(dock.openFraction())
                                 val leftMargin = (kept.left - (panel.left - boxLeftPx)).coerceAtLeast(0f)
-                                leftMargin * dockSmooth(openNow / 0.15f) *
+                                // Rises with the raw drag, not the card ease: that ease stays near
+                // zero for the first quarter of the drag, which left the cover flush
+                // against the panel's top edge while the panel grew out of the pill.
+                leftMargin * dockSmooth(dock.openFraction() / 0.04f) *
                                     (1f - dockSmooth((openNow - 0.75f) / 0.25f))
                             }
                             val minTop = bannerTopPx.toFloat() + topMargin
