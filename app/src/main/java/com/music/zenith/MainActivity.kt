@@ -491,6 +491,7 @@ class MainActivity : AppCompatActivity() {
                             hazeState = haze,
                             placement = IosMenuPlacement.AboveStart,
                             dimBackground = false,
+                            frostAlpha = 0.5f,
                         ) {
                             entries.forEach { entry ->
                                 IosMenuRow(
