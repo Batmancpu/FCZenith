@@ -615,6 +615,44 @@ internal fun LyricsStatusWithChange(
     }
 }
 
+/**
+ * The credit at the very end of the lyrics, as Apple Music sets it: small, dim
+ * and part of the scroll, not a line parked over the controls. Tapping it opens
+ * the provider chooser.
+ */
+@Composable
+private fun LyricsProviderFooter(
+    text: String,
+    onClick: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+) {
+    val haptics = rememberHaptics()
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(start = GLOW_ROOM, end = GLOW_ROOM, top = 28.dp, bottom = 8.dp),
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium,
+            color = LocalPlayerTint.current.copy(alpha = 0.45f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = if (onClick != null) {
+                Modifier.clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                ) {
+                    haptics.play(Haptic.Select)
+                    onClick()
+                }
+            } else {
+                Modifier
+            },
+        )
+    }
+}
+
 internal fun adjustedLyricsPosition(positionMs: Long, offsetMs: Int): Long =
     (positionMs - offsetMs.toLong()).coerceAtLeast(0L)
 
@@ -2063,6 +2101,9 @@ private fun LyricsPanelList(
     browsingState: MutableState<Boolean>,
     /** The line the panel follows, or -1 while there is none. */
     followLine: MutableIntState,
+    /** Credit shown after the last line, e.g. "Lyrics by KuGou". Null for none. */
+    providerFooter: String? = null,
+    onProviderFooterClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val panelPlaying = isPlaying && active
@@ -2808,6 +2849,14 @@ private fun LyricsPanelList(
                 }
             }
         }
+        if (providerFooter != null) {
+            item {
+                LyricsProviderFooter(
+                    text = providerFooter,
+                    onClick = onProviderFooterClick,
+                )
+            }
+        }
     }
 }
 
@@ -2837,6 +2886,8 @@ internal fun LyricsPanel(
     onTogglePick: (Int) -> Unit = {},
     centerFocus: Boolean = false,
     hazeState: HazeState? = null,
+    providerFooter: String? = null,
+    onProviderFooterClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
@@ -2884,6 +2935,8 @@ internal fun LyricsPanel(
             listState = listState,
             browsingState = browsingState,
             followLine = followLine,
+            providerFooter = providerFooter,
+            onProviderFooterClick = onProviderFooterClick,
             modifier = Modifier.fillMaxSize(),
         )
         if (returnShown > 0.01f) {

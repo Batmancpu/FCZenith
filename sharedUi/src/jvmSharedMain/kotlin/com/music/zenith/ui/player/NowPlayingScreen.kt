@@ -4834,6 +4834,9 @@ Spacer(Modifier.width(12.dp))
                                         isPlaying = isPlaying && position.advancing,
                                         active = lyricsPanelVisible,
                                         onSeekToLine = seekToLyric,
+                                        providerFooter = lyricsTranslation.status
+                                            .takeIf { it.isNotBlank() && !lyrics.isNullOrEmpty() },
+                                        onProviderFooterClick = { showLyricsProviders = true },
                                         controlsOpen = lyricsControlsOpen,
                                         onRevealControls = { lyricsControlsOpen = true },
                                         onHideControls = { lyricsControlsOpen = false },
@@ -5110,9 +5113,12 @@ Spacer(Modifier.width(12.dp))
                         )
                     }
                     if (lyricsOpen) {
-                        LyricsStatusWithChange(
-                            status = lyricsTranslation.status,
-                            onStatusClick = { showLyricsProviders = true },
+                        // The provider credit moved to the foot of the lyrics. The
+                        // slot stays, invisibly, so the controls keep their place.
+                        Text(
+                            text = "\u00A0",
+                            style = MaterialTheme.typography.titleMedium,
+                            maxLines = 1,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .offset(y = 6.dp)
