@@ -2143,11 +2143,20 @@ fun NowPlayingScreen(
     // between the portrait and landscape players; only the cached bitmap
     // changes when the artwork preparation above completes for another song.
     val currentFullArtworkBlurImage = rememberUpdatedState(fullArtworkBlurImage)
-    // Always zero: the main player uses the same full-screen centre-cropped blur as
-    // lyrics and queue. A non-zero seam cropped the blur to the banner and stretched
-    // its last row down the screen, which made the area under the cover a flat strip.
+    // The banner's bottom edge while the main player shows it, 0 otherwise (lyrics,
+    // queue, tablet/landscape, full-screen Spotify Canvas). With a seam the blur is
+    // cropped like the banner and mirrored below the edge, so the banner dissolves
+    // into its own reflection instead of a flat strip.
+    val blurSeamTarget = if (
+        heroMode && !clipFullscreen && !landscape && !tabletArtworkBackdrop &&
+        !lyricsOpen && !queueOpen
+    ) {
+        with(density) {
+            (if (clipPortrait && clipBottom > 0.dp) clipBottom else heroHeight).toPx()
+        }
+    } else 0f
     val blurSeamPx = animateFloatAsState(
-        targetValue = 0f,
+        targetValue = blurSeamTarget,
         animationSpec = tween(300),
         label = "blurSeam",
     )
