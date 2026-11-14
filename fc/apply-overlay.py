@@ -29,6 +29,13 @@ def main() -> None:
     version_code = os.environ.get("FC_VERSION_CODE", "").strip()
     version_name = os.environ.get("FC_VERSION_NAME", "").strip()
     repository = os.environ.get("GITHUB_REPOSITORY", "").strip()
+    brand_config = ROOT / "fc" / "branding" / "config.properties"
+    enabled_matches = re.findall(r"(?m)^enabled=(true|false)$", brand_config.read_text(encoding="utf-8"))
+    if len(enabled_matches) != 1:
+        raise SystemExit("Expected exactly one enabled=true/false in FC branding config")
+    brand_enabled = enabled_matches[0] == "true"
+    app_label = "brrMusic" if brand_enabled else "Music"
+    apk_prefix = "brrMusic-" if brand_enabled else "Music-"
 
     if not version_code.isdigit() or int(version_code) < 1:
         raise SystemExit("FC overlay requires a positive FC_VERSION_CODE")
@@ -48,7 +55,7 @@ def main() -> None:
     app_text = replace_once(
         app_text,
         'buildConfigField("String", "UPDATE_APK_PREFIX", "\\"Zenith-\\"")',
-        'buildConfigField("String", "UPDATE_APK_PREFIX", "\\"Music-\\"")',
+        f'buildConfigField("String", "UPDATE_APK_PREFIX", "\\"{apk_prefix}\\"")',
         "in-app updater asset prefix",
     )
 
@@ -56,11 +63,11 @@ def main() -> None:
             dimension = "env"
             // Matches defaultConfig — this is the package already shipped/installed.
         }'''
-    prod_block_fc = '''        create("prod") {
+    prod_block_fc = f'''        create("prod") {{
             dimension = "env"
-            resValue("string", "app_name", "Music")
-            // FC production label.
-        }'''
+            resValue("string", "app_name", "{app_label}")
+            // FC production label; reversible by fc/branding/config.properties.
+        }}'''
     app_text = replace_once(app_text, prod_block, prod_block_fc, "production app label")
     app_gradle.write_text(app_text, encoding="utf-8")
 
@@ -154,7 +161,7 @@ def main() -> None:
 
     print(
         f"FC overlay applied: com.spotify.music / Music / "
-        f"{version_name} / {repository}"
+        f"{version_name} / {repository} / {app_label}"
     )
 
 
