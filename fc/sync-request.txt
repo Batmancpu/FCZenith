@@ -1,0 +1,4 @@
+# On-demand upstream sync trigger
+# Each edit committed to main starts the upstream sync-and-release workflow.
+# Update the counter when asking ChatGPT to run an immediate upstream check.
+counter=0
