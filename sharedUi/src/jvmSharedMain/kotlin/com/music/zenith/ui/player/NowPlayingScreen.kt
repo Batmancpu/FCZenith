@@ -509,25 +509,14 @@ private const val DOCK_FADE_FLOOR = 1f / 255f
 private const val CLIP_MIX_FADE_OUT_MS = 900
 private const val CLIP_MIX_FADE_IN_MS = 500
 
-/**
- * Backdrop cover yang diburamkan baru mulai muncul setelah sleeve yang terbang
- * dari mini player melewati titik ini. Sebelumnya backdrop ikut memudar bersama
- * sheet dan terlihat sebagai salinan cover ukuran penuh di belakang cover kecil
- * yang masih terbang (tampak seperti dua cover).
- */
-private const val DOCK_BACKDROP_FROM = 0.15f
+
 
 /** Seberapa jauh drag (0..1 dari mini ke penuh) saat cover sudah selebar panel dan menutup sudutnya. */
 private const val DOCK_COVER_FULL_AT = 0.6f
 
-/** Untuk cover kartu (bukan full-bleed): drag sejauh ini sebelum cover mencapai ukuran penuh. */
-private const val DOCK_CARD_FULL_AT = 0.9f
 
-/** Smoothstep: membesar bertahap, tidak melonjak di awal drag. */
-private fun dockEaseCard(t: Float): Float {
-    val x = (t / DOCK_CARD_FULL_AT).coerceIn(0f, 1f)
-    return x * x * (3f - 2f * x)
-}
+
+
 
 /** Untuk thumbnail header (menu lirik/queue): cover ikut panel sampai drag sejauh ini, baru menyatu ke mini. */
 private const val DOCK_THUMB_FULL_AT = 0.35f
@@ -551,21 +540,7 @@ private const val DOCK_CENTRE_RISE_AT = 0.06f
 private const val DOCK_CENTRE_HOLD_TO = 0.30f
 private const val DOCK_CENTRE_END_AT = 0.70f
 
-/**
- * Cover kartu tidak boleh melayang di atas posisi akhirnya relatif terhadap
- * sheet (centring dan kaki yang ditahan di mini player mengangkatnya), lalu
- * turun lagi di ujung. Dari [DOCK_SETTLE_FROM] sampai [DOCK_SETTLE_TO] terbuka,
- * cover ditarik pelan ke posisi akhirnya; setelah itu ia naik bersama sheet.
- */
-private const val DOCK_SETTLE_FROM = 0.30f
-private const val DOCK_SETTLE_TO = 0.60f
 
-/**
- * Tarikan "settle" dimatikan: jalur cover kini sudah menempel ke sheet sendiri
- * (lihat [towardsDock]), jadi tarikan tambahan itu justru membuat cover naik
- * terlalu tinggi lalu turun lagi di sekitar 70-80% terbuka.
- */
-private const val DOCK_SETTLE_ENABLED = false
 
 private fun dockSmooth(x: Float): Float {
     val t = x.coerceIn(0f, 1f)
@@ -1798,8 +1773,7 @@ fun NowPlayingScreen(
     val spotifyCanvasFullscreen = spotifyCanvasOnPhone &&
         heroClip?.source == CanvasSource.SPOTIFY
     val spotifyCanvasPresentation = spotifyCanvasFullscreen && canvasRendered
-    val canvasFirstPortrait = !spotifyCanvasFullscreen &&
-        heroClip != null && canvasAspect > 0f && canvasAspect < 1f
+
     // The clip's player, which outlives [heroClip] by the second half of a
     // collapse: mounted from the moment the player is asked back, and let go
     // of once the sleeve has settled into the header. Faded out by the half
@@ -2205,15 +2179,7 @@ fun NowPlayingScreen(
         }
     }
     val docking: () -> Boolean = { dockT() < 1f }
-    // 0 selagi sleeve masih terbang kecil, naik ke 1 di ujung perjalanan; 1 saat
-    // player tidak sedang docking.
-    val dockBackdropAlpha: () -> Float = {
-        if (!docking()) {
-            1f
-        } else {
-            ((dockT() - DOCK_BACKDROP_FROM) / (DOCK_COVER_FULL_AT - DOCK_BACKDROP_FROM)).coerceIn(0f, 1f)
-        }
-    }
+
     // The same, for composition: derived, so it recomposes the player twice a
     // trip — as the sheet leaves fully open and as it gets back — rather than
     // on each frame between.
@@ -3751,7 +3717,7 @@ fun NowPlayingScreen(
                         // player: tidak lewat tepi atas panel (yang memotong bagian atas
                         // cover) dan tidak keluar dari kiri/kanan. Tepi atas panel di
                         // koordinat kotak ini adalah bannerTopPx.
-                        fun fitToPanel(rawSource: Rect, active: Boolean, rest: Rect? = null): Rect {
+                        fun fitToPanel(rawSource: Rect, active: Boolean): Rect {
                             if (!active) return rawSource
                             // Jalur cover kini garis lurus di layar (lihat [towardsDock]) dan
                             // selalu ada di dalam panel, jadi centring, jarak kaki, dan tarikan
@@ -3784,22 +3750,7 @@ fun NowPlayingScreen(
                                     rawSource.translate(0f, (centredTop - rawSource.top) * share)
                                 }
                             }
-                            // Cover kartu (bukan full-bleed) tidak boleh melayang di atas posisi
-                            // akhirnya relatif terhadap panel: dari DOCK_SETTLE_FROM sampai
-                            // DOCK_SETTLE_TO terbuka ia ditarik pelan ke sana, lalu naik bersama
-                            // panel, tidak menempel ke tepi atas. Banner full-bleed tidak berubah.
-                            val rect = if (!DOCK_SETTLE_ENABLED || dock == null || rest == null) {
-                                centred
-                            } else {
-                                val g = dockSmooth(
-                                    (dock.openFraction() - DOCK_SETTLE_FROM) / (DOCK_SETTLE_TO - DOCK_SETTLE_FROM),
-                                )
-                                if (g <= 0f || centred.top >= rest.top) {
-                                    centred
-                                } else {
-                                    centred.translate(0f, (rest.top - centred.top) * g)
-                                }
-                            }
+                            val rect = centred
                             // Kaki cover tidak boleh terpotong tepi bawah panel selagi panel
                             // masih tumbuh dari pill. Cover hanya diangkat sebesar bagian yang
                             // melewati tepi bawah (0 di mini player dan di posisi akhir), jadi
@@ -3898,7 +3849,7 @@ fun NowPlayingScreen(
                                     } else {
                                         dockFrame.rideShare = 1f
                                     }
-                                    val rect = fitToPanel(towardsDock(open, mini), mini != null, open)
+                                    val rect = fitToPanel(towardsDock(open, mini), mini != null)
                                     dockFrame.miniInBox = mini
                                     dockFrame.sleeve = rect
                                     val placeable = measurable.measure(
@@ -4046,7 +3997,6 @@ fun NowPlayingScreen(
                                         val card = fitToPanel(
                                             towardsDock(cardRect(), dockFrame.miniInBox),
                                             dockFrame.miniInBox != null,
-                                            cardRect(),
                                         )
                                         val sleeve = dockFrame.sleeve
                                         val placeable = measurable.measure(

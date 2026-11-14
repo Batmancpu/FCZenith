@@ -467,9 +467,6 @@ class MainActivity : AppCompatActivity() {
                             item = if (open) Unit else null,
                             anchor = anchor,
                             onDismiss = onDismiss,
-                            // Haze player (mesh + lirik) dipakai bila ada, supaya panel
-                            // benar-benar blur; rekaman lirik saja tidak memuat background.
-                            backdrop = if (haze == null) lyricsBackdrop else null,
                             hazeState = haze,
                             placement = IosMenuPlacement.AboveStart,
                             dimBackground = false,
