@@ -1176,7 +1176,7 @@ fun NowPlayingScreen(
     // CanvasArtworkPlayer's refreshFrameEveryMs. Null otherwise: the blurred
     // still cover under every other phone player has nothing to re-tint, and
     // each read is a GPU readback.
-    val meshRefreshMs = MESH_REFRESH_MS.takeIf { legacyMesh }
+    val meshRefreshMs: Long? = MESH_REFRESH_MS
 
     val scrub = rememberPlayerScrub(song.videoId, position, durationMs)
     // Read by the scrubber itself — see [PlayerScrubber.shown].
@@ -2116,6 +2116,7 @@ fun NowPlayingScreen(
     val fullArtworkBlurImage = rememberFullArtworkBlurImage(
         imageUrl = remoteArt,
         artPx = ART_PX,
+        liveFrame = canvasFrame.takeIf { !legacyMesh },
         // Straight away when it is the main player's backdrop too: the decode
         // and blur run off the main thread, and the last cover's blur is held
         // on screen until this one is ready.
@@ -2936,7 +2937,7 @@ fun NowPlayingScreen(
                             onRenderedChanged = { canvasRendered = it },
                             // Frames only for the legacy mesh, the one backdrop still
                             // tinted off the clip.
-                            frameCapturePx = if (legacyMesh) CANVAS_FRAME_CAPTURE_PX else 0,
+                            frameCapturePx = if (legacyMesh || !clipFullscreen) CANVAS_FRAME_CAPTURE_PX else 0,
                             onFrameCaptured = {
                                 if (!clipFullscreen && !tabletArtworkBackdrop &&
                                     !lyricsOpen && !queueOpen && !queueDragging
@@ -4327,7 +4328,7 @@ fun NowPlayingScreen(
                                         onResumed = onClipResumed,
                                         frameGrab = canvasFrameGrab,
                                         onRenderedChanged = { canvasRendered = it },
-                                        frameCapturePx = if (legacyMesh) CANVAS_FRAME_CAPTURE_PX else 0,
+                                        frameCapturePx = CANVAS_FRAME_CAPTURE_PX,
                                         onFrameCaptured = {
                                             if (!tabletArtworkBackdrop && !lyricsOpen && !queueOpen) {
                                                 canvasFrame = it

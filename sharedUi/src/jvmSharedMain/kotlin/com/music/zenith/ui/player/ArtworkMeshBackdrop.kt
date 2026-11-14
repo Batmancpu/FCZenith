@@ -100,9 +100,19 @@ fun rememberFullArtworkBlurImage(
     imageUrl: String?,
     artPx: Int = CARD_ART_PX,
     prepare: Boolean = true,
+    /** A frame off the playing clip; when set, the backdrop is its blur instead of the still's. */
+    liveFrame: ImageBitmap? = null,
 ): ImageBitmap? {
     val context = LocalPlatformContext.current
     var image by remember { mutableStateOf(imageUrl?.let(fullBlurCache::get)) }
+
+    // The clip's own colours, so the light under the cover follows the clip. Small
+    // frame, blurred off the main thread; the Crossfade in the backdrop eases it in.
+    LaunchedEffect(liveFrame) {
+        val frame = liveFrame ?: return@LaunchedEffect
+        if (isLikelyBlackFrame(frame)) return@LaunchedEffect
+        image = withContext(Dispatchers.Default) { frame.boxBlurred(FULL_BLUR_PASSES) }
+    }
 
     LaunchedEffect(imageUrl, artPx, prepare) {
         imageUrl?.let(fullBlurCache::get)?.let {
@@ -182,7 +192,7 @@ fun FullArtworkBlurBackdrop(
             // bukan ditukar mendadak di atas lapisan yang sedang naik.
             Crossfade(
                 targetState = image,
-                animationSpec = tween(320, easing = FastOutSlowInEasing),
+                animationSpec = tween(900, easing = FastOutSlowInEasing),
                 label = "preparedBackdropImage",
             ) { bitmap ->
                 if (bitmap != null) {
