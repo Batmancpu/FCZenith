@@ -3799,16 +3799,32 @@ fun NowPlayingScreen(
                                     centred.translate(0f, (rest.top - centred.top) * g)
                                 }
                             }
+                            // Kaki cover tidak boleh terpotong tepi bawah panel selagi panel
+                            // masih tumbuh dari pill. Cover hanya diangkat sebesar bagian yang
+                            // melewati tepi bawah (0 di mini player dan di posisi akhir), jadi
+                            // jalurnya tetap mulus dan mendarat pas di tujuan.
+                            val kept = if (dock == null || heroMode || playerBounds.height <= 0) {
+                                rect
+                            } else {
+                                val panel = dock.panelBounds(
+                                    Size(playerBounds.width.toFloat(), playerBounds.height.toFloat()),
+                                )
+                                val panelBottom = bannerTopPx.toFloat() + (panel.bottom - panel.top)
+                                val gap = with(density) { DOCK_PANEL_BOTTOM_GAP.toPx() } *
+                                    dockSmooth(dock.openFraction() / DOCK_GAP_FULL_AT)
+                                val over = rect.bottom + gap - panelBottom
+                                if (over > 0f) rect.translate(0f, -over) else rect
+                            }
                             val minTop = bannerTopPx.toFloat()
                             val minLeft = -boxLeftPx.toFloat()
                             val maxRight = (playerBounds.width - boxLeftPx).toFloat()
-                            val dy = if (rect.top < minTop) minTop - rect.top else 0f
+                            val dy = if (kept.top < minTop) minTop - kept.top else 0f
                             val dx = when {
-                                rect.left < minLeft -> minLeft - rect.left
-                                rect.right > maxRight -> maxRight - rect.right
+                                kept.left < minLeft -> minLeft - kept.left
+                                kept.right > maxRight -> maxRight - kept.right
                                 else -> 0f
                             }
-                            return if (dx == 0f && dy == 0f) rect else rect.translate(dx, dy)
+                            return if (dx == 0f && dy == 0f) kept else kept.translate(dx, dy)
                         }
                         // A rect of the sleeve's, carried as far towards the cover as
                         // the sheet has gone.
