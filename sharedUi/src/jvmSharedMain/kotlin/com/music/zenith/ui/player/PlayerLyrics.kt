@@ -119,6 +119,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalDensity
@@ -1763,7 +1764,7 @@ internal fun RomanizationToggleButton(
     // romanize, and change the lyrics provider. It folds back after a choice,
     // a second tap on the globe, or a few idle seconds.
     var expanded by remember { mutableStateOf(false) }
-    val popoverMode = menu != null && LocalLyricsMenuPopover.current != null
+    val popoverMode = menu != null
     LaunchedEffect(menuEnabled) { if (!menuEnabled) menu?.open = false }
     LaunchedEffect(expanded, menuEnabled) {
         if (!menuEnabled) {
@@ -1901,7 +1902,7 @@ internal fun LyricsGlobeMenuHost(
     onRomanize: () -> Unit,
     onProviders: () -> Unit,
 ) {
-    val popover = LocalLyricsMenuPopover.current ?: return
+    val popover = LocalLyricsMenuPopover.current
     val romanizeLabel = stringResource(
         if (showingRomanization) Res.string.show_original_lyrics else Res.string.romanize_lyrics,
     )
@@ -1917,7 +1918,98 @@ internal fun LyricsGlobeMenuHost(
             onProviders()
         },
     )
-    popover(menu.open, menu.anchor, { menu.open = false }, entries)
+    if (popover != null) {
+        popover(menu.open, menu.anchor, { menu.open = false }, entries)
+    } else {
+        LyricsGlobeMenuFallback(menu, entries)
+    }
+}
+
+/**
+ * Popover bawaan bila app tidak menyediakan [LocalLyricsMenuPopover] (desktop):
+ * tumbuh dari tombol globe dengan pegas, lalu menyusut kembali saat ditutup.
+ */
+@Composable
+private fun LyricsGlobeMenuFallback(menu: LyricsGlobeMenu, entries: List<LyricsMenuEntry>) {
+    var rootOrigin by remember { mutableStateOf(Offset.Zero) }
+    val shape = androidx.compose.foundation.shape.RoundedCornerShape(22.dp)
+    val origin = androidx.compose.ui.graphics.TransformOrigin(0.12f, 1f)
+    Box(Modifier.fillMaxSize().onGloballyPositioned { rootOrigin = it.positionInWindow() }) {
+        if (menu.open) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                    ) { menu.open = false },
+            )
+        }
+        val anchor = menu.anchor
+        if (anchor != null) {
+            AnimatedVisibility(
+                visible = menu.open,
+                enter = fadeIn(tween(140)) + androidx.compose.animation.scaleIn(
+                    animationSpec = androidx.compose.animation.core.spring(
+                        dampingRatio = 0.62f,
+                        stiffness = 380f,
+                    ),
+                    initialScale = 0.6f,
+                    transformOrigin = origin,
+                ),
+                exit = fadeOut(tween(110)) + androidx.compose.animation.scaleOut(
+                    animationSpec = tween(140),
+                    targetScale = 0.7f,
+                    transformOrigin = origin,
+                ),
+                modifier = Modifier.layout { measurable, constraints ->
+                    val p = measurable.measure(constraints.copy(minWidth = 0, minHeight = 0))
+                    layout(p.width, p.height) {
+                        p.place(
+                            (anchor.left - rootOrigin.x).toInt(),
+                            (anchor.top - rootOrigin.y - 10.dp.toPx()).toInt() - p.height,
+                        )
+                    }
+                },
+            ) {
+                Column(
+                    Modifier
+                        .width(240.dp)
+                        .background(Color(0xCC1C1C1E), shape)
+                        .padding(vertical = 6.dp),
+                ) {
+                    entries.forEach { entry ->
+                        val alpha = if (entry.enabled) 1f else 0.4f
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable(
+                                    enabled = entry.enabled,
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                    onClick = entry.onClick,
+                                )
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                imageVector = entry.icon,
+                                contentDescription = null,
+                                tint = Color.White.copy(alpha = alpha),
+                                modifier = Modifier.size(20.dp),
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            Text(
+                                text = entry.label,
+                                color = Color.White.copy(alpha = alpha),
+                                style = MaterialTheme.typography.bodyLarge,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 /**

@@ -2743,6 +2743,7 @@ fun NowPlayingScreen(
                         )
                     },
                     lyricsPane = {
+                        val globeMenu = remember { LyricsGlobeMenu() }
                         LandscapeLyricsPane(
                             hasLyrics = lyricsTranslation.displayedLyrics.isNotEmpty(),
                             placeholder = if (lyricsUnavailable) {
@@ -2769,6 +2770,7 @@ fun NowPlayingScreen(
                                     enabled = !lyrics.isNullOrEmpty(),
                                     onClick = lyricsTranslation.toggleRomanization,
                                     onProviders = { showLyricsProviders = true },
+                                    menu = globeMenu,
                                 )
                             },
                             translationToggle = {
@@ -2778,6 +2780,16 @@ fun NowPlayingScreen(
                                     showingTranslation = lyricsTranslation.showingTranslation,
                                     enabled = !lyrics.isNullOrEmpty(),
                                     onClick = lyricsTranslation.toggleTranslation,
+                                )
+                            },
+                            overlay = {
+                                LyricsGlobeMenuHost(
+                                    menu = globeMenu,
+                                    state = lyricsTranslation.romanizationState,
+                                    showingRomanization = lyricsTranslation.showingRomanization,
+                                    enabled = !lyrics.isNullOrEmpty(),
+                                    onRomanize = lyricsTranslation.toggleRomanization,
+                                    onProviders = { showLyricsProviders = true },
                                 )
                             },
                         ) { panelModifier ->
