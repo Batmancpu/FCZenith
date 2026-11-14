@@ -1585,8 +1585,6 @@ internal fun Modifier.lyricsGlassDisc(
     active: Boolean,
     interaction: MutableInteractionSource,
     hazeState: HazeState? = null,
-    /** False memakai disc default (Haze), tanpa Liquid Glass app. */
-    useAppGlass: Boolean = true,
 ): Modifier {
     val pressed by interaction.collectIsPressedAsState()
     val reduceBlur by PlayerSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
@@ -1612,7 +1610,7 @@ internal fun Modifier.lyricsGlassDisc(
     }
     // Liquid Glass app (sama dengan tombol back melayang) bila tersedia;
     // null berarti kaca mati / Reduce dynamic blur, jadi disc Haze di bawah dipakai.
-    val appGlass = if (useAppGlass) LocalLyricsGlassDisc.current?.invoke(active) else null
+    val appGlass = LocalLyricsGlassDisc.current?.invoke(active)
     if (appGlass != null) {
         return this
             .graphicsLayer {
@@ -1720,12 +1718,7 @@ internal fun TranslationToggleButton(
     Box(
         modifier = Modifier
             .size(34.dp)
-            .lyricsGlassDisc(
-                active = active,
-                interaction = glassInteraction,
-                hazeState = hazeState,
-                useAppGlass = false,
-            )
+            .lyricsGlassDisc(active = active, interaction = glassInteraction, hazeState = hazeState)
             .clickable(
                 enabled = enabled,
                 interactionSource = glassInteraction,
@@ -1798,12 +1791,7 @@ internal fun RomanizationToggleButton(
             modifier = Modifier
                 .size(34.dp)
                 .onGloballyPositioned { menu?.anchor = it.boundsInWindow() }
-                .lyricsGlassDisc(
-                    active = globeActive,
-                    interaction = globeInteraction,
-                    hazeState = hazeState,
-                    useAppGlass = false,
-                )
+                .lyricsGlassDisc(active = globeActive, interaction = globeInteraction, hazeState = hazeState)
                 .clickable(
                     enabled = menuEnabled,
                     interactionSource = globeInteraction,
