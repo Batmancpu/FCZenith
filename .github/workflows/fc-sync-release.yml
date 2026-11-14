@@ -139,6 +139,13 @@ jobs:
           set -euo pipefail
           CURRENT_UPSTREAM_VERSION="$(sed -n 's/^upstreamVersion=//p' fc/version.properties)"
           VERSION_NAME="$(sed -n 's/^versionName=//p' fc/version.properties)"
+          EXPERIMENT_ENABLED="$(sed -n 's/^enabled=//p' fc/spatial-audio/experimental/config.properties)"
+          LAST_EXPERIMENT_ENABLED="$(sed -n 's/^experimentalAudio=//p' fc/version.properties)"
+          LAST_EXPERIMENT_ENABLED="${LAST_EXPERIMENT_ENABLED:-false}"
+          if [[ "$EXPERIMENT_ENABLED" != "true" && "$EXPERIMENT_ENABLED" != "false" ]]; then
+            echo "Invalid experimental spatial audio flag" >&2
+            exit 1
+          fi
           if [[ -z "$CURRENT_UPSTREAM_VERSION" || -z "$VERSION_NAME" ]]; then
             echo "Missing FC upstreamVersion/versionName metadata." >&2
             exit 1
@@ -152,7 +159,7 @@ jobs:
             release_asset_exists=true
           fi
 
-          if [[ "$UPSTREAM_VERSION" != "$CURRENT_UPSTREAM_VERSION" || "$UPSTREAM_CHANGED" == "true" ]]; then
+          if [[ "$UPSTREAM_VERSION" != "$CURRENT_UPSTREAM_VERSION" || "$UPSTREAM_CHANGED" == "true" || "$EXPERIMENT_ENABLED" != "$LAST_EXPERIMENT_ENABLED" ]]; then
             # A new stable series starts at .1; new main commits in that series increment the FC revision.
             python3 fc/bump-version.py "$UPSTREAM_VERSION"
             should_release=true
@@ -167,6 +174,11 @@ jobs:
             should_release=false
           fi
 
+          if [[ "$should_release" == "true" ]]; then
+            # Record the shipped variant after a release is selected; flag changes bump version.
+            sed -i '/^experimentalAudio=/d' fc/version.properties
+            printf 'experimentalAudio=%s\n' "$EXPERIMENT_ENABLED" >> fc/version.properties
+          fi
           VERSION_CODE="$(sed -n 's/^versionCode=//p' fc/version.properties)"
           VERSION_NAME="$(sed -n 's/^versionName=//p' fc/version.properties)"
           echo "should_release=$should_release" >> "$GITHUB_OUTPUT"
@@ -252,6 +264,14 @@ jobs:
             echo "included=true" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Apply temporary Spatial Audio quality experiment
+        id: spatial_quality
+        if: steps.decision.outputs.should_release == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 fc/spatial-audio/experimental/apply.py
+          echo "enabled=$(sed -n 's/^enabled=//p' fc/spatial-audio/experimental/config.properties)" >> "$GITHUB_OUTPUT"
       - name: Fill missing Android locale fallbacks for this build
         if: steps.decision.outputs.should_release == 'true'
         run: |
@@ -442,6 +462,7 @@ jobs:
             app/src/main/java/com/music/zenith/playback/SpatialAudioDecisionEngine.kt
             app/src/main/java/com/music/zenith/TopBarActionVisibility.kt
             app/src/test/java/com/music/zenith/playback/SpatialAudioLearningTest.kt
+            app/src/test/java/com/music/zenith/playback/SpatialAudioQualityTest.kt
             app/src/test/java/com/music/zenith/playback/SpatialAudioPreferenceTest.kt
             app/src/test/java/com/music/zenith/playback/SpatialAudioDecisionEngineTest.kt
           )
@@ -510,6 +531,7 @@ jobs:
             - Includes ${{ steps.upstream.outputs.commits_ahead }} upstream commits beyond the stable baseline when built as a main snapshot.
             - FC Zenith follows upstream main automatically. Every new source snapshot must pass tests, build and signature verification before publishing.
             - The same FC signing certificate is checked before publishing.
+            - Experimental DSP quality layer: ${{ steps.spatial_quality.outputs.enabled }} (reversible; includes audio regression tests).
             - Spatial Audio: ${{ steps.spatial_audio.outputs.included == 'true' && 'Includes the persistent FC stereo learner, binary per-track On/Off with Auto status, and phone-speaker/Atmos/DSP safety bypasses. Profiles and explicit feedback remain on-device.' || 'Not included in this build.' }}
 
             Obtainium source: https://github.com/Batmancpu/FCZenith
