@@ -3808,7 +3808,17 @@ fun NowPlayingScreen(
                             val open = dockT()
                             val base = dockFlyEase(open)
                             val ease = base + (dockEaseThumb(open) - base) * p()
-                            return lerp(mini, rect.translate(0f, -unridden), ease)
+                            val target = rect.translate(0f, -unridden)
+                            // Vertical position leads the size a little, so the cover climbs
+                            // toward the panel's top-left instead of hanging low in it. The
+                            // lead is zero at both ends, so it still leaves and lands exactly.
+                            val lift = 0.25f
+                            val lifted = ease + (1f - ease) * ease * lift * (1f - p())
+                            val left = mini.left + (target.left - mini.left) * ease
+                            val right = mini.right + (target.right - mini.right) * ease
+                            val height = mini.height + (target.height - mini.height) * ease
+                            val top = mini.top + (target.top - mini.top) * lifted
+                            return Rect(left, top, right, top + height)
                         }
                         // The banner's dissolve, firmed up into the cover's hard edge as
                         // it docks.
