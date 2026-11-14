@@ -2740,6 +2740,7 @@ fun NowPlayingScreen(
                             },
                             romanizationToggle = {
                                 RomanizationToggleButton(
+                                    hazeState = playerHaze,
                                     state = lyricsTranslation.romanizationState,
                                     showingRomanization = lyricsTranslation.showingRomanization,
                                     enabled = !lyrics.isNullOrEmpty(),
@@ -2748,6 +2749,7 @@ fun NowPlayingScreen(
                             },
                             translationToggle = {
                                 TranslationToggleButton(
+                                    hazeState = playerHaze,
                                     state = lyricsTranslation.translationState,
                                     showingTranslation = lyricsTranslation.showingTranslation,
                                     enabled = !lyrics.isNullOrEmpty(),
@@ -2784,6 +2786,7 @@ fun NowPlayingScreen(
                                     onPickLine = lyricPicker.pick,
                                     onTogglePick = lyricPicker.toggle,
                                     centerFocus = true,
+                                    hazeState = playerHaze,
                                     modifier = Modifier.fillMaxSize(),
                                 )
                             }
@@ -4823,6 +4826,7 @@ Spacer(Modifier.width(12.dp))
                                         picked = lyricPicker.picks,
                                         onPickLine = lyricPicker.pick,
                                         onTogglePick = lyricPicker.toggle,
+                                        hazeState = playerHaze,
                                         modifier = Modifier.fillMaxSize(),
                                     )
                                 }
@@ -4852,6 +4856,7 @@ Spacer(Modifier.width(12.dp))
                                         .graphicsLayer { alpha = translateFade },
                                 ) {
                                     RomanizationToggleButton(
+                                        hazeState = playerHaze,
                                         state = lyricsTranslation.romanizationState,
                                         showingRomanization = lyricsTranslation.showingRomanization,
                                         enabled = translateShown && !lyrics.isNullOrEmpty(),
@@ -4864,6 +4869,7 @@ Spacer(Modifier.width(12.dp))
                                         .graphicsLayer { alpha = translateFade },
                                 ) {
                                     TranslationToggleButton(
+                                        hazeState = playerHaze,
                                         state = lyricsTranslation.translationState,
                                         showingTranslation = lyricsTranslation.showingTranslation,
                                         // Not tappable on the way out: a disc at 20%
