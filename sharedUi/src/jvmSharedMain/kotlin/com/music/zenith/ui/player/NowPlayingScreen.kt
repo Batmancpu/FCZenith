@@ -560,6 +560,13 @@ private const val DOCK_CENTRE_END_AT = 0.70f
 private const val DOCK_SETTLE_FROM = 0.30f
 private const val DOCK_SETTLE_TO = 0.60f
 
+/**
+ * Tarikan "settle" dimatikan: jalur cover kini sudah menempel ke sheet sendiri
+ * (lihat [towardsDock]), jadi tarikan tambahan itu justru membuat cover naik
+ * terlalu tinggi lalu turun lagi di sekitar 70-80% terbuka.
+ */
+private const val DOCK_SETTLE_ENABLED = false
+
 private fun dockSmooth(x: Float): Float {
     val t = x.coerceIn(0f, 1f)
     return t * t * (3f - 2f * t)
@@ -3748,7 +3755,10 @@ fun NowPlayingScreen(
                                 val fall = dockSmooth(
                                     (open - DOCK_CENTRE_HOLD_TO) / (DOCK_CENTRE_END_AT - DOCK_CENTRE_HOLD_TO),
                                 )
-                                val share = rise * (1f - fall)
+                                // Hanya banner full-bleed yang masih diletakkan di tengah panel.
+                                // Cover kartu mengikuti jalur sheet-nya sendiri, tanpa dorongan
+                                // ke tengah yang membuatnya naik turun.
+                                val share = if (heroMode) rise * (1f - fall) else 0f
                                 if (share <= 0f) {
                                     rawSource
                                 } else {
@@ -3765,7 +3775,7 @@ fun NowPlayingScreen(
                             // akhirnya relatif terhadap panel: dari DOCK_SETTLE_FROM sampai
                             // DOCK_SETTLE_TO terbuka ia ditarik pelan ke sana, lalu naik bersama
                             // panel, tidak menempel ke tepi atas. Banner full-bleed tidak berubah.
-                            val rect = if (heroMode || dock == null || rest == null) {
+                            val rect = if (!DOCK_SETTLE_ENABLED || dock == null || rest == null) {
                                 centred
                             } else {
                                 val g = dockSmooth(
@@ -3799,7 +3809,13 @@ fun NowPlayingScreen(
                             // Ukuran dan posisinya menyusul lebar panel (dockFlyEase): sudah
                             // hampir penuh ke kanan saat panel selebar layar, tapi tetap
                             // landai di awal drag.
-                            val unridden = dockFrame.offset * (1f - p())
+                            // Tujuan cover = posisi akhirnya di sheet yang sedang naik, tapi
+                            // tidak pernah lebih rendah dari cover mini (tidak ada lekukan di
+                            // awal buka / akhir tutup). Cover selalu di antara mini dan
+                            // tujuan ini, jadi geraknya satu arah: tidak melewati tepi atas
+                            // panel, tidak berhenti di layar lalu turun saat sheet menyusul.
+                            val cap = (mini.top + dockFrame.offset - rect.top).coerceAtLeast(0f)
+                            val unridden = (dockFrame.offset - cap).coerceAtLeast(0f) * (1f - p())
                             val open = dockT()
                             val base = dockFlyEase(open)
                             val ease = base + (dockEaseThumb(open) - base) * p()
