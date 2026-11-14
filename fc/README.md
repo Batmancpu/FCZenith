@@ -6,7 +6,7 @@ Direct upstream: **rezapranata089-bit/Zenith**
 ## Only installed-app changes
 
 - Android application ID: `com.spotify.music`
-- Installed app label: `Music`
+- Installed app label: `brrMusic` while the temporary branding flag is enabled
 - Launcher icon: the supplied artwork stored in `fc/icon/music.webp.b64`
 - Existing Zenith features and behavior remain upstream-controlled.
 
@@ -41,9 +41,37 @@ Use this repository URL as the Obtainium source:
 
 https://github.com/Batmancpu/FCZenith
 
-Releases publish one universal APK named
-`Music-v<version>.apk`. The app's built-in updater is also configured to check
-this repository and select the Music APK asset.
+Releases publish one universal APK named `brrMusic-v<version>.apk` while the
+branding flag is enabled (or `Music-v<version>.apk` after rollback). The app's
+built-in updater uses that matching prefix in each APK.
+
+## Temporary, reversible presentation-only brrMusic branding
+
+The launcher label, Home header, visible UI resource text, release title and APK
+asset prefix are displayed as **brrMusic**. The launcher icon is unchanged.
+
+**Lyrics-share images are intentionally unbranded**: the Z icon, Music/Zenith
+watermark and reserved watermark band are removed from the saved/shared pixels.
+Replay poster branding is brrMusic text, with the upstream Z logo removed.
+
+This change exists entirely in the owned build-only overlay:
+`fc/branding/config.properties` and `fc/branding/apply.py`.
+It does not rename Kotlin packages, Android application ID, existing downloads,
+upstream APIs, Fluid Cloud integration, spatial-audio code or the release key.
+Existing on-disk Music/Zenith downloads paths remain untouched to preserve
+user files and old downloads.
+
+To **revert** on request, set `enabled=false` in
+`fc/branding/config.properties` and merge the change to `main` (or ask ChatGPT
+to do it). The next workflow returns to the previous Music branding and
+`Music-` release prefix. When switching the prefix, the workflow increments
+the FC release revision and Android versionCode so the rollback is installable
+over existing brrMusic versions. No history rewrite, package rename or
+Spatial Audio uninstall is needed.
+
+All changes to upstream UI files are made in the CI workspace only, tested and
+removed from Git before committing new upstream source. Missing upstream
+anchors fail the build instead of silently creating a partially rebranded APK.
 
 ## Automated upstream main releases
 
