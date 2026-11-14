@@ -561,8 +561,13 @@ private fun dockEase(t: Float): Float {
  * player dan sleeve. Mengikuti kurva lebar panel, jadi cover tidak turun ke
  * mini player selagi panel masih lebar.
  */
-private fun dockFlyEase(t: Float): Float =
-    panelWideEase(t) * dockSmooth(t / DOCK_FLY_SOFT_START_AT)
+private fun dockFlyEase(t: Float): Float {
+    // t^2 * (2 - t): never ahead of the sheet (<= t), so the cover stays inside the
+    // growing panel instead of poking above its top edge, starts softly, and has the
+    // sheet's own speed on arrival, so it lands without a hitch.
+    val x = t.coerceIn(0f, 1f)
+    return x * x * (2f - x)
+}
 
 /**
  * Drag sejauh ini cover terbang dilandaikan dulu (kemiringan 0 di awal), supaya
@@ -3737,7 +3742,10 @@ fun NowPlayingScreen(
                                 // Hanya banner full-bleed yang masih diletakkan di tengah panel.
                                 // Cover kartu mengikuti jalur sheet-nya sendiri, tanpa dorongan
                                 // ke tengah yang membuatnya naik turun.
-                                val share = if (heroMode) rise * (1f - fall) else 0f
+                                // No vertical centring any more: the flight stays inside the
+                                // panel by itself, and centring is what moved the cover up
+                                // and down.
+                                val share = 0f
                                 if (share <= 0f) {
                                     rawSource
                                 } else {
