@@ -36,6 +36,24 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
+      - name: Select temporary release branding
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$(sed -n 's/^enabled=//p' fc/branding/config.properties)" in
+            true)
+              echo 'FC_APP_NAME=brrMusic' >> "$GITHUB_ENV"
+              echo 'FC_APK_PREFIX=brrMusic-' >> "$GITHUB_ENV"
+              ;;
+            false)
+              echo 'FC_APP_NAME=Music' >> "$GITHUB_ENV"
+              echo 'FC_APK_PREFIX=Music-' >> "$GITHUB_ENV"
+              ;;
+            *)
+              echo 'Invalid branding config; expected enabled=true or enabled=false' >&2
+              exit 1
+              ;;
+          esac
       - name: Fetch upstream source and latest stable release metadata
         id: upstream
         env:
@@ -126,7 +144,7 @@ jobs:
             exit 1
           fi
 
-          release_asset="Music-v${VERSION_NAME}.apk"
+          release_asset="${FC_APK_PREFIX}v${VERSION_NAME}.apk"
           release_assets="$(gh release view "v$VERSION_NAME" --repo "$GITHUB_REPOSITORY" \
             --json assets --jq '.assets[].name' 2>/dev/null || true)"
           release_asset_exists=false
@@ -139,7 +157,11 @@ jobs:
             python3 fc/bump-version.py "$UPSTREAM_VERSION"
             should_release=true
           elif [[ "$release_asset_exists" == "false" ]]; then
-            # Also recover automatically if a previous run created the release but missed its APK.
+            # When switching branding, publish a higher Android versionCode.
+            if grep -Eq '\.apk$' <<< "$release_assets"; then
+              python3 fc/bump-version.py "$UPSTREAM_VERSION"
+            fi
+            # If the old release has no APK, recover without reusing an installed version.
             should_release=true
           else
             should_release=false
@@ -280,6 +302,9 @@ jobs:
               print(f"{qualifier}: added {added} English fallback entries for this build.")
           PY
 
+      - name: Apply reversible brrMusic presentation overlay
+        if: steps.decision.outputs.should_release == 'true'
+        run: python3 fc/branding/apply.py
       - name: Run production unit tests
         if: steps.decision.outputs.should_release == 'true'
         env:
@@ -354,7 +379,7 @@ jobs:
             -alias fczenith >/dev/null
 
           mkdir -p dist
-          SIGNED_APK="dist/Music-v${EXPECTED_VERSION_NAME}.apk"
+          SIGNED_APK="dist/${FC_APK_PREFIX}v${EXPECTED_VERSION_NAME}.apk"
           "$APKSIGNER" sign \
             --ks "$KEYSTORE" \
             --ks-type PKCS12 \
@@ -429,6 +454,30 @@ jobs:
             fi
           done
 
+      - name: Restore temporary branding files before committing upstream sync
+        if: steps.decision.outputs.should_release == 'true' && always()
+        env:
+          UPSTREAM_COMMIT: ${{ steps.upstream.outputs.commit }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          paths=(
+            app/src/main/java/com/music/zenith/ui/player/LyricsShareCard.kt
+            app/src/main/java/com/music/zenith/ui/player/AndroidLyricsShareSheet.kt
+            app/src/main/java/com/music/zenith/ui/replay/ReplayPoster.kt
+            app/src/main/java/com/music/zenith/ui/replay/ReplayShareSheet.kt
+            app/src/main/java/com/music/zenith/ui/screens/SettingsSheet.kt
+            sharedUi/src/jvmSharedMain/kotlin/com/music/zenith/ui/screens/HomeScreen.kt
+            app/src/main/res/values/strings.xml
+            app/src/main/res/values-in/strings.xml
+            app/src/main/res/values-ko/strings.xml
+            sharedUi/src/commonMain/composeResources/values/strings.xml
+            sharedUi/src/commonMain/composeResources/values-id/strings.xml
+            sharedUi/src/commonMain/composeResources/values-ko/strings.xml
+          )
+          for path in "${paths[@]}"; do
+            git restore --source="$UPSTREAM_COMMIT" --staged --worktree -- "$path"
+          done
       - name: Commit the upstream sync and FC version metadata to main
         if: steps.decision.outputs.should_release == 'true'
         env:
@@ -440,22 +489,22 @@ jobs:
           # password-protected signing key; ignored build outputs stay excluded.
           git add -A
           if ! git diff --cached --quiet; then
-            git commit -m "chore(fc): sync upstream and prepare Music v$VERSION_NAME"
+            git commit -m "chore(fc): sync upstream and prepare ${FC_APP_NAME} v$VERSION_NAME"
           fi
           git push origin HEAD:main
 
-      - name: Publish Music APK to FCZenith Releases
+      - name: Publish branded APK to FCZenith Releases
         if: steps.decision.outputs.should_release == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.decision.outputs.version_name }}
           target_commitish: main
-          name: Music v${{ steps.decision.outputs.version_name }}
+          name: ${{ env.FC_APP_NAME }} v${{ steps.decision.outputs.version_name }}
           body: |
-            FC Zenith release: Music v${{ steps.decision.outputs.version_name }}.
+            FC Zenith release: ${{ env.FC_APP_NAME }} v${{ steps.decision.outputs.version_name }}.
 
             - Android package: com.spotify.music
-            - App label: Music
+            - App label: ${{ env.FC_APP_NAME }}
             - Upstream stable version baseline: ${{ steps.upstream.outputs.tag }}.
             - Upstream source: ${{ steps.upstream.outputs.source_ref }} at commit ${{ steps.upstream.outputs.commit }}.
             - Includes ${{ steps.upstream.outputs.commits_ahead }} upstream commits beyond the stable baseline when built as a main snapshot.
@@ -464,6 +513,6 @@ jobs:
             - Spatial Audio: ${{ steps.spatial_audio.outputs.included == 'true' && 'Includes the persistent FC stereo learner, binary per-track On/Off with Auto status, and phone-speaker/Atmos/DSP safety bypasses. Profiles and explicit feedback remain on-device.' || 'Not included in this build.' }}
 
             Obtainium source: https://github.com/Batmancpu/FCZenith
-          files: dist/Music-v${{ steps.decision.outputs.version_name }}.apk
+          files: dist/${{ env.FC_APK_PREFIX }}v${{ steps.decision.outputs.version_name }}.apk
           fail_on_unmatched_files: true
           make_latest: true
