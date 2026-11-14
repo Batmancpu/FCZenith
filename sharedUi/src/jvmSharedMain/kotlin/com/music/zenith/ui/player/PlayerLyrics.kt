@@ -100,6 +100,7 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -115,7 +116,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalDensity
@@ -1753,11 +1756,15 @@ internal fun RomanizationToggleButton(
     hazeState: HazeState? = null,
     onProviders: () -> Unit = {},
     menuEnabled: Boolean = true,
+    /** Bila diisi dan app menyediakan popover, globe membuka popover, bukan kipas disc. */
+    menu: LyricsGlobeMenu? = null,
 ) {
     // The globe is a menu now: one tap fans two glass discs out beside it —
     // romanize, and change the lyrics provider. It folds back after a choice,
     // a second tap on the globe, or a few idle seconds.
     var expanded by remember { mutableStateOf(false) }
+    val popoverMode = menu != null && LocalLyricsMenuPopover.current != null
+    LaunchedEffect(menuEnabled) { if (!menuEnabled) menu?.open = false }
     LaunchedEffect(expanded, menuEnabled) {
         if (!menuEnabled) {
             expanded = false
@@ -1768,7 +1775,7 @@ internal fun RomanizationToggleButton(
     }
     val loading = state is LyricsTranslationUiState.Loading
     val romanizeActive = showingRomanization || loading
-    val globeActive = expanded || romanizeActive
+    val globeActive = expanded || romanizeActive || (popoverMode && menu?.open == true)
     val globeTint = if (globeActive) LocalPlayerTint.current else LocalPlayerTint.current.copy(alpha = 0.78f)
     val romanizeTint = when {
         !enabled || state is LyricsTranslationUiState.SameLanguage -> LocalPlayerTint.current.copy(alpha = 0.42f)
@@ -1782,12 +1789,15 @@ internal fun RomanizationToggleButton(
         Box(
             modifier = Modifier
                 .size(34.dp)
+                .onGloballyPositioned { menu?.anchor = it.boundsInWindow() }
                 .lyricsGlassDisc(active = globeActive, interaction = globeInteraction, hazeState = hazeState)
                 .clickable(
                     enabled = menuEnabled,
                     interactionSource = globeInteraction,
                     indication = null,
-                ) { expanded = !expanded },
+                ) {
+                    if (popoverMode && menu != null) menu.open = !menu.open else expanded = !expanded
+                },
             contentAlignment = Alignment.Center,
         ) {
             if (loading && !expanded) {
@@ -1868,6 +1878,46 @@ internal fun RomanizationToggleButton(
             }
         }
     }
+}
+
+/** State popover menu globe: terbuka atau tidak, dan bounds tombol globe di window. */
+@Stable
+internal class LyricsGlobeMenu {
+    var open by mutableStateOf(false)
+    var anchor by mutableStateOf<Rect?>(null)
+}
+
+/**
+ * Menggambar popover menu globe lewat [LocalLyricsMenuPopover]. Dipasang di
+ * container yang cukup besar (sibling tombol), bukan di dalam slot tombol.
+ * Tanpa pengait (desktop) tidak menggambar apa pun.
+ */
+@Composable
+internal fun LyricsGlobeMenuHost(
+    menu: LyricsGlobeMenu,
+    state: LyricsTranslationUiState,
+    showingRomanization: Boolean,
+    enabled: Boolean,
+    onRomanize: () -> Unit,
+    onProviders: () -> Unit,
+) {
+    val popover = LocalLyricsMenuPopover.current ?: return
+    val romanizeLabel = stringResource(
+        if (showingRomanization) Res.string.show_original_lyrics else Res.string.romanize_lyrics,
+    )
+    val providerLabel = stringResource(Res.string.lyrics_provider_current)
+    val romanizeEnabled = enabled && state !is LyricsTranslationUiState.SameLanguage
+    val entries = listOf(
+        LyricsMenuEntry(romanizeLabel, Icons.Rounded.SortByAlpha, romanizeEnabled) {
+            menu.open = false
+            onRomanize()
+        },
+        LyricsMenuEntry(providerLabel, Icons.Rounded.SwapHoriz, true) {
+            menu.open = false
+            onProviders()
+        },
+    )
+    popover(menu.open, menu.anchor, { menu.open = false }, entries)
 }
 
 /**

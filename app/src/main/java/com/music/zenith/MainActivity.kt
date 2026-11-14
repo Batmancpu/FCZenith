@@ -232,7 +232,9 @@ import com.music.zenith.ui.components.LongPressOrigin
 import com.music.zenith.ui.components.MenuAnchor
 import com.music.zenith.ui.components.menuAnchor
 import com.music.zenith.ui.components.macOSPopupMorph
+import com.music.zenith.ui.components.IosMenuPlacement
 import com.music.zenith.ui.components.IosMenuPopover
+import com.music.zenith.ui.components.IosMenuRow
 import com.music.zenith.ui.components.SongActionsMenu
 import com.music.zenith.ui.components.HeldContextMenu
 import com.music.zenith.ui.components.cancelCoverFlight
@@ -284,6 +286,7 @@ import com.music.zenith.ui.player.LocalLyricsGlassDisc
 import com.music.zenith.ui.components.lyricsGlassDiscSurface
 import com.music.zenith.ui.components.lyricsGlassSource
 import com.music.zenith.ui.player.LocalLyricsGlassSource
+import com.music.zenith.ui.player.LocalLyricsMenuPopover
 import com.motion.lyrics.MotionLyricLine
 import com.motion.lyrics.toMotionWords
 import com.music.zenith.ui.screens.LocalMixCoverBackground
@@ -459,6 +462,25 @@ class MainActivity : AppCompatActivity() {
                     LocalAppBackdrop provides appBackdrop,
                     LocalLyricsGlassDisc provides { active -> lyricsGlassDiscSurface(active, lyricsBackdrop) },
                     LocalLyricsGlassSource provides { content -> lyricsGlassSource(content, lyricsBackdrop) },
+                    LocalLyricsMenuPopover provides { open, anchor, onDismiss, entries ->
+                        IosMenuPopover(
+                            item = if (open) Unit else null,
+                            anchor = anchor,
+                            onDismiss = onDismiss,
+                            backdrop = lyricsBackdrop,
+                            placement = IosMenuPlacement.AboveStart,
+                            dimBackground = false,
+                        ) {
+                            entries.forEach { entry ->
+                                IosMenuRow(
+                                    label = entry.label,
+                                    icon = entry.icon,
+                                    onClick = entry.onClick,
+                                    enabled = entry.enabled,
+                                )
+                            }
+                        }
+                    },
                     LocalMotionLyricLine provides { line, position, style, inactive, active, modifier ->
                         val motionWords = remember(line) { line.toMotionWords() }
                         val sparkle by AppSettings.lyricsSparkle.collectAsStateWithLifecycle()

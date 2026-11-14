@@ -4886,10 +4886,15 @@ Spacer(Modifier.width(12.dp))
                                 animationSpec = tween(if (translateShown) 220 else 160),
                                 label = "translateFade",
                             )
+                            val globeMenu = remember { LyricsGlobeMenu() }
+                            LaunchedEffect(translateShown) {
+                                if (!translateShown) globeMenu.open = false
+                            }
                             if (translateFade > 0.01f && !lyricPicker.picking) {
                                 Box(
                                     modifier = Modifier
                                         .align(Alignment.BottomStart)
+                                        .offset(y = 20.dp)
                                         .graphicsLayer { alpha = translateFade },
                                 ) {
                                     RomanizationToggleButton(
@@ -4901,11 +4906,13 @@ Spacer(Modifier.width(12.dp))
                                         onProviders = { showLyricsProviders = true },
                                         // Not tappable on the way out, like the translate disc.
                                         menuEnabled = translateShown,
+                                        menu = globeMenu,
                                     )
                                 }
                                 Box(
                                     modifier = Modifier
                                         .align(Alignment.BottomEnd)
+                                        .offset(y = 20.dp)
                                         .graphicsLayer { alpha = translateFade },
                                 ) {
                                     TranslationToggleButton(
@@ -4919,6 +4926,14 @@ Spacer(Modifier.width(12.dp))
                                     )
                                 }
                             }
+                            LyricsGlobeMenuHost(
+                                menu = globeMenu,
+                                state = lyricsTranslation.romanizationState,
+                                showingRomanization = lyricsTranslation.showingRomanization,
+                                enabled = !lyrics.isNullOrEmpty(),
+                                onRomanize = lyricsTranslation.toggleRomanization,
+                                onProviders = { showLyricsProviders = true },
+                            )
                             // The bar arrives and leaves without a transition of its own:
                             // it is an instruction over the words, and one that has to
                             // be legible the instant it is on. Anything that animated

@@ -3,7 +3,9 @@ package com.music.zenith.ui.player
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.TextStyle
 import com.music.zenith.data.lyrics.LyricLine
 
@@ -36,4 +38,22 @@ val LocalLyricsGlassDisc = staticCompositionLocalOf<
  */
 val LocalLyricsGlassSource = staticCompositionLocalOf<
     (@Composable (Modifier) -> Modifier)?
+> { null }
+
+/** Satu baris pada popover menu globe di kontrol lirik. */
+class LyricsMenuEntry(
+    val label: String,
+    val icon: ImageVector,
+    val enabled: Boolean,
+    val onClick: () -> Unit,
+)
+
+/**
+ * Pengait popover menu globe (gaya macOS: morph dari tombol, jelly, live blur).
+ * Diisi oleh modul app (MainActivity). Argumen: apakah terbuka, bounds tombol
+ * di window, aksi tutup, dan isi menu. Null / tidak diisi (desktop) berarti
+ * globe memakai kipas disc bawaan.
+ */
+val LocalLyricsMenuPopover = staticCompositionLocalOf<
+    (@Composable (Boolean, Rect?, () -> Unit, List<LyricsMenuEntry>) -> Unit)?
 > { null }
