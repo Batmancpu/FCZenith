@@ -14,6 +14,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.music.zenith.data.settings.AppSettings
+import com.music.zenith.ui.components.backdrop.Backdrop
+import com.music.zenith.ui.components.backdrop.backdrops.LayerBackdrop
+import com.music.zenith.ui.components.backdrop.backdrops.layerBackdrop
 
 /**
  * Permukaan kaca untuk tombol bulat kontrol lirik, mengikuti pengaturan glass
@@ -21,16 +24,17 @@ import com.music.zenith.data.settings.AppSettings
  * didukung, memakai nilai tint / rim / shadow dari pengaturan glass, plus rim
  * dan hairline yang sama.
  *
- * Tombol ini berada di atas player, yang bukan bagian rekaman [LocalAppBackdrop]
- * (itu merekam halaman di bawah player), jadi tidak ada sampling backdrop di
- * sini: fill putih tipis, rim, dan hairline. Dengan begitu tidak ada lagi
- * lingkaran hitam. Mengembalikan null bila kaca mati / tidak didukung / Reduce
+ * Resepnya sama persis dengan tombol back melayang ([liquidGlass]: blur, lensa,
+ * saturasi, rim, shadow, frosted, clarity, semuanya dari pengaturan Liquid
+ * Glass), tetapi membiaskan [source], rekaman daftar lirik, bukan halaman di
+ * bawah player. Mengembalikan null bila kaca mati / tidak didukung / Reduce
  * dynamic blur aktif, supaya pemanggil memakai disc bawaannya.
  */
 @Composable
-fun lyricsGlassDiscSurface(active: Boolean): Modifier? {
+fun lyricsGlassDiscSurface(active: Boolean, source: Backdrop): Modifier? {
     val glassOn = LocalLiquidGlassEnabled.current && isGlassSupported()
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
+    val clarity by AppSettings.glassClarity.collectAsStateWithLifecycle()
     val custom by AppSettings.glassCustom.collectAsStateWithLifecycle()
     val lift by animateFloatAsState(
         targetValue = if (active) 1f else 0f,
@@ -40,18 +44,25 @@ fun lyricsGlassDiscSurface(active: Boolean): Modifier? {
     if (!glassOn || reduceDynamicBlur) return null
 
     val shape = CircleShape
-    val fillAlpha = ((0.12f + 0.12f * lift) * custom.tint).coerceIn(0f, 1f)
-    val shadowAlpha = (0.20f * custom.shadow).coerceIn(0f, 1f)
+    val tintAlpha = ((clarity.tintAlpha + 0.10f * lift) * custom.tint).coerceIn(0f, 1f)
     return Modifier
-        .shadow(
-            elevation = 6.dp,
-            shape = shape,
-            clip = false,
-            ambientColor = Color.Black.copy(alpha = shadowAlpha * 0.6f),
-            spotColor = Color.Black.copy(alpha = shadowAlpha),
-        )
         .clip(shape)
-        .background(Color.White.copy(alpha = fillAlpha), shape)
-        .liquidGlassRim(shape)
+        .liquidGlass(
+            shape = shape,
+            surfaceTint = Color(0xFF121212).copy(alpha = tintAlpha),
+            source = source,
+        )
         .border(GLASS_EDGE_WIDTH, GLASS_EDGE_COLOR, shape)
+}
+
+/**
+ * Merekam [content] (daftar lirik) ke [backdrop] supaya tombol kaca di
+ * sebelahnya bisa membiaskannya. Tanpa rekaman bila kaca mati / tidak
+ * didukung / Reduce dynamic blur aktif, jadi tidak ada biaya saat dimatikan.
+ */
+@Composable
+fun lyricsGlassSource(content: Modifier, backdrop: LayerBackdrop): Modifier {
+    val glassOn = LocalLiquidGlassEnabled.current && isGlassSupported()
+    val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
+    return if (glassOn && !reduceDynamicBlur) content.layerBackdrop(backdrop) else content
 }

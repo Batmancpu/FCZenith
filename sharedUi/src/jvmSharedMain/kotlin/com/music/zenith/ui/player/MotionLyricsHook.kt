@@ -27,3 +27,13 @@ val LocalMotionLyricLine = staticCompositionLocalOf<
 val LocalLyricsGlassDisc = staticCompositionLocalOf<
     (@Composable (Boolean) -> Modifier?)?
 > { null }
+
+/**
+ * Pengait sumber kaca tombol lirik: dipasang pada daftar lirik supaya direkam,
+ * lalu dibiaskan oleh tombol bulat yang menjadi sibling-nya (lihat
+ * [LocalLyricsGlassDisc]). Diisi oleh modul app. Mengembalikan modifier apa
+ * adanya bila kaca mati; null / tidak diisi (desktop) berarti tanpa rekaman.
+ */
+val LocalLyricsGlassSource = staticCompositionLocalOf<
+    (@Composable (Modifier) -> Modifier)?
+> { null }

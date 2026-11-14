@@ -224,6 +224,8 @@ fun Modifier.liquidGlass(
     surfaceTint: Color? = null,
     /** False keeps the blur, tint and rim but skips the lens that bends what is behind. */
     refract: Boolean = true,
+    /** Sampled in place of [LocalAppBackdrop], for glass over something the page behind is not. */
+    source: Backdrop? = null,
 ): Modifier {
     if (!isGlassSupported()) return this
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
@@ -234,8 +236,8 @@ fun Modifier.liquidGlass(
         return background(MaterialTheme.colorScheme.surface, shape)
             .border(GLASS_EDGE_WIDTH, GLASS_EDGE_COLOR, shape)
     }
-    val backdrop = LocalAppBackdrop.current
-    val exportedBackdrop = LocalGlassExport.current
+    val backdrop = source ?: LocalAppBackdrop.current
+    val exportedBackdrop = if (source == null) LocalGlassExport.current else null
     val density = LocalDensity.current
     val resolution = (clarity.resolutionScale * custom.quality).coerceIn(0.2f, 1f)
     val blurPx = with(density) { BLUR_RADIUS_DP.dp.toPx() } * resolution * clarity.blurScale * custom.blur

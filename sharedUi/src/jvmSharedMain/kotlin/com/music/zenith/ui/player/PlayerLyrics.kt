@@ -2948,7 +2948,10 @@ internal fun LyricsPanel(
             followLine = followLine,
             providerFooter = providerFooter,
             onProviderFooterClick = onProviderFooterClick,
-            modifier = Modifier.fillMaxSize(),
+            // Daftar ini direkam sebagai sumber kaca; tombol bulat (sibling)
+            // membiaskannya. Tombol tidak boleh jadi anak yang direkam.
+            modifier = LocalLyricsGlassSource.current?.invoke(Modifier.fillMaxSize())
+                ?: Modifier.fillMaxSize(),
         )
         if (returnShown > 0.01f) {
             Box(

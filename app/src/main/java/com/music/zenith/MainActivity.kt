@@ -282,6 +282,8 @@ import com.music.zenith.ui.screens.LocalMostPlayedArt
 import com.music.zenith.ui.player.LocalMotionLyricLine
 import com.music.zenith.ui.player.LocalLyricsGlassDisc
 import com.music.zenith.ui.components.lyricsGlassDiscSurface
+import com.music.zenith.ui.components.lyricsGlassSource
+import com.music.zenith.ui.player.LocalLyricsGlassSource
 import com.motion.lyrics.MotionLyricLine
 import com.motion.lyrics.toMotionWords
 import com.music.zenith.ui.screens.LocalMixCoverBackground
@@ -436,6 +438,8 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
                 val appBackdrop = rememberLayerBackdrop(onDraw = paintBackdrop)
+                // Rekaman daftar lirik, yang dibiaskan tombol kaca di atas player.
+                val lyricsBackdrop = rememberLayerBackdrop()
                 CompositionLocalProvider(
                     LocalOverscrollFactory provides iosOverscrollFactory,
                     LocalLiquidGlassEnabled provides liquidGlassEnabled,
@@ -453,7 +457,8 @@ class MainActivity : AppCompatActivity() {
                         )
                     },
                     LocalAppBackdrop provides appBackdrop,
-                    LocalLyricsGlassDisc provides { active -> lyricsGlassDiscSurface(active) },
+                    LocalLyricsGlassDisc provides { active -> lyricsGlassDiscSurface(active, lyricsBackdrop) },
+                    LocalLyricsGlassSource provides { content -> lyricsGlassSource(content, lyricsBackdrop) },
                     LocalMotionLyricLine provides { line, position, style, inactive, active, modifier ->
                         val motionWords = remember(line) { line.toMotionWords() }
                         val sparkle by AppSettings.lyricsSparkle.collectAsStateWithLifecycle()
