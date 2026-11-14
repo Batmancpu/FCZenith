@@ -22,8 +22,10 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.layout.ContentScale
@@ -243,7 +245,25 @@ fun FullArtworkBlurBackdrop(
         // Everything on this is white: the lyrics, the queue and the main
         // player's controls. Preserve the cover's colour and layout, but keep
         // bright sleeves from lowering contrast.
-        Canvas(Modifier.fillMaxSize()) { drawRect(brush = FullArtworkScrim) }
+        Canvas(Modifier.fillMaxSize()) {
+            val seamY = seam().coerceIn(0f, size.height)
+            if (seamY > 1f && seamY < size.height - 1f) {
+                // Clear around the seam so the sharp banner dissolves into an
+                // undarkened blur; the shade only deepens below it.
+                val f = seamY / size.height
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        0f to Color.Black.copy(alpha = 0f),
+                        f * 0.6f to Color.Black.copy(alpha = 0f),
+                        f to Color.Black.copy(alpha = 0.10f),
+                        (f + 1f) / 2f to Color.Black.copy(alpha = 0.28f),
+                        1f to Color.Black.copy(alpha = 0.44f),
+                    ),
+                )
+            } else {
+                drawRect(brush = FullArtworkScrim)
+            }
+        }
     }
 }
 
@@ -551,26 +571,22 @@ private class SeamAlignedBlurPainter(
                 dstSize = IntSize(w.roundToInt(), (h - seamY).roundToInt().coerceAtLeast(1)),
                 filterQuality = FilterQuality.Low,
             )
-            // Below the seam the blurred cover carries on as its own mirror image,
-            // so the area under the banner has the cover's colours instead of
-            // one flat colour. It meets the banner's last row exactly at the seam.
-            // Skipped for a cover with a canvas: the stretched last rows above
-            // are then the whole continuation, which stays smooth.
-            if (mirror()) withTransform({
-                scale(
-                    scaleX = 1f,
-                    scaleY = -1f,
-                    pivot = androidx.compose.ui.geometry.Offset(0f, seamY),
-                )
-            }) {
-                drawImage(
-                    image = image,
-                    srcOffset = IntOffset(srcX, srcY),
-                    srcSize = IntSize(srcW, srcH),
-                    dstOffset = IntOffset.Zero,
-                    dstSize = IntSize(w.roundToInt(), coverH.roundToInt().coerceAtLeast(1)),
-                    filterQuality = FilterQuality.Low,
-                )
+            // Mirror: the blurred cover is reflected across the seam, so the area
+            // below it continues the picture instead of a stretched colour band.
+            // Still the same live-blurred bitmap, so it follows the clip.
+            val mirrorH = minOf(h - seamY, coverH)
+            val mirrorSrcH = (mirrorH / scale).roundToInt().coerceIn(1, srcH)
+            clipRect(top = seamY) {
+                withTransform({ scale(1f, -1f, Offset(0f, seamY)) }) {
+                    drawImage(
+                        image = image,
+                        srcOffset = IntOffset(srcX, srcY + srcH - mirrorSrcH),
+                        srcSize = IntSize(srcW, mirrorSrcH),
+                        dstOffset = IntOffset(0, (seamY - mirrorH).roundToInt()),
+                        dstSize = IntSize(w.roundToInt(), mirrorH.roundToInt().coerceAtLeast(1)),
+                        filterQuality = FilterQuality.Low,
+                    )
+                }
             }
         }
     }
@@ -627,7 +643,10 @@ private fun boxBlurPass(
         var green = 0
         var blue = 0
         fun pixel(at: Int): Int {
-            val position = at.coerceIn(0, major - 1)
+            // Mirror at the edges instead of clamping, so the blur does not
+            // smear the outermost row/column of the cover.
+            val reflected = if (at < 0) -at - 1 else if (at >= major) 2 * major - 1 - at else at
+            val position = reflected.coerceIn(0, major - 1)
             return if (horizontal) source[fixed * width + position]
             else source[position * width + fixed]
         }

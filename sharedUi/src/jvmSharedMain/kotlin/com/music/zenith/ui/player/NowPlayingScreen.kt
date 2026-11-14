@@ -509,6 +509,9 @@ private const val DOCK_FADE_FLOOR = 1f / 255f
 private const val CLIP_MIX_FADE_OUT_MS = 900
 private const val CLIP_MIX_FADE_IN_MS = 500
 
+/** Setelah mix/crossfade, klip lagu berikutnya ditahan sebentar supaya dissolve cover tuntas dulu. */
+private const val CLIP_MIX_HOLD_MS = 2_000
+
 
 
 /** Seberapa jauh drag (0..1 dari mini ke penuh) saat cover sudah selebar panel dan menutup sudutnya. */
@@ -574,8 +577,11 @@ private fun dockFlyEase(t: Float): Float {
  * the first part of the drag, then rises and grows to the card together, on one curve.
  */
 private fun dockCardEase(t: Float): Float {
-    val holdUntil = 0.15f
-    return dockSmooth((t - holdUntil) / (1f - holdUntil))
+    // A short hold on the mini player's cover, then one curve for sliding and growing
+    // together. Smootherstep: no slope and no curvature at either end, so it leaves the
+    // mini player and lands without a jolt, and it is done a little before the sheet is.
+    val x = ((t - 0.04f) / (0.88f - 0.04f)).coerceIn(0f, 1f)
+    return x * x * x * (x * (x * 6f - 15f) + 10f)
 }
 
 /**
@@ -1139,6 +1145,7 @@ fun NowPlayingScreen(
         targetValue = if (mixing || crossfading) 0f else 1f,
         animationSpec = tween(
             durationMillis = if (mixing || crossfading) CLIP_MIX_FADE_OUT_MS else CLIP_MIX_FADE_IN_MS,
+            delayMillis = if (mixing || crossfading) 0 else CLIP_MIX_HOLD_MS,
             easing = FastOutSlowInEasing,
         ),
         label = "clipMixFade",
@@ -2155,11 +2162,20 @@ fun NowPlayingScreen(
     // between the portrait and landscape players; only the cached bitmap
     // changes when the artwork preparation above completes for another song.
     val currentFullArtworkBlurImage = rememberUpdatedState(fullArtworkBlurImage)
-    // Always zero: the main player uses the same full-screen centre-cropped blur as
-    // lyrics and queue. A non-zero seam cropped the blur to the banner and stretched
-    // its last row down the screen, which made the area under the cover a flat strip.
+    // The banner's bottom edge while the main player shows it, 0 otherwise (lyrics,
+    // queue, tablet/landscape, full-screen Spotify Canvas). With a seam the blur is
+    // cropped like the banner and mirrored below the edge, so the banner dissolves
+    // into its own reflection instead of a flat strip.
+    val blurSeamTarget = if (
+        heroMode && !clipFullscreen && !landscape && !tabletArtworkBackdrop &&
+        !lyricsOpen && !queueOpen
+    ) {
+        with(density) {
+            (if (clipPortrait && clipBottom > 0.dp) clipBottom else heroHeight).toPx()
+        }
+    } else 0f
     val blurSeamPx = animateFloatAsState(
-        targetValue = 0f,
+        targetValue = blurSeamTarget,
         animationSpec = tween(300),
         label = "blurSeam",
     )
@@ -2251,6 +2267,11 @@ fun NowPlayingScreen(
     val stillUrl = stillClip?.url
     val stillSongKey = "${song.title}|${song.artist}"
     fun still(): CanvasStill? {
+        // While a mix or crossfade has the clip dimmed (and for the hold after it),
+        // the sleeve must show the real cover. Two songs can share one clip, and the
+        // held frame of the song that is leaving would then be drawn over the cover
+        // of the one that is arriving, with nothing left to dissolve into.
+        if (clipDimmed) return null
         val current = CanvasStills.current ?: return null
         if (stillUrl != null) return current.takeIf { it.url == stillUrl }
         // Player baru dibuka dan canvas-nya belum ditemukan: pakai frame terakhir
@@ -3851,7 +3872,25 @@ fun NowPlayingScreen(
                                 val over = rect.bottom + gap - panelBottom
                                 if (over > 0f) rect.translate(0f, -over) else rect
                             }
-                            val minTop = bannerTopPx.toFloat()
+                            // Card cover: a top margin equal to its own left margin from the
+                            // panel's top edge while the panel opens, so it sits neither on the
+                            // top nor on the left. Eased in off the mini player's cover and out
+                            // again before landing, so it still arrives exactly on its place.
+                            val topMargin = if (dock == null || heroMode || playerBounds.height <= 0) {
+                                0f
+                            } else {
+                                val panel = dock.panelBounds(
+                                    Size(playerBounds.width.toFloat(), playerBounds.height.toFloat()),
+                                )
+                                val openNow = dockCardEase(dock.openFraction())
+                                val leftMargin = (kept.left - (panel.left - boxLeftPx)).coerceAtLeast(0f)
+                                // Rises with the raw drag, not the card ease: that ease stays near
+                // zero for the first quarter of the drag, which left the cover flush
+                // against the panel's top edge while the panel grew out of the pill.
+                leftMargin * dockSmooth(dock.openFraction() / 0.04f) *
+                                    (1f - dockSmooth((openNow - 0.75f) / 0.25f))
+                            }
+                            val minTop = bannerTopPx.toFloat() + topMargin
                             val minLeft = -boxLeftPx.toFloat()
                             val maxRight = (playerBounds.width - boxLeftPx).toFloat()
                             val dy = if (kept.top < minTop) minTop - kept.top else 0f
@@ -3883,16 +3922,31 @@ fun NowPlayingScreen(
                             val open = dockT()
                             val base = if (heroMode) dockFlyEase(open) else dockCardEase(open)
                             val ease = base + (dockEaseThumb(open) - base) * p()
-                            val target = rect.translate(0f, -unridden)
+                            // Card cover: both ends ride the sheet, so the cover is lifted with
+                            // the panel and then moves down to the card inside it. The banner
+                            // keeps its straight line on screen.
+                            val target = rect.translate(0f, if (heroMode) -unridden else 0f)
+                            // The panel's top rises from the pill's top edge, so that distance
+                            // (not the whole window's height) is how far the cover rides with it.
+                            val pillTravel = dock?.travel() ?: 0f
+                            val riding = if (heroMode || pillTravel <= 0f) 0f else
+                                (dockFrame.offset - pillTravel).coerceAtMost(0f) * (1f - p())
+                            val start = mini.translate(0f, riding)
                             // Vertical position leads the size a little, so the cover climbs
                             // toward the panel's top-left instead of hanging low in it. The
                             // lead is zero at both ends, so it still leaves and lands exactly.
                             val lift = if (heroMode) 0.25f else 0f
                             val lifted = ease + (1f - ease) * ease * lift * (1f - p())
-                            val left = mini.left + (target.left - mini.left) * ease
-                            val right = mini.right + (target.right - mini.right) * ease
-                            val height = mini.height + (target.height - mini.height) * ease
-                            val top = mini.top + (target.top - mini.top) * lifted
+                            val left = start.left + (target.left - start.left) * ease
+                            val right = start.right + (target.right - start.right) * ease
+                            val height = start.height + (target.height - start.height) * ease
+                            // A gentle bow downwards through the middle of the flight, zero at both
+                            // ends, so the card cover is not hugging the panel's top edge on its way
+                            // yet still lands exactly. Same curve as size and slide, so it stays in step.
+                            val bow = if (heroMode) 0f else {
+                                target.height * 0.10f * 4f * ease * (1f - ease) * (1f - p())
+                            }
+                            val top = start.top + (target.top - start.top) * lifted + bow
                             return Rect(left, top, right, top + height)
                         }
                         // The banner's dissolve, firmed up into the cover's hard edge as
