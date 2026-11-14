@@ -5,16 +5,21 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.music.zenith.data.settings.AppSettings
+import com.music.zenith.data.settings.GlassClarity
+import com.music.zenith.data.settings.GlassPreset
 import com.music.zenith.data.settings.GlassClarity
 import com.music.zenith.ui.components.backdrop.Backdrop
 import com.music.zenith.ui.components.backdrop.backdrops.LayerBackdrop
@@ -36,8 +41,17 @@ import com.music.zenith.ui.components.backdrop.backdrops.layerBackdrop
 fun lyricsGlassDiscSurface(active: Boolean, source: Backdrop): Modifier? {
     val glassOn = LocalLiquidGlassEnabled.current && isGlassSupported()
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
-    val clarity by AppSettings.glassClarity.collectAsStateWithLifecycle()
-    val custom by AppSettings.glassCustom.collectAsStateWithLifecycle()
+    // Pengaturan glass tetap khusus tombol lirik, tidak mengikuti pengaturan user:
+    // preset Zenith (terang/gelap), dengan Glass clear 0%, Refraction strength 250%
+    // dan Refraction width 176% yang di-hardcode.
+    val darkTheme = MaterialTheme.colorScheme.surface.luminance() <= 0.5f
+    val lyricsClarity = remember { GlassClarity(0f) }
+    val lyricsCustom = remember(darkTheme) {
+        GlassPreset.DEFAULT.customFor(darkTheme).copy(
+            refraction = 2.5f,
+            refractionWidth = 1.76f,
+        )
+    }
     val lift by animateFloatAsState(
         targetValue = if (active) 1f else 0f,
         animationSpec = tween(durationMillis = 220),
@@ -56,13 +70,16 @@ fun lyricsGlassDiscSurface(active: Boolean, source: Backdrop): Modifier? {
     if (!glassOn || reduceDynamicBlur) return null
 
     val shape = CircleShape
-    val tintAlpha = ((clarity.tintAlpha + 0.10f * lift) * custom.tint).coerceIn(0f, 1f)
+    val tintAlpha = ((lyricsClarity.tintAlpha + 0.10f * lift) * lyricsCustom.tint).coerceIn(0f, 1f)
     return Modifier
         .clip(shape)
         .liquidGlass(
             shape = shape,
             surfaceTint = Color(0xFF121212).copy(alpha = tintAlpha),
             source = source,
+            clarityOverride = lyricsClarity,
+            customOverride = lyricsCustom,
+            frostedOverride = false,
             clarityOverride = lyricsClarity,
             customOverride = lyricsCustom,
         )
