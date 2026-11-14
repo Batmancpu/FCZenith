@@ -56,54 +56,23 @@ jobs:
 
           git fetch --no-tags upstream "refs/tags/$TAG:refs/tags/upstream/$TAG"
           STABLE_TARGET="refs/tags/upstream/$TAG^{commit}"
-          TRACK_MODE="$(sed -n 's/^upstreamTrack=//p' fc/version.properties)"
-          TRACK_MODE="${TRACK_MODE:-stable}"
-
-          case "$TRACK_MODE" in
-            stable)
-              TARGET="$STABLE_TARGET"
-              SOURCE_REF="stable:$TAG"
-              COMMITS_AHEAD=0
-              ;;
-            main-once)
-              PIN="$(sed -n 's/^upstreamCommit=//p' fc/version.properties)"
-              if [[ ! "$PIN" =~ ^[0-9a-f]{40}$ ]]; then
-                echo "main-once mode requires a full upstreamCommit SHA in fc/version.properties." >&2
-                exit 1
-              fi
-              git fetch --no-tags upstream refs/heads/main:refs/remotes/upstream/main
-              if ! git cat-file -e "$PIN^{commit}" 2>/dev/null; then
-                echo "Pinned upstream main commit is unavailable: $PIN" >&2
-                exit 1
-              fi
-              if ! git merge-base --is-ancestor "$PIN" refs/remotes/upstream/main; then
-                echo "Pinned upstream commit is no longer on upstream main; refusing an unreviewed snapshot." >&2
-                exit 1
-              fi
-              if ! git merge-base --is-ancestor "$STABLE_TARGET" "$PIN"; then
-                echo "Pinned upstream main commit does not contain the latest stable release $TAG." >&2
-                exit 1
-              fi
-              TARGET="$PIN"
-              SOURCE_REF="main"
-              COMMITS_AHEAD="$(git rev-list --count "$STABLE_TARGET..$PIN")"
-              if [[ "$COMMITS_AHEAD" -lt 1 ]]; then
-                echo "Pinned upstream main snapshot contains no commits beyond $TAG." >&2
-                exit 1
-              fi
-              ;;
-            *)
-              echo "Unsupported upstreamTrack mode: $TRACK_MODE" >&2
-              exit 1
-              ;;
-          esac
+          # Build from upstream main, with stable releases defining the FC version series.
+          # A newer upstream main SHA creates a new FC revision after tests and signing pass.
+          git fetch --no-tags upstream "refs/heads/main:refs/remotes/upstream/main"
+          TARGET="refs/remotes/upstream/main"
+          if ! git merge-base --is-ancestor "$STABLE_TARGET" "$TARGET"; then
+            echo "Upstream main does not contain latest published release $TAG; refusing divergent source." >&2
+            exit 1
+          fi
+          SOURCE_REF="main"
+          COMMITS_AHEAD="$(git rev-list --count "$STABLE_TARGET..$TARGET")"
 
           TARGET_SHA="$(git rev-parse "$TARGET^{commit}")"
           if git merge-base --is-ancestor "$TARGET_SHA" HEAD; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "Upstream target $TARGET_SHA is already in FCZenith main."
           else
-            # Upstream rebased its history. Prefer incoming upstream hunks in upstream-owned files; FC features are injected later through the isolated build overlay.
+            # Prefer incoming hunks in upstream-owned files; FC integrations live in build overlays.
             if ! git merge --no-edit --no-ff -X theirs "$TARGET_SHA"; then
               conflicts="$(git diff --name-only --diff-filter=U)"
               if [[ -z "$conflicts" ]] || grep -qv '^.github/workflows/' <<< "$conflicts"; then
@@ -137,7 +106,7 @@ jobs:
       - name: Preserve FCZenith-owned GitHub Actions workflows
         run: |
           set -euo pipefail
-          # The app source follows the selected stable tag or pinned main snapshot;
+          # The app source follows upstream main;
           # CI/CD ownership stays with FCZenith. Do not import upstream workflows.
           git rm -r --ignore-unmatch .github/workflows
           git checkout "${{ steps.upstream.outputs.base_sha }}" -- .github/workflows
@@ -147,6 +116,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           UPSTREAM_VERSION: ${{ steps.upstream.outputs.version }}
+          UPSTREAM_CHANGED: ${{ steps.upstream.outputs.changed }}
         run: |
           set -euo pipefail
           CURRENT_UPSTREAM_VERSION="$(sed -n 's/^upstreamVersion=//p' fc/version.properties)"
@@ -164,8 +134,8 @@ jobs:
             release_asset_exists=true
           fi
 
-          if [[ "$UPSTREAM_VERSION" != "$CURRENT_UPSTREAM_VERSION" ]]; then
-            # The parent published a new stable version. Start its FC sequence at .1.
+          if [[ "$UPSTREAM_VERSION" != "$CURRENT_UPSTREAM_VERSION" || "$UPSTREAM_CHANGED" == "true" ]]; then
+            # A new stable series starts at .1; new main commits in that series increment the FC revision.
             python3 fc/bump-version.py "$UPSTREAM_VERSION"
             should_release=true
           elif [[ "$release_asset_exists" == "false" ]]; then
@@ -466,11 +436,6 @@ jobs:
         run: |
           set -euo pipefail
           # FC integration sources remain tracked under fc/spatial-audio; generated app edits are restored.
-          # A requested main snapshot is one-time; future scheduled syncs return to stable tags.
-          TRACK_MODE="$(sed -n 's/^upstreamTrack=//p' fc/version.properties)"
-          if [[ "$TRACK_MODE" == "main-once" ]]; then
-            sed -i 's/^upstreamTrack=main-once$/upstreamTrack=stable/' fc/version.properties
-          fi
           # Stage the real upstream merge plus FC release metadata and the
           # password-protected signing key; ignored build outputs stay excluded.
           git add -A
@@ -491,10 +456,10 @@ jobs:
 
             - Android package: com.spotify.music
             - App label: Music
-            - Stable upstream baseline: ${{ steps.upstream.outputs.tag }}.
+            - Upstream stable version baseline: ${{ steps.upstream.outputs.tag }}.
             - Upstream source: ${{ steps.upstream.outputs.source_ref }} at commit ${{ steps.upstream.outputs.commit }}.
             - Includes ${{ steps.upstream.outputs.commits_ahead }} upstream commits beyond the stable baseline when built as a main snapshot.
-            - This is an FC-branded upstream-main development snapshot; future automatic syncs return to published stable releases.
+            - FC Zenith follows upstream main automatically. Every new source snapshot must pass tests, build and signature verification before publishing.
             - The same FC signing certificate is checked before publishing.
             - Spatial Audio: ${{ steps.spatial_audio.outputs.included == 'true' && 'Includes the persistent FC stereo learner, binary per-track On/Off with Auto status, and phone-speaker/Atmos/DSP safety bypasses. Profiles and explicit feedback remain on-device.' || 'Not included in this build.' }}
 
