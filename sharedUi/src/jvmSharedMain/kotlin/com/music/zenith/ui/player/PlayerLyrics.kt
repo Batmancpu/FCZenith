@@ -1585,6 +1585,8 @@ internal fun Modifier.lyricsGlassDisc(
     active: Boolean,
     interaction: MutableInteractionSource,
     hazeState: HazeState? = null,
+    /** False memakai disc default (Haze), tanpa Liquid Glass app. */
+    useAppGlass: Boolean = true,
 ): Modifier {
     val pressed by interaction.collectIsPressedAsState()
     val reduceBlur by PlayerSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
@@ -1610,7 +1612,7 @@ internal fun Modifier.lyricsGlassDisc(
     }
     // Liquid Glass app (sama dengan tombol back melayang) bila tersedia;
     // null berarti kaca mati / Reduce dynamic blur, jadi disc Haze di bawah dipakai.
-    val appGlass = LocalLyricsGlassDisc.current?.invoke(active)
+    val appGlass = if (useAppGlass) LocalLyricsGlassDisc.current?.invoke(active) else null
     if (appGlass != null) {
         return this
             .graphicsLayer {
@@ -1718,7 +1720,12 @@ internal fun TranslationToggleButton(
     Box(
         modifier = Modifier
             .size(34.dp)
-            .lyricsGlassDisc(active = active, interaction = glassInteraction, hazeState = hazeState)
+            .lyricsGlassDisc(
+                active = active,
+                interaction = glassInteraction,
+                hazeState = hazeState,
+                useAppGlass = false,
+            )
             .clickable(
                 enabled = enabled,
                 interactionSource = glassInteraction,
@@ -1741,7 +1748,7 @@ internal fun TranslationToggleButton(
                     else Res.string.translate_lyrics,
                 ),
                 tint = tint,
-                modifier = Modifier.size(19.dp),
+                modifier = Modifier.size(22.dp),
             )
         }
     }
@@ -1791,7 +1798,12 @@ internal fun RomanizationToggleButton(
             modifier = Modifier
                 .size(34.dp)
                 .onGloballyPositioned { menu?.anchor = it.boundsInWindow() }
-                .lyricsGlassDisc(active = globeActive, interaction = globeInteraction, hazeState = hazeState)
+                .lyricsGlassDisc(
+                    active = globeActive,
+                    interaction = globeInteraction,
+                    hazeState = hazeState,
+                    useAppGlass = false,
+                )
                 .clickable(
                     enabled = menuEnabled,
                     interactionSource = globeInteraction,
@@ -1812,7 +1824,7 @@ internal fun RomanizationToggleButton(
                     imageVector = Icons.Rounded.Language,
                     contentDescription = null,
                     tint = globeTint,
-                    modifier = Modifier.size(19.dp),
+                    modifier = Modifier.size(22.dp),
                 )
             }
         }

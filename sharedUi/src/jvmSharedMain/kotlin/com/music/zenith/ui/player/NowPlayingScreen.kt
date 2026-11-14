@@ -4923,7 +4923,7 @@ Spacer(Modifier.width(12.dp))
                                 Box(
                                     modifier = Modifier
                                         .align(Alignment.BottomStart)
-                                        .offset(y = 20.dp)
+                                        .offset(y = 30.dp)
                                         .graphicsLayer { alpha = translateFade },
                                 ) {
                                     RomanizationToggleButton(
@@ -4941,7 +4941,7 @@ Spacer(Modifier.width(12.dp))
                                 Box(
                                     modifier = Modifier
                                         .align(Alignment.BottomEnd)
-                                        .offset(y = 20.dp)
+                                        .offset(y = 30.dp)
                                         .graphicsLayer { alpha = translateFade },
                                 ) {
                                     TranslationToggleButton(
