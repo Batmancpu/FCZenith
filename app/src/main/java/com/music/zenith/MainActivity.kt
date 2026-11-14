@@ -232,7 +232,9 @@ import com.music.zenith.ui.components.LongPressOrigin
 import com.music.zenith.ui.components.MenuAnchor
 import com.music.zenith.ui.components.menuAnchor
 import com.music.zenith.ui.components.macOSPopupMorph
+import com.music.zenith.ui.components.IosMenuPlacement
 import com.music.zenith.ui.components.IosMenuPopover
+import com.music.zenith.ui.components.IosMenuRow
 import com.music.zenith.ui.components.SongActionsMenu
 import com.music.zenith.ui.components.HeldContextMenu
 import com.music.zenith.ui.components.cancelCoverFlight
@@ -280,6 +282,11 @@ import com.music.zenith.ui.components.TopBarAccountButton
 import com.music.zenith.ui.screens.SegmentedControl
 import com.music.zenith.ui.screens.LocalMostPlayedArt
 import com.music.zenith.ui.player.LocalMotionLyricLine
+import com.music.zenith.ui.player.LocalLyricsGlassDisc
+import com.music.zenith.ui.components.lyricsGlassDiscSurface
+import com.music.zenith.ui.components.lyricsGlassSource
+import com.music.zenith.ui.player.LocalLyricsGlassSource
+import com.music.zenith.ui.player.LocalLyricsMenuPopover
 import com.motion.lyrics.MotionLyricLine
 import com.motion.lyrics.toMotionWords
 import com.music.zenith.ui.screens.LocalMixCoverBackground
@@ -434,6 +441,8 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
                 val appBackdrop = rememberLayerBackdrop(onDraw = paintBackdrop)
+                // Rekaman daftar lirik, yang dibiaskan tombol kaca di atas player.
+                val lyricsBackdrop = rememberLayerBackdrop()
                 CompositionLocalProvider(
                     LocalOverscrollFactory provides iosOverscrollFactory,
                     LocalLiquidGlassEnabled provides liquidGlassEnabled,
@@ -451,6 +460,27 @@ class MainActivity : AppCompatActivity() {
                         )
                     },
                     LocalAppBackdrop provides appBackdrop,
+                    LocalLyricsGlassDisc provides { active -> lyricsGlassDiscSurface(active, lyricsBackdrop) },
+                    LocalLyricsGlassSource provides { content -> lyricsGlassSource(content, lyricsBackdrop) },
+                    LocalLyricsMenuPopover provides { open, anchor, onDismiss, entries ->
+                        IosMenuPopover(
+                            item = if (open) Unit else null,
+                            anchor = anchor,
+                            onDismiss = onDismiss,
+                            backdrop = lyricsBackdrop,
+                            placement = IosMenuPlacement.AboveStart,
+                            dimBackground = false,
+                        ) {
+                            entries.forEach { entry ->
+                                IosMenuRow(
+                                    label = entry.label,
+                                    icon = entry.icon,
+                                    onClick = entry.onClick,
+                                    enabled = entry.enabled,
+                                )
+                            }
+                        }
+                    },
                     LocalMotionLyricLine provides { line, position, style, inactive, active, modifier ->
                         val motionWords = remember(line) { line.toMotionWords() }
                         val sparkle by AppSettings.lyricsSparkle.collectAsStateWithLifecycle()
@@ -993,6 +1023,7 @@ private fun ZenithApp(
     val lyricsSource by viewModel.lyricsSource.collectAsStateWithLifecycle()
     val lyricsChecked by viewModel.lyricsChecked.collectAsStateWithLifecycle()
     val lyricsProviderStates by viewModel.lyricsProviderStates.collectAsStateWithLifecycle()
+    val manualLyricsState by viewModel.manualLyricsState.collectAsStateWithLifecycle()
     val searchHistory by viewModel.searchHistory.collectAsStateWithLifecycle()
     val searchSuggestions by viewModel.suggestions.collectAsStateWithLifecycle()
     val searchLoadingMore by viewModel.searchLoadingMore.collectAsStateWithLifecycle()
@@ -2939,6 +2970,8 @@ private fun ZenithApp(
             lyricsSource = lyricsSource,
             lyricsProviderStates = lyricsProviderStates,
             onSelectLyricsProvider = viewModel::selectLyricsProvider,
+            manualLyricsState = manualLyricsState,
+            onSearchLyricsManually = viewModel::searchLyricsManually,
             lyricsUnavailable = lyricsChecked && lyrics.isNullOrEmpty(),
             lyricsOffsetOpen = showLyricsOffset,
             onDismissLyricsOffset = { showLyricsOffset = false },

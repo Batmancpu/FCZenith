@@ -219,6 +219,15 @@ private const val MENU_BACKDROP_SCALE = 0.25f
 /** The longest a menu waits for its frost's still before growing without it. */
 private const val STILL_WAIT_MS = 150L
 
+/** Where [IosMenuPopover] settles relative to the button that opened it. */
+enum class IosMenuPlacement {
+    /** Trailing edge on the anchor's, docked to the bottom or hung down from the top. */
+    Auto,
+
+    /** Leading edge on the anchor's, sitting just above it. */
+    AboveStart,
+}
+
 /** The break between groups: a hairline inset from the panel's edges, with air either side. */
 @Composable
 fun IosMenuSeparator(colors: IosMenuColors = iosMenuColors()) {
@@ -421,6 +430,8 @@ fun <T : Any> IosMenuPopover(
     onDismiss: () -> Unit,
     backdrop: Backdrop? = null,
     hazeState: HazeState? = null,
+    placement: IosMenuPlacement = IosMenuPlacement.Auto,
+    dimBackground: Boolean = true,
     content: @Composable (T) -> Unit,
 ) {
     var last by remember { mutableStateOf<Pair<T, Rect?>?>(null) }
@@ -506,7 +517,7 @@ fun <T : Any> IosMenuPopover(
                 Modifier
                     .fillMaxSize()
                     .graphicsLayer { alpha = progress.value.coerceIn(0f, 1f) }
-                    .background(scrim)
+                    .background(if (dimBackground) scrim else Color.Transparent)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
@@ -591,12 +602,23 @@ fun <T : Any> IosMenuPopover(
         )
         val shadowPlate = measurables[1].measure(Constraints.fixed(panel.width, panel.height))
         val anchorBounds = menuAnchor?.translate(-overlayOffset)
+        val above = placement == IosMenuPlacement.AboveStart && anchorBounds != null
         val right = anchorBounds?.right?.roundToInt() ?: (width - margin)
-        val panelX = (right - panel.width)
+        val startX = if (above && anchorBounds != null) {
+            anchorBounds.left.roundToInt()
+        } else {
+            right - panel.width
+        }
+        val panelX = startX
             .coerceIn(margin, (width - margin - panel.width).coerceAtLeast(margin))
         val lowest = (bottom - panel.height).coerceAtLeast(top)
-        val hangsDown = anchorBounds != null && anchorBounds.center.y < height / 2f
-        val panelY = if (hangsDown) anchorBounds.top.roundToInt().coerceIn(top, lowest) else lowest
+        val hangsDown = !above && anchorBounds != null && anchorBounds.center.y < height / 2f
+        val panelY = when {
+            above && anchorBounds != null ->
+                (anchorBounds.top.roundToInt() - 10.dp.roundToPx() - panel.height).coerceIn(top, lowest)
+            hangsDown -> anchorBounds!!.top.roundToInt().coerceIn(top, lowest)
+            else -> lowest
+        }
 
         val cardRect = Rect(
             panelX.toFloat(),

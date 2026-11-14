@@ -160,6 +160,7 @@ import com.music.zenith.ui.theme.stableStatusBarInsets
 import com.music.zenith.ui.theme.rememberArtworkTopBandLuminance
 import com.music.zenith.ui.theme.topBandScrimAlpha
 import com.music.zenith.ui.LyricsProviderState
+import com.music.zenith.ui.ManualLyricsSearchState
 import com.music.zenith.ui.haptics.Haptic
 import com.music.zenith.ui.haptics.rememberHaptics
 import com.music.zenith.ui.icons.ZenithIcons
@@ -313,6 +314,9 @@ private const val SPOTIFY_CANVAS_RESUME_DELAY_MS = 1_000L
 
 /** Tinggi dek kaca Spotify Canvas sebagai bagian dari layar; sama dengan lapisan kaca hidupnya. */
 private const val SPOTIFY_DECK_HEIGHT_FRACTION = 0.56f
+
+/** Height of the seek bar that stays on screen once Spotify Canvas' control deck is hidden. */
+private val SPOTIFY_MINI_SCRUBBER_HEIGHT = 48.dp
 
 /** [image] selebar scope, rata atas, rasio aslinya tanpa crop; yang melewati tepi bawah terpotong. */
 private fun DrawScope.drawFrameTopAligned(image: ImageBitmap) {
@@ -555,6 +559,13 @@ private const val DOCK_CENTRE_END_AT = 0.70f
  */
 private const val DOCK_SETTLE_FROM = 0.30f
 private const val DOCK_SETTLE_TO = 0.60f
+
+/**
+ * Tarikan "settle" dimatikan: jalur cover kini sudah menempel ke sheet sendiri
+ * (lihat [towardsDock]), jadi tarikan tambahan itu justru membuat cover naik
+ * terlalu tinggi lalu turun lagi di sekitar 70-80% terbuka.
+ */
+private const val DOCK_SETTLE_ENABLED = false
 
 private fun dockSmooth(x: Float): Float {
     val t = x.coerceIn(0f, 1f)
@@ -1020,6 +1031,8 @@ fun NowPlayingScreen(
     lyricsSource: LyricsSource?,
     lyricsProviderStates: Map<LyricsSource, LyricsProviderState>,
     onSelectLyricsProvider: (LyricsSource) -> Unit,
+    manualLyricsState: ManualLyricsSearchState,
+    onSearchLyricsManually: (title: String, artist: String) -> Unit,
     lyricsUnavailable: Boolean,
     lyricsOffsetOpen: Boolean,
     onDismissLyricsOffset: () -> Unit,
@@ -2077,6 +2090,10 @@ fun NowPlayingScreen(
                 states = lyricsProviderStates,
                 onSelect = onSelectLyricsProvider,
                 onDismiss = { showLyricsProviders = false },
+                songTitle = song.title,
+                songArtist = song.artist,
+                manualState = manualLyricsState,
+                onManualSearch = onSearchLyricsManually,
             )
         }
         if (showAudioPipeline) {
@@ -2151,8 +2168,14 @@ fun NowPlayingScreen(
     val currentFullArtworkBlurImage = rememberUpdatedState(fullArtworkBlurImage)
     // Where the full-bleed banner stops, so the blur can be cropped to match it. Only
     // the portrait phone player has one; everywhere else the plain crop is kept.
-    val blurSeamPx = rememberUpdatedState(
-        if (heroMode && !landscape && !tabletArtworkBackdrop) with(density) { heroHeight.toPx() } else 0f,
+    // Zero while lyrics or queue cover the banner: the sharp banner is gone there, so
+    // the blur must span the whole screen instead of ending in a flat strip at the seam.
+    val blurSeamPx = animateFloatAsState(
+        targetValue = if (heroMode && !landscape && !tabletArtworkBackdrop && !lyricsOpen && !queueOpen) {
+            with(density) { heroHeight.toPx() }
+        } else 0f,
+        animationSpec = tween(300),
+        label = "blurSeam",
     )
     // A cover with a canvas keeps the smooth stretched foot below the banner;
     // the mirrored continuation is only for the still full-bleed cover.
@@ -2771,6 +2794,7 @@ fun NowPlayingScreen(
                         )
                     },
                     lyricsPane = {
+                        val globeMenu = remember { LyricsGlobeMenu() }
                         LandscapeLyricsPane(
                             hasLyrics = lyricsTranslation.displayedLyrics.isNotEmpty(),
                             placeholder = if (lyricsUnavailable) {
@@ -2791,18 +2815,32 @@ fun NowPlayingScreen(
                             },
                             romanizationToggle = {
                                 RomanizationToggleButton(
+                                    hazeState = playerHaze,
                                     state = lyricsTranslation.romanizationState,
                                     showingRomanization = lyricsTranslation.showingRomanization,
                                     enabled = !lyrics.isNullOrEmpty(),
                                     onClick = lyricsTranslation.toggleRomanization,
+                                    onProviders = { showLyricsProviders = true },
+                                    menu = globeMenu,
                                 )
                             },
                             translationToggle = {
                                 TranslationToggleButton(
+                                    hazeState = playerHaze,
                                     state = lyricsTranslation.translationState,
                                     showingTranslation = lyricsTranslation.showingTranslation,
                                     enabled = !lyrics.isNullOrEmpty(),
                                     onClick = lyricsTranslation.toggleTranslation,
+                                )
+                            },
+                            overlay = {
+                                LyricsGlobeMenuHost(
+                                    menu = globeMenu,
+                                    state = lyricsTranslation.romanizationState,
+                                    showingRomanization = lyricsTranslation.showingRomanization,
+                                    enabled = !lyrics.isNullOrEmpty(),
+                                    onRomanize = lyricsTranslation.toggleRomanization,
+                                    onProviders = { showLyricsProviders = true },
                                 )
                             },
                         ) { panelModifier ->
@@ -2835,6 +2873,7 @@ fun NowPlayingScreen(
                                     onPickLine = lyricPicker.pick,
                                     onTogglePick = lyricPicker.toggle,
                                     centerFocus = true,
+                                    hazeState = playerHaze,
                                     modifier = Modifier.fillMaxSize(),
                                 )
                             }
@@ -3604,7 +3643,8 @@ fun NowPlayingScreen(
                                 .takeIf { it > 0.dp }
                                 ?: maxHeight
                             val collapsedTitleTop = (
-                                expandedTopHeight + spotifyCanvasDeckHeight - HEADER_HEIGHT
+                                expandedTopHeight + spotifyCanvasDeckHeight - HEADER_HEIGHT -
+                                    SPOTIFY_MINI_SCRUBBER_HEIGHT
                             ).coerceAtLeast(0.dp)
                             collapsedTitleTop
                         } else {
@@ -3793,7 +3833,10 @@ fun NowPlayingScreen(
                                 val fall = dockSmooth(
                                     (open - DOCK_CENTRE_HOLD_TO) / (DOCK_CENTRE_END_AT - DOCK_CENTRE_HOLD_TO),
                                 )
-                                val share = rise * (1f - fall)
+                                // Hanya banner full-bleed yang masih diletakkan di tengah panel.
+                                // Cover kartu mengikuti jalur sheet-nya sendiri, tanpa dorongan
+                                // ke tengah yang membuatnya naik turun.
+                                val share = if (heroMode) rise * (1f - fall) else 0f
                                 if (share <= 0f) {
                                     rawSource
                                 } else {
@@ -3810,7 +3853,7 @@ fun NowPlayingScreen(
                             // akhirnya relatif terhadap panel: dari DOCK_SETTLE_FROM sampai
                             // DOCK_SETTLE_TO terbuka ia ditarik pelan ke sana, lalu naik bersama
                             // panel, tidak menempel ke tepi atas. Banner full-bleed tidak berubah.
-                            val rect = if (heroMode || dock == null || rest == null) {
+                            val rect = if (!DOCK_SETTLE_ENABLED || dock == null || rest == null) {
                                 centred
                             } else {
                                 val g = dockSmooth(
@@ -3844,7 +3887,13 @@ fun NowPlayingScreen(
                             // Ukuran dan posisinya menyusul lebar panel (dockFlyEase): sudah
                             // hampir penuh ke kanan saat panel selebar layar, tapi tetap
                             // landai di awal drag.
-                            val unridden = dockFrame.offset * (1f - p())
+                            // Tujuan cover = posisi akhirnya di sheet yang sedang naik, tapi
+                            // tidak pernah lebih rendah dari cover mini (tidak ada lekukan di
+                            // awal buka / akhir tutup). Cover selalu di antara mini dan
+                            // tujuan ini, jadi geraknya satu arah: tidak melewati tepi atas
+                            // panel, tidak berhenti di layar lalu turun saat sheet menyusul.
+                            val cap = (mini.top + dockFrame.offset - rect.top).coerceAtLeast(0f)
+                            val unridden = (dockFrame.offset - cap).coerceAtLeast(0f) * (1f - p())
                             val open = dockT()
                             val base = dockFlyEase(open)
                             val ease = base + (dockEaseThumb(open) - base) * p()
@@ -4880,6 +4929,9 @@ Spacer(Modifier.width(12.dp))
                                         isPlaying = isPlaying && position.advancing,
                                         active = lyricsPanelVisible,
                                         onSeekToLine = seekToLyric,
+                                        providerFooter = lyricsTranslation.status
+                                            .takeIf { it.isNotBlank() && !lyrics.isNullOrEmpty() },
+                                        onProviderFooterClick = { showLyricsProviders = true },
                                         controlsOpen = lyricsControlsOpen,
                                         onRevealControls = { lyricsControlsOpen = true },
                                         onHideControls = { lyricsControlsOpen = false },
@@ -4890,6 +4942,7 @@ Spacer(Modifier.width(12.dp))
                                         picked = lyricPicker.picks,
                                         onPickLine = lyricPicker.pick,
                                         onTogglePick = lyricPicker.toggle,
+                                        hazeState = playerHaze,
                                         modifier = Modifier.fillMaxSize(),
                                     )
                                 }
@@ -4912,25 +4965,37 @@ Spacer(Modifier.width(12.dp))
                                 animationSpec = tween(if (translateShown) 220 else 160),
                                 label = "translateFade",
                             )
+                            val globeMenu = remember { LyricsGlobeMenu() }
+                            LaunchedEffect(translateShown) {
+                                if (!translateShown) globeMenu.open = false
+                            }
                             if (translateFade > 0.01f && !lyricPicker.picking) {
                                 Box(
                                     modifier = Modifier
                                         .align(Alignment.BottomStart)
+                                        .offset(y = 20.dp)
                                         .graphicsLayer { alpha = translateFade },
                                 ) {
                                     RomanizationToggleButton(
+                                        hazeState = playerHaze,
                                         state = lyricsTranslation.romanizationState,
                                         showingRomanization = lyricsTranslation.showingRomanization,
                                         enabled = translateShown && !lyrics.isNullOrEmpty(),
                                         onClick = lyricsTranslation.toggleRomanization,
+                                        onProviders = { showLyricsProviders = true },
+                                        // Not tappable on the way out, like the translate disc.
+                                        menuEnabled = translateShown,
+                                        menu = globeMenu,
                                     )
                                 }
                                 Box(
                                     modifier = Modifier
                                         .align(Alignment.BottomEnd)
+                                        .offset(y = 20.dp)
                                         .graphicsLayer { alpha = translateFade },
                                 ) {
                                     TranslationToggleButton(
+                                        hazeState = playerHaze,
                                         state = lyricsTranslation.translationState,
                                         showingTranslation = lyricsTranslation.showingTranslation,
                                         // Not tappable on the way out: a disc at 20%
@@ -4940,6 +5005,14 @@ Spacer(Modifier.width(12.dp))
                                     )
                                 }
                             }
+                            LyricsGlobeMenuHost(
+                                menu = globeMenu,
+                                state = lyricsTranslation.romanizationState,
+                                showingRomanization = lyricsTranslation.showingRomanization,
+                                enabled = !lyrics.isNullOrEmpty(),
+                                onRomanize = lyricsTranslation.toggleRomanization,
+                                onProviders = { showLyricsProviders = true },
+                            )
                             // The bar arrives and leaves without a transition of its own:
                             // it is an instruction over the words, and one that has to
                             // be legible the instant it is on. Anything that animated
@@ -5027,6 +5100,50 @@ Spacer(Modifier.width(12.dp))
                         }
                     }
 
+                    // Spotify Canvas with its control deck hidden: keep only a seek bar
+                    // (elapsed, quality, remaining) under the title, so the song can be
+                    // skipped forward or back without opening the deck again. Its slot
+                    // grows as the deck leaves, so the two trade the same height.
+                    if (spotifyCanvasPresentation && !spotifyCanvasControlsOpen && !lyricsOpen && !queueOpen) {
+                        val miniTransitionWindow by PlayerSettings.smartTransitionWindow.collectAsStateWithLifecycle()
+                        Box(
+                            modifier = Modifier
+                                .widthIn(max = PLAYER_MAX_WIDTH)
+                                .fillMaxWidth()
+                                .padding(horizontal = 10.dp)
+                                .layout { measurable, constraints ->
+                                    val placeable = measurable.measure(constraints)
+                                    val slot = (placeable.height * (1f - playerDeckReveal.value)).toInt()
+                                    layout(placeable.width, slot) {
+                                        placeable.place(0, slot - placeable.height)
+                                    }
+                                }
+                                .height(SPOTIFY_MINI_SCRUBBER_HEIGHT)
+                                .graphicsLayer { alpha = 1f - playerDeckReveal.value },
+                            contentAlignment = Alignment.BottomCenter,
+                        ) {
+                            PlayerScrubber(
+                                shown = shown,
+                                durationMs = durationMs,
+                                loading = versionSwitching,
+                                mixing = mixing && !scrub.scrubbing,
+                                transitionWindow = miniTransitionWindow
+                                    ?.takeIf { !scrub.scrubbing && it.end > it.start }
+                                    ?.let { it.start..it.end },
+                                onScrub = onScrub,
+                                onScrubFinished = onScrubFinished,
+                            ) {
+                                PlaybackQualityLabel(
+                                    song = song,
+                                    isLoading = isLoading,
+                                    modifier = Modifier
+                                        .align(Alignment.Center)
+                                        .padding(horizontal = 8.dp),
+                                )
+                            }
+                        }
+                    }
+
                     // ---- Bottom: lyric strip, scrubber, transport, volume, toggles ----
                     // One block, measured at its natural height and pinned to the foot
                     // of the player. Whatever is left over above it is the artwork's,
@@ -5106,9 +5223,12 @@ Spacer(Modifier.width(12.dp))
                         )
                     }
                     if (lyricsOpen) {
-                        LyricsStatusWithChange(
-                            status = lyricsTranslation.status,
-                            onStatusClick = { showLyricsProviders = true },
+                        // The provider credit moved to the foot of the lyrics. The
+                        // slot stays, invisibly, so the controls keep their place.
+                        Text(
+                            text = "\u00A0",
+                            style = MaterialTheme.typography.titleMedium,
+                            maxLines = 1,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .offset(y = 6.dp)
