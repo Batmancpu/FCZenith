@@ -196,6 +196,11 @@ def upgrade_learner(text: str) -> str:
     )
     text = replace(
         text,
+        "            onShare >= CONFIDENCE_THRESHOLD -> SpatialAudioDecisionReason.AUTO_LEARNED_ON",
+        "            onShare + 1.0e-9 >= CONFIDENCE_THRESHOLD -> SpatialAudioDecisionReason.AUTO_LEARNED_ON",
+    )
+    text = replace(
+        text,
         "            onShare <= 1.0 - CONFIDENCE_THRESHOLD -> SpatialAudioDecisionReason.AUTO_LEARNED_OFF",
         "            onShare <= 1.0 - AUTO_OFF_THRESHOLD -> SpatialAudioDecisionReason.AUTO_LEARNED_OFF"
     )
