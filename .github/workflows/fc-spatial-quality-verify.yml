@@ -107,9 +107,6 @@ jobs:
               print(f"{qualifier}: added {added} English fallback entries for this build.")
           PY
 
-      - name: Apply reversible brrMusic presentation overlay
-        if: steps.decision.outputs.should_release == 'true'
-        run: python3 fc/branding/apply.py
       - name: Run all production unit tests, including new audio regressions
         run: |
           set -euo pipefail
