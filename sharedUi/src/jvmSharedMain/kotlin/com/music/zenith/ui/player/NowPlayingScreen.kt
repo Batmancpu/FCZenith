@@ -2862,6 +2862,7 @@ fun NowPlayingScreen(
                     MeshGradientBackground(
                         palette = rememberArtworkColors(remoteArt, canvasFrame),
                         trackKey = song.videoId,
+                        continuous = true,
                         driftMillis = 20_000,
                         colorFadeMillis = 3_500,
                         modifier = Modifier.graphicsLayer { alpha = 1f - fullArtworkBackdropAlpha },
