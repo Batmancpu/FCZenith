@@ -508,6 +508,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 sources = setOf(source),
                 order = listOf(source),
                 prioritizeSyllableSync = false,
+                usePinned = false,
                 onSourceStarted = { provider -> providerStarted(generation, provider) },
                 onSourceResult = { provider, result ->
                     providerFinished(generation, provider, result)
@@ -557,6 +558,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             manualLyricsJobs.values.forEach(Job::cancel)
             manualLyricsJobs.clear()
             selectedLyricsSource = null
+            LyricsRepository.pin(request.videoId, found)
             showLyricsResult(found)
             _manualLyricsState.value = ManualLyricsSearchState.FOUND
         }
