@@ -2957,14 +2957,12 @@ fun NowPlayingScreen(
                 if (heroMode && heroHeight > 0.dp) {
                     heroClipMounted?.let { clip ->
                         val stillStart = remember(clip.url) { stillAtMount() }
-                        val panelBlur by animateFloatAsState(
-                            targetValue = if (liveCanvasPanels && (lyricsOpen || queueOpen)) 1f else 0f,
-                            animationSpec = tween(
-                                durationMillis = if (liveCanvasPanels && (lyricsOpen || queueOpen)) 120 else 360,
-                                easing = FastOutSlowInEasing,
-                            ),
-                            label = "canvasPanelBlur",
-                        )
+                        // Follows the panel collapse itself, read at draw time, so the blur
+                        // is complete by the time the lyrics or queue appear instead of
+                        // waiting on a recomposition and a separate animation.
+                        val panelBlur: () -> Float = {
+                            if (liveCanvasPanels) (p() * 2f).coerceIn(0f, 1f) else 0f
+                        }
                         CanvasArtworkPlayer(
                             canvas = clip,
                             isPlaying = isPlaying,
@@ -3065,12 +3063,13 @@ fun NowPlayingScreen(
                                 )
                                 .drawWithContent {
                                     drawContent()
-                                    if (panelBlur > 0f) {
-                                        drawRect(Color.Black.copy(alpha = CANVAS_PANEL_DIM * panelBlur))
+                                    val dimAmount = panelBlur()
+                                    if (dimAmount > 0f) {
+                                        drawRect(Color.Black.copy(alpha = CANVAS_PANEL_DIM * dimAmount))
                                     }
                                 }
                                 .graphicsLayer {
-                                    val radius = CANVAS_PANEL_BLUR_DP.dp.toPx() * panelBlur
+                                    val radius = CANVAS_PANEL_BLUR_DP.dp.toPx() * panelBlur()
                                     renderEffect = if (radius > 0.5f) BlurEffect(radius, radius, TileMode.Clamp) else null
                                     compositingStrategy = CompositingStrategy.Offscreen
                                 }
