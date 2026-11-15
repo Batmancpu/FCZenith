@@ -3402,30 +3402,48 @@ fun NowPlayingScreen(
                             },
                         contentAlignment = Alignment.Center,
                     ) {
-                        // Thin drag handle, Apple Music style. The strip itself hands
-                        // drags to the sheet; this only says it can be pulled down.
-                        Box(
+                        // Chevron turun di sisi kiri, bukan garis divider. Strip-nya tetap
+                        // yang meneruskan drag ke sheet; ini hanya penanda bisa ditutup.
+                        androidx.compose.foundation.Canvas(
                             modifier = Modifier
-                                .align(Alignment.TopCenter)
-                                .padding(top = 6.dp)
-                                .size(width = 36.dp, height = 3.dp)
-                                .graphicsLayer { alpha = (1f - p()) * spotifyChromeAlpha }
-                                .clip(androidx.compose.foundation.shape.CircleShape)
-                                .background(Color.White.copy(alpha = 0.4f)),
-                        )
+                                .align(Alignment.CenterStart)
+                                .padding(start = PLAYER_GUTTER)
+                                .size(width = 20.dp, height = 10.dp)
+                                .graphicsLayer { alpha = (1f - p()) * spotifyChromeAlpha },
+                        ) {
+                            val stroke = 2.2.dp.toPx()
+                            val chevron = androidx.compose.ui.graphics.Path().apply {
+                                moveTo(stroke / 2f, stroke / 2f)
+                                lineTo(size.width / 2f, size.height - stroke / 2f)
+                                lineTo(size.width - stroke / 2f, stroke / 2f)
+                            }
+                            drawPath(
+                                path = chevron,
+                                color = Color.White.copy(alpha = 0.92f),
+                                style = androidx.compose.ui.graphics.drawscope.Stroke(
+                                    width = stroke,
+                                    cap = androidx.compose.ui.graphics.StrokeCap.Round,
+                                    join = androidx.compose.ui.graphics.StrokeJoin.Round,
+                                ),
+                            )
+                        }
                         // [p] is the shared album-to-panel transition. Keeping this in
                         // composition until its final frame gives the caption a real
                         // fade on both entry and exit, but removes its click target
                         // entirely once lyrics or the queue owns the player.
                         if (!hideSongStatus) {
                             WhileShown({ !collapseAlmostDone }) {
-                                PlaybackOriginCaption(
-                                    text = playbackOriginText(song, playedBy),
+                                val (originLabel, originName) = playbackOriginParts(song, playedBy)
+                                PlaybackOriginHeader(
+                                    label = originLabel,
+                                    name = originName,
                                     onClick = openPlaybackOrigin,
-                                    textAlign = TextAlign.Center,
-                                    contentPadding = PaddingValues(start = PLAYER_GUTTER, end = PLAYER_GUTTER, bottom = 1.dp),
+                                    contentPadding = PaddingValues(
+                                        start = PLAYER_GUTTER + 36.dp,
+                                        end = PLAYER_GUTTER + 36.dp,
+                                    ),
                                     modifier = Modifier
-                                        .align(Alignment.BottomCenter)
+                                        .align(Alignment.Center)
                                         .graphicsLayer { alpha = (1f - p()) * spotifyChromeAlpha },
                                 )
                             }

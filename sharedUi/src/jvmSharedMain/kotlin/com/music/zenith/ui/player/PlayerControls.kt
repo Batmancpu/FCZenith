@@ -200,6 +200,74 @@ internal fun PlaybackOriginCaption(
 }
 
 /**
+ * [playbackOriginText] dipecah dua: label kecil ("Playing from") dan nama
+ * asalnya, untuk header player dua baris.
+ */
+@Composable
+internal fun playbackOriginParts(song: Song, playedBy: String?): Pair<String, String> =
+    playedBy?.let {
+        stringResource(Res.string.played_by_label) to it
+    } ?: song.radioName?.let {
+        stringResource(Res.string.playing_radio_label) to it
+    } ?: (
+        stringResource(Res.string.playing_from_label) to
+            (song.playbackSource ?: song.albumName ?: stringResource(Res.string.queue))
+        )
+
+/**
+ * Header dua baris di tengah strip atas player: label kecil kapital yang pucat,
+ * nama asal di bawahnya lebih terang. Bisa diketuk, kembali ke tempat itu.
+ */
+@Composable
+internal fun PlaybackOriginHeader(
+    label: String,
+    name: String,
+    onClick: () -> Unit,
+    contentPadding: PaddingValues,
+    modifier: Modifier = Modifier,
+) {
+    val shadow = Shadow(
+        color = Color.Black.copy(alpha = 0.45f),
+        offset = Offset(0f, 1f),
+        blurRadius = 4f,
+    )
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier
+            .clickable(onClick = onClick)
+            .padding(contentPadding),
+    ) {
+        Text(
+            text = label.uppercase(),
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontSize = 9.sp,
+                lineHeight = 11.sp,
+                letterSpacing = 1.2.sp,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
+                shadow = shadow,
+            ),
+            color = LocalPlayerTint.current.copy(alpha = 0.55f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+        )
+        Text(
+            text = name,
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontSize = 12.sp,
+                lineHeight = 15.sp,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
+                shadow = shadow,
+            ),
+            color = LocalPlayerTint.current.copy(alpha = 0.92f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
+/**
  * The seek bar, with elapsed and remaining either side under it and
  * [centerLabel] — the quality badge — between them.
  */
