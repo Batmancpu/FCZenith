@@ -1713,6 +1713,15 @@ fun NowPlayingScreen(
     // Pegangan terpisah untuk Spotify Canvas layar penuh: frame-nya tidak
     // dianimasikan di sleeve, tapi di lapisan setinggi layar.
     val fullFrameGrab = remember { CanvasFrameGrab() }
+    // Frame terakhir klip saat lirik/queue dibuka. Hanya jadi sumber warna mesh
+    // legacy di belakang panel; klip sendiri sudah berhenti pada frame itu.
+    var canvasPanelFrame by remember(canvas?.url) { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(lyricsOpen || queueOpen, canvas?.url) {
+        if (lyricsOpen || queueOpen) {
+            val grabbed = (fullFrameGrab.grab ?: canvasFrameGrab.grab)?.invoke()
+            if (grabbed != null) canvasPanelFrame = grabbed
+        }
+    }
     // Bentuk klip hero yang sedang tampil; diisi tiap komposisi di bawah (setelah
     // clipFadeFraction), dibaca saat skip menahan frame-nya.
     val heroClipGeometry = remember { HeroClipGeometry() }
@@ -1824,8 +1833,8 @@ fun NowPlayingScreen(
     // and queue. Only where it can be drawn (Android 12+, dynamic blur not reduced).
     val canvasLiveBlur by PlayerSettings.canvasLiveBlurPanels.collectAsStateWithLifecycle()
     val liveBlurReduced by PlayerSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
-    val liveCanvasPanels = canvasLiveBlur && !liveBlurReduced && renderEffectBlurSupported &&
-        canvas != null && heroMode
+    // Live blur dimatikan: lirik/queue memakai mesh legacy dari frame terakhir canvas.
+    val liveCanvasPanels = false
     // While a panel is up the clip, whatever its shape, covers the whole player.
     val clipFillsPanels = liveCanvasPanels && (lyricsOpen || queueOpen)
     val heroClipMounted = canvas?.takeIf {
@@ -2880,10 +2889,24 @@ fun NowPlayingScreen(
                 // Legacy mesh is the whole backdrop on every page, so the lyrics and
                 // queue panels must not crossfade the blurred artwork over it. A
                 // full-screen Spotify Canvas is its own backdrop until a panel opens.
-                val legacyMeshBackdrop = !tabletArtworkBackdrop && !spotifyCanvasPresentation && legacyMesh
+                // Di lirik/queue, Spotify Canvas digantikan mesh legacy yang warnanya
+                // diambil dari frame terakhirnya, bukan blur cover statis.
+                val canvasPanelMesh = !tabletArtworkBackdrop && spotifyCanvasOnPhone && heroMode &&
+                    (lyricsOpen || queueOpen)
+                val canvasMeshAlpha by animateFloatAsState(
+                    targetValue = if (canvasPanelMesh) 1f else 0f,
+                    animationSpec = tween(
+                        durationMillis = if (canvasPanelMesh) 360 else 600,
+                        easing = FastOutSlowInEasing,
+                    ),
+                    label = "canvasPanelMesh",
+                )
+                val canvasPanelPalette = rememberArtworkColors(remoteArt, canvasPanelFrame)
+                val legacyMeshBackdrop = !tabletArtworkBackdrop && !spotifyCanvasPresentation &&
+                    legacyMesh && !canvasPanelMesh
                 val fullArtworkBackdropAlpha by animateFloatAsState(
                     targetValue = if (
-                        !legacyMeshBackdrop &&
+                        !legacyMeshBackdrop && !canvasPanelMesh &&
                         (tabletArtworkBackdrop || fullArtworkBlurImage != null) &&
                         (!spotifyCanvasPresentation || lyricsOpen || queueOpen ||
                             mixing || crossfading || clipDimmed || dissolve.fullFrame != null)
@@ -2913,6 +2936,16 @@ fun NowPlayingScreen(
                         driftMillis = 20_000,
                         colorFadeMillis = 3_500,
                         modifier = Modifier.graphicsLayer { alpha = 1f - fullArtworkBackdropAlpha },
+                    )
+                }
+                if (canvasMeshAlpha > 0.001f) {
+                    MeshGradientBackground(
+                        palette = canvasPanelPalette,
+                        trackKey = song.videoId,
+                        continuous = true,
+                        driftMillis = 20_000,
+                        colorFadeMillis = 900,
+                        modifier = Modifier.graphicsLayer { alpha = canvasMeshAlpha },
                     )
                 }
                 fullArtworkBlurContent(
