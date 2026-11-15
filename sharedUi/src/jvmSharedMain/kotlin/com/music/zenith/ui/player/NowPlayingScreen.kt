@@ -2891,7 +2891,7 @@ fun NowPlayingScreen(
                 // full-screen Spotify Canvas is its own backdrop until a panel opens.
                 // Di lirik/queue, Spotify Canvas digantikan mesh legacy yang warnanya
                 // diambil dari frame terakhirnya, bukan blur cover statis.
-                val canvasPanelMesh = !tabletArtworkBackdrop && spotifyCanvasOnPhone && heroMode &&
+                val canvasPanelMesh = !tabletArtworkBackdrop && canvas != null && heroMode &&
                     (lyricsOpen || queueOpen)
                 val canvasMeshAlpha by animateFloatAsState(
                     targetValue = if (canvasPanelMesh) 1f else 0f,
