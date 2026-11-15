@@ -3005,7 +3005,9 @@ fun NowPlayingScreen(
                             //
                             // Out of sight altogether while its still stands in for it.
                             presentationAlpha = {
-                                if (stillTakesOver() || (dockMoving && !clipFullscreen)) 0f
+                                if (stillTakesOver() ||
+                                    (dockMoving && !clipFullscreen && !(liveCanvasPanels && (lyricsOpen || queueOpen)))
+                                ) 0f
                                 else (
                                     if (liveCanvasPanels && (lyricsOpen || queueOpen)) 1f
                                     else if (clipFullscreen) {
