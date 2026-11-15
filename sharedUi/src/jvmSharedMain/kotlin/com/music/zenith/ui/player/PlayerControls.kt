@@ -17,6 +17,7 @@ import com.music.zenith.sharedui.resources.*
 import org.jetbrains.compose.resources.DrawableResource
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.fadeIn
@@ -1059,12 +1060,22 @@ private fun OutputPartyPill(
     val badge = rememberPartyBadge()
     val shown by PlayerSettings.showListenTogetherButton.collectAsStateWithLifecycle()
     val output = rememberOutputGlyph()
+    // Lit in a colour opposite the sleeve's own while the sound leaves by
+    // another device, so it reads as "connected" on any cover.
+    val external = rememberOutputIsExternal()
+    val outputAccent by animateColorAsState(
+        targetValue = outputAccentFor(LocalPlayerTint.current),
+        animationSpec = tween(durationMillis = 300),
+        label = "outputAccent",
+    )
+    val outputTint = if (external) outputAccent else null
     // Party half hidden only outside a party: once in one, this is the way to
     // who's in it. Without it the output glyph stands alone, drawn like the
     // lyrics and queue glyphs either side rather than as half a capsule.
     if (!shown && !badge.inParty) {
         BottomGlyph(
             icon = output.icon,
+            tintOverride = outputTint,
             iconSize = output.size * (BOTTOM_ICON_SIZE / PILL_OUTPUT_SIZE),
             fluidPress = true,
             contentDescription = stringResource(Res.string.audio_output),
@@ -1075,6 +1086,7 @@ private fun OutputPartyPill(
     Pill {
         PillSegment(
             icon = output.icon,
+            tintOverride = outputTint,
             iconSize = output.size,
             fluidPress = true,
             contentDescription = stringResource(Res.string.audio_output),
@@ -1144,6 +1156,39 @@ private fun rememberOutputGlyph(): OutputGlyph {
 /** An output glyph and the size that makes it match the others — see [PILL_OUTPUT_SIZE]. */
 private data class OutputGlyph(val icon: ImageVector, val size: Dp = PILL_OUTPUT_SIZE)
 
+/** Whether the sound leaves by anything other than the phone's own speaker: a cast, the watch, buds, a speaker, a wire. */
+@Composable
+private fun rememberOutputIsExternal(): Boolean {
+    val cast by PlayerPlatform.host.castState.collectAsStateWithLifecycle()
+    val watch by PlayerPlatform.host.watchOutput.collectAsStateWithLifecycle()
+    val active = rememberAudioOutputs().firstOrNull { it.isActive }
+    return cast.connectedName != null || watch.active ||
+        (active != null && active.kind != AudioOutputKind.PHONE)
+}
+
+/** Used when the player tint carries no sleeve colour to turn away from. */
+private val OutputAccentFallback = Color(0xFF30D158)
+
+/**
+ * The connected-output colour: the hue directly opposite the sleeve's own,
+ * saturated and mid-light, so it stands apart from the artwork behind it
+ * whatever the cover looks like. Read off [tint], which already echoes the
+ * sleeve; plain white (no sleeve colour) gets a fixed green instead.
+ */
+private fun outputAccentFor(tint: Color): Color {
+    val high = maxOf(tint.red, tint.green, tint.blue)
+    val low = minOf(tint.red, tint.green, tint.blue)
+    val chroma = high - low
+    if (chroma < 0.03f) return OutputAccentFallback
+    var hue = when (high) {
+        tint.red -> 60f * (((tint.green - tint.blue) / chroma) % 6f)
+        tint.green -> 60f * ((tint.blue - tint.red) / chroma + 2f)
+        else -> 60f * ((tint.red - tint.green) / chroma + 4f)
+    }
+    if (hue < 0f) hue += 360f
+    return Color.hsl((hue + 180f) % 360f, 0.85f, 0.58f)
+}
+
 /**
  * One control inside a [Pill] — [BottomGlyph]'s twin, squared off.
  *
@@ -1168,6 +1213,8 @@ private fun PillSegment(
     tapWindowMs: Long = 0L,
     /** Per-segment override — see [OutputPartyPill]'s three-up capsule. */
     width: Dp = PILL_SEGMENT_WIDTH,
+    /** Draws the glyph in this colour, at full strength, instead of the player tint. */
+    tintOverride: Color? = null,
 ) {
     val haptics = rememberHaptics()
     val lastTap = remember { mutableLongStateOf(-tapWindowMs) }
@@ -1193,7 +1240,7 @@ private fun PillSegment(
             .semantics { this.contentDescription = contentDescription },
         contentAlignment = Alignment.Center,
     ) {
-        val tint = LocalPlayerTint.current.copy(alpha = if (highlighted) 1f else 0.75f)
+        val tint = tintOverride ?: LocalPlayerTint.current.copy(alpha = if (highlighted) 1f else 0.75f)
         Crossfade(
             targetState = loading,
             animationSpec = tween(durationMillis = 200),
@@ -1361,6 +1408,8 @@ private fun BottomGlyph(
      * ask for a window.
      */
     tapWindowMs: Long = 0L,
+    /** Draws the glyph in this colour, at full strength, instead of the player tint. */
+    tintOverride: Color? = null,
 ) {
     val haptics = rememberHaptics()
     // Read only from the click handler, never during composition, so writing it
@@ -1411,7 +1460,7 @@ private fun BottomGlyph(
             .semantics { this.contentDescription = contentDescription },
         contentAlignment = Alignment.Center,
     ) {
-        val tint = LocalPlayerTint.current.copy(alpha = if (highlighted) 1f else 0.75f)
+        val tint = tintOverride ?: LocalPlayerTint.current.copy(alpha = if (highlighted) 1f else 0.75f)
         if (icon != null) {
             Icon(
                 imageVector = icon,
