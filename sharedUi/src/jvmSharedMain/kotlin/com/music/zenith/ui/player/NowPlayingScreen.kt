@@ -2961,7 +2961,9 @@ fun NowPlayingScreen(
                         // is complete by the time the lyrics or queue appear instead of
                         // waiting on a recomposition and a separate animation.
                         val panelBlur: () -> Float = {
-                            if (liveCanvasPanels) (p() * 4f).coerceIn(0f, 1f) else 0f
+                            if (!liveCanvasPanels) 0f
+                            else if (lyricsOpen || queueOpen) 1f
+                            else (p() * 4f).coerceIn(0f, 1f)
                         }
                         CanvasArtworkPlayer(
                             canvas = clip,
@@ -3105,7 +3107,7 @@ fun NowPlayingScreen(
                                 .fillMaxSize()
                                 .graphicsLayer {
                                     alpha = if (panelsUp) {
-                                        stillCoverFade * (p() * 4f).coerceIn(0f, 1f)
+                                        stillCoverFade
                                     } else {
                                         0f
                                     }
