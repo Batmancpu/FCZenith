@@ -3055,6 +3055,8 @@ fun NowPlayingScreen(
                             },
                             bottomFadeEndPx = if (clipPortrait && !clipFillsPanels) with(density) { clipBottom.toPx() }
                                 else null,
+                            // Blur on the TextureView itself, not a Compose layer over it.
+                            blurPx = { with(density) { CANVAS_PANEL_BLUR_DP.dp.toPx() } * panelBlur() },
                             modifier = Modifier
                                 .align(Alignment.TopStart)
                                 .then(
@@ -3067,11 +3069,6 @@ fun NowPlayingScreen(
                                     if (dimAmount > 0f) {
                                         drawRect(Color.Black.copy(alpha = CANVAS_PANEL_DIM * dimAmount))
                                     }
-                                }
-                                .graphicsLayer {
-                                    val radius = CANVAS_PANEL_BLUR_DP.dp.toPx() * panelBlur()
-                                    renderEffect = if (radius > 0.5f) BlurEffect(radius, radius, TileMode.Clamp) else null
-                                    compositingStrategy = CompositingStrategy.Offscreen
                                 }
                                 .hazeSource(playerHaze),
                         )
