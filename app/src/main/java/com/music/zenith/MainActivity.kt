@@ -493,6 +493,7 @@ class MainActivity : AppCompatActivity() {
                             hazeState = haze,
                             placement = IosMenuPlacement.AboveStart,
                             dimBackground = false,
+                            glassRim = true,
                             frostAlpha = 0.3f,
                             startOffset = (-32).dp,
                         ) {
