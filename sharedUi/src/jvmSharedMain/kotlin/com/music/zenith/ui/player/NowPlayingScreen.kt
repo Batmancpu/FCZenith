@@ -3033,7 +3033,11 @@ fun NowPlayingScreen(
                                 if (stillTakesOver() || (dockMoving && !clipFullscreen)) 0f
                                 else (
                                     if (liveCanvasPanels && (lyricsOpen || queueOpen)) 1f
-                                    else (1f - 2f * p()).coerceIn(0f, 1f)
+                                    else if (clipFullscreen) {
+                                        // Spotify layar penuh: frame melebur lebih awal langsung
+                                        // ke backdrop, tanpa bercampur dengan cover statis.
+                                        1f - smootherStep(((p() - 0.05f) / 0.3f).coerceIn(0f, 1f))
+                                    } else (1f - 2f * p()).coerceIn(0f, 1f)
                                     ) * dockFade() * clipMixFade.value
                             },
                             // A full-screen Spotify Canvas holds its frame for a beat
@@ -4110,7 +4114,15 @@ fun NowPlayingScreen(
                                     // Whole while the clip's still is standing in for it.
                                     alpha = (
                                         if (stillTakesOver()) 1f
-                                        else if (heroClip != null) 1f - canvasCover.floatValue
+                                        else if (heroClip != null) {
+                                            if (clipFullscreen && canvasRendered && !clipDimmed) {
+                                                // Cover statis baru muncul setelah frame klip
+                                                // melebur, saat ia sudah menyusut ke header.
+                                                smootherStep(((p() - 0.3f) / 0.2f).coerceIn(0f, 1f))
+                                            } else {
+                                                1f - canvasCover.floatValue
+                                            }
+                                        }
                                         else 1f
                                         ) *
                                         // Selama frame Spotify Canvas lama masih menutup
