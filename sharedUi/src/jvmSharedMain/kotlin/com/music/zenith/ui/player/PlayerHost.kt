@@ -266,6 +266,8 @@ interface PlayerSettingsSource {
     /** Whether the full cover effect (fluid or slide) runs only while Automix or a crossfade is playing. */
     val coverMixOnlyEffects: StateFlow<Boolean>
     val reduceDynamicBlur: StateFlow<Boolean>
+    /** Keeps a full-screen Spotify Canvas playing, blurred live, behind the lyrics and queue. */
+    val canvasLiveBlurPanels: StateFlow<Boolean>
     /** Whether Dolby Atmos is both playable on this device and switched on, so the player can show its badge. */
     val dolbyAtmosActive: StateFlow<Boolean>
     val showNerdStats: StateFlow<Boolean>
