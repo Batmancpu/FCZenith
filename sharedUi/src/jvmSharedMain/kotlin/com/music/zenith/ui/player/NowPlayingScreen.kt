@@ -1825,7 +1825,9 @@ fun NowPlayingScreen(
     val canvasLiveBlur by PlayerSettings.canvasLiveBlurPanels.collectAsStateWithLifecycle()
     val liveBlurReduced by PlayerSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
     val liveCanvasPanels = canvasLiveBlur && !liveBlurReduced && renderEffectBlurSupported &&
-        spotifyCanvasOnPhone
+        canvas != null && heroMode
+    // While a panel is up the clip, whatever its shape, covers the whole player.
+    val clipFillsPanels = liveCanvasPanels && (lyricsOpen || queueOpen)
     val heroClipMounted = canvas?.takeIf {
         heroMode && (!(lyricsOpen || queueOpen) || !collapseDone || liveCanvasPanels)
     }
@@ -2949,7 +2951,7 @@ fun NowPlayingScreen(
                             // Spotify's 9:16 Canvas is the phone background, so it
                             // covers every edge. Other providers retain the contained
                             // portrait treatment introduced for motion cover art.
-                            contentMode = if (clipFullscreen) {
+                            contentMode = if (clipFullscreen || clipFillsPanels) {
                                 CanvasContentMode.CROP
                             } else {
                                 CanvasContentMode.FIT_PORTRAIT
@@ -3014,7 +3016,7 @@ fun NowPlayingScreen(
                             modifier = Modifier
                                 .align(Alignment.TopStart)
                                 .then(
-                                    if (clipFullscreen || clipPortrait) Modifier.fillMaxSize()
+                                    if (clipFullscreen || clipPortrait || clipFillsPanels) Modifier.fillMaxSize()
                                     else Modifier.fillMaxWidth().height(heroHeight),
                                 )
                                 .drawWithContent {
