@@ -601,6 +601,10 @@ private const val DOCK_FLY_SOFT_START_AT = 0.3f
  */
 private const val DOCK_RIDE_SHARE = 1f
 
+/** Blur radius (dp) and dim of a Spotify Canvas kept playing behind the lyrics and queue. */
+private const val CANVAS_PANEL_BLUR_DP = 28f
+private const val CANVAS_PANEL_DIM = 0.35f
+
 /** How far the static card cover trails the panel's progress while docking; 1 = in step, higher = more gap. */
 private const val DOCK_CARD_LAG = 1.25f
 
@@ -1816,8 +1820,14 @@ fun NowPlayingScreen(
     // [heroClip], which has gone by the time it is still lingering: re-read
     // off that, its last few frames would resize the view and rebuild its
     // fade for a picture nobody can see.
+    // A full-screen Spotify Canvas that stays up, blurred live, behind the lyrics
+    // and queue. Only where it can be drawn (Android 12+, dynamic blur not reduced).
+    val canvasLiveBlur by PlayerSettings.canvasLiveBlurPanels.collectAsStateWithLifecycle()
+    val liveBlurReduced by PlayerSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
+    val liveCanvasPanels = canvasLiveBlur && !liveBlurReduced && renderEffectBlurSupported &&
+        spotifyCanvasOnPhone
     val heroClipMounted = canvas?.takeIf {
-        heroMode && (!(lyricsOpen || queueOpen) || !collapseDone)
+        heroMode && (!(lyricsOpen || queueOpen) || !collapseDone || liveCanvasPanels)
     }
     val clipFullscreen = spotifyCanvasOnPhone &&
         heroClipMounted?.source == CanvasSource.SPOTIFY
@@ -2259,6 +2269,7 @@ fun NowPlayingScreen(
     // Whether the still is on screen in the clip's place: while it moves, and
     // until the clip has painted the same frame again.
     fun stillTakesOver(): Boolean = still() != null && CanvasStills.fresh &&
+        !(liveCanvasPanels && (lyricsOpen || queueOpen)) &&
         (collapseStarted || dockMoving || lyricsOpen || queueOpen || queueDragging || !canvasRendered)
     // A portrait still is the clip's whole picture, not the banner's square:
     // top-aligned across the player's width, as the clip is contained, and as
@@ -2911,6 +2922,11 @@ fun NowPlayingScreen(
                 if (heroMode && heroHeight > 0.dp) {
                     heroClipMounted?.let { clip ->
                         val stillStart = remember(clip.url) { stillAtMount() }
+                        val panelBlur by animateFloatAsState(
+                            targetValue = if (liveCanvasPanels && (lyricsOpen || queueOpen)) 1f else 0f,
+                            animationSpec = tween(durationMillis = 360, easing = FastOutSlowInEasing),
+                            label = "canvasPanelBlur",
+                        )
                         CanvasArtworkPlayer(
                             canvas = clip,
                             isPlaying = isPlaying,
@@ -2926,8 +2942,10 @@ fun NowPlayingScreen(
                             // Not for the drawers, popups and ⋯ menu over a
                             // full-screen Spotify Canvas, though: that is the whole
                             // screen, and keeps playing under them, blurred live.
-                            pausedForTransition = lyricsOpen || queueOpen || queueDragging ||
-                                collapseStarted || (overlayOpen.value && !clipFullscreen),
+                            pausedForTransition = (!liveCanvasPanels && (lyricsOpen || queueOpen)) ||
+                                queueDragging ||
+                                (collapseStarted && !(liveCanvasPanels && (lyricsOpen || queueOpen))) ||
+                                (overlayOpen.value && !clipFullscreen),
                             // Spotify's 9:16 Canvas is the phone background, so it
                             // covers every edge. Other providers retain the contained
                             // portrait treatment introduced for motion cover art.
@@ -2950,7 +2968,10 @@ fun NowPlayingScreen(
                             // Out of sight altogether while its still stands in for it.
                             presentationAlpha = {
                                 if (stillTakesOver() || (dockMoving && !clipFullscreen)) 0f
-                                else (1f - 2f * p()).coerceIn(0f, 1f) * dockFade() * clipMixFade.value
+                                else (
+                                    if (liveCanvasPanels && (lyricsOpen || queueOpen)) 1f
+                                    else (1f - 2f * p()).coerceIn(0f, 1f)
+                                    ) * dockFade() * clipMixFade.value
                             },
                             // A full-screen Spotify Canvas holds its frame for a beat
                             // once the player has come all the way up, rather than
@@ -2996,6 +3017,17 @@ fun NowPlayingScreen(
                                     if (clipFullscreen || clipPortrait) Modifier.fillMaxSize()
                                     else Modifier.fillMaxWidth().height(heroHeight),
                                 )
+                                .drawWithContent {
+                                    drawContent()
+                                    if (panelBlur > 0f) {
+                                        drawRect(Color.Black.copy(alpha = CANVAS_PANEL_DIM * panelBlur))
+                                    }
+                                }
+                                .graphicsLayer {
+                                    val radius = CANVAS_PANEL_BLUR_DP.dp.toPx() * panelBlur
+                                    renderEffect = if (radius > 0.5f) BlurEffect(radius, radius, TileMode.Clamp) else null
+                                    compositingStrategy = CompositingStrategy.Offscreen
+                                }
                                 .hazeSource(playerHaze),
                         )
                     }
