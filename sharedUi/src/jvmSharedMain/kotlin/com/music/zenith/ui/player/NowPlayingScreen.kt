@@ -3077,48 +3077,7 @@ fun NowPlayingScreen(
                     }
                 }
 
-                // Live blur on: a pre-blurred still covers the clip as the panel opens, so
-                // the sharp video is never seen. Once the panel has settled and the live
-                // blur is running behind it, the still fades out into the live blur.
-                if (liveCanvasPanels && heroMode) {
-                    val panelsUp = lyricsOpen || queueOpen
-                    var liveBlurReady by remember { mutableStateOf(false) }
-                    LaunchedEffect(panelsUp) {
-                        liveBlurReady = false
-                        if (!panelsUp) return@LaunchedEffect
-                        snapshotFlow { collapseDone }.first { it }
-                        delay(450)
-                        liveBlurReady = true
-                    }
-                    val stillCoverFade by animateFloatAsState(
-                        targetValue = if (liveBlurReady) 0f else 1f,
-                        animationSpec = if (liveBlurReady) {
-                            tween(durationMillis = 600, easing = FastOutSlowInEasing)
-                        } else {
-                            snap()
-                        },
-                        label = "canvasPanelStillCover",
-                    )
-                    val stillCover = fullArtworkBlurImage ?: canvasPanelFrameBlur
-                    if (stillCover != null) {
-                        FullArtworkBlurBackdrop(
-                            image = stillCover,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .graphicsLayer {
-                                    alpha = if (panelsUp) {
-                                        stillCoverFade
-                                    } else {
-                                        0f
-                                    }
-                                }
-                                .drawWithContent {
-                                    drawContent()
-                                    drawRect(Color.Black.copy(alpha = CANVAS_PANEL_DIM))
-                                },
-                        )
-                    }
-                }
+                // Live blur on: the clip itself is blurred live on its TextureView; no static still.
 
                 // Frame terakhir Spotify Canvas layar penuh, di atas latar dan di
                 // bawah kontrol. Tak terlihat sampai lagu berganti; lalu menutup
