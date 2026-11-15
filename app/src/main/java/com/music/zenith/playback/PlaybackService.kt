@@ -1755,6 +1755,7 @@ class PlaybackService : MediaLibraryService() {
         observeScrobbling()
         observeDiscord()
         watchSleepTimer()
+        watchZeroVolume()
         val restored = if (PartyPersonalQueueStash.hasStash()) {
             val stashed = PartyPersonalQueueStash.load()
             PartyPersonalQueueStash.clear()
@@ -6667,6 +6668,35 @@ class PlaybackService : MediaLibraryService() {
                 if (remaining > 0) delay(remaining)
                 player?.pause()
                 SleepTimer.cancel()
+            }
+        }
+    }
+
+    /**
+     * Pause when the music volume is turned all the way down.
+     *
+     * Only the moment the level *reaches* zero counts, so starting playback
+     * with the volume already at zero does not pause it again at once. Skipped
+     * while casting or on a direct USB DAC, where the phone's music stream is
+     * not what the listener is turning down.
+     */
+    private fun watchZeroVolume() {
+        scope.launch {
+            AppSettings.pauseOnZeroVolume.collectLatest { enabled ->
+                if (!enabled) return@collectLatest
+                val manager = audioManager ?: return@collectLatest
+                var last = manager.getStreamVolume(AudioManager.STREAM_MUSIC)
+                while (true) {
+                    delay(400)
+                    val now = manager.getStreamVolume(AudioManager.STREAM_MUSIC)
+                    val phoneOutput = !CastController.state.value.casting &&
+                        !castPlayback.active &&
+                        DacVolume.level.value == null
+                    if (phoneOutput && last > 0 && now == 0) {
+                        player?.takeIf { it.playWhenReady }?.pause()
+                    }
+                    last = now
+                }
             }
         }
     }

@@ -309,6 +309,7 @@ fun SettingsScreen(
     val downloadFolderUri by AppSettings.downloadFolderUri.collectAsStateWithLifecycle()
     val syncDownloadedPlaylists by AppSettings.syncDownloadedPlaylists.collectAsStateWithLifecycle()
     val stopOnTaskRemoved by AppSettings.stopOnTaskRemoved.collectAsStateWithLifecycle()
+    val pauseOnZeroVolume by AppSettings.pauseOnZeroVolume.collectAsStateWithLifecycle()
     val hideVolumeBar by AppSettings.hideVolumeBar.collectAsStateWithLifecycle()
     val hideStatusBarInPlayer by AppSettings.hideStatusBarInPlayer.collectAsStateWithLifecycle()
     val hideSongStatus by AppSettings.hideSongStatus.collectAsStateWithLifecycle()
@@ -1840,6 +1841,21 @@ fun SettingsScreen(
                         )
                     },
                     onClick = { AppSettings.setHideVolumeBar(!hideVolumeBar) },
+                )
+            }
+            val pauseOnZeroVolumeTitle = stringResource(R.string.pause_on_zero_volume)
+            row(pauseOnZeroVolumeTitle, "volume", "pause", "mute", "player") {
+                SettingsRow(
+                    icon = SfIcons.VolumeOff,
+                    title = pauseOnZeroVolumeTitle,
+                    subtitle = stringResource(R.string.pause_on_zero_volume_subtitle),
+                    trailing = {
+                        IosSwitch(
+                            checked = pauseOnZeroVolume,
+                            onCheckedChange = AppSettings::setPauseOnZeroVolume,
+                        )
+                    },
+                    onClick = { AppSettings.setPauseOnZeroVolume(!pauseOnZeroVolume) },
                 )
             }
             val listenTogetherTabTitle = stringResource(R.string.show_listen_together_tab)
