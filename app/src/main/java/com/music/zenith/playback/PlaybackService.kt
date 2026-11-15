@@ -8068,6 +8068,57 @@ class PlaybackService : MediaLibraryService() {
         private var reportedPlaybackState = Player.STATE_IDLE
         private var reportedIsPlaying = false
 
+        // A pause the listener asked for is eased out over a moment rather than
+        // cut at the sink. Driven on the player's own thread; while it runs the
+        // player is still playing, just getting quieter.
+        private val pauseFadeHandler = Handler(player.applicationLooper)
+        private var pauseFade: Runnable? = null
+        private var pauseFadeRestoreVolume = 1f
+
+        /** Puts the volume back and drops an unfinished pause fade, e.g. when play is pressed mid-fade. */
+        private fun cancelPauseFade() {
+            val running = pauseFade ?: return
+            pauseFadeHandler.removeCallbacks(running)
+            pauseFade = null
+            wrappedPlayer.volume = pauseFadeRestoreVolume
+        }
+
+        /**
+         * Starts fading the current track out and pauses it at silence.
+         * Returns false when a plain pause should happen instead: the setting
+         * is off, nothing is audibly playing, or a crossfade owns the volumes.
+         */
+        private fun pauseSmoothly(): Boolean {
+            val target = wrappedPlayer
+            if (!AppSettings.smoothPause.value) return false
+            if (pauseFade != null) return true
+            if (!target.playWhenReady || !target.isPlaying) return false
+            if (crossfade.isTransitioning()) return false
+            val startVolume = target.volume
+            if (startVolume <= 0f) return false
+            pauseFadeRestoreVolume = startVolume
+            val startedAt = SystemClock.elapsedRealtime()
+            val step = object : Runnable {
+                override fun run() {
+                    val progress = ((SystemClock.elapsedRealtime() - startedAt).toFloat() / PAUSE_FADE_MS)
+                        .coerceIn(0f, 1f)
+                    // A blend took over the volumes mid-fade: finish at once.
+                    val done = progress >= 1f || crossfade.isTransitioning()
+                    if (!done) {
+                        target.volume = startVolume * (1f - progress) * (1f - progress)
+                        pauseFadeHandler.postDelayed(this, PAUSE_FADE_STEP_MS)
+                    } else {
+                        pauseFade = null
+                        target.pause()
+                        target.volume = startVolume
+                    }
+                }
+            }
+            pauseFade = step
+            pauseFadeHandler.post(step)
+            return true
+        }
+
         init {
             cast.sink = this
         }
@@ -8080,6 +8131,10 @@ class PlaybackService : MediaLibraryService() {
 
             /** A hardware key press, as a share of the receiver's range. */
             const val VOLUME_STEP = 0.05f
+
+            /** How long a listener's pause takes to fade to silence, and how often the fade steps. */
+            const val PAUSE_FADE_MS = 400L
+            const val PAUSE_FADE_STEP_MS = 16L
 
             /**
              * A DAC on direct USB output, whose volume is its own hardware
@@ -8377,6 +8432,7 @@ class PlaybackService : MediaLibraryService() {
                 cast.play()
                 return
             }
+            cancelPauseFade()
             super.play()
         }
 
@@ -8387,6 +8443,7 @@ class PlaybackService : MediaLibraryService() {
                 cast.pause()
                 return
             }
+            if (pauseSmoothly()) return
             super.pause()
         }
 
@@ -8407,6 +8464,7 @@ class PlaybackService : MediaLibraryService() {
                 if (playWhenReady) cast.play() else cast.pause()
                 return
             }
+            if (playWhenReady) cancelPauseFade() else if (pauseSmoothly()) return
             super.setPlayWhenReady(playWhenReady)
         }
 
