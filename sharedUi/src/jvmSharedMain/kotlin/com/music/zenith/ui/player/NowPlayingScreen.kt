@@ -4094,8 +4094,8 @@ fun NowPlayingScreen(
                                     alpha = (
                                         if (liveCanvasPanels && (lyricsOpen || queueOpen)) {
                                             // The clip is blurred live behind the panel; the sleeve
-                                            // fades in at once and visibly shrinks into the header.
-                                            smootherStep((p() / 0.15f).coerceIn(0f, 1f))
+                                            // is whole from the first frame and shrinks into the header.
+                                            1f
                                         } else if (stillTakesOver()) 1f
                                         else if (heroClip != null) {
                                             if (clipFullscreen && canvasRendered && !clipDimmed) {
