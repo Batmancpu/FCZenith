@@ -306,6 +306,7 @@
     <string name="clear_name">Hapus nama</string>
     <string name="connect_account_first">Hubungkan akun terlebih dahulu</string>
     <string name="connected_presence_off">Terhubung, presence nonaktif</string>
+    <string name="discord_token_rejected">Discord menolak login ini. Putuskan lalu masuk lagi.</string>
     <string name="copy_log">Salin log</string>
     <string name="couldnt_find">Tidak dapat menemukan %1$s</string>
     <string name="couldnt_open_link">Tidak dapat membuka tautan itu</string>
