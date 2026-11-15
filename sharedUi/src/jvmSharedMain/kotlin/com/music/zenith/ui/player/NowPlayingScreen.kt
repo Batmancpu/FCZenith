@@ -2959,7 +2959,10 @@ fun NowPlayingScreen(
                         val stillStart = remember(clip.url) { stillAtMount() }
                         val panelBlur by animateFloatAsState(
                             targetValue = if (liveCanvasPanels && (lyricsOpen || queueOpen)) 1f else 0f,
-                            animationSpec = tween(durationMillis = 360, easing = FastOutSlowInEasing),
+                            animationSpec = tween(
+                                durationMillis = if (liveCanvasPanels && (lyricsOpen || queueOpen)) 120 else 360,
+                                easing = FastOutSlowInEasing,
+                            ),
                             label = "canvasPanelBlur",
                         )
                         CanvasArtworkPlayer(
@@ -3018,7 +3021,11 @@ fun NowPlayingScreen(
                             resumeDelayMs = if (clipFullscreen) SPOTIFY_CANVAS_RESUME_DELAY_MS else 0L,
                             startPositionMs = stillStart?.positionMs ?: 0L,
                             revealInstantly = stillStart != null,
-                            captureStill = stillMoving && !clipFullscreen,
+                            // Live blur on: the clip keeps playing under the panel and the
+                            // still is never shown there, so a per-frame PixelCopy loop would
+                            // only stall the render thread and delay the blur.
+                            captureStill = stillMoving && !clipFullscreen &&
+                                !(liveCanvasPanels && (lyricsOpen || queueOpen) && !dockMoving),
                             onStillCaptured = onStillCaptured,
                             onResumed = onClipResumed,
                             frameGrab = if (clipFullscreen) fullFrameGrab else canvasFrameGrab,
