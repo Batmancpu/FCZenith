@@ -3875,6 +3875,36 @@ fun NowPlayingScreen(
                             val top = start.top + (target.top - start.top) * lifted + bow
                             return Rect(left, top, right, top + height)
                         }
+                        // Static card cover: one straight line on screen from the mini
+                        // player's cover to the card's resting place, driven by the same
+                        // progress as the panel's own top and bottom. Both ends of the
+                        // cover sit inside the panel's ends, and the panel's edges are
+                        // each at least as far along as this progress, so the cover is
+                        // inside the panel on every frame by construction: no clamps, no
+                        // bow, no lift, and it keeps its square shape. Opening and
+                        // closing take the same path. Banner, video and the lyrics/queue
+                        // thumbnail keep the earlier path.
+                        fun dockedRect(rect: Rect, mini: Rect?): Rect {
+                            if (mini == null) return rect
+                            val anchor = dockFrame.anchor
+                            if (dock == null || anchor == null || heroMode || videoMode ||
+                                p() > 0f || bannerShare() > 0f
+                            ) {
+                                return fitToPanel(towardsDock(rect, mini), true)
+                            }
+                            val u = dockT().coerceIn(0f, 1f)
+                            val ox = anchor.x + boxLeftPx
+                            val oy = anchor.y + dockFrame.offset - bannerTopPx
+                            val from = mini.translate(ox, oy)
+                            // The sheet is fully open (offset 0) at the card's resting place.
+                            val to = rect.translate(anchor.x + boxLeftPx, anchor.y - bannerTopPx)
+                            return Rect(
+                                from.left + (to.left - from.left) * u,
+                                from.top + (to.top - from.top) * u,
+                                from.right + (to.right - from.right) * u,
+                                from.bottom + (to.bottom - from.bottom) * u,
+                            ).translate(-ox, -oy)
+                        }
                         // The banner's dissolve, firmed up into the cover's hard edge as
                         // it docks.
                         fun sleeveShown(): Float = bannerShown() * dockEase(dockT())
@@ -3923,7 +3953,7 @@ fun NowPlayingScreen(
                                     } else {
                                         dockFrame.rideShare = 1f
                                     }
-                                    val rect = fitToPanel(towardsDock(open, mini), mini != null)
+                                    val rect = dockedRect(open, mini)
                                     dockFrame.miniInBox = mini
                                     dockFrame.sleeve = rect
                                     val placeable = measurable.measure(
@@ -4068,10 +4098,7 @@ fun NowPlayingScreen(
                                     // As wide as the sleeve, for the same reason the
                                     // sleeve is as wide as its box: right to left.
                                     .layout { measurable, constraints ->
-                                        val card = fitToPanel(
-                                            towardsDock(cardRect(), dockFrame.miniInBox),
-                                            dockFrame.miniInBox != null,
-                                        )
+                                        val card = dockedRect(cardRect(), dockFrame.miniInBox)
                                         val sleeve = dockFrame.sleeve
                                         val placeable = measurable.measure(
                                             Constraints.fixed(card.width.roundToInt(), card.height.roundToInt()),
