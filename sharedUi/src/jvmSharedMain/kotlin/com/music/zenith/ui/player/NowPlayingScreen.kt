@@ -3036,7 +3036,9 @@ fun NowPlayingScreen(
                         // is complete by the time the lyrics or queue appear instead of
                         // waiting on a recomposition and a separate animation.
                         val panelBlur: () -> Float = {
-                            if (liveCanvasPanels) (p() * 2f).coerceIn(0f, 1f) else 0f
+                            if (!liveCanvasPanels) 0f
+                            else if (lyricsOpen || queueOpen) 1f
+                            else (p() * 4f).coerceIn(0f, 1f)
                         }
                         CanvasArtworkPlayer(
                             canvas = clip,
@@ -3130,6 +3132,8 @@ fun NowPlayingScreen(
                             },
                             bottomFadeEndPx = if (clipPortrait && !clipFillsPanels) with(density) { clipBottom.toPx() }
                                 else null,
+                            // Blur on the TextureView itself, not a Compose layer over it.
+                            blurPx = { with(density) { CANVAS_PANEL_BLUR_DP.dp.toPx() } * panelBlur() },
                             modifier = Modifier
                                 .align(Alignment.TopStart)
                                 .then(
@@ -3142,11 +3146,6 @@ fun NowPlayingScreen(
                                     if (dimAmount > 0f) {
                                         drawRect(Color.Black.copy(alpha = CANVAS_PANEL_DIM * dimAmount))
                                     }
-                                }
-                                .graphicsLayer {
-                                    val radius = CANVAS_PANEL_BLUR_DP.dp.toPx() * panelBlur()
-                                    renderEffect = if (radius > 0.5f) BlurEffect(radius, radius, TileMode.Clamp) else null
-                                    compositingStrategy = CompositingStrategy.Offscreen
                                 }
                                 .hazeSource(playerHaze),
                         )
@@ -3183,7 +3182,7 @@ fun NowPlayingScreen(
                                 .fillMaxSize()
                                 .graphicsLayer {
                                     alpha = if (panelsUp) {
-                                        stillCoverFade * (p() * 2f).coerceIn(0f, 1f)
+                                        stillCoverFade
                                     } else {
                                         0f
                                     }
@@ -4213,7 +4212,12 @@ fun NowPlayingScreen(
                                     // again by the time it unmounts.
                                     // Whole while the clip's still is standing in for it.
                                     alpha = (
-                                        if (stillTakesOver() || (liveCanvasPanels && (lyricsOpen || queueOpen))) 1f
+                                        if (liveCanvasPanels && (lyricsOpen || queueOpen)) {
+                                            // The clip is blurred live behind the panel, so the
+                                            // sleeve must not cross it as a sharp full-size
+                                            // image: it only appears once it is the header thumbnail.
+                                            smootherStep(((p() - 0.9f) / 0.1f).coerceIn(0f, 1f))
+                                        } else if (stillTakesOver()) 1f
                                         else if (heroClip != null) {
                                             if (clipFullscreen && canvasRendered && !clipDimmed) {
                                                 // Cover statis baru muncul setelah frame klip
