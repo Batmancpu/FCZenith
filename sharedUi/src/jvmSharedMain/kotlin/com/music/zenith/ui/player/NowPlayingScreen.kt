@@ -580,8 +580,12 @@ private fun dockCardEase(t: Float): Float {
     // A short hold on the mini player's cover, then one curve for sliding and growing
     // together. Smootherstep: no slope and no curvature at either end, so it leaves the
     // mini player and lands without a jolt, and it is done a little before the sheet is.
-    val x = ((t - 0.04f) / (0.88f - 0.04f)).coerceIn(0f, 1f)
-    return x * x * x * (x * (x * 6f - 15f) + 10f)
+    // Sine ease-out so the card keeps up with the growing panel instead of staying
+    // mini-sized until late in the drag; the soft start keeps it leaving the mini
+    // player without a jolt, and the sine's flat end lands it without one.
+    val x = ((t - 0.03f) / (0.80f - 0.03f)).coerceIn(0f, 1f)
+    val grow = kotlin.math.sin(x * (kotlin.math.PI / 2.0).toFloat())
+    return grow * dockSmooth(x / 0.15f)
 }
 
 /**
