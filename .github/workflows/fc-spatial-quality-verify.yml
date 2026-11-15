@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'fc/spatial-audio/experimental/**'
+      - 'fc/spatial-audio/refinement/**'
       - '.github/workflows/fc-sync-release.yml'
       - '.github/workflows/fc-spatial-quality-verify.yml'
   workflow_dispatch:
@@ -56,6 +57,7 @@ jobs:
           python3 fc/apply-overlay.py
           python3 fc/spatial-audio/apply.py
           python3 fc/spatial-audio/experimental/apply.py
+          python3 fc/spatial-audio/refinement/apply.py
           python3 fc/branding/apply.py
 
       - name: Fill missing Android locale fallbacks for this build
