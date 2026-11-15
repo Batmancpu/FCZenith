@@ -1846,8 +1846,13 @@ fun NowPlayingScreen(
     val liveCanvasPanels = canvasLiveBlur && frost != null
     // While a panel is up the clip, whatever its shape, covers the whole player.
     val clipFillsPanels = liveCanvasPanels && (lyricsOpen || queueOpen)
+    // Spotify layar penuh tidak dilepas saat panel terbuka, juga ketika live blur off:
+    // klip tetap ter-mount, dijeda dan tak terlihat (presentationAlpha 0). Dilepas, ia
+    // dibangun ulang dari nol saat kembali ke player utama, dan selama decoder serta
+    // frame pertamanya belum siap yang tampil adalah cover statis.
+    val keepSpotifyClip = spotifyCanvasOnPhone && canvas?.source == CanvasSource.SPOTIFY
     val heroClipMounted = canvas?.takeIf {
-        heroMode && (!(lyricsOpen || queueOpen) || !collapseDone || liveCanvasPanels)
+        heroMode && (!(lyricsOpen || queueOpen) || !collapseDone || liveCanvasPanels || keepSpotifyClip)
     }
     val clipFullscreen = spotifyCanvasOnPhone &&
         heroClipMounted?.source == CanvasSource.SPOTIFY
