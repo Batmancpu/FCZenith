@@ -1833,8 +1833,10 @@ fun NowPlayingScreen(
     // and queue. Only where it can be drawn (Android 12+, dynamic blur not reduced).
     val canvasLiveBlur by PlayerSettings.canvasLiveBlurPanels.collectAsStateWithLifecycle()
     val liveBlurReduced by PlayerSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
-    // Live blur dimatikan: lirik/queue memakai mesh legacy dari frame terakhir canvas.
-    val liveCanvasPanels = false
+    // Frost host is null when dynamic blur is reduced or the platform cannot blur live (below Android 12).
+    val frost = if (liveBlurReduced) null else PlayerPlatform.host.rememberPlayerFrost()
+    // Setting on: the clip keeps playing, blurred live. Off: static blur of its last frame.
+    val liveCanvasPanels = canvasLiveBlur && frost != null
     // While a panel is up the clip, whatever its shape, covers the whole player.
     val clipFillsPanels = liveCanvasPanels && (lyricsOpen || queueOpen)
     val heroClipMounted = canvas?.takeIf {
@@ -2421,8 +2423,6 @@ fun NowPlayingScreen(
     val reportLiveCanvas by rememberUpdatedState(onLiveCanvasChanged)
     LaunchedEffect(spotifyCanvasPresentation) { reportLiveCanvas(spotifyCanvasPresentation) }
     DisposableEffect(Unit) { onDispose { reportLiveCanvas(false) } }
-    val frostOff by PlayerSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
-    val frost = if (frostOff) null else PlayerPlatform.host.rememberPlayerFrost()
     FrostedPlayerFrame(
         modifier = modifier,
         tint = playerTint,
@@ -2889,10 +2889,10 @@ fun NowPlayingScreen(
                 // Legacy mesh is the whole backdrop on every page, so the lyrics and
                 // queue panels must not crossfade the blurred artwork over it. A
                 // full-screen Spotify Canvas is its own backdrop until a panel opens.
-                // Di lirik/queue, Spotify Canvas digantikan mesh legacy yang warnanya
-                // diambil dari frame terakhirnya, bukan blur cover statis.
+                // Live blur off: lyrics/queue show a static blur of the clip's last frame,
+                // not the legacy mesh. Live blur on: the clip itself stays playing instead.
                 val canvasPanelMesh = !tabletArtworkBackdrop && canvas != null && heroMode &&
-                    (lyricsOpen || queueOpen)
+                    (lyricsOpen || queueOpen) && !liveCanvasPanels
                 val canvasMeshAlpha by animateFloatAsState(
                     targetValue = if (canvasPanelMesh) 1f else 0f,
                     animationSpec = tween(
@@ -2901,26 +2901,10 @@ fun NowPlayingScreen(
                     ),
                     label = "canvasPanelMesh",
                 )
-                val canvasPanelPalette = rememberArtworkColors(remoteArt, canvasPanelFrame)
-                // Blur dari frame terakhir canvas: tampil di awal panel, lalu melebur ke mesh.
+                // Blur statis dari frame terakhir canvas: tetap tampil selama panel terbuka.
                 val canvasPanelFrameBlur = rememberFullArtworkBlurImage(
                     imageUrl = null,
                     liveFrame = canvasPanelFrame,
-                )
-                var meshMorphTarget by remember { mutableFloatStateOf(0f) }
-                LaunchedEffect(canvasPanelMesh) {
-                    if (canvasPanelMesh) {
-                        delay(900L)
-                        meshMorphTarget = 1f
-                    }
-                }
-                LaunchedEffect(canvasMeshAlpha <= 0.001f) {
-                    if (canvasMeshAlpha <= 0.001f) meshMorphTarget = 0f
-                }
-                val meshMorph by animateFloatAsState(
-                    targetValue = meshMorphTarget,
-                    animationSpec = tween(durationMillis = 1_800, easing = FastOutSlowInEasing),
-                    label = "canvasPanelMeshMorph",
                 )
                 val legacyMeshBackdrop = !tabletArtworkBackdrop && !spotifyCanvasPresentation &&
                     legacyMesh && !canvasPanelMesh
@@ -2959,22 +2943,10 @@ fun NowPlayingScreen(
                     )
                 }
                 if (canvasMeshAlpha > 0.001f) {
-                    MeshGradientBackground(
-                        palette = canvasPanelPalette,
-                        trackKey = song.videoId,
-                        continuous = true,
-                        driftMillis = 20_000,
-                        colorFadeMillis = 900,
+                    FullArtworkBlurBackdrop(
+                        image = canvasPanelFrameBlur ?: fullArtworkBlurImage,
                         modifier = Modifier.graphicsLayer { alpha = canvasMeshAlpha },
                     )
-                    if (canvasPanelFrameBlur != null) {
-                        FullArtworkBlurBackdrop(
-                            image = canvasPanelFrameBlur,
-                            modifier = Modifier.graphicsLayer {
-                                alpha = canvasMeshAlpha * (1f - meshMorph)
-                            },
-                        )
-                    }
                 }
                 fullArtworkBlurContent(
                     Modifier.graphicsLayer { alpha = fullArtworkBackdropAlpha },
