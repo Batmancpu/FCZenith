@@ -140,6 +140,13 @@ jobs:
           EXPERIMENT_ENABLED="$(sed -n 's/^enabled=//p' fc/spatial-audio/experimental/config.properties)"
           LAST_EXPERIMENT_ENABLED="$(sed -n 's/^experimentalAudio=//p' fc/version.properties)"
           LAST_EXPERIMENT_ENABLED="${LAST_EXPERIMENT_ENABLED:-false}"
+          REFINEMENT_ENABLED="$(sed -n 's/^enabled=//p' fc/spatial-audio/refinement/config.properties)"
+          LAST_REFINEMENT_ENABLED="$(sed -n 's/^audioRefinement=//p' fc/version.properties)"
+          LAST_REFINEMENT_ENABLED="${LAST_REFINEMENT_ENABLED:-false}"
+          if [[ "$REFINEMENT_ENABLED" != "true" && "$REFINEMENT_ENABLED" != "false" ]]; then
+            echo "Invalid spatial refinement flag" >&2
+            exit 1
+          fi
           if [[ "$EXPERIMENT_ENABLED" != "true" && "$EXPERIMENT_ENABLED" != "false" ]]; then
             echo "Invalid experimental spatial audio flag" >&2
             exit 1
@@ -157,7 +164,7 @@ jobs:
             release_asset_exists=true
           fi
 
-          if [[ "$UPSTREAM_VERSION" != "$CURRENT_UPSTREAM_VERSION" || "$UPSTREAM_CHANGED" == "true" || "$EXPERIMENT_ENABLED" != "$LAST_EXPERIMENT_ENABLED" ]]; then
+          if [[ "$UPSTREAM_VERSION" != "$CURRENT_UPSTREAM_VERSION" || "$UPSTREAM_CHANGED" == "true" || "$EXPERIMENT_ENABLED" != "$LAST_EXPERIMENT_ENABLED" || "$REFINEMENT_ENABLED" != "$LAST_REFINEMENT_ENABLED" ]]; then
             # A new stable series starts at .1; new main commits in that series increment the FC revision.
             python3 fc/bump-version.py "$UPSTREAM_VERSION"
             should_release=true
@@ -176,6 +183,8 @@ jobs:
             # Record the shipped variant after a release is selected; flag changes bump version.
             sed -i '/^experimentalAudio=/d' fc/version.properties
             printf 'experimentalAudio=%s\n' "$EXPERIMENT_ENABLED" >> fc/version.properties
+            sed -i '/^audioRefinement=/d' fc/version.properties
+            printf 'audioRefinement=%s\n' "$REFINEMENT_ENABLED" >> fc/version.properties
           fi
           VERSION_CODE="$(sed -n 's/^versionCode=//p' fc/version.properties)"
           VERSION_NAME="$(sed -n 's/^versionName=//p' fc/version.properties)"
@@ -270,6 +279,14 @@ jobs:
           set -euo pipefail
           python3 fc/spatial-audio/experimental/apply.py
           echo "enabled=$(sed -n 's/^enabled=//p' fc/spatial-audio/experimental/config.properties)" >> "$GITHUB_OUTPUT"
+      - name: Apply reversible Spatial Audio center/limiter refinement
+        id: spatial_refinement
+        if: steps.decision.outputs.should_release == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 fc/spatial-audio/refinement/apply.py
+          echo "enabled=$(sed -n 's/^enabled=//p' fc/spatial-audio/refinement/config.properties)" >> "$GITHUB_OUTPUT"
       - name: Fill missing Android locale fallbacks for this build
         if: steps.decision.outputs.should_release == 'true'
         run: |
@@ -450,6 +467,7 @@ jobs:
             app/src/main/java/com/music/zenith/data/settings/AppSettings.kt
             app/src/main/java/com/music/zenith/playback/PlaybackService.kt
             app/src/main/java/com/music/zenith/playback/SpatialAudioProcessor.kt
+            app/src/main/java/com/music/zenith/playback/audio/DspChain.kt
             app/src/main/java/com/music/zenith/ui/components/SongActionsMenu.kt
             app/src/main/java/com/music/zenith/ui/screens/SettingsSheet.kt
             app/src/main/res/values/strings.xml
@@ -461,6 +479,7 @@ jobs:
             app/src/main/java/com/music/zenith/TopBarActionVisibility.kt
             app/src/test/java/com/music/zenith/playback/SpatialAudioLearningTest.kt
             app/src/test/java/com/music/zenith/playback/SpatialAudioQualityTest.kt
+            app/src/test/java/com/music/zenith/playback/SpatialAudioRefinementTest.kt
             app/src/test/java/com/music/zenith/playback/SpatialAudioPreferenceTest.kt
             app/src/test/java/com/music/zenith/playback/SpatialAudioDecisionEngineTest.kt
           )
@@ -530,6 +549,7 @@ jobs:
             - FC Zenith follows upstream main automatically. Every new source snapshot must pass tests, build and signature verification before publishing.
             - The same FC signing certificate is checked before publishing.
             - Experimental DSP quality layer: ${{ steps.spatial_quality.outputs.enabled }} (reversible; includes audio regression tests).
+            - Additional center/limiter refinement: ${{ steps.spatial_refinement.outputs.enabled }} (independently reversible; tests required).
             - Spatial Audio: ${{ steps.spatial_audio.outputs.included == 'true' && 'Includes the persistent FC stereo learner, binary per-track On/Off with Auto status, and phone-speaker/Atmos/DSP safety bypasses. Profiles and explicit feedback remain on-device.' || 'Not included in this build.' }}
 
             Obtainium source: https://github.com/Batmancpu/FCZenith
