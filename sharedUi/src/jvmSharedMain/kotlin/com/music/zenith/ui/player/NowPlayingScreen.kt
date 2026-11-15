@@ -2429,14 +2429,20 @@ fun NowPlayingScreen(
     // [FrostedPlayerFrame], which records the player for it and draws them
     // beside it. None under "reduce dynamic blur": the panels go opaque, and a
     // recording nothing reads is the cost that setting exists to remove.
+    // Klip Spotify layar penuh yang tetap diputar di belakang lirik/antrean (live blur
+    // on) juga harus jadi sumber blur live untuk popup dan menu di atasnya. Tanpa ini
+    // spotifyCanvasPresentation sudah false begitu panel terbuka (heroClip lepas di
+    // p >= 0.5), sehingga popup jatuh ke still statis.
+    val liveBackdropOn = spotifyCanvasPresentation ||
+        (liveCanvasPanels && clipFullscreen && canvasRendered && (lyricsOpen || queueOpen))
     val reportLiveCanvas by rememberUpdatedState(onLiveCanvasChanged)
-    LaunchedEffect(spotifyCanvasPresentation) { reportLiveCanvas(spotifyCanvasPresentation) }
+    LaunchedEffect(liveBackdropOn) { reportLiveCanvas(liveBackdropOn) }
     DisposableEffect(Unit) { onDispose { reportLiveCanvas(false) } }
     FrostedPlayerFrame(
         modifier = modifier,
         tint = playerTint,
         frost = frost,
-        live = spotifyCanvasPresentation,
+        live = liveBackdropOn,
         // Not the host's ⋯ menu: that takes its own still, of everything.
         overlayOpen = { overlayOpen.value && !currentMenuOpen() },
         overlays = playerOverlays,
