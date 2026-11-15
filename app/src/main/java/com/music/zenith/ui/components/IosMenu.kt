@@ -72,6 +72,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
@@ -435,6 +436,8 @@ fun <T : Any> IosMenuPopover(
     placement: IosMenuPlacement = IosMenuPlacement.Auto,
     dimBackground: Boolean = true,
     frostAlpha: Float? = null,
+    /** Shifts an [IosMenuPlacement.AboveStart] panel sideways from the anchor's leading edge; negative is left. */
+    startOffset: Dp = 0.dp,
     content: @Composable (T) -> Unit,
 ) {
     var last by remember { mutableStateOf<Pair<T, Rect?>?>(null) }
@@ -609,7 +612,7 @@ fun <T : Any> IosMenuPopover(
         val above = placement == IosMenuPlacement.AboveStart && anchorBounds != null
         val right = anchorBounds?.right?.roundToInt() ?: (width - margin)
         val startX = if (above && anchorBounds != null) {
-            anchorBounds.left.roundToInt()
+            anchorBounds.left.roundToInt() + startOffset.roundToPx()
         } else {
             right - panel.width
         }
