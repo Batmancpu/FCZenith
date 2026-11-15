@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalSharedTransitionApi::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
+@file:OptIn(ExperimentalSharedTransitionApi::class)
 
 /*
  * FloatingTabBar v1.0.1 by Elyes Mansour
@@ -60,7 +60,6 @@ import androidx.compose.foundation.Indication
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -591,8 +590,7 @@ interface FloatingTabBarScope {
         title: @Composable () -> Unit,
         icon: @Composable () -> Unit,
         onClick: () -> Unit,
-        indication: (@Composable () -> Indication)? = { LocalIndication.current },
-        onLongClick: (() -> Unit)? = null,
+        indication: (@Composable () -> Indication)? = { LocalIndication.current }
     )
 
     /**
@@ -1357,9 +1355,8 @@ private fun SharedTransitionScope.ExpandedTabs(
                                 .weight(1f)
                                 .skipToLookaheadSize()
                                 .clip(shapes.tabShape)
-                                .combinedClickable(
+                                .clickable(
                                     onClick = tab.onClick,
-                                    onLongClick = tab.onLongClick,
                                     indication = tab.indication?.invoke(),
                                     interactionSource = remember { MutableInteractionSource() }
                                 )
@@ -1571,8 +1568,7 @@ private class FloatingTabBarScopeImpl(
         title: @Composable () -> Unit,
         icon: @Composable () -> Unit,
         onClick: () -> Unit,
-        indication: (@Composable () -> Indication)?,
-        onLongClick: (() -> Unit)?,
+        indication: (@Composable () -> Indication)?
     ) {
         tabs.add(
             FloatingTabBarTab(
@@ -1580,8 +1576,7 @@ private class FloatingTabBarScopeImpl(
                 title = title,
                 icon = icon,
                 onClick = onClick,
-                indication = indication,
-                onLongClick = onLongClick,
+                indication = indication
             )
         )
     }
@@ -1607,8 +1602,7 @@ private data class FloatingTabBarTab(
     val title: @Composable () -> Unit,
     val icon: @Composable () -> Unit,
     val onClick: () -> Unit,
-    val indication: (@Composable () -> Indication)?,
-    val onLongClick: (() -> Unit)? = null,
+    val indication: (@Composable () -> Indication)?
 )
 
 /**

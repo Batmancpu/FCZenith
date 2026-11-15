@@ -8,8 +8,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -182,7 +181,6 @@ fun FloatingBottomBar(
     onTabSelected: (Int) -> Unit,
     hazeState: HazeState,
     modifier: Modifier = Modifier,
-    onTabLongClick: ((Int) -> Unit)? = null,
 ) {
     val pillShape = RoundedCornerShape(percent = 50)
     val container = MaterialTheme.colorScheme.surface
@@ -353,7 +351,6 @@ fun FloatingBottomBar(
                     selectedTint = MaterialTheme.colorScheme.primary,
                     unselectedTint = adaptiveTint?.copy(alpha = 0.65f),
                     onClick = { onTabSelected(index) },
-                    onLongClick = onTabLongClick?.let { handler -> { handler(index) } },
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -361,7 +358,6 @@ fun FloatingBottomBar(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun BottomBarItem(
     tab: BottomTab,
@@ -372,7 +368,6 @@ private fun BottomBarItem(
     /** Overrides the theme's primary/onSurfaceVariant tint — see the glass branch above. */
     selectedTint: Color? = null,
     unselectedTint: Color? = null,
-    onLongClick: (() -> Unit)? = null,
 ) {
     // The same spring the indicator rides, so the glyph arriving and the glass
     // arriving are one movement rather than two that nearly agree.
@@ -396,20 +391,13 @@ private fun BottomBarItem(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
             .clip(RoundedCornerShape(percent = 50))
-            .combinedClickable(
+            .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
-                onLongClick = onLongClick?.let { handler ->
-                    {
-                        haptics.play(Haptic.Select)
-                        handler()
-                    }
-                },
-                onClick = {
-                    if (!selected) haptics.play(Haptic.Select)
-                    onClick()
-                },
-            )
+            ) {
+                if (!selected) haptics.play(Haptic.Select)
+                onClick()
+            }
             .padding(vertical = TAB_VERTICAL_PADDING),
     ) {
         Icon(
