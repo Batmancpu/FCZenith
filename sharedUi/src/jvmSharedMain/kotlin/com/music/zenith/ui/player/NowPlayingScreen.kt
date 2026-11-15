@@ -4093,10 +4093,9 @@ fun NowPlayingScreen(
                                     // Whole while the clip's still is standing in for it.
                                     alpha = (
                                         if (liveCanvasPanels && (lyricsOpen || queueOpen)) {
-                                            // The clip is blurred live behind the panel, so the
-                                            // sleeve must not cross it as a sharp full-size
-                                            // image: it only appears once it is the header thumbnail.
-                                            smootherStep(((p() - 0.9f) / 0.1f).coerceIn(0f, 1f))
+                                            // The clip is blurred live behind the panel; the sleeve
+                                            // fades in at once and visibly shrinks into the header.
+                                            smootherStep((p() / 0.15f).coerceIn(0f, 1f))
                                         } else if (stillTakesOver()) 1f
                                         else if (heroClip != null) {
                                             if (clipFullscreen && canvasRendered && !clipDimmed) {
