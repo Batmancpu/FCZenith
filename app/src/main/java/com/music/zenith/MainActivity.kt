@@ -9,6 +9,7 @@ import android.os.Bundle
 import android.view.KeyEvent
 import android.view.View
 import android.widget.Toast
+import com.music.zenith.ui.player.CanvasTransitionExperiment
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -4584,6 +4585,19 @@ private fun ZenithApp(
                     }
                 }
 
+                // Temporary: long-press Home flips the Spotify canvas transition mode.
+                val experimentContext = LocalContext.current
+                val onTabLongClick: (Int) -> Unit = { barIndex ->
+                    if (barIndex == TAB_HOME) {
+                        val simple = !CanvasTransitionExperiment.simple
+                        CanvasTransitionExperiment.simple = simple
+                        Toast.makeText(
+                            experimentContext,
+                            if (simple) "Spotify canvas: mode 2 (simple)" else "Spotify canvas: mode 1 (flight)",
+                            Toast.LENGTH_SHORT,
+                        ).show()
+                    }
+                }
                 if (glassActive) Column(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
@@ -4600,6 +4614,7 @@ private fun ZenithApp(
                         tabs = barTabs,
                         selectedIndex = selectedBarIndex,
                         onTabSelected = onTabSelected,
+                        onTabLongClick = onTabLongClick,
                         searchSeparate = searchTabSeparate,
                         scrollConnection = navBarScroll,
                         song = player.song,
@@ -4665,6 +4680,7 @@ private fun ZenithApp(
                         selectedIndex = selectedBarIndex,
                         hazeState = hazeState,
                         onTabSelected = onTabSelected,
+                        onTabLongClick = onTabLongClick,
                     )
                 }
             }

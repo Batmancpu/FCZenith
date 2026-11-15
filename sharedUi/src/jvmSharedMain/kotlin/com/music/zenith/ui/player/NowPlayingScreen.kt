@@ -1716,10 +1716,16 @@ fun NowPlayingScreen(
     // Frame terakhir klip saat lirik/queue dibuka. Hanya jadi sumber warna mesh
     // legacy di belakang panel; klip sendiri sudah berhenti pada frame itu.
     var canvasPanelFrame by remember(canvas?.url) { mutableStateOf<ImageBitmap?>(null) }
+    // The full-screen clip's frame as a panel opens: what the sleeve flies as (flight mode).
+    var flightFrame by remember(canvas?.url) { mutableStateOf<ImageBitmap?>(null) }
     LaunchedEffect(lyricsOpen || queueOpen, canvas?.url) {
         if (lyricsOpen || queueOpen) {
-            val grabbed = (fullFrameGrab.grab ?: canvasFrameGrab.grab)?.invoke()
-            if (grabbed != null) canvasPanelFrame = grabbed
+            val fullGrab = fullFrameGrab.grab
+            val grabbed = (fullGrab ?: canvasFrameGrab.grab)?.invoke()
+            if (grabbed != null) {
+                canvasPanelFrame = grabbed
+                if (fullGrab != null) flightFrame = grabbed
+            }
         }
     }
     // Bentuk klip hero yang sedang tampil; diisi tiap komposisi di bawah (setelah
@@ -1844,6 +1850,8 @@ fun NowPlayingScreen(
     }
     val clipFullscreen = spotifyCanvasOnPhone &&
         heroClipMounted?.source == CanvasSource.SPOTIFY
+    // Mode 1 of [CanvasTransitionExperiment]: the sleeve flies as the canvas frame.
+    val canvasFlight = clipFullscreen && liveCanvasPanels && !CanvasTransitionExperiment.simple
     val clipPortrait = !clipFullscreen &&
         heroClipMounted != null && canvasAspect > 0f && canvasAspect < 1f
 
@@ -2330,6 +2338,8 @@ fun NowPlayingScreen(
     // The plain thumbnail, drawn over the clip's frame while docking so the
     // flying artwork lands as the same picture the mini player's cover shows.
     val thumbLayer = rememberGraphicsLayer()
+    // The static cover, drawn over the canvas frame while the sleeve flies (flight mode).
+    val coverLayer = rememberGraphicsLayer()
     // The title row, recorded while docking so it can be drawn over the flying
     // artwork instead of under it.
     val titleLayer = rememberGraphicsLayer()
@@ -4095,9 +4105,18 @@ fun NowPlayingScreen(
                                     // Whole while the clip's still is standing in for it.
                                     alpha = (
                                         if (liveCanvasPanels && (lyricsOpen || queueOpen)) {
-                                            // The clip is blurred live behind the panel; the sleeve
-                                            // is whole from the first frame and shrinks into the header.
-                                            1f
+                                            // The clip is blurred live behind the panel. A full-screen
+                                            // Spotify clip either flies as its own frame (flight) or
+                                            // leaves the header to fade in at the end (simple).
+                                            if (clipFullscreen && !canvasFlight) {
+                                                smootherStep(((p() - 0.75f) / 0.25f).coerceIn(0f, 1f))
+                                            } else {
+                                                1f
+                                            }
+                                        } else if (canvasFlight && collapseStarted) {
+                                            // Closing: the cover grows back as the clip's frame and
+                                            // gives way to the live clip near the top.
+                                            smootherStep((p() / 0.3f).coerceIn(0f, 1f))
                                         } else if (stillTakesOver()) 1f
                                         else if (heroClip != null) {
                                             if (clipFullscreen && canvasRendered && !clipDimmed) {
@@ -4327,7 +4346,22 @@ fun NowPlayingScreen(
                                     .drawWithContent {
                                         val frame = still()
                                         if (frame == null) {
-                                            if (art.loaded || !canvasRendered) drawContent()
+                                            val flight = flightFrame
+                                            if (canvasFlight && (lyricsOpen || queueOpen || collapseStarted)) {
+                                                if (flight != null) {
+                                                    // The canvas frame first, melting into the cover as it shrinks.
+                                                    drawCropped(flight)
+                                                    val toCover = smootherStep(((p() - 0.15f) / 0.5f).coerceIn(0f, 1f))
+                                                    if (toCover > 0f && art.loaded) {
+                                                        coverLayer.alpha = toCover
+                                                        coverLayer.record { this@drawWithContent.drawContent() }
+                                                        drawLayer(coverLayer)
+                                                    }
+                                                } else if (p() > 0.5f && art.loaded) {
+                                                    // No frame could be read; fall back to the cover.
+                                                    drawContent()
+                                                }
+                                            } else if (art.loaded || !canvasRendered) drawContent()
                                         } else if (
                                             // The clip's still in place of the cover —
                                             // see [stillTakesOver] — and, for the reason

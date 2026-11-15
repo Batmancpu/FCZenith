@@ -103,6 +103,7 @@ fun GlassNavBar(
     tabs: List<BottomTab>,
     selectedIndex: Int,
     onTabSelected: (Int) -> Unit,
+    onTabLongClick: ((Int) -> Unit)? = null,
     scrollConnection: FloatingTabBarScrollConnection,
     song: Song?,
     isPlaying: Boolean,
@@ -146,6 +147,7 @@ val haptics = rememberHaptics()
     // Held through a state that is always current instead, which also keeps the
     // handler out of the key.
     val currentOnTabSelected by rememberUpdatedState(onTabSelected)
+    val currentOnTabLongClick by rememberUpdatedState(onTabLongClick)
 
     // Search is the odd one out in the iOS 26 layout: a circle of its own beside
     // the pill rather than a quarter of it. It is the last tab in Zenith's
@@ -320,6 +322,7 @@ val haptics = rememberHaptics()
                         }
                     },
                     onClick = onClick,
+                    onLongClick = currentOnTabLongClick?.let { handler -> { handler(index) } },
                 )
             }
         }
