@@ -4107,6 +4107,11 @@ fun NowPlayingScreen(
                                             } else {
                                                 1f
                                             }
+                                        } else if (clipFullscreen && (lyricsOpen || queueOpen || collapseStarted)) {
+                                            // Live blur off: the cover behaves the same as with
+                                            // live blur on. It does not fly with the panel, it only
+                                            // fades in at the header and out again on the way back.
+                                            smootherStep(((p() - 0.75f) / 0.25f).coerceIn(0f, 1f))
                                         } else if (stillTakesOver()) 1f
                                         else if (heroClip != null) {
                                             if (clipFullscreen && canvasRendered && !clipDimmed) {
