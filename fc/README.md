@@ -75,8 +75,9 @@ anchors fail the build instead of silently creating a partially rebranded APK.
 
 ## Automated upstream main releases
 
-FC Zenith checks `rezapranata089-bit/Zenith` main on a 15-minute GitHub Actions
-schedule. New upstream commits are merged into the FC fork's build workspace
+FC Zenith does **not** poll upstream on a timer. It checks upstream only when
+the workflow is manually started or a commit is pushed to this fork's `main`.
+New upstream commits are merged into the FC fork's build workspace
 while FC-owned workflows, branding, signing and the Spatial Audio integration
 remain separate. Each successful upstream source update triggers a production
 unit-test run, APK build, certificate verification and a new release in this
@@ -100,9 +101,9 @@ An on-demand run checks upstream immediately, but an APK release appears
 **only** when a new source revision exists (or the previous release asset is
 missing) and all checks pass. GitHub Actions build and signing take time.
 
-The schedule is a polling interval, not a guaranteed release deadline:
-GitHub may delay scheduled workflows, and a build may take longer than the
-interval.
+There are no scheduled upstream checks. A new APK is built only if a
+manual workflow run or push to `main` finds upstream changes (or another
+configured release condition), and production tests and signing pass.
 
 ## Signing
 
