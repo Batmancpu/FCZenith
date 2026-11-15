@@ -316,7 +316,9 @@ private const val SPOTIFY_CANVAS_RESUME_DELAY_MS = 1_000L
 private const val SPOTIFY_DECK_HEIGHT_FRACTION = 0.56f
 
 /** Height of the seek bar that stays on screen once Spotify Canvas' control deck is hidden. */
-private val SPOTIFY_MINI_SCRUBBER_HEIGHT = 48.dp
+/** Seberapa jauh bar progres, menit, dan label kualitas dinaikkan dari tepi bawah layar. */
+private val SPOTIFY_MINI_SCRUBBER_LIFT = 16.dp
+private val SPOTIFY_MINI_SCRUBBER_HEIGHT = 48.dp + SPOTIFY_MINI_SCRUBBER_LIFT
 
 /** [image] selebar scope, rata atas, rasio aslinya tanpa crop; yang melewati tepi bawah terpotong. */
 private fun DrawScope.drawFrameTopAligned(image: ImageBitmap) {
@@ -5304,6 +5306,7 @@ Spacer(Modifier.width(12.dp))
                                     }
                                 }
                                 .height(SPOTIFY_MINI_SCRUBBER_HEIGHT)
+                                .padding(bottom = SPOTIFY_MINI_SCRUBBER_LIFT)
                                 .graphicsLayer { alpha = 1f - playerDeckReveal.value },
                             contentAlignment = Alignment.BottomCenter,
                         ) {
