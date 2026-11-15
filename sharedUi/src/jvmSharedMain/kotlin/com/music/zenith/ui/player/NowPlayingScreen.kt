@@ -601,6 +601,9 @@ private const val DOCK_FLY_SOFT_START_AT = 0.3f
  */
 private const val DOCK_RIDE_SHARE = 1f
 
+/** How far the static card cover trails the panel's progress while docking; 1 = in step, higher = more gap. */
+private const val DOCK_CARD_LAG = 1.25f
+
 /**
  * Jarak antara kaki cover terbang (tanpa canvas) dan tepi bawah panel selagi
  * panel di-drag. Jarak ini tumbuh dari 0 di mini player sampai penuh pada
@@ -3892,7 +3895,10 @@ fun NowPlayingScreen(
                             ) {
                                 return fitToPanel(towardsDock(rect, mini), true)
                             }
-                            val u = dockT().coerceIn(0f, 1f)
+                            // Slightly behind the panel's own progress (never ahead of it), so
+                            // the cover always keeps a gap from the panel's top edge while it
+                            // opens; zero at both ends, so it still leaves and lands exactly.
+                            val u = Math.pow(dockT().coerceIn(0f, 1f).toDouble(), DOCK_CARD_LAG.toDouble()).toFloat()
                             val ox = anchor.x + boxLeftPx
                             val oy = anchor.y + dockFrame.offset - bannerTopPx
                             val from = mini.translate(ox, oy)
