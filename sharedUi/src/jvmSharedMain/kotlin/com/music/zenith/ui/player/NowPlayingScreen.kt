@@ -3044,11 +3044,11 @@ fun NowPlayingScreen(
                             },
                             onCoverChanged = { canvasCover.floatValue = it },
                             bottomFade = when {
-                                clipFullscreen -> 0f
+                                clipFullscreen || clipFillsPanels -> 0f
                                 clipPortrait -> clipFadeFraction
                                 else -> HERO_FADE_FRACTION
                             },
-                            bottomFadeEndPx = if (clipPortrait) with(density) { clipBottom.toPx() }
+                            bottomFadeEndPx = if (clipPortrait && !clipFillsPanels) with(density) { clipBottom.toPx() }
                                 else null,
                             modifier = Modifier
                                 .align(Alignment.TopStart)
@@ -4085,7 +4085,7 @@ fun NowPlayingScreen(
                                     // again by the time it unmounts.
                                     // Whole while the clip's still is standing in for it.
                                     alpha = (
-                                        if (stillTakesOver()) 1f
+                                        if (stillTakesOver() || (liveCanvasPanels && (lyricsOpen || queueOpen))) 1f
                                         else if (heroClip != null) {
                                             if (clipFullscreen && canvasRendered && !clipDimmed) {
                                                 // Cover statis baru muncul setelah frame klip
@@ -4320,6 +4320,7 @@ fun NowPlayingScreen(
                                             // see [stillTakesOver] — and, for the reason
                                             // above, drawn only while it can be seen.
                                             stillTakesOver() || !canvasRendered ||
+                                            (liveCanvasPanels && (lyricsOpen || queueOpen)) ||
                                             (heroMode && canvasCover.floatValue < 1f)
                                         ) {
                                             drawCropped(frame.image)
