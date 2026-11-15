@@ -2902,6 +2902,26 @@ fun NowPlayingScreen(
                     label = "canvasPanelMesh",
                 )
                 val canvasPanelPalette = rememberArtworkColors(remoteArt, canvasPanelFrame)
+                // Blur dari frame terakhir canvas: tampil di awal panel, lalu melebur ke mesh.
+                val canvasPanelFrameBlur = rememberFullArtworkBlurImage(
+                    imageUrl = null,
+                    liveFrame = canvasPanelFrame,
+                )
+                var meshMorphTarget by remember { mutableFloatStateOf(0f) }
+                LaunchedEffect(canvasPanelMesh) {
+                    if (canvasPanelMesh) {
+                        delay(900L)
+                        meshMorphTarget = 1f
+                    }
+                }
+                LaunchedEffect(canvasMeshAlpha <= 0.001f) {
+                    if (canvasMeshAlpha <= 0.001f) meshMorphTarget = 0f
+                }
+                val meshMorph by animateFloatAsState(
+                    targetValue = meshMorphTarget,
+                    animationSpec = tween(durationMillis = 1_800, easing = FastOutSlowInEasing),
+                    label = "canvasPanelMeshMorph",
+                )
                 val legacyMeshBackdrop = !tabletArtworkBackdrop && !spotifyCanvasPresentation &&
                     legacyMesh && !canvasPanelMesh
                 val fullArtworkBackdropAlpha by animateFloatAsState(
@@ -2947,6 +2967,14 @@ fun NowPlayingScreen(
                         colorFadeMillis = 900,
                         modifier = Modifier.graphicsLayer { alpha = canvasMeshAlpha },
                     )
+                    if (canvasPanelFrameBlur != null) {
+                        FullArtworkBlurBackdrop(
+                            image = canvasPanelFrameBlur,
+                            modifier = Modifier.graphicsLayer {
+                                alpha = canvasMeshAlpha * (1f - meshMorph)
+                            },
+                        )
+                    }
                 }
                 fullArtworkBlurContent(
                     Modifier.graphicsLayer { alpha = fullArtworkBackdropAlpha },
