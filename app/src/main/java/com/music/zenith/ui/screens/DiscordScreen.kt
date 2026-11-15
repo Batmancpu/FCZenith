@@ -239,7 +239,7 @@ fun DiscordScreen(
 
         AnimatedVisibility(visible = connected && rpcEnabled && authRejected) {
             NoticeCard(
-                text = stringResource(R.string.discord_token_rejected),
+                text = stringResource(R.string.discord_login_rejected),
                 onDismiss = { com.my.kizzy.gateway.DiscordGatewayState.authRejected.value = false },
             )
         }

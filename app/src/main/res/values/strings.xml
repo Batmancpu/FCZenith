@@ -600,7 +600,7 @@
     <string name="no_languages_match">No languages match</string>
     <string name="connect_account_first">Connect an account first</string>
     <string name="connected_presence_off">Connected, presence off</string>
-    <string name="discord_token_rejected">Discord rejected this login. Disconnect and sign in again.</string>
+    <string name="discord_login_rejected">Discord rejected this login. Disconnect and sign in again.</string>
     <string name="copy_log">Copy log</string>
     <string name="couldnt_find">Couldn\'t find %1$s</string>
     <string name="couldnt_open_link">Couldn\'t open that link</string>
