@@ -2778,6 +2778,7 @@ private fun ZenithApp(
             // the parameter.
             menuOpen = { songActions != null && menuFromPlayer && songMenuOrigin == null },
             onLiveCanvasChanged = { playerLiveCanvas = it },
+            onDismissPlayer = dismissPlayer,
             isPlaying = player.isPlaying,
             isLoading = playPauseBusy,
             position = player.position,

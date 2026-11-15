@@ -1045,6 +1045,8 @@ fun NowPlayingScreen(
      * rather than a still of it.
      */
     onLiveCanvasChanged: (Boolean) -> Unit = {},
+    /** Menutup player (turun ke mini player); dipanggil chevron di header. */
+    onDismissPlayer: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val density = LocalDensity.current
@@ -3407,9 +3409,20 @@ fun NowPlayingScreen(
                         androidx.compose.foundation.Canvas(
                             modifier = Modifier
                                 .align(Alignment.CenterStart)
-                                .padding(start = PLAYER_GUTTER)
-                                .size(width = 20.dp, height = 10.dp)
-                                .graphicsLayer { alpha = (1f - p()) * spotifyChromeAlpha },
+                                .graphicsLayer { alpha = (1f - p()) * spotifyChromeAlpha }
+                                // Padding setelah clickable: area ketuknya melebar melewati
+                                // gambar chevron, tapi tetap di dalam tinggi strip.
+                                .clickable(
+                                    enabled = !collapsePastHalf &&
+                                        (!spotifyCanvasPresentation || spotifyCanvasControlsOpen),
+                                    interactionSource = remember {
+                                        androidx.compose.foundation.interaction.MutableInteractionSource()
+                                    },
+                                    indication = null,
+                                    onClick = onDismissPlayer,
+                                )
+                                .padding(start = PLAYER_GUTTER, end = 24.dp, top = 14.dp, bottom = 4.dp)
+                                .size(width = 20.dp, height = 10.dp),
                         ) {
                             val stroke = 2.2.dp.toPx()
                             val chevron = androidx.compose.ui.graphics.Path().apply {
@@ -3443,7 +3456,8 @@ fun NowPlayingScreen(
                                         end = PLAYER_GUTTER + 36.dp,
                                     ),
                                     modifier = Modifier
-                                        .align(Alignment.Center)
+                                        .align(Alignment.BottomCenter)
+                                        .offset(y = 2.dp)
                                         .graphicsLayer { alpha = (1f - p()) * spotifyChromeAlpha },
                                 )
                             }
