@@ -59,11 +59,20 @@ baseline_processor = subprocess.run(
     capture_output=True,
     text=True,
 ).stdout
-if read(processor_path) != baseline_processor:
-    raise SystemExit(
-        "Upstream SpatialAudioProcessor.kt changed after the reviewed FC baseline; "
-        "reconcile the FC adapter before building."
-    )
+current_processor = read(processor_path)
+if current_processor != baseline_processor:
+    # Upstream 2026-11-16 removed this one *unused* import. Reviewed against
+    # c553552cfe1b03e74c74a2f0643c15b70da9349b: every other byte matches
+    # the original reviewed processor. Keep strict protection against any
+    # future functional or otherwise unreviewed changes.
+    retired_import = "import com.music.zenith.playback.audio.FloatAudioProcessor\n"
+    if (baseline_processor.count(retired_import) != 1 or
+            current_processor != baseline_processor.replace(retired_import, "", 1)):
+        raise SystemExit(
+            "Upstream SpatialAudioProcessor.kt changed beyond the specifically "
+            "reviewed unused-import removal; reconcile the FC adapter before building."
+        )
+    print("FC Spatial Audio: accepted reviewed upstream unused-import removal.")
 
 # Use the reviewed stereo sampler and learner as complete source assets.
 copy_asset("SpatialAudioLearning.kt", "app/src/main/java/com/music/zenith/playback/SpatialAudioLearning.kt")
