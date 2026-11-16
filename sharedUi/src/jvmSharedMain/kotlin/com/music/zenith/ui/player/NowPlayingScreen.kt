@@ -3444,7 +3444,7 @@ fun NowPlayingScreen(
                                     indication = null,
                                     onClick = onDismissPlayer,
                                 )
-                                .padding(start = PLAYER_GUTTER, end = 24.dp, top = 14.dp, bottom = 4.dp)
+                                .padding(start = PLAYER_GUTTER, end = 24.dp, top = 30.dp, bottom = 4.dp)
                                 .size(width = 20.dp, height = 10.dp),
                         ) {
                             val stroke = 2.2.dp.toPx()
@@ -3480,7 +3480,7 @@ fun NowPlayingScreen(
                                     ),
                                     modifier = Modifier
                                         .align(Alignment.BottomCenter)
-                                        .offset(y = 2.dp)
+                                        .offset(y = 10.dp)
                                         .graphicsLayer { alpha = (1f - p()) * spotifyChromeAlpha },
                                 )
                             }
