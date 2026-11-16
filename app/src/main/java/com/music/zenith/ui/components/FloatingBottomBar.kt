@@ -42,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -382,7 +383,7 @@ fun FloatingBottomBar(
                                 ),
                             )
                         }
-                        androidx.compose.ui.graphics.drawscope.clipPath(maskPath) {
+                        clipPath(maskPath) {
                             this@drawWithContent.drawContent()
                         }
                     },
@@ -395,7 +396,7 @@ fun FloatingBottomBar(
                         selected = index == selectedIndex,
                         glassSpec = glassSpec,
                         selectedTint = MaterialTheme.colorScheme.primary,
-                        unselectedTint = adaptiveTint?.copy(alpha = 0.65f),
+                        unselectedTint = null,
                         maskLayer = true,
                         onClick = {},
                         modifier = Modifier.weight(1f),
