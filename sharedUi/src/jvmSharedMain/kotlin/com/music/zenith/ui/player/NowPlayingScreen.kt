@@ -299,7 +299,7 @@ private const val HERO_FADE_FRACTION = 0.42f
  * dari [HERO_FADE_FRACTION] agar gambar bertahan lebih rendah seperti di Apple Music;
  * klip tetap memakai [HERO_FADE_FRACTION].
  */
-private const val HERO_COVER_FADE_FRACTION = 0.25f
+private const val HERO_COVER_FADE_FRACTION = 0.18f
 /** Kept transparent so the cover remains edge-to-edge, while aiding icon contrast. */
 /** A modest floor while a subview replaces the hero with its blurred artwork backdrop. */
 private const val SUBVIEW_STATUS_SCRIM_MIN_ALPHA = 0.40f
