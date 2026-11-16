@@ -82,6 +82,19 @@ import com.music.zenith.ui.icons.ZenithIcons
 import androidx.compose.material.icons.rounded.Add
 import com.music.zenith.ui.haptics.Haptic
 import com.music.zenith.ui.haptics.rememberHaptics
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.border
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.requiredWidth
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.zIndex
+import com.music.zenith.ui.components.MenuFrostDark
+import com.music.zenith.ui.components.liveMenuFrost
+import dev.chrisbanes.haze.HazeState
+import kotlinx.coroutines.delay
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.semantics
 import com.music.zenith.data.model.QueueTier
@@ -248,6 +261,8 @@ internal fun InlineQueue(
     onToggleShuffle: () -> Unit = {},
     onCycleRepeat: () -> Unit = {},
     onToggleAutoplay: () -> Unit = {},
+    /** Frost source for the long-press info cards on the playback mode buttons. */
+    hazeState: HazeState? = null,
     modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
@@ -297,6 +312,7 @@ internal fun InlineQueue(
             onToggleShuffle = onToggleShuffle,
             onCycleRepeat = onCycleRepeat,
             onToggleAutoplay = onToggleAutoplay,
+            hazeState = hazeState,
         )
         Spacer(Modifier.height(18.dp))
         Row(
@@ -510,11 +526,13 @@ private fun QueueModeRow(
     onToggleShuffle: () -> Unit,
     onCycleRepeat: () -> Unit,
     onToggleAutoplay: () -> Unit,
+    hazeState: HazeState? = null,
     modifier: Modifier = Modifier,
 ) {
     val automixEnabled by PlayerSettings.smartFadeEnabled.collectAsStateWithLifecycle()
     Row(
-        modifier = modifier.fillMaxWidth(),
+        // Above the list under it, so the info cards hanging off the buttons stay visible.
+        modifier = modifier.fillMaxWidth().zIndex(1f),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         QueueModeButton(
@@ -528,6 +546,10 @@ private fun QueueModeRow(
             // before that lands would undo work that hasn't happened yet.
             tapWindowMs = 400L,
             onClick = onToggleShuffle,
+            info = stringResource(Res.string.queue_info_shuffle_title) to
+                stringResource(Res.string.queue_info_shuffle_body),
+            popupAtStart = true,
+            hazeState = hazeState,
             modifier = Modifier.weight(1f),
         )
         QueueModeButton(
@@ -544,6 +566,10 @@ private fun QueueModeRow(
                 else -> Haptic.Select
             },
             onClick = onCycleRepeat,
+            info = stringResource(Res.string.queue_info_repeat_title) to
+                stringResource(Res.string.queue_info_repeat_body),
+            popupAtStart = true,
+            hazeState = hazeState,
             modifier = Modifier.weight(1f),
         )
         QueueModeButton(
@@ -557,6 +583,10 @@ private fun QueueModeRow(
             // network, so it ignores taps for longer than shuffle does.
             tapWindowMs = 700L,
             onClick = onToggleAutoplay,
+            info = stringResource(Res.string.queue_info_autoplay_title) to
+                stringResource(Res.string.queue_info_autoplay_body),
+            popupAtStart = false,
+            hazeState = hazeState,
             modifier = Modifier.weight(1f),
         )
         QueueModeButton(
@@ -569,11 +599,16 @@ private fun QueueModeRow(
             // Same switch as Settings > Automix; it may start a model download.
             tapWindowMs = 700L,
             onClick = { PlayerPlatform.host.toggleAutomix() },
+            info = stringResource(Res.string.queue_info_automix_title) to
+                stringResource(Res.string.queue_info_automix_body),
+            popupAtStart = false,
+            hazeState = hazeState,
             modifier = Modifier.weight(1f),
         )
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun QueueModeButton(
     icon: ImageVector,
@@ -584,46 +619,150 @@ private fun QueueModeButton(
     modifier: Modifier = Modifier,
     label: String? = null,
     tapWindowMs: Long = 0L,
+    /** Title and description shown in a frosted card on long press; null for none. */
+    info: Pair<String, String>? = null,
+    /** Card lines up with the button's left edge, otherwise its right edge. */
+    popupAtStart: Boolean = true,
+    hazeState: HazeState? = null,
 ) {
     val haptics = rememberHaptics()
     val lastTap = remember { LongArray(1) }
+    var showInfo by remember { mutableStateOf(false) }
+    LaunchedEffect(showInfo) {
+        if (showInfo) {
+            delay(2600L)
+            showInfo = false
+        }
+    }
     val container by animateColorAsState(
         targetValue = if (highlighted) Color.White.copy(alpha = 0.88f) else Color.White.copy(alpha = 0.14f),
         label = "queueModeFill",
     )
     val tint = if (highlighted) Color.Black.copy(alpha = 0.82f) else Color.White.copy(alpha = 0.9f)
-    Box(
-        modifier = modifier
-            .height(40.dp)
-            .clip(RoundedCornerShape(percent = 50))
-            .background(container)
-            .clickable {
-                val now = System.currentTimeMillis()
-                if (now - lastTap[0] >= tapWindowMs) {
-                    lastTap[0] = now
-                    haptics.play(haptic)
-                    onClick()
+    Box(modifier = modifier.zIndex(if (showInfo) 1f else 0f)) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(40.dp)
+                .clip(RoundedCornerShape(percent = 50))
+                .background(container)
+                .combinedClickable(
+                    onLongClick = if (info != null) {
+                        {
+                            haptics.play(Haptic.Select)
+                            showInfo = true
+                        }
+                    } else {
+                        null
+                    },
+                    onClick = {
+                        val now = System.currentTimeMillis()
+                        if (now - lastTap[0] >= tapWindowMs) {
+                            lastTap[0] = now
+                            haptics.play(haptic)
+                            onClick()
+                        }
+                    },
+                )
+                .semantics { this.contentDescription = contentDescription },
+            contentAlignment = Alignment.Center,
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = tint,
+                    modifier = Modifier.size(24.dp),
+                )
+                if (label != null) {
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = tint,
+                    )
                 }
             }
-            .semantics { this.contentDescription = contentDescription },
-        contentAlignment = Alignment.Center,
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = tint,
-                modifier = Modifier.size(24.dp),
-            )
-            if (label != null) {
-                Spacer(Modifier.width(4.dp))
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = tint,
-                )
-            }
         }
+        if (info != null && showInfo) {
+            QueueModeInfoCard(
+                title = info.first,
+                body = info.second,
+                atStart = popupAtStart,
+                hazeState = hazeState,
+                onDismiss = { showInfo = false },
+                modifier = Modifier
+                    .align(if (popupAtStart) Alignment.TopStart else Alignment.TopEnd)
+                    .offset(y = 48.dp),
+            )
+        }
+    }
+}
+
+/** The long-press card of a playback mode button: frosted like the player's menus, macOS style. */
+@Composable
+private fun QueueModeInfoCard(
+    title: String,
+    body: String,
+    atStart: Boolean,
+    hazeState: HazeState?,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val reduceDynamicBlur by PlayerSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
+    var entered by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { entered = true }
+    val progress by animateFloatAsState(
+        targetValue = if (entered) 1f else 0f,
+        animationSpec = tween(180, easing = FastOutSlowInEasing),
+        label = "queueModeInfo",
+    )
+    val shape = RoundedCornerShape(18.dp)
+    Column(
+        modifier = modifier
+            .requiredWidth(220.dp)
+            .graphicsLayer {
+                alpha = progress
+                val s = 0.92f + 0.08f * progress
+                scaleX = s
+                scaleY = s
+                transformOrigin = TransformOrigin(if (atStart) 0.15f else 0.85f, 0f)
+            }
+            .shadow(
+                elevation = 20.dp,
+                shape = shape,
+                ambientColor = Color.Black.copy(alpha = 0.30f),
+                spotColor = Color.Black.copy(alpha = 0.30f),
+            )
+            .clip(shape)
+            .then(
+                if (hazeState != null && !reduceDynamicBlur) {
+                    Modifier.liveMenuFrost(hazeState, MenuFrostDark)
+                } else {
+                    Modifier.background(MenuFrostDark.copy(alpha = 0.94f))
+                },
+            )
+            .border(0.5.dp, Color.White.copy(alpha = 0.14f), shape)
+            .clickable(
+                interactionSource = androidx.compose.foundation.interaction.MutableInteractionSource(),
+                indication = null,
+                onClick = onDismiss,
+            )
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleSmall.copy(
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+            ),
+            color = Color.White,
+        )
+        Spacer(Modifier.height(2.dp))
+        Text(
+            text = body,
+            style = MaterialTheme.typography.bodySmall,
+            color = Color.White.copy(alpha = 0.72f),
+        )
     }
 }
 

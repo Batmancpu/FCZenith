@@ -2901,6 +2901,7 @@ fun NowPlayingScreen(
                             onToggleShuffle = onToggleShuffle,
                             onCycleRepeat = onCycleRepeat,
                             onToggleAutoplay = onToggleAutoplay,
+                            hazeState = playerHaze,
                             modifier = Modifier.fillMaxSize(),
                         )
                     },
@@ -5294,6 +5295,7 @@ Spacer(Modifier.width(12.dp))
                                     onToggleShuffle = onToggleShuffle,
                                     onCycleRepeat = onCycleRepeat,
                                     onToggleAutoplay = onToggleAutoplay,
+                                    hazeState = playerHaze,
                                     collapsePlayerOnScroll = true,
                                     onRevealPlayer = { queueControlsOpen = true },
                                     onHidePlayer = { queueControlsOpen = false },
