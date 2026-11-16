@@ -2263,6 +2263,14 @@ fun NowPlayingScreen(
     // the trip, as for the collapse into the lyrics or the queue; a paused
     // clip keeps its last frame, so nothing blinks.
     val dockMoving by remember { derivedStateOf { docking() } }
+    // Chevron dan teks "Playing from" baru muncul setelah sheet 100% terbuka:
+    // hilang cepat begitu di-drag, lalu fade in halus saat sudah menetap.
+    // Dibaca di graphicsLayer (State), bukan di komposisi, supaya tidak recompose per frame.
+    val headerReveal = animateFloatAsState(
+        targetValue = if (dockMoving) 0f else 1f,
+        animationSpec = if (dockMoving) tween(90) else tween(durationMillis = 280, delayMillis = 40),
+        label = "playerHeaderReveal",
+    )
     // The rest of the player gets out of the way a little ahead of the artwork,
     // so the cover lands on the bar rather than on a ghost of the player.
     val dockFade: () -> Float = { ((dockT() - DOCK_FADE_LEAD) / (DOCK_FADE_FULL - DOCK_FADE_LEAD)).coerceIn(0f, 1f) }
@@ -3433,7 +3441,7 @@ fun NowPlayingScreen(
                         androidx.compose.foundation.Canvas(
                             modifier = Modifier
                                 .align(Alignment.CenterStart)
-                                .graphicsLayer { alpha = (1f - p()) * spotifyChromeAlpha }
+                                .graphicsLayer { alpha = (1f - p()) * spotifyChromeAlpha * headerReveal.value }
                                 // Padding setelah clickable: area ketuknya melebar melewati
                                 // gambar chevron, tapi tetap di dalam tinggi strip.
                                 .clickable(
@@ -3486,7 +3494,7 @@ fun NowPlayingScreen(
                                     modifier = Modifier
                                         .align(Alignment.BottomCenter)
                                         .offset(y = 10.dp)
-                                        .graphicsLayer { alpha = (1f - p()) * spotifyChromeAlpha },
+                                        .graphicsLayer { alpha = (1f - p()) * spotifyChromeAlpha * headerReveal.value },
                                 )
                             }
                         }
