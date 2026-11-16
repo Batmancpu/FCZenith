@@ -423,7 +423,8 @@ internal fun Modifier.miniPlayerGestures(
  * Alpha of the mini player's cover, read at draw time. Hidden at once while the
  * player's own cover is flying to or from it. When that cover is not drawn at
  * all (a full-screen Spotify Canvas, see [PlayerDock.fadeMiniArtIn]) the mini
- * cover fades back in instead of popping in after being empty.
+ * cover fades out as the player opens and fades back in as it closes, instead
+ * of vanishing or popping in.
  */
 @Composable
 internal fun rememberMiniArtAlpha(dock: PlayerDock?): () -> Float {
@@ -432,14 +433,27 @@ internal fun rememberMiniArtAlpha(dock: PlayerDock?): () -> Float {
         val covered = dock.coversMiniArt
         val fadeIn = dock.fadeMiniArtIn
         LaunchedEffect(covered, fadeIn) {
-            if (covered) {
-                if (fadeIn) fade.snapTo(0f)
-            } else if (fade.value < 1f) {
-                fade.animateTo(1f, tween(durationMillis = 320, easing = FastOutSlowInEasing))
+            val target = if (covered) 0f else 1f
+            if (fade.value != target) {
+                if (fadeIn) {
+                    fade.animateTo(
+                        target,
+                        tween(durationMillis = if (covered) 220 else 320, easing = FastOutSlowInEasing),
+                    )
+                } else {
+                    fade.snapTo(target)
+                }
             }
         }
     }
-    return { if (dock != null && dock.coversMiniArt) 0f else fade.value }
+    return {
+        when {
+            dock == null -> 1f
+            dock.fadeMiniArtIn -> fade.value
+            dock.coversMiniArt -> 0f
+            else -> 1f
+        }
+    }
 }
 
 @Composable
