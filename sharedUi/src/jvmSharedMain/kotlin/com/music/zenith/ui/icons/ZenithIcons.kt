@@ -456,15 +456,15 @@ object ZenithIcons {
             defaultWidth = 24.dp, defaultHeight = 24.dp,
             viewportWidth = 24f, viewportHeight = 24f,
         ).apply {
-            // Left ring, a little softer than the disc beside it.
+            // Left ring, a little softer than the disc beside it. An open arc that
+            // stops where it meets the disc's edge, with the same outer radius as the disc.
             path(
                 stroke = SolidColor(Color.Black.copy(alpha = 0.7f)),
                 strokeLineWidth = 1.9f,
+                strokeLineCap = StrokeCap.Round,
             ) {
-                moveTo(2.65f, 12f)
-                arcToRelative(5.44f, 5.44f, 0f, isMoreThanHalf = true, isPositiveArc = true, 10.88f, 0f)
-                arcToRelative(5.44f, 5.44f, 0f, isMoreThanHalf = true, isPositiveArc = true, -10.88f, 0f)
-                close()
+                moveTo(11.16f, 8.27f)
+                arcTo(4.83f, 4.83f, 0f, isMoreThanHalf = true, isPositiveArc = false, 11.16f, 15.73f)
             }
             // Right disc with its centre hole cut out.
             path(
