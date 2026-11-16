@@ -2941,10 +2941,15 @@ fun NowPlayingScreen(
                     (lyricsOpen || queueOpen) && !liveCanvasPanels &&
                     !(legacyMesh && canvas.source != CanvasSource.SPOTIFY)
                 // Blur statis dari frame terakhir canvas: tetap tampil selama panel terbuka.
-                val canvasPanelFrameBlur = rememberFullArtworkBlurImage(
-                    imageUrl = null,
-                    liveFrame = canvasPanelFrame,
-                )
+                // Di-key per frame beku: tanpa key, blur dari pembukaan panel sebelumnya
+                // masih tersimpan dan tampil dulu (frame basi), lalu dilebur ke blur baru.
+                // Itu yang terlihat sebagai perubahan kecerahan dan lompatan.
+                val canvasPanelFrameBlur = androidx.compose.runtime.key(canvasPanelFrame) {
+                    rememberFullArtworkBlurImage(
+                        imageUrl = null,
+                        liveFrame = canvasPanelFrame,
+                    )
+                }
                 // Spotify layar penuh, live blur off: alas panel HANYA blur frame beku
                 // klipnya sendiri. Cover lagu tidak boleh tampil sama sekali, juga bukan
                 // sebagai cadangan selagi blur frame belum siap.
@@ -2968,6 +2973,20 @@ fun NowPlayingScreen(
                         )
                     },
                     label = "canvasPanelMesh",
+                )
+                // Live blur off: begitu blur frame beku siap, klip melebur ke sana dengan
+                // jamnya sendiri, bukan mengikuti progres panel (yang bisa sudah jauh dan
+                // membuat klip hilang mendadak). Saat panel menutup, p() yang memimpin.
+                val spotifyFrameHandoff by animateFloatAsState(
+                    targetValue = if (
+                        spotifyFrameOnly && (lyricsOpen || queueOpen) && canvasPanelFrameBlur != null
+                    ) 0f else 1f,
+                    animationSpec = if (spotifyFrameOnly && (lyricsOpen || queueOpen)) {
+                        tween(durationMillis = 240, easing = FastOutSlowInEasing)
+                    } else {
+                        snap()
+                    },
+                    label = "spotifyFrameHandoff",
                 )
                 val legacyMeshBackdrop = !tabletArtworkBackdrop && !spotifyCanvasPresentation &&
                     legacyMesh && !canvasPanelMesh
@@ -3079,9 +3098,7 @@ fun NowPlayingScreen(
                                         // ke backdrop, tanpa bercampur dengan cover statis.
                                         // Live blur off: klip bertahan utuh sampai blur
                                         // frame beku-nya siap, lalu melebur ke sana.
-                                        if (spotifyFrameOnly && (lyricsOpen || queueOpen) &&
-                                            canvasPanelFrameBlur == null
-                                        ) 1f
+                                        if (spotifyFrameOnly && (lyricsOpen || queueOpen)) spotifyFrameHandoff
                                         else 1f - smootherStep(((p() - 0.05f) / 0.3f).coerceIn(0f, 1f))
                                     } else (1f - 2f * p()).coerceIn(0f, 1f)
                                     ) * dockFade() * clipMixFade.value
@@ -3138,7 +3155,15 @@ fun NowPlayingScreen(
                                 )
                                 .drawWithContent {
                                     drawContent()
-                                    val dimAmount = panelBlur()
+                                    // Live blur off: klip beku menggelap ke tingkat backdrop selagi
+                                    // melebur, jadi tidak ada lonjakan kecerahan saat bertukar.
+                                    val dimAmount = if (liveCanvasPanels) {
+                                        panelBlur()
+                                    } else if (spotifyFrameOnly && (lyricsOpen || queueOpen)) {
+                                        1f - spotifyFrameHandoff
+                                    } else {
+                                        0f
+                                    }
                                     if (dimAmount > 0f) {
                                         drawRect(Color.Black.copy(alpha = CANVAS_PANEL_DIM * dimAmount))
                                     }
