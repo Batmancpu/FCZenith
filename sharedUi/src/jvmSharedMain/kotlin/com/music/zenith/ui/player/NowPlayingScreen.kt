@@ -4,7 +4,6 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.ui.unit.constrainWidth
 import androidx.compose.ui.unit.offset
-import androidx.compose.ui.unit.constrain
 import androidx.compose.ui.unit.Constraints
 import com.music.zenith.ui.graphics.FADE_CURVE_STOPS
 import com.music.zenith.ui.graphics.smootherStep
@@ -142,7 +141,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
@@ -299,7 +297,7 @@ private const val HERO_FADE_FRACTION = 0.42f
  * dari [HERO_FADE_FRACTION] agar gambar bertahan lebih rendah seperti di Apple Music;
  * klip tetap memakai [HERO_FADE_FRACTION].
  */
-private const val HERO_COVER_FADE_FRACTION = 0.25f
+private const val HERO_COVER_FADE_FRACTION = 0.18f
 /** Kept transparent so the cover remains edge-to-edge, while aiding icon contrast. */
 /** A modest floor while a subview replaces the hero with its blurred artwork backdrop. */
 private const val SUBVIEW_STATUS_SCRIM_MIN_ALPHA = 0.40f
@@ -2295,6 +2293,14 @@ fun NowPlayingScreen(
     // the trip, as for the collapse into the lyrics or the queue; a paused
     // clip keeps its last frame, so nothing blinks.
     val dockMoving by remember { derivedStateOf { docking() } }
+    // Chevron dan teks "Playing from" baru muncul setelah sheet 100% terbuka:
+    // hilang cepat begitu di-drag, lalu fade in halus saat sudah menetap.
+    // Dibaca di graphicsLayer (State), bukan di komposisi, supaya tidak recompose per frame.
+    val headerReveal = animateFloatAsState(
+        targetValue = if (dockMoving) 0f else 1f,
+        animationSpec = if (dockMoving) tween(90) else tween(durationMillis = 280, delayMillis = 40),
+        label = "playerHeaderReveal",
+    )
     // The rest of the player gets out of the way a little ahead of the artwork,
     // so the cover lands on the bar rather than on a ghost of the player.
     val dockFade: () -> Float = { ((dockT() - DOCK_FADE_LEAD) / (DOCK_FADE_FULL - DOCK_FADE_LEAD)).coerceIn(0f, 1f) }
@@ -2961,6 +2967,7 @@ fun NowPlayingScreen(
                             onToggleShuffle = onToggleShuffle,
                             onCycleRepeat = onCycleRepeat,
                             onToggleAutoplay = onToggleAutoplay,
+                            hazeState = playerHaze,
                             modifier = Modifier.fillMaxSize(),
                         )
                     },
@@ -2988,8 +2995,11 @@ fun NowPlayingScreen(
                 // full-screen Spotify Canvas is its own backdrop until a panel opens.
                 // Live blur off: lyrics/queue show a static blur of the clip's last frame,
                 // not the legacy mesh. Live blur on: the clip itself stays playing instead.
+                // Legacy mesh aktif + canvas non-Spotify (Apple Music): panel lirik/queue
+                // memakai mesh legacy, bukan blur cover/frame. Spotify tetap seperti semula.
                 val canvasPanelMesh = !tabletArtworkBackdrop && canvas != null && heroMode &&
-                    (lyricsOpen || queueOpen) && !liveCanvasPanels
+                    (lyricsOpen || queueOpen) && !liveCanvasPanels &&
+                    !(legacyMesh && canvas.source != CanvasSource.SPOTIFY)
                 // Blur statis dari frame terakhir canvas: tetap tampil selama panel terbuka.
                 val canvasPanelFrameBlur = rememberFullArtworkBlurImage(
                     imageUrl = null,
@@ -3504,7 +3514,13 @@ fun NowPlayingScreen(
                         androidx.compose.foundation.Canvas(
                             modifier = Modifier
                                 .align(Alignment.CenterStart)
-                                .graphicsLayer { alpha = (1f - p()) * spotifyChromeAlpha }
+                                .graphicsLayer {
+                                    alpha = (1f - p()) * spotifyChromeAlpha * headerReveal.value
+                                    // Alpha per-draw tanpa layer offscreen: ujung bawah chevron
+                                    // melewati tinggi strip, dan layer offscreen memotongnya
+                                    // selama fade in.
+                                    compositingStrategy = CompositingStrategy.ModulateAlpha
+                                }
                                 // Padding setelah clickable: area ketuknya melebar melewati
                                 // gambar chevron, tapi tetap di dalam tinggi strip.
                                 .clickable(
@@ -3516,14 +3532,19 @@ fun NowPlayingScreen(
                                     indication = null,
                                     onClick = onDismissPlayer,
                                 )
-                                .padding(start = PLAYER_GUTTER, end = 24.dp, top = 14.dp, bottom = 4.dp)
-                                .size(width = 20.dp, height = 10.dp),
+                                .padding(start = PLAYER_GUTTER, end = 24.dp, top = 28.dp, bottom = 4.dp)
+                                .size(width = 20.dp, height = 11.dp),
                         ) {
-                            val stroke = 2.2.dp.toPx()
+                            val stroke = 2.6.dp.toPx()
+                            // Sudut lebih tumpul (lengan lebar, tinggi pendek) supaya tidak lancip.
+                            val armX = 8.dp.toPx()
+                            val armY = 5.dp.toPx()
+                            val cx = size.width / 2f
+                            val top = stroke / 2f + 1.dp.toPx()
                             val chevron = androidx.compose.ui.graphics.Path().apply {
-                                moveTo(stroke / 2f, stroke / 2f)
-                                lineTo(size.width / 2f, size.height - stroke / 2f)
-                                lineTo(size.width - stroke / 2f, stroke / 2f)
+                                moveTo(cx - armX, top)
+                                lineTo(cx, top + armY)
+                                lineTo(cx + armX, top)
                             }
                             drawPath(
                                 path = chevron,
@@ -3552,8 +3573,8 @@ fun NowPlayingScreen(
                                     ),
                                     modifier = Modifier
                                         .align(Alignment.BottomCenter)
-                                        .offset(y = 2.dp)
-                                        .graphicsLayer { alpha = (1f - p()) * spotifyChromeAlpha },
+                                        .offset(y = 10.dp)
+                                        .graphicsLayer { alpha = (1f - p()) * spotifyChromeAlpha * headerReveal.value },
                                 )
                             }
                         }
@@ -3931,8 +3952,19 @@ fun NowPlayingScreen(
                             val thumb = Rect(Offset(fromStart(0f, thumbW), 0f), Size(thumbW, thumbH))
                             lerp(video, thumb, p())
                         }
+                        // Spotify layar penuh: cover tidak bergerak/terbang ke header, ia
+                        // langsung diam di posisi header dan hanya fade in/out di tempat.
+                        fun spotifyCoverInPlace(): Boolean =
+                            clipFullscreen && (lyricsOpen || queueOpen || collapseStarted)
                         fun sleeveRect(): Rect {
                             val card = cardRect()
+                            if (spotifyCoverInPlace()) {
+                                val inPlaceSide = with(density) { THUMB_SIZE.roundToPx().toFloat() }
+                                return Rect(
+                                    Offset(fromStart(0f, inPlaceSide), 0f),
+                                    Size(inPlaceSide, inPlaceSide),
+                                )
+                            }
                             val share = bannerShare()
                             if (share == 0f) return card
                             val banner = with(density) {
@@ -4245,10 +4277,11 @@ fun NowPlayingScreen(
                                     val idle = cardScale()
                                     val t = dockT()
                                     val open = idle + (1f - idle) * share
-                                    val scale = if (t >= 1f) open else 1f + (open - 1f) * t
+                                    val inPlace = spotifyCoverInPlace()
+                                    val scale = if (inPlace) 1f else if (t >= 1f) open else 1f + (open - 1f) * t
                                     scaleX = scale
                                     scaleY = scale
-                                    translationX = swipeSettle.value * (1f - p()) * (1f - share) * t
+                                    translationX = if (inPlace) 0f else swipeSettle.value * (1f - p()) * (1f - share) * t
                                 }
                                 // Haze must observe the drawable layer itself, the
                                 // banner included — a source on the surrounding layout
@@ -4267,7 +4300,7 @@ fun NowPlayingScreen(
                                             // full-screen Spotify clip's cover does not fly: it fades in
                                             // at the header on the way in and out again on the way back.
                                             if (clipFullscreen) {
-                                                smootherStep(((p() - 0.75f) / 0.25f).coerceIn(0f, 1f))
+                                                smootherStep(((p() - 0.4f) / 0.6f).coerceIn(0f, 1f))
                                             } else {
                                                 1f
                                             }
@@ -4275,17 +4308,9 @@ fun NowPlayingScreen(
                                             // Live blur off: the cover behaves the same as with
                                             // live blur on. It does not fly with the panel, it only
                                             // fades in at the header and out again on the way back.
-                                            smootherStep(((p() - 0.75f) / 0.25f).coerceIn(0f, 1f))
+                                            smootherStep(((p() - 0.4f) / 0.6f).coerceIn(0f, 1f))
                                         } else if (stillTakesOver()) 1f
-                                        else if (heroClip != null) {
-                                            if (clipFullscreen && canvasRendered && !clipDimmed) {
-                                                // Cover statis baru muncul setelah frame klip
-                                                // melebur, saat ia sudah menyusut ke header.
-                                                smootherStep(((p() - 0.3f) / 0.2f).coerceIn(0f, 1f))
-                                            } else {
-                                                1f - canvasCover.floatValue
-                                            }
-                                        }
+                                        else if (heroClip != null) 1f - canvasCover.floatValue
                                         else 1f
                                         ) *
                                         // Selama frame Spotify Canvas lama masih menutup
@@ -5370,6 +5395,7 @@ Spacer(Modifier.width(12.dp))
                                     onToggleShuffle = onToggleShuffle,
                                     onCycleRepeat = onCycleRepeat,
                                     onToggleAutoplay = onToggleAutoplay,
+                                    hazeState = playerHaze,
                                     collapsePlayerOnScroll = true,
                                     onRevealPlayer = { queueControlsOpen = true },
                                     onHidePlayer = { queueControlsOpen = false },
