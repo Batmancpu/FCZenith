@@ -595,7 +595,7 @@ private fun QueueModeButton(
     Box(
         modifier = modifier
             .height(40.dp)
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(percent = 50))
             .background(container)
             .clickable {
                 val now = System.currentTimeMillis()
