@@ -293,7 +293,9 @@ private val ART_BOX_TOP_PAD = 8.dp
  * short enough to still be reading as artwork where it ends reads as a picture
  * that was cut off rather than one that ran out.
  */
-private const val HERO_FADE_FRACTION = 0.42f
+// Diperpendek dari 0.42 agar pudar bawah cover mirip Apple Music: gambar bertahan
+// lebih rendah, lalu larut ke backdrop dalam jarak yang lebih pendek.
+private const val HERO_FADE_FRACTION = 0.28f
 /** Kept transparent so the cover remains edge-to-edge, while aiding icon contrast. */
 /** A modest floor while a subview replaces the hero with its blurred artwork backdrop. */
 private const val SUBVIEW_STATUS_SCRIM_MIN_ALPHA = 0.40f
