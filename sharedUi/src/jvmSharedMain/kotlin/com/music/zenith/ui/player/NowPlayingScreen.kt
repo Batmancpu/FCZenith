@@ -3439,7 +3439,13 @@ fun NowPlayingScreen(
                         androidx.compose.foundation.Canvas(
                             modifier = Modifier
                                 .align(Alignment.CenterStart)
-                                .graphicsLayer { alpha = (1f - p()) * spotifyChromeAlpha * headerReveal.value }
+                                .graphicsLayer {
+                                    alpha = (1f - p()) * spotifyChromeAlpha * headerReveal.value
+                                    // Alpha per-draw tanpa layer offscreen: ujung bawah chevron
+                                    // melewati tinggi strip, dan layer offscreen memotongnya
+                                    // selama fade in.
+                                    compositingStrategy = CompositingStrategy.ModulateAlpha
+                                }
                                 // Padding setelah clickable: area ketuknya melebar melewati
                                 // gambar chevron, tapi tetap di dalam tinggi strip.
                                 .clickable(
