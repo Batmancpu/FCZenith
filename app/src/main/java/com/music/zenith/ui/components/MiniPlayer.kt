@@ -481,6 +481,13 @@ fun MiniPlayer(
 ) {
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
     val haptics = rememberHaptics()
+    // Solid cover over the frost while the player is up; it fades out after the
+    // player closes so the bar's colour eases in instead of popping.
+    val surfaceCover by animateFloatAsState(
+        targetValue = if (dock?.panelShown == true) 1f else 0f,
+        animationSpec = tween(durationMillis = 450),
+        label = "miniSurfaceCover",
+    )
     // percent rather than a dp figure, so the corner stays exactly half the
     // height if the row's contents ever change it — which is what keeps a pill
     // a pill instead of a rounded rectangle. Same idiom as [FloatingBottomBar]
@@ -523,6 +530,12 @@ fun MiniPlayer(
             // its own confirmation. The glyphs on it still buzz.
             .clickable(onClick = onExpand),
     ) {
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .graphicsLayer { alpha = surfaceCover }
+                .background(MaterialTheme.colorScheme.surface),
+        )
         Row(
             modifier = Modifier
                 .fillMaxWidth()
