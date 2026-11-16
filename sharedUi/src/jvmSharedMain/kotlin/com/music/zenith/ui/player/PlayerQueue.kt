@@ -95,6 +95,10 @@ import com.music.zenith.ui.components.MenuFrostDark
 import com.music.zenith.ui.components.liveMenuFrost
 import dev.chrisbanes.haze.HazeState
 import kotlinx.coroutines.delay
+import androidx.compose.runtime.Immutable
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.semantics
 import com.music.zenith.data.model.QueueTier
@@ -301,7 +305,18 @@ internal fun InlineQueue(
         }
     }
 
-    Column(modifier.fillMaxWidth()) {
+    var modeInfo by remember { mutableStateOf<QueueModeInfo?>(null) }
+    var modeInfoOpen by remember { mutableStateOf(false) }
+    LaunchedEffect(modeInfoOpen, modeInfo) {
+        if (modeInfoOpen) {
+            delay(2600L)
+            modeInfoOpen = false
+        }
+    }
+    val modeInfoPopover = LocalQueueInfoPopover.current
+
+    Box(modifier.fillMaxWidth()) {
+    Column(Modifier.fillMaxWidth()) {
         // The current song is already shown by the player's collapsed header
         // (the sleeve flies into it), so the playback modes sit directly under it.
         Spacer(Modifier.height(10.dp))
@@ -313,6 +328,10 @@ internal fun InlineQueue(
             onCycleRepeat = onCycleRepeat,
             onToggleAutoplay = onToggleAutoplay,
             hazeState = hazeState,
+            onShowInfo = {
+                modeInfo = it
+                modeInfoOpen = true
+            },
         )
         Spacer(Modifier.height(18.dp))
         Row(
@@ -414,6 +433,19 @@ internal fun InlineQueue(
                 }
             }
         }
+    }
+    val shownInfo = modeInfo
+    if (modeInfoPopover != null && shownInfo != null) {
+        modeInfoPopover(
+            modeInfoOpen,
+            shownInfo.anchor,
+            shownInfo.atStart,
+            { modeInfoOpen = false },
+            shownInfo.title,
+            shownInfo.body,
+            hazeState,
+        )
+    }
     }
 }
 
@@ -517,6 +549,15 @@ private fun QueueClearButton(style: TextStyle, locked: Boolean, onClear: () -> U
     )
 }
 
+/** Info card of a playback mode button, drawn by the app as a floating popover. */
+@Immutable
+private class QueueModeInfo(
+    val title: String,
+    val body: String,
+    val anchor: Rect,
+    val atStart: Boolean,
+)
+
 /** Shuffle, repeat and AutoPlay as one row of equal buttons. */
 @Composable
 private fun QueueModeRow(
@@ -527,6 +568,7 @@ private fun QueueModeRow(
     onCycleRepeat: () -> Unit,
     onToggleAutoplay: () -> Unit,
     hazeState: HazeState? = null,
+    onShowInfo: (QueueModeInfo) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val automixEnabled by PlayerSettings.smartFadeEnabled.collectAsStateWithLifecycle()
@@ -549,6 +591,7 @@ private fun QueueModeRow(
             info = stringResource(Res.string.queue_info_shuffle_title) to
                 stringResource(Res.string.queue_info_shuffle_body),
             popupAtStart = true,
+            onShowInfo = onShowInfo,
             hazeState = hazeState,
             modifier = Modifier.weight(1f),
         )
@@ -569,6 +612,7 @@ private fun QueueModeRow(
             info = stringResource(Res.string.queue_info_repeat_title) to
                 stringResource(Res.string.queue_info_repeat_body),
             popupAtStart = true,
+            onShowInfo = onShowInfo,
             hazeState = hazeState,
             modifier = Modifier.weight(1f),
         )
@@ -586,6 +630,7 @@ private fun QueueModeRow(
             info = stringResource(Res.string.queue_info_autoplay_title) to
                 stringResource(Res.string.queue_info_autoplay_body),
             popupAtStart = false,
+            onShowInfo = onShowInfo,
             hazeState = hazeState,
             modifier = Modifier.weight(1f),
         )
@@ -602,6 +647,7 @@ private fun QueueModeRow(
             info = stringResource(Res.string.queue_info_automix_title) to
                 stringResource(Res.string.queue_info_automix_body),
             popupAtStart = false,
+            onShowInfo = onShowInfo,
             hazeState = hazeState,
             modifier = Modifier.weight(1f),
         )
@@ -624,33 +670,31 @@ private fun QueueModeButton(
     /** Card lines up with the button's left edge, otherwise its right edge. */
     popupAtStart: Boolean = true,
     hazeState: HazeState? = null,
+    onShowInfo: (QueueModeInfo) -> Unit = {},
 ) {
     val haptics = rememberHaptics()
     val lastTap = remember { LongArray(1) }
-    var showInfo by remember { mutableStateOf(false) }
-    LaunchedEffect(showInfo) {
-        if (showInfo) {
-            delay(2600L)
-            showInfo = false
-        }
-    }
+    var bounds by remember { mutableStateOf<Rect?>(null) }
     val container by animateColorAsState(
         targetValue = if (highlighted) Color.White.copy(alpha = 0.88f) else Color.White.copy(alpha = 0.14f),
         label = "queueModeFill",
     )
     val tint = if (highlighted) Color.Black.copy(alpha = 0.82f) else Color.White.copy(alpha = 0.9f)
-    Box(modifier = modifier.zIndex(if (showInfo) 1f else 0f)) {
+    Box(modifier = modifier) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(40.dp)
+                .onGloballyPositioned { bounds = it.boundsInWindow() }
                 .clip(RoundedCornerShape(percent = 50))
                 .background(container)
                 .combinedClickable(
                     onLongClick = if (info != null) {
                         {
                             haptics.play(Haptic.Select)
-                            showInfo = true
+                            bounds?.let { rect ->
+                                onShowInfo(QueueModeInfo(info.first, info.second, rect, popupAtStart))
+                            }
                         }
                     } else {
                         null
@@ -684,85 +728,6 @@ private fun QueueModeButton(
                 }
             }
         }
-        if (info != null && showInfo) {
-            QueueModeInfoCard(
-                title = info.first,
-                body = info.second,
-                atStart = popupAtStart,
-                hazeState = hazeState,
-                onDismiss = { showInfo = false },
-                modifier = Modifier
-                    .align(if (popupAtStart) Alignment.TopStart else Alignment.TopEnd)
-                    .offset(y = 48.dp),
-            )
-        }
-    }
-}
-
-/** The long-press card of a playback mode button: frosted like the player's menus, macOS style. */
-@Composable
-private fun QueueModeInfoCard(
-    title: String,
-    body: String,
-    atStart: Boolean,
-    hazeState: HazeState?,
-    onDismiss: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val reduceDynamicBlur by PlayerSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
-    var entered by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { entered = true }
-    val progress by animateFloatAsState(
-        targetValue = if (entered) 1f else 0f,
-        animationSpec = tween(180, easing = FastOutSlowInEasing),
-        label = "queueModeInfo",
-    )
-    val shape = RoundedCornerShape(18.dp)
-    Column(
-        modifier = modifier
-            .requiredWidth(220.dp)
-            .graphicsLayer {
-                alpha = progress
-                val s = 0.92f + 0.08f * progress
-                scaleX = s
-                scaleY = s
-                transformOrigin = TransformOrigin(if (atStart) 0.15f else 0.85f, 0f)
-            }
-            .shadow(
-                elevation = 20.dp,
-                shape = shape,
-                ambientColor = Color.Black.copy(alpha = 0.30f),
-                spotColor = Color.Black.copy(alpha = 0.30f),
-            )
-            .clip(shape)
-            .then(
-                if (hazeState != null && !reduceDynamicBlur) {
-                    Modifier.liveMenuFrost(hazeState, MenuFrostDark)
-                } else {
-                    Modifier.background(MenuFrostDark.copy(alpha = 0.94f))
-                },
-            )
-            .border(0.5.dp, Color.White.copy(alpha = 0.14f), shape)
-            .clickable(
-                interactionSource = androidx.compose.foundation.interaction.MutableInteractionSource(),
-                indication = null,
-                onClick = onDismiss,
-            )
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-    ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleSmall.copy(
-                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-            ),
-            color = Color.White,
-        )
-        Spacer(Modifier.height(2.dp))
-        Text(
-            text = body,
-            style = MaterialTheme.typography.bodySmall,
-            color = Color.White.copy(alpha = 0.72f),
-        )
     }
 }
 
