@@ -3400,6 +3400,45 @@ private fun MixHero(
                     ),
                 ),
         )
+
+        // Nama mix di tengah area hero yang terlihat: di bawah bar, di atas blok judul
+        // yang menimpa kaki hero. Muncul setelah cover mendarat.
+        val (mixName, mixTail) = remember(mixTitle) { splitMixTitle(mixTitle) }
+        val mixTitleStyle = MaterialTheme.typography.headlineMedium.copy(
+            fontSize = 38.sp,
+            lineHeight = 40.sp,
+            letterSpacing = (-0.5).sp,
+            shadow = androidx.compose.ui.graphics.Shadow(Color(0x45000000), Offset(0f, 2f), 12f),
+        )
+        Box(
+            Modifier
+                .matchParentSize()
+                .padding(bottom = LIKED_HERO_OVERLAP, start = 24.dp, end = 24.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Column(
+                modifier = Modifier.flightReveal(delayMs = 0, rise = 0.dp, afterFlight = true),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    text = mixName,
+                    color = Color.White,
+                    style = mixTitleStyle.copy(fontWeight = FontWeight.Bold),
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (mixTail != null) {
+                    Text(
+                        text = mixTail,
+                        color = Color.White.copy(alpha = 0.92f),
+                        style = mixTitleStyle.copy(fontWeight = FontWeight.Normal),
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                    )
+                }
+            }
+        }
     }
 }
 
