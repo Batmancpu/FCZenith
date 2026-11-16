@@ -64,6 +64,7 @@ import com.music.zenith.ui.components.TrackTextSwitch
 import com.music.zenith.ui.components.LocalLiquidGlassEnabled
 import com.music.zenith.ui.components.MiniPlayerNextButton
 import com.music.zenith.ui.components.MiniPlayerPlayPauseButton
+import com.music.zenith.ui.components.rememberMiniArtAlpha
 import com.music.zenith.ui.components.glassContentColor
 import com.music.zenith.ui.components.isGlassSupported
 import com.music.zenith.ui.components.liquidGlass
@@ -356,6 +357,7 @@ private fun PanelMiniRow(
         ) {
             val artSize = if (glass) MINI_ART_SIZE else 40.dp
             val artShape = RoundedCornerShape(if (glass) MINI_ART_CORNER else 8.dp)
+            val miniArtAlpha = rememberMiniArtAlpha(dock)
             val artWidth = when {
                 !song.isVideo -> artSize
                 glass -> artSize * (16f / 9f)
@@ -366,7 +368,7 @@ private fun PanelMiniRow(
                     .size(width = artWidth, height = artSize)
                     // The player's own cover is the one that flies; this one
                     // stands aside as soon as it does.
-                    .graphicsLayer { alpha = if (dock != null && dock.coversMiniArt) 0f else 1f }
+                    .graphicsLayer { alpha = miniArtAlpha() }
                     .clip(artShape)
                     .then(if (glass) Modifier else Modifier.thumbnailBorder(artShape))
                     .background(MaterialTheme.colorScheme.surfaceVariant),
