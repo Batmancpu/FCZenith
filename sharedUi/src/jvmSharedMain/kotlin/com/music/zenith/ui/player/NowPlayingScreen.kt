@@ -3451,26 +3451,27 @@ fun NowPlayingScreen(
                                     indication = null,
                                     onClick = onDismissPlayer,
                                 )
-                                .padding(start = PLAYER_GUTTER, end = 24.dp, top = 10.dp, bottom = 4.dp)
+                                .padding(start = PLAYER_GUTTER, end = 24.dp, top = 28.dp, bottom = 4.dp)
                                 .size(width = 20.dp, height = 11.dp),
                         ) {
-                            val stroke = 2.2.dp.toPx()
-                            // Sudut siku 90 derajat: lengan sama panjang secara horizontal dan vertikal.
-                            val arm = 8.dp.toPx()
-                            val cx = arm + stroke / 2f
-                            val top = stroke / 2f
+                            val stroke = 2.6.dp.toPx()
+                            // Sudut lebih tumpul (lengan lebar, tinggi pendek) supaya tidak lancip.
+                            val armX = 8.dp.toPx()
+                            val armY = 5.dp.toPx()
+                            val cx = size.width / 2f
+                            val top = stroke / 2f + 1.dp.toPx()
                             val chevron = androidx.compose.ui.graphics.Path().apply {
-                                moveTo(cx - arm, top)
-                                lineTo(cx, top + arm)
-                                lineTo(cx + arm, top)
+                                moveTo(cx - armX, top)
+                                lineTo(cx, top + armY)
+                                lineTo(cx + armX, top)
                             }
                             drawPath(
                                 path = chevron,
                                 color = Color.White.copy(alpha = 0.92f),
                                 style = androidx.compose.ui.graphics.drawscope.Stroke(
                                     width = stroke,
-                                    cap = androidx.compose.ui.graphics.StrokeCap.Butt,
-                                    join = androidx.compose.ui.graphics.StrokeJoin.Miter,
+                                    cap = androidx.compose.ui.graphics.StrokeCap.Round,
+                                    join = androidx.compose.ui.graphics.StrokeJoin.Round,
                                 ),
                             )
                         }
