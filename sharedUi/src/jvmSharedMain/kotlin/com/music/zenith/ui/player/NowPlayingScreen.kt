@@ -2928,8 +2928,11 @@ fun NowPlayingScreen(
                 // full-screen Spotify Canvas is its own backdrop until a panel opens.
                 // Live blur off: lyrics/queue show a static blur of the clip's last frame,
                 // not the legacy mesh. Live blur on: the clip itself stays playing instead.
+                // Legacy mesh aktif + canvas non-Spotify (Apple Music): panel lirik/queue
+                // memakai mesh legacy, bukan blur cover/frame. Spotify tetap seperti semula.
                 val canvasPanelMesh = !tabletArtworkBackdrop && canvas != null && heroMode &&
-                    (lyricsOpen || queueOpen) && !liveCanvasPanels
+                    (lyricsOpen || queueOpen) && !liveCanvasPanels &&
+                    !(legacyMesh && canvas.source != CanvasSource.SPOTIFY)
                 // Blur statis dari frame terakhir canvas: tetap tampil selama panel terbuka.
                 val canvasPanelFrameBlur = rememberFullArtworkBlurImage(
                     imageUrl = null,
