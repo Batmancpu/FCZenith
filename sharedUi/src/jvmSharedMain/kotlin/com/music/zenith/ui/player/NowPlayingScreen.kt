@@ -3871,8 +3871,19 @@ fun NowPlayingScreen(
                             val thumb = Rect(Offset(fromStart(0f, thumbW), 0f), Size(thumbW, thumbH))
                             lerp(video, thumb, p())
                         }
+                        // Spotify layar penuh: cover tidak bergerak/terbang ke header, ia
+                        // langsung diam di posisi header dan hanya fade in/out di tempat.
+                        fun spotifyCoverInPlace(): Boolean =
+                            clipFullscreen && (lyricsOpen || queueOpen || collapseStarted)
                         fun sleeveRect(): Rect {
                             val card = cardRect()
+                            if (spotifyCoverInPlace()) {
+                                val inPlaceSide = with(density) { THUMB_SIZE.roundToPx().toFloat() }
+                                return Rect(
+                                    Offset(fromStart(0f, inPlaceSide), 0f),
+                                    Size(inPlaceSide, inPlaceSide),
+                                )
+                            }
                             val share = bannerShare()
                             if (share == 0f) return card
                             val banner = with(density) {
@@ -4181,10 +4192,11 @@ fun NowPlayingScreen(
                                     val idle = cardScale()
                                     val t = dockT()
                                     val open = idle + (1f - idle) * share
-                                    val scale = if (t >= 1f) open else 1f + (open - 1f) * t
+                                    val inPlace = spotifyCoverInPlace()
+                                    val scale = if (inPlace) 1f else if (t >= 1f) open else 1f + (open - 1f) * t
                                     scaleX = scale
                                     scaleY = scale
-                                    translationX = swipeSettle.value * (1f - p()) * (1f - share) * t
+                                    translationX = if (inPlace) 0f else swipeSettle.value * (1f - p()) * (1f - share) * t
                                 }
                                 // Haze must observe the drawable layer itself, the
                                 // banner included — a source on the surrounding layout
@@ -4203,7 +4215,7 @@ fun NowPlayingScreen(
                                             // full-screen Spotify clip's cover does not fly: it fades in
                                             // at the header on the way in and out again on the way back.
                                             if (clipFullscreen) {
-                                                smootherStep(((p() - 0.75f) / 0.25f).coerceIn(0f, 1f))
+                                                smootherStep(((p() - 0.4f) / 0.6f).coerceIn(0f, 1f))
                                             } else {
                                                 1f
                                             }
@@ -4211,7 +4223,7 @@ fun NowPlayingScreen(
                                             // Live blur off: the cover behaves the same as with
                                             // live blur on. It does not fly with the panel, it only
                                             // fades in at the header and out again on the way back.
-                                            smootherStep(((p() - 0.75f) / 0.25f).coerceIn(0f, 1f))
+                                            smootherStep(((p() - 0.4f) / 0.6f).coerceIn(0f, 1f))
                                         } else if (stillTakesOver()) 1f
                                         else if (heroClip != null) {
                                             if (clipFullscreen && canvasRendered && !clipDimmed) {
