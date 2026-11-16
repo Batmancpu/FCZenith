@@ -2261,9 +2261,6 @@ fun NowPlayingScreen(
     // the trip, as for the collapse into the lyrics or the queue; a paused
     // clip keeps its last frame, so nothing blinks.
     val dockMoving by remember { derivedStateOf { docking() } }
-    // Spotify Canvas layar penuh: sleeve tidak terbang ke mini player, jadi cover
-    // mini player yang harus muncul perlahan saat player turun.
-    SideEffect { dock?.fadeMiniArtIn = clipFullscreen }
     // Chevron dan teks "Playing from" baru muncul setelah sheet 100% terbuka:
     // hilang cepat begitu di-drag, lalu fade in halus saat sudah menetap.
     // Dibaca di graphicsLayer (State), bukan di komposisi, supaya tidak recompose per frame.
@@ -4234,15 +4231,7 @@ fun NowPlayingScreen(
                                             // fades in at the header and out again on the way back.
                                             smootherStep(((p() - 0.4f) / 0.6f).coerceIn(0f, 1f))
                                         } else if (stillTakesOver()) 1f
-                                        else if (heroClip != null) {
-                                            if (clipFullscreen && canvasRendered && !clipDimmed) {
-                                                // Cover statis baru muncul setelah frame klip
-                                                // melebur, saat ia sudah menyusut ke header.
-                                                smootherStep(((p() - 0.3f) / 0.2f).coerceIn(0f, 1f))
-                                            } else {
-                                                1f - canvasCover.floatValue
-                                            }
-                                        }
+                                        else if (heroClip != null) 1f - canvasCover.floatValue
                                         else 1f
                                         ) *
                                         // Selama frame Spotify Canvas lama masih menutup

@@ -39,7 +39,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
@@ -419,47 +418,9 @@ internal fun Modifier.miniPlayerGestures(
  * Read at draw, off the sheet's offset — a layer property per frame of the
  * sheet's travel, never a recomposition of the bar.
  */
-/**
- * Alpha of the mini player's cover, read at draw time. Hidden at once while the
- * player's own cover is flying to or from it. When that cover is not drawn at
- * all (a full-screen Spotify Canvas, see [PlayerDock.fadeMiniArtIn]) the mini
- * cover fades out as the player opens and fades back in as it closes, instead
- * of vanishing or popping in.
- */
-@Composable
-internal fun rememberMiniArtAlpha(dock: PlayerDock?): () -> Float {
-    val fade = remember { Animatable(1f) }
-    if (dock != null) {
-        val covered = dock.coversMiniArt
-        val fadeIn = dock.fadeMiniArtIn
-        LaunchedEffect(covered, fadeIn) {
-            val target = if (covered) 0f else 1f
-            if (fade.value != target) {
-                if (fadeIn) {
-                    fade.animateTo(
-                        target,
-                        tween(durationMillis = if (covered) 220 else 320, easing = FastOutSlowInEasing),
-                    )
-                } else {
-                    fade.snapTo(target)
-                }
-            }
-        }
-    }
-    return {
-        when {
-            dock == null -> 1f
-            dock.fadeMiniArtIn -> fade.value
-            dock.coversMiniArt -> 0f
-            else -> 1f
-        }
-    }
-}
-
 @Composable
 internal fun Modifier.playerDockArt(dock: PlayerDock?, corner: Dp): Modifier {
     if (dock == null) return this
-    val miniArtAlpha = rememberMiniArtAlpha(dock)
     val placed = remember { arrayOfNulls<LayoutCoordinates>(1) }
     DisposableEffect(dock) {
         onDispose { placed[0]?.let(dock::releaseMiniArt) }
@@ -469,7 +430,7 @@ internal fun Modifier.playerDockArt(dock: PlayerDock?, corner: Dp): Modifier {
             placed[0] = coordinates
             dock.reportMiniArt(coordinates, corner)
         }
-        .graphicsLayer { alpha = miniArtAlpha() }
+        .graphicsLayer { alpha = if (dock.coversMiniArt) 0f else 1f }
 }
 
 /**

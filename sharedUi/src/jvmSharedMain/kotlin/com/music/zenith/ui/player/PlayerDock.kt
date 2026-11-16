@@ -72,13 +72,6 @@ class PlayerDock {
     var attached by mutableStateOf(false)
         internal set
 
-    /**
-     * True while the player on screen is a full-screen Spotify Canvas: its
-     * sleeve is not drawn while docking, so the mini player's cover has to
-     * fade in by itself instead of popping in once the player is gone.
-     */
-    var fadeMiniArtIn by mutableStateOf(false)
-
     /** Reported by the mini player's cover whenever it is placed. */
     fun reportMiniArt(coordinates: LayoutCoordinates, corner: Dp) {
         miniArt = coordinates
