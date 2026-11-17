@@ -10,14 +10,14 @@ on:
 permissions:
   contents: write
 
-concurrency:
-  group: build-apk
-  cancel-in-progress: true
-
 jobs:
   build:
+    if: ${{ !contains(github.event.head_commit.message, '[no build]') }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    concurrency:
+      group: build-apk
+      cancel-in-progress: true
     env:
       CCACHE_DIR: /home/runner/.ccache
       CCACHE_MAXSIZE: 1G
