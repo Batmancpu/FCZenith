@@ -4636,7 +4636,9 @@ private fun ZenithApp(
 
                     if (index == TAB_SEARCH) {
                         viewModel.onQueryChange("")
-                        searchFocusRequested = reopenField
+                        // Liquid glass separate Search: the circle only expands here.
+                        // Focus (keyboard + recent searches) waits for a tap on the input.
+                        searchFocusRequested = reopenField && !(glassActive && searchTabSeparate)
                     }
                 }
 
