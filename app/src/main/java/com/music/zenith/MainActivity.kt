@@ -258,6 +258,7 @@ import com.music.zenith.ui.components.FLOATING_BAR_MAX_WIDTH
 import com.music.zenith.ui.components.FloatingBottomBar
 import com.music.zenith.ui.components.GlassMiniPlayer
 import com.music.zenith.ui.components.GlassNavBar
+import com.music.zenith.ui.components.GlassSearchBar
 import com.music.zenith.ui.components.GlassSearchMorph
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.offset
@@ -951,6 +952,9 @@ private fun ZenithApp(
     // Separate Search on liquid glass: the field only opens after the Search
     // circle is tapped while already on the categories.
     var searchFieldOpen by remember { mutableStateOf(false) }
+    // The target the search bar animates to; searchFieldOpen stays true until
+    // the close animation has finished, so the bar is not swapped out mid-fold.
+    var searchFieldExpanded by remember { mutableStateOf(false) }
     // Invalidates an in-flight radio lookup when a later play request wins.
     var playRequestGeneration by remember { mutableIntStateOf(0) }
     // Starting radio from the item already playing must not replace that media
@@ -4628,6 +4632,7 @@ private fun ZenithApp(
                     selectedTab = index
                     searchFieldFocused = false
                     searchFieldOpen = reopenField
+                    searchFieldExpanded = reopenField
 
                     if (index == TAB_SEARCH) {
                         viewModel.onQueryChange("")
@@ -4706,15 +4711,13 @@ private fun ZenithApp(
                         )
                         Spacer(Modifier.height(8.dp))
                     }
-                    GlassSearchMorph(
+                    GlassSearchBar(
+                        tabs = barTabs.dropLast(1),
                         lastTab = barTabs[lastBarTab.coerceIn(0, barTabs.lastIndex)],
-                        onLastTabClick = {
-                            viewModel.onQueryChange("")
-                            searchFieldFocused = false
-                            searchFieldOpen = false
-                        },
-                        onClose = {
-                            viewModel.onQueryChange("")
+                        open = searchFieldExpanded,
+                        onLastTabClick = { searchFieldExpanded = false },
+                        onClose = { searchFieldExpanded = false },
+                        onClosed = {
                             searchFieldFocused = false
                             searchFieldOpen = false
                         },
