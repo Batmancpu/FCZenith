@@ -49,48 +49,69 @@ jobs:
           RELEASE_URL: ${{ github.event.release.html_url }}
         run: |
           set -eu
+          esc() { printf '%s' "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'; }
+          NL=$'\n'
+          R=$(esc "$REPO")
+          A=$(esc "$ACTOR")
+
           case "$EVENT" in
             issues)
-              MSG=$(printf '%s • Issue\n%s %s\n%s#%s %s\nState: %s • Author: %s\nLabels: %s\n%s' \
-                "$REPO" "$ACTOR" "$ACTION" "${REPO#*/}" "$ISSUE_NUM" "$ISSUE_TITLE" \
-                "$ISSUE_STATE" "$ISSUE_AUTHOR" "${ISSUE_LABELS:-none}" "$ISSUE_URL")
+              case "$ACTION" in
+                opened) ICON="🟢" ;;
+                closed) ICON="🔴" ;;
+                reopened) ICON="🔄" ;;
+                *) ICON="📝" ;;
+              esac
+              T=$(esc "$ISSUE_TITLE")
+              AU=$(esc "$ISSUE_AUTHOR")
+              L=$(esc "${ISSUE_LABELS:-none}")
+              MSG="${ICON} <b>Issue ${ACTION}</b>${NL}<code>${R}</code>${NL}${NL}<b>#${ISSUE_NUM}</b> <a href=\"${ISSUE_URL}\">${T}</a>${NL}${NL}📌 <b>State:</b> ${ISSUE_STATE^^}${NL}👤 <b>Author:</b> ${AU}${NL}🏷 <b>Labels:</b> ${L}${NL}⚙️ <b>By:</b> ${A}"
               ;;
             issue_comment)
+              T=$(esc "$ISSUE_TITLE")
               BODY="${COMMENT_BODY:0:300}"
-              MSG=$(printf '%s • Comment\n%s commented %s#%s %s\n\n%s\n%s' \
-                "$REPO" "$ACTOR" "${REPO#*/}" "$ISSUE_NUM" "$ISSUE_TITLE" "$BODY" "$COMMENT_URL")
+              if [ "${#COMMENT_BODY}" -gt 300 ]; then BODY="${BODY}…"; fi
+              BODY=$(esc "$BODY")
+              MSG="💬 <b>New comment</b>${NL}<code>${R}</code>${NL}${NL}<b>#${ISSUE_NUM}</b> <a href=\"${COMMENT_URL}\">${T}</a>${NL}👤 <b>By:</b> ${A}${NL}${NL}<blockquote>${BODY}</blockquote>"
               ;;
             pull_request)
+              T=$(esc "$PR_TITLE")
+              AU=$(esc "$PR_AUTHOR")
               STATE="$PR_STATE"
-              if [ "$PR_MERGED" = "true" ]; then STATE="merged"; fi
-              MSG=$(printf '%s • Pull Request\n%s %s %s#%s %s\nState: %s • Author: %s\n%s' \
-                "$REPO" "$ACTOR" "$ACTION" "${REPO#*/}" "$PR_NUM" "$PR_TITLE" \
-                "$STATE" "$PR_AUTHOR" "$PR_URL")
+              TITLE_ACTION="$ACTION"
+              ICON="🔀"
+              if [ "$PR_MERGED" = "true" ]; then
+                STATE="merged"; TITLE_ACTION="merged"; ICON="🟣"
+              elif [ "$PR_STATE" = "closed" ]; then
+                ICON="🔴"
+              elif [ "$PR_STATE" = "open" ]; then
+                ICON="🟢"
+              fi
+              MSG="${ICON} <b>Pull request ${TITLE_ACTION}</b>${NL}<code>${R}</code>${NL}${NL}<b>#${PR_NUM}</b> <a href=\"${PR_URL}\">${T}</a>${NL}${NL}📌 <b>State:</b> ${STATE^^}${NL}👤 <b>Author:</b> ${AU}${NL}⚙️ <b>By:</b> ${A}"
               ;;
             push)
               COMMIT_COUNT=$(jq '.commits | length' "$GITHUB_EVENT_PATH" 2>/dev/null || echo 0)
-              FIRST_LINE="${HEAD_MSG%%$'\n'*}"
-              MSG=$(printf '%s • Push\n%s pushed %s commit(s) to %s\n%s\n%s' \
-                "$REPO" "$ACTOR" "$COMMIT_COUNT" "$REF_NAME" "$FIRST_LINE" "$COMPARE_URL")
+              FIRST_LINE=$(esc "${HEAD_MSG%%$'\n'*}")
+              BR=$(esc "$REF_NAME")
+              MSG="📦 <b>New push</b> → <code>${BR}</code>${NL}<code>${R}</code>${NL}${NL}<blockquote>${FIRST_LINE}</blockquote>${NL}👤 <b>By:</b> ${A}${NL}🧮 <b>Commits:</b> ${COMMIT_COUNT}${NL}🔗 <a href=\"${COMPARE_URL}\">View changes</a>"
               ;;
             release)
-              MSG=$(printf '%s • Release\n%s published %s %s\n%s' \
-                "$REPO" "$ACTOR" "$RELEASE_TAG" "$RELEASE_NAME" "$RELEASE_URL")
+              RT=$(esc "$RELEASE_TAG")
+              RN=$(esc "$RELEASE_NAME")
+              MSG="🚀 <b>New release</b>${NL}<code>${R}</code>${NL}${NL}<a href=\"${RELEASE_URL}\">${RT} ${RN}</a>${NL}⚙️ <b>By:</b> ${A}"
               ;;
             *)
-              MSG="$REPO • $EVENT $ACTION by $ACTOR"
+              MSG="ℹ️ <b>${EVENT}</b> ${ACTION}${NL}<code>${R}</code>${NL}⚙️ <b>By:</b> ${A}"
               ;;
           esac
 
+          ARGS=(
+            --data-urlencode "chat_id=${TG_CHAT_ID}"
+            --data-urlencode "parse_mode=HTML"
+            --data-urlencode "disable_web_page_preview=true"
+            --data-urlencode "text=${MSG}"
+          )
           if [ -n "${TG_TOPIC_ID:-}" ]; then
-            curl -sS -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
-              --data-urlencode "chat_id=${TG_CHAT_ID}" \
-              --data-urlencode "message_thread_id=${TG_TOPIC_ID}" \
-              --data-urlencode "disable_web_page_preview=true" \
-              --data-urlencode "text=${MSG}"
-          else
-            curl -sS -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
-              --data-urlencode "chat_id=${TG_CHAT_ID}" \
-              --data-urlencode "disable_web_page_preview=true" \
-              --data-urlencode "text=${MSG}"
+            ARGS+=(--data-urlencode "message_thread_id=${TG_TOPIC_ID}")
           fi
+          curl -sS -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" "${ARGS[@]}"
