@@ -2016,6 +2016,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                         homeShelfRequestSettled(identity, generation)
                     }
                 }
+                if (isCurrentHomeLoad(identity, generation)) ensureQuickPicks()
             }
         }
     }
@@ -2162,7 +2163,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      */
     private fun withQuickPicksFallback(feed: List<HomeShelf>): List<HomeShelf> {
         fun key(shelf: HomeShelf) = com.music.zenith.data.model.homeShelfKey(shelf.title)
-        if (feed.any { key(it) == "shelf:quick-picks" }) return feed
+        val quickTitles = setOf(
+            "quick picks", "lựa chọn nhanh", "chọn nhanh đài phát", "クイック ミックス",
+            "pilihan cepat", "pilihan singkat", "빠른 선곡", "빠른 선택",
+        )
+        if (feed.any { it.title.trim().lowercase(Locale.ROOT) in quickTitles && it.items.isNotEmpty() }) return feed
         val again = feed.indexOfFirst { key(it) == "shelf:listen-again" }
         if (again < 0) return feed
         val skipTitles = setOf("recents", "recently played", "my speed dial", "speed dial")
@@ -2173,9 +2178,28 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             .distinctBy { it.videoId }
             .shuffled()
             .take(20)
-        if (songs.size < 6) return feed
+            .let { picked ->
+                if (picked.size >= 6) {
+                    picked
+                } else {
+                    (picked + feed[again].items.filter { it.videoId != null && !it.isVideo && !it.thumbnailUrl.isNullOrBlank() })
+                        .distinctBy { it.videoId }
+                        .take(20)
+                }
+            }
+        if (songs.size < 4) return feed
         val shelf = HomeShelf(title = "Quick picks", items = songs)
         return feed.toMutableList().also { it.add(again + 1, shelf) }
+    }
+
+    /** Re-runs the Quick picks fallback once more of the feed has landed (supplements, next pages). */
+    private fun ensureQuickPicks() {
+        val current = (_home.value as? UiState.Success)?.data ?: return
+        val withQuick = withQuickPicksFallback(current)
+        if (withQuick.size != current.size) {
+            homeSeenTitles.add("quick picks")
+            _home.value = UiState.Success(withQuick)
+        }
     }
 
     private suspend fun localSpeedDialShelf(): HomeShelf? {
@@ -2284,6 +2308,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     // treat it the same as exhausted so scrolling can't spin here.
                     homeContinuation = feed.continuation.takeIf { added.isNotEmpty() }
                     if (added.isNotEmpty()) _home.value = UiState.Success(existing + added)
+                    ensureQuickPicks()
                 }
             }
             if (identity == listenerKey()) _homeLoadingMore.value = false
