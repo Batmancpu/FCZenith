@@ -3471,7 +3471,8 @@ fun NowPlayingScreen(
                     ) {
                         // Chevron turun di sisi kiri, bukan garis divider. Strip-nya tetap
                         // yang meneruskan drag ke sheet; ini hanya penanda bisa ditutup.
-                        androidx.compose.foundation.Canvas(
+                        // Disembunyikan bersama status lagu bila "Sembunyikan status lagu" aktif.
+                        if (!hideSongStatus) androidx.compose.foundation.Canvas(
                             modifier = Modifier
                                 .align(Alignment.CenterStart)
                                 .graphicsLayer {
