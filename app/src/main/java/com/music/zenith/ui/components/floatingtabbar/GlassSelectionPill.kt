@@ -148,6 +148,9 @@ internal class GlassPillMotion(
     var index: Int = initialIndex
         private set
 
+    /** A finger is holding the pill up: a press or a drag that has not been released yet. */
+    val isHeld: Boolean get() = dragging
+
     /** One tab step in dp, which the squash model samples the pill's travel in. */
     var stepDp: Float = 0f
 
@@ -193,6 +196,13 @@ internal class GlassPillMotion(
             return
         }
         index = next
+        // A press may be holding the pill up when the selection lands: the travel
+        // takes over from where the held pill stands and keeps it lifted.
+        if (dragging) {
+            travelPos = dragFollow
+            travelVel = 0.0
+            dragging = false
+        }
         releasedFromDrag = false
         travelActive = true
         lifted = true
