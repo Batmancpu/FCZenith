@@ -863,6 +863,18 @@ private fun androidx.compose.foundation.lazy.LazyListScope.itemsIndexedShelves(
                     isPlaying = isPlaying,
                     onPlaySongs = onPlaySongs,
                 )
+            } else if (shelf.isDailyDiscoverShelf()) {
+                DailyDiscoverShelf(
+                    shelf = shelf.copy(
+                        title = localizeShelfTitle(shelf.title),
+                        subtitle = localizeShelfSubtitle(shelf.subtitle),
+                    ),
+                    onItemClick = openItem,
+                    onItemLongPress = onItemLongPress,
+                    onPlaySongs = onPlaySongs,
+                    isCurrentItem = shelf.items.playingItemMatcher(currentSong),
+                    isPlaying = isPlaying,
+                )
             } else if (shelf.isMixShelf()) {
                 MixCoverShelf(
                     shelf = shelf,
