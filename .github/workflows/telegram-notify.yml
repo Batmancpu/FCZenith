@@ -108,10 +108,10 @@ jobs:
           SUBJECT=""
           QUOTE=""
 
-          # Aligned key/value row for the monochrome detail block (skipped when empty).
+          # Detail row: bold label, monospace value (skipped when empty).
           meta() {
             [ -n "${2:-}" ] || return 0
-            META="${META}$(printf '%-11s' "$1")$(esc "$2")${NL}"
+            META="${META}<b>$1</b>  <code>$(esc "$2")</code>${NL}"
           }
           # Inline shortcut button (skipped when the URL is empty).
           btn() {
@@ -211,17 +211,18 @@ jobs:
                 LINES=""
                 while IFS=$'\t' read -r SH TT; do
                   [ -n "$SH" ] || continue
-                  LINES="${LINES}<code>${SH}</code>  $(esc "$TT")${NL}"
+                   LINES="${LINES}<code>${SH}</code>${NL}$(esc "$TT")${NL}${NL}"
                 done < <(jq -r '.commits[:10][] | [.id[:7], (.message | split("\n")[0])] | @tsv' "$GITHUB_EVENT_PATH" 2>/dev/null || true)
                 if [ -z "$LINES" ]; then
-                  LINES="<code>${SHA:0:7}</code>  $(esc "${HEAD_MSG%%$'\n'*}")${NL}"
+                   LINES="<code>${SHA:0:7}</code>${NL}$(esc "${HEAD_MSG%%$'\n'*}")${NL}"
                 fi
                 if [ "$COMMIT_COUNT" -gt 10 ]; then
-                  LINES="${LINES}and $((COMMIT_COUNT - 10)) more${NL}"
+                   LINES="${LINES}+ $((COMMIT_COUNT - 10)) more${NL}"
                 fi
                 LABEL="PUSH"
-                SUBJECT="<b>$(esc "$REF_NAME")</b>  ${COMMIT_COUNT} commit(s)"
-                QUOTE="<blockquote>${LINES%$NL}</blockquote>"
+                 if [ "$COMMIT_COUNT" = "1" ]; then CWORD="commit"; else CWORD="commits"; fi
+                 SUBJECT="<b>${COMMIT_COUNT} ${CWORD}</b> pushed to <code>$(esc "$REF_NAME")</code>"
+                 QUOTE="<blockquote>$(printf '%s' "$LINES")</blockquote>"
                 meta "Branch" "$REF_NAME"
                 meta "Author" "$HEAD_AUTHOR"
                 meta "Pusher" "${PUSHER:-$ACTOR}"
@@ -272,15 +273,14 @@ jobs:
               ;;
           esac
 
-          meta "Run" "#${RUN_NUMBER}"
-          meta "Time" "$NOW"
           btn "Workflow run" "$RUN_URL"
 
-          RULE='────────────────────'
+          RULE='━━━━━━━━━━━━━━'
           META="${META%$NL}"
-          MSG="<b>${LABEL}</b>${NL}<a href=\"${REPO_URL}\">${R}</a>${NL}${RULE}${NL}${SUBJECT}"
+          MSG="<b>${LABEL}</b>${NL}<a href=\"${REPO_URL}\">${R}</a>${NL}${RULE}${NL}${NL}${SUBJECT}"
           if [ -n "$QUOTE" ]; then MSG="${MSG}${NL}${NL}${QUOTE}"; fi
-          MSG="${MSG}${NL}${NL}<pre>${META}</pre>"
+          if [ -n "$META" ]; then MSG="${MSG}${NL}${NL}${META}"; fi
+          MSG="${MSG}${NL}${NL}${RULE}${NL}<i>Run #${RUN_NUMBER}  ·  ${NOW}</i>"
 
           ARGS=(
             --data-urlencode "chat_id=${TG_CHAT_ID}"
