@@ -256,6 +256,7 @@ import com.music.zenith.ui.components.FloatingBarsTapGuard
 import com.music.zenith.ui.components.BottomTab
 import com.music.zenith.ui.components.FLOATING_BAR_MAX_WIDTH
 import com.music.zenith.ui.components.FloatingBottomBar
+import com.music.zenith.ui.components.GlassMiniPlayer
 import com.music.zenith.ui.components.GlassNavBar
 import com.music.zenith.ui.components.GlassSearchMorph
 import androidx.compose.foundation.layout.ime
@@ -4675,11 +4676,10 @@ private fun ZenithApp(
                 ) {
                     QueueActionNoticeHost(queueNotice)
                     player.song?.let { song ->
-                        MiniPlayer(
+                        GlassMiniPlayer(
                             song = song,
                             isPlaying = player.isPlaying,
                             isLoading = playPauseBusy,
-                            hazeState = hazeState,
                             onPlayPause = {
                                 togglePlayPause()
                             },

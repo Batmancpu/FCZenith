@@ -523,6 +523,48 @@ private fun GlassNowPlaying(
     }
 }
 
+/**
+ * The now playing pill as a standalone liquid glass surface, for screens where
+ * [GlassNavBar] is not drawn (the separate Search morph). Same row and same
+ * material as the bar's expanded accessory, so it does not fall back to the
+ * Haze-frosted [MiniPlayer].
+ */
+@Composable
+fun GlassMiniPlayer(
+    song: Song,
+    isPlaying: Boolean,
+    isLoading: Boolean,
+    onPlayPause: () -> Unit,
+    onNext: () -> Unit,
+    onPrevious: () -> Unit,
+    onExpand: () -> Unit,
+    controlsLocked: Boolean = false,
+    onBlockedControl: () -> Unit = {},
+    dock: PlayerDock? = null,
+    pull: MiniPlayerPull? = null,
+    modifier: Modifier = Modifier,
+) {
+    val pillShape = remember { RoundedCornerShape(percent = 50) }
+    Box(modifier = modifier.padding(horizontal = NAV_BAR_GUTTER)) {
+        GlassNowPlaying(
+            song = song,
+            isInline = false,
+            isPlaying = isPlaying,
+            isLoading = isLoading,
+            contentColor = glassContentColor(),
+            onPlayPause = onPlayPause,
+            onNext = onNext,
+            onPrevious = onPrevious,
+            onExpand = onExpand,
+            controlsLocked = controlsLocked,
+            onBlockedControl = onBlockedControl,
+            dock = dock,
+            pull = pull,
+            modifier = Modifier.fillMaxWidth().then(Modifier.liquidGlass(shape = pillShape)),
+        )
+    }
+}
+
 /** The collapsed row's margin at either side of the screen, and its items' spacing. */
 private val INLINE_GUTTER = 28.dp
 private val INLINE_SPACING = 14.dp
