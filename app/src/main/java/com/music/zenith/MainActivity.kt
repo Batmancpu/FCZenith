@@ -1037,6 +1037,10 @@ private fun ZenithApp(
      */
     val updateNotice = updateAvailable
 
+    // Overdue update (release older than two days): the popup is no longer
+    // once-per-launch or dismissible — it stays up until the update is installed.
+    val updateForced = updateNotice?.isMandatory() == true
+
     LaunchedEffect(updateNotice) {
         if (updateNotice != null && !updateDialogShown) {
             updateDialogShown = true
@@ -3096,7 +3100,7 @@ private fun ZenithApp(
         val replayDrawable = replay.summary?.isEmpty == false
         BackHandler(enabled = replayDrawable && replayStory != null && !showReplayShare) { replayStory = null }
         BackHandler(enabled = replayDrawable && showReplayShare) { showReplayShare = false }
-        BackHandler(enabled = showUpdateDialog) { showUpdateDialog = false }
+        BackHandler(enabled = showUpdateDialog || updateForced) { if (!updateForced) showUpdateDialog = false }
         BackHandler(enabled = showListenBrainzLogin) { showListenBrainzLogin = false }
         BackHandler(enabled = showLastfmLogin) { showLastfmLogin = false }
         BackHandler(enabled = discordDialog != null) { discordDialog = null }
@@ -6057,12 +6061,13 @@ private fun ZenithApp(
         }
 
         // ---- Update available (once per launch; held until the welcome is done) ----
-        if (showUpdateDialog && onboardingComplete) {
+        if ((showUpdateDialog || updateForced) && onboardingComplete) {
             updateNotice?.let { update ->
                 UpdateAvailableDialog(
                     version = update.version,
                     notes = update.notes,
                     hazeState = hazeState,
+                    mandatory = updateForced,
                     // A download in progress keeps running behind the closed
                     // sheet — only the sheet itself goes away. The top bar's
                     // update icon reopens it onto whatever state it reached.
