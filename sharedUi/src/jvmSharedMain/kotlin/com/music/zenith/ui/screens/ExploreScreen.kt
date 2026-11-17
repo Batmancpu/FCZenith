@@ -290,12 +290,12 @@ private fun moodTone(item: MoodGenre): MoodTone {
     val given = item.stripeColor?.let { Color(it.toInt()) }
     // Greys carry no hue to boost, so they take one of the vivid fallbacks.
     val base = if (given == null || chroma(given) < .12f) fallbackMoodColor(item.title) else given
-    // YouTube's palette is pastel: push the saturation up, then ramp from a deep
-    // shadow to a clean highlight so the sleeve is rich and high in contrast.
-    val vivid = saturate(base, 1.55f)
+    // YouTube's palette is pastel: lift the saturation only slightly, then ramp from a
+    // deep shadow to a soft highlight so the sleeve stays rich but easy on the eyes.
+    val vivid = saturate(base, 1.05f)
     val stripe = lerp(vivid, Color.Black, .05f)
-    val shadow = lerp(vivid, Color.Black, .74f)
-    val highlight = lerp(vivid, Color.White, .12f)
+    val shadow = lerp(vivid, Color.Black, .78f)
+    val highlight = lerp(vivid, Color.Black, .12f)
     return MoodTone(
         stripe = stripe,
         placeholder = lerp(shadow, highlight, .55f),
@@ -321,7 +321,7 @@ private fun saturate(c: Color, amount: Float): Color {
  */
 private fun duotone(shadow: Color, highlight: Color): ColorFilter {
     // Luminance is stretched around mid grey before it is mapped onto the ramp.
-    val contrast = 1.3f
+    val contrast = 1.1f
     fun channel(from: Float, to: Float): FloatArray {
         val span = to - from
         val k = span * contrast
