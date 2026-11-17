@@ -2191,6 +2191,10 @@ fun NowPlayingScreen(
         prepare = !legacyMesh || landscape || tabletArtworkBackdrop || lyricsOpen || queueOpen ||
             playerPrewarmStage >= 1,
     )
+    // Palet mesh legacy dihitung di level layar, bukan di dalam blok mesh: state-nya
+    // tidak hilang saat blok mesh keluar-masuk composition, dan palet sudah siap
+    // (tercache) sebelum mesh pertama kali digambar.
+    val meshPalette = if (legacyMesh) rememberArtworkColors(remoteArt, canvasFrame) else null
     // One movable Image node, not two backdrop call sites. Compose carries it
     // between the portrait and landscape players; only the cached bitmap
     // changes when the artwork preparation above completes for another song.
@@ -3021,7 +3025,7 @@ fun NowPlayingScreen(
                     // drag a full-screen blur along with them, which is why the palette
                     // is passed as one immutable value.
                     MeshGradientBackground(
-                        palette = rememberArtworkColors(remoteArt, canvasFrame),
+                        palette = meshPalette ?: rememberArtworkColors(remoteArt, canvasFrame),
                         trackKey = song.videoId,
                         continuous = true,
                         driftMillis = 20_000,
