@@ -56,52 +56,41 @@ jobs:
 
           case "$EVENT" in
             issues)
-              case "$ACTION" in
-                opened) ICON="🟢" ;;
-                closed) ICON="🔴" ;;
-                reopened) ICON="🔄" ;;
-                *) ICON="📝" ;;
-              esac
               T=$(esc "$ISSUE_TITLE")
               AU=$(esc "$ISSUE_AUTHOR")
               L=$(esc "${ISSUE_LABELS:-none}")
-              MSG="${ICON} <b>Issue ${ACTION}</b>${NL}<code>${R}</code>${NL}${NL}<b>#${ISSUE_NUM}</b> <a href=\"${ISSUE_URL}\">${T}</a>${NL}${NL}📌 <b>State:</b> ${ISSUE_STATE^^}${NL}👤 <b>Author:</b> ${AU}${NL}🏷 <b>Labels:</b> ${L}${NL}⚙️ <b>By:</b> ${A}"
+              MSG="<b>Issue ${ACTION}</b>${NL}<code>${R}</code>${NL}${NL}<b>#${ISSUE_NUM}</b> <a href=\"${ISSUE_URL}\">${T}</a>${NL}${NL}<b>State:</b> ${ISSUE_STATE^^}${NL}<b>Author:</b> ${AU}${NL}<b>Labels:</b> ${L}${NL}<b>By:</b> ${A}"
               ;;
             issue_comment)
               T=$(esc "$ISSUE_TITLE")
               BODY="${COMMENT_BODY:0:300}"
               if [ "${#COMMENT_BODY}" -gt 300 ]; then BODY="${BODY}…"; fi
               BODY=$(esc "$BODY")
-              MSG="💬 <b>New comment</b>${NL}<code>${R}</code>${NL}${NL}<b>#${ISSUE_NUM}</b> <a href=\"${COMMENT_URL}\">${T}</a>${NL}👤 <b>By:</b> ${A}${NL}${NL}<blockquote>${BODY}</blockquote>"
+              MSG="<b>New comment</b>${NL}<code>${R}</code>${NL}${NL}<b>#${ISSUE_NUM}</b> <a href=\"${COMMENT_URL}\">${T}</a>${NL}<b>By:</b> ${A}${NL}${NL}<blockquote>${BODY}</blockquote>"
               ;;
             pull_request)
               T=$(esc "$PR_TITLE")
               AU=$(esc "$PR_AUTHOR")
               STATE="$PR_STATE"
               TITLE_ACTION="$ACTION"
-              ICON="🔀"
               if [ "$PR_MERGED" = "true" ]; then
-                STATE="merged"; TITLE_ACTION="merged"; ICON="🟣"
-              elif [ "$PR_STATE" = "closed" ]; then
-                ICON="🔴"
-              elif [ "$PR_STATE" = "open" ]; then
-                ICON="🟢"
+                STATE="merged"; TITLE_ACTION="merged"
               fi
-              MSG="${ICON} <b>Pull request ${TITLE_ACTION}</b>${NL}<code>${R}</code>${NL}${NL}<b>#${PR_NUM}</b> <a href=\"${PR_URL}\">${T}</a>${NL}${NL}📌 <b>State:</b> ${STATE^^}${NL}👤 <b>Author:</b> ${AU}${NL}⚙️ <b>By:</b> ${A}"
+              MSG="<b>Pull request ${TITLE_ACTION}</b>${NL}<code>${R}</code>${NL}${NL}<b>#${PR_NUM}</b> <a href=\"${PR_URL}\">${T}</a>${NL}${NL}<b>State:</b> ${STATE^^}${NL}<b>Author:</b> ${AU}${NL}<b>By:</b> ${A}"
               ;;
             push)
               COMMIT_COUNT=$(jq '.commits | length' "$GITHUB_EVENT_PATH" 2>/dev/null || echo 0)
               FIRST_LINE=$(esc "${HEAD_MSG%%$'\n'*}")
               BR=$(esc "$REF_NAME")
-              MSG="📦 <b>New push</b> → <code>${BR}</code>${NL}<code>${R}</code>${NL}${NL}<blockquote>${FIRST_LINE}</blockquote>${NL}👤 <b>By:</b> ${A}${NL}🧮 <b>Commits:</b> ${COMMIT_COUNT}${NL}🔗 <a href=\"${COMPARE_URL}\">View changes</a>"
+              MSG="<b>New push</b> to <code>${BR}</code>${NL}<code>${R}</code>${NL}${NL}<blockquote>${FIRST_LINE}</blockquote>${NL}<b>By:</b> ${A}${NL}<b>Commits:</b> ${COMMIT_COUNT}${NL}<a href=\"${COMPARE_URL}\">View changes</a>"
               ;;
             release)
               RT=$(esc "$RELEASE_TAG")
               RN=$(esc "$RELEASE_NAME")
-              MSG="🚀 <b>New release</b>${NL}<code>${R}</code>${NL}${NL}<a href=\"${RELEASE_URL}\">${RT} ${RN}</a>${NL}⚙️ <b>By:</b> ${A}"
+              MSG="<b>New release</b>${NL}<code>${R}</code>${NL}${NL}<a href=\"${RELEASE_URL}\">${RT} ${RN}</a>${NL}<b>By:</b> ${A}"
               ;;
             *)
-              MSG="ℹ️ <b>${EVENT}</b> ${ACTION}${NL}<code>${R}</code>${NL}⚙️ <b>By:</b> ${A}"
+              MSG="<b>${EVENT}</b> ${ACTION}${NL}<code>${R}</code>${NL}<b>By:</b> ${A}"
               ;;
           esac
 
