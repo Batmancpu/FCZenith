@@ -30,8 +30,10 @@ jobs:
           fetch-depth: 0
           lfs: true
 
-      - name: Merge real upstream main for forward-compatibility validation
+      - name: Merge the safe newest upstream source for forward-compatibility validation
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
