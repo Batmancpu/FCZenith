@@ -1,6 +1,11 @@
 package com.music.zenith.ui.screens
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -72,8 +77,12 @@ private val DAILY_CARD_SHAPE = RoundedCornerShape(24.dp)
 /** Skala kartu yang sudah satu kartu penuh jauhnya dari posisi snap. */
 private const val DAILY_SIDE_SCALE = 0.9f
 
-/** Zoom tambahan cover di dalam kartu saat kartu tepat di posisi snap (1f + nilai ini). */
-private const val DAILY_COVER_ZOOM = 0.14f
+/** Zoom dasar cover saat kartu tepat di posisi snap (1f + nilai ini). */
+private const val DAILY_COVER_ZOOM = 0.06f
+
+/** Tambahan zoom yang berdenyut pelan (zoom-in lalu zoom-out terus-menerus) pada kartu aktif. */
+private const val DAILY_COVER_DRIFT = 0.12f
+private const val DAILY_COVER_DRIFT_MS = 4500
 
 internal fun HomeShelf.isDailyDiscoverShelf(): Boolean =
     layout == ShelfLayout.CARDS &&
@@ -168,7 +177,7 @@ internal fun DailyDiscoverShelf(
                         modifier = Modifier
                             .dailyZoom(state, index, cardWidth)
                             .width(cardWidth),
-                        coverZoom = { dailyCoverZoom(state, index, spanPx) },
+                        coverFocus = { dailyCardFocus(state, index, spanPx) },
                         isCurrent = isCurrentItem(item),
                         isPlaying = isCurrentItem(item) && isPlaying,
                     )
@@ -202,9 +211,9 @@ private fun dailyCardDistance(state: LazyListState, index: Int, spanPx: Float): 
     return abs(index - position).coerceIn(0f, 1f)
 }
 
-/** Skala cover di dalam kartu: zoom-in halus saat kartu mendekati posisi snap, normal saat menjauh. */
-private fun dailyCoverZoom(state: LazyListState, index: Int, spanPx: Float): Float =
-    1f + DAILY_COVER_ZOOM * (1f - dailyCardDistance(state, index, spanPx))
+/** Seberapa aktif kartu: 1 tepat di posisi snap, 0 satu kartu atau lebih jauhnya. */
+private fun dailyCardFocus(state: LazyListState, index: Int, spanPx: Float): Float =
+    1f - dailyCardDistance(state, index, spanPx)
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -213,7 +222,7 @@ private fun DailyDiscoverCard(
     onClick: () -> Unit,
     onLongPress: (() -> Unit)?,
     modifier: Modifier = Modifier,
-    coverZoom: () -> Float = { 1f },
+    coverFocus: () -> Float = { 0f },
     isCurrent: Boolean = false,
     isPlaying: Boolean = false,
 ) {
@@ -221,6 +230,15 @@ private fun DailyDiscoverCard(
     val openWithCover = rememberCoverFlightTap(item.browseId, token, onClick)
     val scrimBase = rememberArtworkPanelColor(item.thumbnailUrl, HEADER_ART_PX) ?: Color.Black
     val scrim = animateColorAsState(scrimBase, tween(260), label = "dailyScrim").value
+    val drift = rememberInfiniteTransition(label = "dailyCoverDrift").animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(DAILY_COVER_DRIFT_MS, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "dailyCoverDriftValue",
+    )
     Box(
         modifier = modifier
             .aspectRatio(1f)
@@ -241,7 +259,7 @@ private fun DailyDiscoverCard(
                 .coverFlightSource(token, item.thumbnailUrl.artworkAt(HEADER_ART_PX), 24.dp)
                 .fillMaxSize()
                 .graphicsLayer {
-                    val zoom = coverZoom()
+                    val zoom = 1f + coverFocus() * (DAILY_COVER_ZOOM + DAILY_COVER_DRIFT * drift.value)
                     scaleX = zoom
                     scaleY = zoom
                 },
