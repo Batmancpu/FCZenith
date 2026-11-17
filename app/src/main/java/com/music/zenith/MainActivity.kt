@@ -492,7 +492,10 @@ class MainActivity : AppCompatActivity() {
                             item = if (open) Unit else null,
                             anchor = anchor,
                             onDismiss = onDismiss,
-                            backdrop = playerFrost ?: lyricsBackdrop,
+                            // Saat Canvas live, playerFrost adalah LayerBackdrop yang merekam
+                            // seluruh player, termasuk popover ini sendiri (dipasang di dalam
+                            // lirik). Menggambar backdrop yang memuat dirinya = rekursi -> crash.
+                            backdrop = (playerFrost as? SnapshotBackdrop) ?: lyricsBackdrop,
                             hazeState = haze,
                             placement = IosMenuPlacement.AboveStart,
                             dimBackground = false,
@@ -530,7 +533,8 @@ class MainActivity : AppCompatActivity() {
                             item = if (open) Unit else null,
                             anchor = anchor,
                             onDismiss = onDismiss,
-                            backdrop = playerFrost ?: lyricsBackdrop,
+                            // Sama seperti popover globe: hindari backdrop live yang memuat dirinya.
+                            backdrop = (playerFrost as? SnapshotBackdrop) ?: lyricsBackdrop,
                             hazeState = haze,
                             placement = if (atStart) IosMenuPlacement.BelowStart else IosMenuPlacement.BelowEnd,
                             dimBackground = false,
