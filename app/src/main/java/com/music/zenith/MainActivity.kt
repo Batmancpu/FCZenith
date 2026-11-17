@@ -258,6 +258,10 @@ import com.music.zenith.ui.components.FLOATING_BAR_MAX_WIDTH
 import com.music.zenith.ui.components.FloatingBottomBar
 import com.music.zenith.ui.components.GlassNavBar
 import com.music.zenith.ui.components.GlassSearchMorph
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.ui.unit.IntOffset
 import com.music.zenith.ui.components.floatingtabbar.rememberFloatingTabBarScrollConnection
 import com.music.zenith.ui.components.FrostedTopBar
 import com.music.zenith.ui.components.LastfmLoginAlert
@@ -4658,7 +4662,41 @@ private fun ZenithApp(
                     )
                 }
 
-                if (searchMorph) {
+                if (searchMorph) Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .widthIn(max = FLOATING_BAR_MAX_WIDTH)
+                        .fillMaxWidth()
+                        // Lifts the whole stack, mini player included, above the keyboard.
+                        .offset { IntOffset(0, -WindowInsets.ime.getBottom(this)) }
+                        .onSizeChanged { floatingBarsHeight.intValue = it.height },
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    QueueActionNoticeHost(queueNotice)
+                    player.song?.let { song ->
+                        MiniPlayer(
+                            song = song,
+                            isPlaying = player.isPlaying,
+                            isLoading = playPauseBusy,
+                            hazeState = hazeState,
+                            onPlayPause = {
+                                togglePlayPause()
+                            },
+                            onNext = { controller?.seekToNextMediaItem() },
+                            onPrevious = { controller?.seekToPrevious() },
+                            onExpand = if (reducePlayerMotion) {
+                                { showNowPlaying = true }
+                            } else {
+                                playerSheetMotion::open
+                            },
+                            controlsLocked = controlsLocked,
+                            onBlockedControl = showHostOnlyNotice,
+                            dock = activeDock,
+                            pull = playerSheetMotion.takeIf { !reducePlayerMotion },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Spacer(Modifier.height(8.dp))
+                    }
                     GlassSearchMorph(
                         lastTab = barTabs[lastBarTab.coerceIn(0, barTabs.lastIndex)],
                         onLastTabClick = { onTabSelected(lastBarTab) },
@@ -4678,11 +4716,12 @@ private fun ZenithApp(
                                 SharedRes.string.search_hint
                             },
                         ),
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .widthIn(max = FLOATING_BAR_MAX_WIDTH)
-                            .fillMaxWidth()
-                            .onSizeChanged { floatingBarsHeight.intValue = it.height },
+                        onSourceClick = {
+                            viewModel.setSearchSource(
+                                SearchSource.values()[(searchSource.ordinal + 1) % SearchSource.values().size],
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 } else if (glassActive) Column(
                     modifier = Modifier
