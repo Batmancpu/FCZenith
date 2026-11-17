@@ -904,7 +904,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.itemsIndexedShelves(
                     currentSong = currentSong,
                     isPlaying = isPlaying,
                 )
-            } else if (index == 0 && firstIsHero && shelf.layout == ShelfLayout.CARDS) {
+            } else if (index == 0 && firstIsHero && !isQuickPicks && shelf.layout == ShelfLayout.CARDS) {
                 HeroShelf(
                     shelf = shelf,
                     onItemClick = openItem,
