@@ -1210,7 +1210,7 @@ private fun SharedTransitionScope.ExpandedTabs(
                     .then(tabBarContentModifier())
                     .padding(contentPadding)
             ) {
-                if (showPill && (!glassPill || pill.isFlat || pill.blurMix > 0f)) {
+                if (showPill && (!glassPill || pill.isFlat || pill.flatVisible)) {
                     FlatSelectionPill(
                         color = colors.indicatorColor,
                         barGlass = barGlass,
