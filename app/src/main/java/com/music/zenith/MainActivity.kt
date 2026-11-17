@@ -261,7 +261,6 @@ import com.music.zenith.ui.components.GlassSearchMorph
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.ui.unit.IntOffset
 import com.music.zenith.ui.components.floatingtabbar.rememberFloatingTabBarScrollConnection
 import com.music.zenith.ui.components.FrostedTopBar
 import com.music.zenith.ui.components.LastfmLoginAlert
@@ -4662,13 +4661,15 @@ private fun ZenithApp(
                     )
                 }
 
+                // Read here, in composition: WindowInsets.ime is a @Composable getter.
+                val imeInsets = WindowInsets.ime
                 if (searchMorph) Column(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .widthIn(max = FLOATING_BAR_MAX_WIDTH)
                         .fillMaxWidth()
                         // Lifts the whole stack, mini player included, above the keyboard.
-                        .offset { IntOffset(0, -WindowInsets.ime.getBottom(this)) }
+                        .offset { IntOffset(0, -imeInsets.getBottom(this)) }
                         .onSizeChanged { floatingBarsHeight.intValue = it.height },
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
