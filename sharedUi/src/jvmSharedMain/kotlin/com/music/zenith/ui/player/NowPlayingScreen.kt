@@ -2939,7 +2939,7 @@ fun NowPlayingScreen(
                 // memakai mesh legacy, bukan blur cover/frame. Spotify tetap seperti semula.
                 val canvasPanelMesh = !tabletArtworkBackdrop && canvas != null && heroMode &&
                     (lyricsOpen || queueOpen) && !liveCanvasPanels &&
-                    !(legacyMesh && canvas.source != CanvasSource.SPOTIFY)
+                    canvas.source != CanvasSource.SPOTIFY && !legacyMesh
                 // Blur statis dari frame terakhir canvas: tetap tampil selama panel terbuka.
                 // Di-key per frame beku: tanpa key, blur dari pembukaan panel sebelumnya
                 // masih tersimpan dan tampil dulu (frame basi), lalu dilebur ke blur baru.
@@ -2953,8 +2953,9 @@ fun NowPlayingScreen(
                 // Spotify layar penuh, live blur off: alas panel HANYA blur frame beku
                 // klipnya sendiri. Cover lagu tidak boleh tampil sama sekali, juga bukan
                 // sebagai cadangan selagi blur frame belum siap.
-                val spotifyFrameOnly = spotifyCanvasOnPhone &&
-                    canvas?.source == CanvasSource.SPOTIFY && heroMode && !liveCanvasPanels
+                // Live blur off: Spotify Canvas memakai jalur default (blur cover statis +
+                // sleeve terbang ke header), bukan lagi blur frame beku klip.
+                val spotifyFrameOnly = false
                 // Blur frame ditahan utuh selama panel terbuka dan selama collapse
                 // (masuk maupun keluar), tepat di bawah klip yang melebur.
                 val spotifyFrameHold = spotifyFrameOnly && (canvasPanelMesh || collapseStarted) &&
@@ -2988,7 +2989,11 @@ fun NowPlayingScreen(
                     },
                     label = "spotifyFrameHandoff",
                 )
-                val legacyMeshBackdrop = !tabletArtworkBackdrop && !spotifyCanvasPresentation &&
+                val spotifyDefaultPanels = spotifyCanvasOnPhone &&
+                    canvas?.source == CanvasSource.SPOTIFY && !liveCanvasPanels &&
+                    (lyricsOpen || queueOpen)
+                val legacyMeshBackdrop = !tabletArtworkBackdrop &&
+                    (!spotifyCanvasPresentation || spotifyDefaultPanels) &&
                     legacyMesh && !canvasPanelMesh
                 val fullArtworkBackdropAlpha by animateFloatAsState(
                     targetValue = if (
@@ -3000,7 +3005,7 @@ fun NowPlayingScreen(
                     // Selagi frame canvas menutup layar, backdrop sudah harus utuh di
                     // bawahnya; kalau masih naik pelan, bagian bawah terlihat gelap
                     // lalu terang saat frame memudar.
-                    animationSpec = if (dissolve.fullFrame != null) {
+                    animationSpec = if (dissolve.fullFrame != null || spotifyDefaultPanels) {
                         snap()
                     } else {
                         tween(durationMillis = 360, easing = FastOutSlowInEasing)
@@ -3907,10 +3912,12 @@ fun NowPlayingScreen(
                             val thumb = Rect(Offset(fromStart(0f, thumbW), 0f), Size(thumbW, thumbH))
                             lerp(video, thumb, p())
                         }
-                        // Spotify layar penuh: cover tidak bergerak/terbang ke header, ia
+                        // Spotify layar penuh + live blur ON: cover tidak terbang ke header, ia
                         // langsung diam di posisi header dan hanya fade in/out di tempat.
+                        // Live blur OFF: cover terbang ke header seperti default.
                         fun spotifyCoverInPlace(): Boolean =
-                            clipFullscreen && (lyricsOpen || queueOpen || collapseStarted)
+                            clipFullscreen && liveCanvasPanels &&
+                                (lyricsOpen || queueOpen || collapseStarted)
                         fun sleeveRect(): Rect {
                             val card = cardRect()
                             if (spotifyCoverInPlace()) {
@@ -4255,11 +4262,6 @@ fun NowPlayingScreen(
                                             } else {
                                                 1f
                                             }
-                                        } else if (clipFullscreen && (lyricsOpen || queueOpen || collapseStarted)) {
-                                            // Live blur off: the cover behaves the same as with
-                                            // live blur on. It does not fly with the panel, it only
-                                            // fades in at the header and out again on the way back.
-                                            smootherStep(((p() - 0.4f) / 0.6f).coerceIn(0f, 1f))
                                         } else if (stillTakesOver()) 1f
                                         else if (heroClip != null) 1f - canvasCover.floatValue
                                         else 1f
