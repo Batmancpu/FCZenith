@@ -172,6 +172,19 @@ jobs:
           NOW=$(TZ='Asia/Makassar' date '+%d %b %Y, %H:%M WITA')
           TITLE="${HEAD_MSG%%$'\n'*}"
 
+          # A merge shows what came in instead of the bare "Merge branch" title.
+          case "$TITLE" in
+            "Merge branch "*|"Merge pull request "*|"Merge remote-tracking branch "*)
+              MERGE_SRC=$(printf '%s' "$TITLE" | sed -n "s/^Merge .*branch '\([^']*\)'.*/\1/p")
+              if [ -z "$MERGE_SRC" ]; then
+                MERGE_SRC=$(printf '%s' "$TITLE" | sed -n 's/^Merge pull request #[0-9]* from //p')
+              fi
+              MERGED=$(jq -r '[.commits[]? | select(.message | startswith("Merge ") | not) | "- " + (.message | split("\n")[0])] | .[:5] | join("\n")' "$GITHUB_EVENT_PATH" 2>/dev/null || true)
+              TITLE="Merged ${MERGE_SRC:-branch} into ${REF_NAME}"
+              if [ -n "$MERGED" ]; then TITLE="${TITLE}${NL}${NL}${MERGED}"; fi
+              ;;
+          esac
+
           case "$JOB_STATUS" in
             success)
               LABEL="BUILD SUCCESS"

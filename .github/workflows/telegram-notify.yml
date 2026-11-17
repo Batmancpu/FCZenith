@@ -224,10 +224,37 @@ jobs:
                 if [ "$COMMIT_COUNT" -gt 10 ]; then
                    LINES="${LINES}+ $((COMMIT_COUNT - 10)) more${NL}"
                 fi
-                LABEL="PUSH"
+                 LABEL="PUSH"
                  if [ "$COMMIT_COUNT" = "1" ]; then CWORD="commit"; else CWORD="commits"; fi
                  SUBJECT="<b>${COMMIT_COUNT} ${CWORD}</b> pushed to <code>$(esc "$REF_NAME")</code>"
                  QUOTE="<blockquote>$(printf '%s' "$LINES")</blockquote>"
+
+                 # A merge push gets its own layout: source -> target, then only
+                 # the commits that came in, without the merge commit itself.
+                 FIRST_MSG="${HEAD_MSG%%$'\n'*}"
+                 case "$FIRST_MSG" in
+                   "Merge branch "*|"Merge pull request "*|"Merge remote-tracking branch "*)
+                     MERGE_SRC=$(printf '%s' "$FIRST_MSG" | sed -n "s/^Merge .*branch '\([^']*\)'.*/\1/p")
+                     if [ -z "$MERGE_SRC" ]; then
+                       MERGE_SRC=$(printf '%s' "$FIRST_MSG" | sed -n 's/^Merge pull request #[0-9]* from //p')
+                     fi
+                     MLINES=""
+                     while IFS=$'\t' read -r SH TT; do
+                       [ -n "$SH" ] || continue
+                       MLINES="${MLINES}<code>${SH}</code>${NL}$(esc "$TT")${NL}${NL}"
+                     done < <(jq -r '.commits[:10][] | select(.message | startswith("Merge ") | not) | [.id[:7], (.message | split("\n")[0])] | @tsv' "$GITHUB_EVENT_PATH" 2>/dev/null || true)
+                     MTOTAL=$(jq '[.commits[] | select(.message | startswith("Merge ") | not)] | length' "$GITHUB_EVENT_PATH" 2>/dev/null || echo 0)
+                     if [ -n "$MLINES" ]; then
+                       if [ "$MTOTAL" -gt 10 ]; then
+                         MLINES="${MLINES}+ $((MTOTAL - 10)) more${NL}"
+                       fi
+                       if [ "$MTOTAL" = "1" ]; then MWORD="commit"; else MWORD="commits"; fi
+                       LABEL="MERGE"
+                       SUBJECT="<b>$(esc "${MERGE_SRC:-branch}")</b> merged into <b>$(esc "$REF_NAME")</b>${NL}${MTOTAL} ${MWORD} included"
+                       QUOTE="<blockquote>$(printf '%s' "$MLINES")</blockquote>"
+                     fi
+                     ;;
+                 esac
                 meta "Branch" "$REF_NAME"
                 meta "Author" "$HEAD_AUTHOR"
                 meta "Pusher" "${PUSHER:-$ACTOR}"
