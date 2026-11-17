@@ -5272,13 +5272,17 @@ private fun ZenithApp(
                 Box(
                     when {
                         reduceDynamicBlur -> Modifier
-                        playerLiveCanvas -> Modifier.layerBackdrop(livePlayerBackdrop)
+                        // Snapshot diam tetap dipasang saat Canvas live, khusus untuk popover
+                        // di dalam player (globe / info antrean) agar frost-nya benar-benar blur.
+                        playerLiveCanvas -> Modifier
+                            .layerBackdrop(livePlayerBackdrop)
+                            .snapshotBackdropSource(playerBackdrop)
                         else -> Modifier.snapshotBackdropSource(playerBackdrop)
                     },
                 ) {
                     CompositionLocalProvider(
                         LocalPlayerDock provides activeDock,
-                        LocalPlayerMenuBackdrop provides (if (playerLiveCanvas) livePlayerBackdrop else playerBackdrop),
+                        LocalPlayerMenuBackdrop provides playerBackdrop,
                     ) {
                         nowPlaying(playerSong)
                     }
