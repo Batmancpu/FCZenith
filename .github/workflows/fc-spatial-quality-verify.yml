@@ -38,8 +38,23 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           BASE_SHA="$(git rev-parse HEAD)"
           git remote add upstream https://github.com/rezapranata089-bit/Zenith.git
+          TAG="$(gh api repos/rezapranata089-bit/Zenith/releases/latest --jq '.tag_name')"
+          git fetch --no-tags upstream "refs/tags/$TAG:refs/tags/upstream/$TAG"
           git fetch --no-tags upstream "refs/heads/main:refs/remotes/upstream/main"
-          if ! git merge --no-edit --no-ff -X theirs refs/remotes/upstream/main; then
+          STABLE_TARGET="refs/tags/upstream/$TAG^{commit}"
+          MAIN_TARGET="refs/remotes/upstream/main"
+          if git merge-base --is-ancestor "$STABLE_TARGET" "$MAIN_TARGET"; then
+            TARGET="$MAIN_TARGET"
+            SOURCE_REF="main"
+          elif git merge-base --is-ancestor "$MAIN_TARGET" "$STABLE_TARGET"; then
+            TARGET="$STABLE_TARGET"
+            SOURCE_REF="tag $TAG (ahead of main)"
+          else
+            echo "Upstream main and release tag $TAG have diverged; refusing to test arbitrary source." >&2
+            exit 1
+          fi
+          echo "Testing source $SOURCE_REF at $(git rev-parse "$TARGET^{commit}")"
+          if ! git merge --no-edit --no-ff -X theirs "$TARGET"; then
             conflicts="$(git diff --name-only --diff-filter=U)"
             if [[ -z "$conflicts" ]] || grep -qv '^.github/workflows/' <<< "$conflicts"; then
               echo "Unreviewed upstream conflicts: $conflicts" >&2
@@ -57,7 +72,7 @@ jobs:
           if ! git diff --cached --quiet; then
             git commit -m "test: preserve FC-owned workflows"
           fi
-          echo "Validated upstream main at $(git rev-parse refs/remotes/upstream/main)"
+          echo "Validated upstream $SOURCE_REF at $(git rev-parse "$TARGET^{commit}")"
 
       - name: JDK 17
         uses: actions/setup-java@v4
