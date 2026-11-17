@@ -299,6 +299,7 @@ import com.music.zenith.ui.screens.LocalMixCoverBackground
 import com.music.zenith.ui.components.OrganicFluidBackground
 import com.music.zenith.ui.screens.MostPlayedArt
 import com.music.zenith.ui.components.SearchField
+import com.music.zenith.ui.components.SearchBottomField
 import com.music.zenith.sharedui.resources.Res as SharedRes
 import com.music.zenith.sharedui.resources.search_hint
 import com.music.zenith.sharedui.resources.search_addons_hint
@@ -2720,7 +2721,9 @@ private fun ZenithApp(
     // See [topBarContentPadding].
     val listPadding = PaddingValues(
         top = topBarContentPadding(),
-        bottom = if (player.song != null) 210.dp else 140.dp,
+        // Tab Search menambah ruang untuk field yang melayang di atas nav bar.
+        bottom = (if (player.song != null) 210.dp else 140.dp) +
+            (if (selectedTab == TAB_SEARCH) 64.dp else 0.dp),
     )
 
     // What colour the page currently under the bars is. The fades either end
@@ -3970,6 +3973,7 @@ private fun ZenithApp(
                                 // suggestions and filters, and a gap reads as a break.
                                 topPadding = topBarHeight() + 4.dp,
                                 showField = false,
+                                showTitle = true,
                                 listModifier = if (glassSamplesBackdrop) {
                                     Modifier.layerBackdrop(searchBackdrop)
                                 } else {
@@ -4242,8 +4246,8 @@ private fun ZenithApp(
                         (1f - pageScroll.floatValue / pageTitleFadePx).coerceIn(0f, 1f)
                     },
                     actionsHidden = showAccountSelector && !accountSelectorLeaving,
-                    // Search has no large in-list header to hand the title back to —
-                    // the field takes that space — so its bar title is always up.
+                    // Judul besar "Search" ada di header halaman selama field kosong
+                    // dan belum fokus; judul bar baru naik setelah itu hilang.
                     scrolled = {
                         when {
                             // The page leads with its own large "Replay", so the bar
@@ -4253,7 +4257,10 @@ private fun ZenithApp(
                             detail != null && detailActiveShelf != null -> true
                             detail != null -> detailScrolled
                             selectedMoodGenre != null -> true
-                            else -> scrolled || selectedTab == TAB_SEARCH
+                            else -> scrolled || (
+                                selectedTab == TAB_SEARCH &&
+                                    (query.isNotEmpty() || results != null || searchFieldFocused)
+                                )
                         }
                     },
                     refreshing = currentFeed != null && currentFeed in refreshing,
@@ -4277,40 +4284,8 @@ private fun ZenithApp(
                                 translationY = blend * (rest - scrolledPx).coerceAtLeast(0f)
                             }
                         },
-                    // Only on the Search tab itself, not on anything pushed over it.
-                    accessory = if (
-                        selectedTab == TAB_SEARCH && route == null && detail == null && selectedMoodGenre == null
-                    ) {
-                        {
-                            // The search field lives up here in the bar, beside the
-                            // account photo, so it answers the nav bar's Search tap
-                            // itself: focus and keyboard, the way the page used to.
-                            val keyboard = LocalSoftwareKeyboardController.current
-                            LaunchedEffect(searchFocusRequested) {
-                                if (searchFocusRequested) {
-                                    searchFieldFocus.requestFocus()
-                                    keyboard?.show()
-                                    searchFocusRequested = false
-                                }
-                            }
-                            SearchField(
-                                query = query,
-                                onQueryChange = viewModel::onQueryChange,
-                                onSubmit = viewModel::submitSearch,
-                                focusRequester = searchFieldFocus,
-                                onFocusChange = { searchFieldFocused = it },
-                                placeholder = org.jetbrains.compose.resources.stringResource(
-                                    if (searchSource == SearchSource.LIBRARY) {
-                                        SharedRes.string.search_library_hint
-                                    } else if (searchSource == SearchSource.ADDONS) {
-                                        SharedRes.string.search_addons_hint
-                                    } else {
-                                        SharedRes.string.search_hint
-                                    },
-                                ),
-                            )
-                        }
-                    } else null,
+                    // Field search pindah ke bawah (SearchBottomField), bukan lagi di bar atas.
+                    accessory = null,
                     actions = {
                         // This is intentionally scoped to Listen together: the
                         // round-trip time is meaningful while coordinating a
@@ -4642,6 +4617,34 @@ private fun ZenithApp(
                         viewModel.onQueryChange("")
                         searchFocusRequested = reopenField
                     }
+                }
+
+                // Field search melayang di atas nav bar (gaya Apple Music), baik
+                // Search terpisah maupun menyatu di pill. Naik mengikuti keyboard.
+                if (selectedTab == TAB_SEARCH && route == null && detail == null && selectedMoodGenre == null) {
+                    SearchBottomField(
+                        query = query,
+                        onQueryChange = viewModel::onQueryChange,
+                        onSubmit = viewModel::submitSearch,
+                        focusRequester = searchFieldFocus,
+                        focusRequested = searchFocusRequested,
+                        onFocusHandled = { searchFocusRequested = false },
+                        onFocusChange = { searchFieldFocused = it },
+                        placeholder = org.jetbrains.compose.resources.stringResource(
+                            if (searchSource == SearchSource.LIBRARY) {
+                                SharedRes.string.search_library_hint
+                            } else if (searchSource == SearchSource.ADDONS) {
+                                SharedRes.string.search_addons_hint
+                            } else {
+                                SharedRes.string.search_hint
+                            },
+                        ),
+                        barsHeight = { floatingBarsHeight.intValue },
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .widthIn(max = FLOATING_BAR_MAX_WIDTH)
+                            .fillMaxWidth(),
+                    )
                 }
 
                 if (glassActive) Column(

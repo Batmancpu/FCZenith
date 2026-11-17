@@ -189,6 +189,8 @@ fun SearchScreen(
     listModifier: Modifier = Modifier,
     /** Applied to the fixed header; the app uses it to draw the blurred list behind the header. */
     headerModifier: Modifier = Modifier,
+    /** Large "Search" heading at the head of the page while the field is empty and unfocused. */
+    showTitle: Boolean = false,
 ) {
     val focusRequester = remember { FocusRequester() }
     var listWidthPx by remember { mutableIntStateOf(0) }
@@ -268,6 +270,22 @@ fun SearchScreen(
                 )
                 .padding(top = topPadding),
         ) {
+            AnimatedVisibility(
+                visible = showTitle && query.isEmpty() && results == null && !fieldFocused,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically(),
+            ) {
+                Text(
+                    text = stringResource(Res.string.search),
+                    style = MaterialTheme.typography.displayLarge,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.padding(
+                        start = PAGE_GUTTER,
+                        end = PAGE_GUTTER,
+                        bottom = 8.dp,
+                    ),
+                )
+            }
             if (showField) {
                 SearchField(
                     query = query,
