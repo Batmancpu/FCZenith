@@ -3043,9 +3043,14 @@ fun NowPlayingScreen(
                         // Follows the panel collapse itself, read at draw time, so the blur
                         // is complete by the time the lyrics or queue appear instead of
                         // waiting on a recomposition and a separate animation.
+                        // Dibaca di composition lalu ditangkap sebagai nilai (bukan State
+                        // delegasi), supaya lambda berubah tepat saat panel dibuka/ditutup
+                        // dan blok update AndroidView menerapkan blur sinkron di frame yang
+                        // sama, bukan lewat handler.post yang bisa terlambat.
+                        val panelsUpNow = lyricsOpen || queueOpen
                         val panelBlur: () -> Float = {
                             if (!liveCanvasPanels) 0f
-                            else if (lyricsOpen || queueOpen) 1f
+                            else if (panelsUpNow) 1f
                             else (p() * 4f).coerceIn(0f, 1f)
                         }
                         CanvasArtworkPlayer(
