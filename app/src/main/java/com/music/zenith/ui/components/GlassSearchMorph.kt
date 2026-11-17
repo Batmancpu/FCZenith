@@ -67,6 +67,7 @@ fun GlassSearchMorph(
     onFocusChange: (Boolean) -> Unit,
     placeholder: String,
     onSourceClick: () -> Unit,
+    onClose: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     // Starts as the Search circle alone and springs wide on the frame it
@@ -117,7 +118,11 @@ fun GlassSearchMorph(
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
-                    onClick = onLastTabClick,
+                    onClick = {
+                        focusManager.clearFocus()
+                        keyboard?.hide()
+                        onLastTabClick()
+                    },
                 ),
             contentAlignment = Alignment.Center,
         ) {
@@ -166,6 +171,7 @@ fun GlassSearchMorph(
                             onQueryChange("")
                             focusManager.clearFocus()
                             keyboard?.hide()
+                            onClose()
                         },
                     contentAlignment = Alignment.Center,
                 ) {

@@ -948,6 +948,9 @@ private fun ZenithApp(
     // Whether the top bar's search field has focus. The Search tab shows its
     // categories while it has none and the recent searches once it does.
     var searchFieldFocused by remember { mutableStateOf(false) }
+    // Separate Search on liquid glass: the field only opens after the Search
+    // circle is tapped while already on the categories.
+    var searchFieldOpen by remember { mutableStateOf(false) }
     // Invalidates an in-flight radio lookup when a later play request wins.
     var playRequestGeneration by remember { mutableIntStateOf(0) }
     // Starting radio from the item already playing must not replace that media
@@ -4624,6 +4627,7 @@ private fun ZenithApp(
                     viewModel.closeMoodGenre()
                     selectedTab = index
                     searchFieldFocused = false
+                    searchFieldOpen = reopenField
 
                     if (index == TAB_SEARCH) {
                         viewModel.onQueryChange("")
@@ -4635,8 +4639,12 @@ private fun ZenithApp(
                 // Search terpisah maupun menyatu di pill. Naik mengikuti keyboard.
                 val searchActive = selectedTab == TAB_SEARCH && route == null && detail == null && selectedMoodGenre == null
                 // Separate Search on liquid glass: the bar itself becomes the search morph.
-                val searchMorph = searchActive && glassActive && searchTabSeparate
-                if (searchActive && !searchMorph) {
+                val searchMorph = searchActive && glassActive && searchTabSeparate && searchFieldOpen
+                // Leaving the categories (tab, category page, route) closes the field.
+                LaunchedEffect(searchActive) {
+                    if (!searchActive) searchFieldOpen = false
+                }
+                if (searchActive && !searchMorph && !(glassActive && searchTabSeparate)) {
                     SearchBottomField(
                         query = query,
                         onQueryChange = viewModel::onQueryChange,
@@ -4700,7 +4708,16 @@ private fun ZenithApp(
                     }
                     GlassSearchMorph(
                         lastTab = barTabs[lastBarTab.coerceIn(0, barTabs.lastIndex)],
-                        onLastTabClick = { onTabSelected(lastBarTab) },
+                        onLastTabClick = {
+                            viewModel.onQueryChange("")
+                            searchFieldFocused = false
+                            searchFieldOpen = false
+                        },
+                        onClose = {
+                            viewModel.onQueryChange("")
+                            searchFieldFocused = false
+                            searchFieldOpen = false
+                        },
                         query = query,
                         onQueryChange = viewModel::onQueryChange,
                         onSubmit = viewModel::submitSearch,
