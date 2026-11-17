@@ -2210,6 +2210,10 @@ fun NowPlayingScreen(
         prepare = !legacyMesh || landscape || tabletArtworkBackdrop || lyricsOpen || queueOpen ||
             playerPrewarmStage >= 1,
     )
+    // Palet mesh legacy dihitung di level layar, bukan di dalam blok mesh: state-nya
+    // tidak hilang saat blok mesh keluar-masuk composition, dan palet sudah siap
+    // (tercache) sebelum mesh pertama kali digambar.
+    val meshPalette = if (legacyMesh) rememberArtworkColors(remoteArt, canvasFrame) else null
     // One movable Image node, not two backdrop call sites. Compose carries it
     // between the portrait and landscape players; only the cached bitmap
     // changes when the artwork preparation above completes for another song.
@@ -2999,17 +3003,23 @@ fun NowPlayingScreen(
                 // memakai mesh legacy, bukan blur cover/frame. Spotify tetap seperti semula.
                 val canvasPanelMesh = !tabletArtworkBackdrop && canvas != null && heroMode &&
                     (lyricsOpen || queueOpen) && !liveCanvasPanels &&
-                    !(legacyMesh && canvas.source != CanvasSource.SPOTIFY)
+                    canvas.source != CanvasSource.SPOTIFY && !legacyMesh
                 // Blur statis dari frame terakhir canvas: tetap tampil selama panel terbuka.
-                val canvasPanelFrameBlur = rememberFullArtworkBlurImage(
-                    imageUrl = null,
-                    liveFrame = canvasPanelFrame,
-                )
+                // Di-key per frame beku: tanpa key, blur dari pembukaan panel sebelumnya
+                // masih tersimpan dan tampil dulu (frame basi), lalu dilebur ke blur baru.
+                // Itu yang terlihat sebagai perubahan kecerahan dan lompatan.
+                val canvasPanelFrameBlur = androidx.compose.runtime.key(canvasPanelFrame) {
+                    rememberFullArtworkBlurImage(
+                        imageUrl = null,
+                        liveFrame = canvasPanelFrame,
+                    )
+                }
                 // Spotify layar penuh, live blur off: alas panel HANYA blur frame beku
                 // klipnya sendiri. Cover lagu tidak boleh tampil sama sekali, juga bukan
                 // sebagai cadangan selagi blur frame belum siap.
-                val spotifyFrameOnly = spotifyCanvasOnPhone &&
-                    canvas?.source == CanvasSource.SPOTIFY && heroMode && !liveCanvasPanels
+                // Live blur off: Spotify Canvas memakai jalur default (blur cover statis +
+                // sleeve terbang ke header), bukan lagi blur frame beku klip.
+                val spotifyFrameOnly = false
                 // Blur frame ditahan utuh selama panel terbuka dan selama collapse
                 // (masuk maupun keluar), tepat di bawah klip yang melebur.
                 val spotifyFrameHold = spotifyFrameOnly && (canvasPanelMesh || collapseStarted) &&
@@ -3029,7 +3039,25 @@ fun NowPlayingScreen(
                     },
                     label = "canvasPanelMesh",
                 )
-                val legacyMeshBackdrop = !tabletArtworkBackdrop && !spotifyCanvasPresentation &&
+                // Live blur off: begitu blur frame beku siap, klip melebur ke sana dengan
+                // jamnya sendiri, bukan mengikuti progres panel (yang bisa sudah jauh dan
+                // membuat klip hilang mendadak). Saat panel menutup, p() yang memimpin.
+                val spotifyFrameHandoff by animateFloatAsState(
+                    targetValue = if (
+                        spotifyFrameOnly && (lyricsOpen || queueOpen) && canvasPanelFrameBlur != null
+                    ) 0f else 1f,
+                    animationSpec = if (spotifyFrameOnly && (lyricsOpen || queueOpen)) {
+                        tween(durationMillis = 240, easing = FastOutSlowInEasing)
+                    } else {
+                        snap()
+                    },
+                    label = "spotifyFrameHandoff",
+                )
+                val spotifyDefaultPanels = spotifyCanvasOnPhone &&
+                    canvas?.source == CanvasSource.SPOTIFY && !liveCanvasPanels &&
+                    (lyricsOpen || queueOpen)
+                val legacyMeshBackdrop = !tabletArtworkBackdrop &&
+                    (!spotifyCanvasPresentation || spotifyDefaultPanels) &&
                     legacyMesh && !canvasPanelMesh
                 val fullArtworkBackdropAlpha by animateFloatAsState(
                     targetValue = if (
@@ -3041,7 +3069,7 @@ fun NowPlayingScreen(
                     // Selagi frame canvas menutup layar, backdrop sudah harus utuh di
                     // bawahnya; kalau masih naik pelan, bagian bawah terlihat gelap
                     // lalu terang saat frame memudar.
-                    animationSpec = if (dissolve.fullFrame != null) {
+                    animationSpec = if (dissolve.fullFrame != null || spotifyDefaultPanels) {
                         snap()
                     } else {
                         tween(durationMillis = 360, easing = FastOutSlowInEasing)
@@ -3057,7 +3085,7 @@ fun NowPlayingScreen(
                     // drag a full-screen blur along with them, which is why the palette
                     // is passed as one immutable value.
                     MeshGradientBackground(
-                        palette = rememberArtworkColors(remoteArt, canvasFrame),
+                        palette = meshPalette ?: rememberArtworkColors(remoteArt, canvasFrame),
                         trackKey = song.videoId,
                         continuous = true,
                         driftMillis = 20_000,
@@ -3099,9 +3127,14 @@ fun NowPlayingScreen(
                         // Follows the panel collapse itself, read at draw time, so the blur
                         // is complete by the time the lyrics or queue appear instead of
                         // waiting on a recomposition and a separate animation.
+                        // Dibaca di composition lalu ditangkap sebagai nilai (bukan State
+                        // delegasi), supaya lambda berubah tepat saat panel dibuka/ditutup
+                        // dan blok update AndroidView menerapkan blur sinkron di frame yang
+                        // sama, bukan lewat handler.post yang bisa terlambat.
+                        val panelsUpNow = lyricsOpen || queueOpen
                         val panelBlur: () -> Float = {
                             if (!liveCanvasPanels) 0f
-                            else if (lyricsOpen || queueOpen) 1f
+                            else if (panelsUpNow) 1f
                             else (p() * 4f).coerceIn(0f, 1f)
                         }
                         CanvasArtworkPlayer(
@@ -3154,9 +3187,7 @@ fun NowPlayingScreen(
                                         // ke backdrop, tanpa bercampur dengan cover statis.
                                         // Live blur off: klip bertahan utuh sampai blur
                                         // frame beku-nya siap, lalu melebur ke sana.
-                                        if (spotifyFrameOnly && (lyricsOpen || queueOpen) &&
-                                            canvasPanelFrameBlur == null
-                                        ) 1f
+                                        if (spotifyFrameOnly && (lyricsOpen || queueOpen)) spotifyFrameHandoff
                                         else 1f - smootherStep(((p() - 0.05f) / 0.3f).coerceIn(0f, 1f))
                                     } else (1f - 2f * p()).coerceIn(0f, 1f)
                                     ) * dockFade() * clipMixFade.value
@@ -3213,7 +3244,15 @@ fun NowPlayingScreen(
                                 )
                                 .drawWithContent {
                                     drawContent()
-                                    val dimAmount = panelBlur()
+                                    // Live blur off: klip beku menggelap ke tingkat backdrop selagi
+                                    // melebur, jadi tidak ada lonjakan kecerahan saat bertukar.
+                                    val dimAmount = if (liveCanvasPanels) {
+                                        panelBlur()
+                                    } else if (spotifyFrameOnly && (lyricsOpen || queueOpen)) {
+                                        1f - spotifyFrameHandoff
+                                    } else {
+                                        0f
+                                    }
                                     if (dimAmount > 0f) {
                                         drawRect(Color.Black.copy(alpha = CANVAS_PANEL_DIM * dimAmount))
                                     }
@@ -3511,7 +3550,8 @@ fun NowPlayingScreen(
                     ) {
                         // Chevron turun di sisi kiri, bukan garis divider. Strip-nya tetap
                         // yang meneruskan drag ke sheet; ini hanya penanda bisa ditutup.
-                        androidx.compose.foundation.Canvas(
+                        // Disembunyikan bersama status lagu bila "Sembunyikan status lagu" aktif.
+                        if (!hideSongStatus) androidx.compose.foundation.Canvas(
                             modifier = Modifier
                                 .align(Alignment.CenterStart)
                                 .graphicsLayer {
@@ -3952,10 +3992,12 @@ fun NowPlayingScreen(
                             val thumb = Rect(Offset(fromStart(0f, thumbW), 0f), Size(thumbW, thumbH))
                             lerp(video, thumb, p())
                         }
-                        // Spotify layar penuh: cover tidak bergerak/terbang ke header, ia
+                        // Spotify layar penuh + live blur ON: cover tidak terbang ke header, ia
                         // langsung diam di posisi header dan hanya fade in/out di tempat.
+                        // Live blur OFF: cover terbang ke header seperti default.
                         fun spotifyCoverInPlace(): Boolean =
-                            clipFullscreen && (lyricsOpen || queueOpen || collapseStarted)
+                            clipFullscreen && liveCanvasPanels &&
+                                (lyricsOpen || queueOpen || collapseStarted)
                         fun sleeveRect(): Rect {
                             val card = cardRect()
                             if (spotifyCoverInPlace()) {
@@ -4304,11 +4346,6 @@ fun NowPlayingScreen(
                                             } else {
                                                 1f
                                             }
-                                        } else if (clipFullscreen && (lyricsOpen || queueOpen || collapseStarted)) {
-                                            // Live blur off: the cover behaves the same as with
-                                            // live blur on. It does not fly with the panel, it only
-                                            // fades in at the header and out again on the way back.
-                                            smootherStep(((p() - 0.4f) / 0.6f).coerceIn(0f, 1f))
                                         } else if (stillTakesOver()) 1f
                                         else if (heroClip != null) 1f - canvasCover.floatValue
                                         else 1f
