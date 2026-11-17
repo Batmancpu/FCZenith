@@ -72,15 +72,23 @@ jobs:
 
           git fetch --no-tags upstream "refs/tags/$TAG:refs/tags/upstream/$TAG"
           STABLE_TARGET="refs/tags/upstream/$TAG^{commit}"
-          # Build from upstream main, with stable releases defining the FC version series.
-          # A newer upstream main SHA creates a new FC revision after tests and signing pass.
+          # A published stable tag may briefly be ahead of upstream main:
+          # upstream tags the release before advancing main. Select the newer
+          # descendant in that case; never discard commits or combine divergent
+          # histories without review.
           git fetch --no-tags upstream "refs/heads/main:refs/remotes/upstream/main"
-          TARGET="refs/remotes/upstream/main"
-          if ! git merge-base --is-ancestor "$STABLE_TARGET" "$TARGET"; then
-            echo "Upstream main does not contain latest published release $TAG; refusing divergent source." >&2
+          MAIN_TARGET="refs/remotes/upstream/main"
+          if git merge-base --is-ancestor "$STABLE_TARGET" "$MAIN_TARGET"; then
+            TARGET="$MAIN_TARGET"
+            SOURCE_REF="main"
+          elif git merge-base --is-ancestor "$MAIN_TARGET" "$STABLE_TARGET"; then
+            TARGET="$STABLE_TARGET"
+            SOURCE_REF="tag $TAG (ahead of main)"
+            echo "Stable release $TAG is ahead of upstream main; selecting the newer tagged commit."
+          else
+            echo "Upstream main and latest published release $TAG have diverged; refusing unsafe automatic merge." >&2
             exit 1
           fi
-          SOURCE_REF="main"
           COMMITS_AHEAD="$(git rev-list --count "$STABLE_TARGET..$TARGET")"
 
           TARGET_SHA="$(git rev-parse "$TARGET^{commit}")"
@@ -122,7 +130,7 @@ jobs:
       - name: Preserve FCZenith-owned GitHub Actions workflows
         run: |
           set -euo pipefail
-          # The app source follows upstream main;
+          # The app source follows the latest safe upstream descendant;
           # CI/CD ownership stays with FCZenith. Do not import upstream workflows.
           git rm -r --ignore-unmatch .github/workflows
           git checkout "${{ steps.upstream.outputs.base_sha }}" -- .github/workflows
