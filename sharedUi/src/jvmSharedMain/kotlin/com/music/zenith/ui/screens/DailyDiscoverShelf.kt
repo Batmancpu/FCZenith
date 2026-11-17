@@ -1,5 +1,7 @@
 package com.music.zenith.ui.screens
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -31,6 +33,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -53,6 +56,7 @@ import com.music.zenith.ui.components.hideDuringCoverFlight
 import com.music.zenith.ui.components.longPressMenuClickable
 import com.music.zenith.ui.components.rememberCoverFlightTap
 import com.music.zenith.ui.components.thumbnailBorder
+import com.music.zenith.ui.theme.rememberArtworkPanelColor
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.abs
 
@@ -67,6 +71,9 @@ private val DAILY_CARD_SHAPE = RoundedCornerShape(24.dp)
 
 /** Skala kartu yang sudah satu kartu penuh jauhnya dari posisi snap. */
 private const val DAILY_SIDE_SCALE = 0.9f
+
+/** Zoom tambahan cover di dalam kartu saat kartu tepat di posisi snap (1f + nilai ini). */
+private const val DAILY_COVER_ZOOM = 0.14f
 
 internal fun HomeShelf.isDailyDiscoverShelf(): Boolean =
     layout == ShelfLayout.CARDS &&
@@ -143,6 +150,7 @@ internal fun DailyDiscoverShelf(
         }
         BoxWithConstraints {
             val cardWidth = minOf(maxWidth * DAILY_CARD_FRACTION, DAILY_CARD_MAX_WIDTH)
+            val spanPx = with(LocalDensity.current) { (cardWidth + DAILY_CARD_GAP).toPx() }
             ShelfRow(
                 state = state,
                 contentPadding = PaddingValues(horizontal = PAGE_GUTTER),
@@ -160,6 +168,7 @@ internal fun DailyDiscoverShelf(
                         modifier = Modifier
                             .dailyZoom(state, index, cardWidth)
                             .width(cardWidth),
+                        coverZoom = { dailyCoverZoom(state, index, spanPx) },
                         isCurrent = isCurrentItem(item),
                         isPlaying = isCurrentItem(item) && isPlaying,
                     )
@@ -186,6 +195,17 @@ private fun Modifier.dailyZoom(state: LazyListState, index: Int, cardWidth: Dp):
         scaleY = scale
     }
 
+/** Jarak kartu ke posisi snap dalam satuan kartu: 0 tepat di snap, 1 satu kartu atau lebih jauhnya. */
+private fun dailyCardDistance(state: LazyListState, index: Int, spanPx: Float): Float {
+    if (spanPx <= 0f) return 1f
+    val position = state.firstVisibleItemIndex + state.firstVisibleItemScrollOffset / spanPx
+    return abs(index - position).coerceIn(0f, 1f)
+}
+
+/** Skala cover di dalam kartu: zoom-in halus saat kartu mendekati posisi snap, normal saat menjauh. */
+private fun dailyCoverZoom(state: LazyListState, index: Int, spanPx: Float): Float =
+    1f + DAILY_COVER_ZOOM * (1f - dailyCardDistance(state, index, spanPx))
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun DailyDiscoverCard(
@@ -193,11 +213,14 @@ private fun DailyDiscoverCard(
     onClick: () -> Unit,
     onLongPress: (() -> Unit)?,
     modifier: Modifier = Modifier,
+    coverZoom: () -> Float = { 1f },
     isCurrent: Boolean = false,
     isPlaying: Boolean = false,
 ) {
     val token = remember { Any() }
     val openWithCover = rememberCoverFlightTap(item.browseId, token, onClick)
+    val scrimBase = rememberArtworkPanelColor(item.thumbnailUrl, HEADER_ART_PX) ?: Color.Black
+    val scrim = animateColorAsState(scrimBase, tween(260), label = "dailyScrim").value
     Box(
         modifier = modifier
             .aspectRatio(1f)
@@ -216,16 +239,25 @@ private fun DailyDiscoverCard(
             contentScale = ContentScale.Crop,
             modifier = Modifier
                 .coverFlightSource(token, item.thumbnailUrl.artworkAt(HEADER_ART_PX), 24.dp)
-                .fillMaxSize(),
+                .fillMaxSize()
+                .graphicsLayer {
+                    val zoom = coverZoom()
+                    scaleX = zoom
+                    scaleY = zoom
+                },
         )
         Box(
             modifier = Modifier
                 .hideDuringCoverFlight(token)
                 .fillMaxWidth()
-                .fillMaxHeight(0.42f)
+                .fillMaxHeight(0.55f)
                 .background(
                     Brush.verticalGradient(
-                        listOf(Color.Black.copy(alpha = 0.62f), Color.Transparent),
+                        colorStops = arrayOf(
+                            0f to scrim.copy(alpha = 0.95f),
+                            0.5f to scrim.copy(alpha = 0.55f),
+                            1f to scrim.copy(alpha = 0f),
+                        ),
                     ),
                 ),
         )
