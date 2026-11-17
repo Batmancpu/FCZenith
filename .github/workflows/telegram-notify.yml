@@ -108,10 +108,33 @@ jobs:
           SUBJECT=""
           QUOTE=""
 
-          # Detail row: bold label, monospace value (skipped when empty).
+          # Detail row: icon, bold label, colon, value (skipped when empty).
           meta() {
             [ -n "${2:-}" ] || return 0
-            META="${META}<b>$1</b>  <code>$(esc "$2")</code>${NL}"
+            local ic="▫️"
+            local val
+            val=$(esc "$2")
+            case "$1" in
+              Branch) ic="🌿"; val="<code>${val}</code>" ;;
+              Author|Commenter|Reviewer|Actor) ic="👤" ;;
+              Pusher) ic="🚀" ;;
+              Commit) ic="🔖"; val="<code>${val}</code>" ;;
+              Commits) ic="🧾" ;;
+              Tag) ic="🏷"; val="<code>${val}</code>" ;;
+              Labels) ic="🏷" ;;
+              Assignees|Reviewers) ic="👥" ;;
+              Milestone|Target) ic="🎯" ;;
+              State) ic="📌" ;;
+              Comments) ic="💬" ;;
+              Changes) ic="📊" ;;
+              Draft) ic="📝" ;;
+              Forced) ic="⚠️" ;;
+              Stars) ic="⭐" ;;
+              Forks) ic="🍴" ;;
+              Channel) ic="📡" ;;
+              Assets) ic="📦" ;;
+            esac
+            META="${META}${ic} <b>$1</b> : ${val}${NL}"
           }
           # Inline shortcut button (skipped when the URL is empty).
           btn() {
@@ -275,12 +298,22 @@ jobs:
 
           btn "Workflow run" "$RUN_URL"
 
+          case "$EVENT" in
+            issues|issue_comment) ICON="🐞" ;;
+            pull_request|pull_request_review) ICON="🔀" ;;
+            push) ICON="🚀" ;;
+            watch) ICON="⭐" ;;
+            fork) ICON="🍴" ;;
+            release) ICON="🎉" ;;
+            *) ICON="🔔" ;;
+          esac
+
           RULE='━━━━━━━━━━━━━━'
           META="${META%$NL}"
-          MSG="<b>${LABEL}</b>${NL}<a href=\"${REPO_URL}\">${R}</a>${NL}${RULE}${NL}${NL}${SUBJECT}"
+          MSG="${ICON} <b>${LABEL}</b>${NL}📦 <a href=\"${REPO_URL}\">${R}</a>${NL}${RULE}${NL}${NL}${SUBJECT}"
           if [ -n "$QUOTE" ]; then MSG="${MSG}${NL}${NL}${QUOTE}"; fi
           if [ -n "$META" ]; then MSG="${MSG}${NL}${NL}${META}"; fi
-          MSG="${MSG}${NL}${NL}${RULE}${NL}<i>Run #${RUN_NUMBER}  ·  ${NOW}</i>"
+          MSG="${MSG}${NL}${NL}${RULE}${NL}⚙️ <b>Run</b> : #${RUN_NUMBER}${NL}🕐 <b>Time</b> : ${NOW}"
 
           ARGS=(
             --data-urlencode "chat_id=${TG_CHAT_ID}"
