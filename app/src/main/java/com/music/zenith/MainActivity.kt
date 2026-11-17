@@ -257,6 +257,7 @@ import com.music.zenith.ui.components.BottomTab
 import com.music.zenith.ui.components.FLOATING_BAR_MAX_WIDTH
 import com.music.zenith.ui.components.FloatingBottomBar
 import com.music.zenith.ui.components.GlassNavBar
+import com.music.zenith.ui.components.GlassSearchMorph
 import com.music.zenith.ui.components.floatingtabbar.rememberFloatingTabBarScrollConnection
 import com.music.zenith.ui.components.FrostedTopBar
 import com.music.zenith.ui.components.LastfmLoginAlert
@@ -688,6 +689,8 @@ private fun ZenithApp(
     // and the page is a sibling of the bar rather than a child.
     val navBarScroll = rememberFloatingTabBarScrollConnection(expandThreshold = 250.dp)
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+    // Bar index of the last tab that was not Search; the search morph folds to it.
+    var lastBarTab by remember { mutableIntStateOf(0) }
     // Explore loads the first time it's shown, not at launch beside Home.
     LaunchedEffect(selectedTab) {
         // The Search tab's categories come from the same feed Explore loads.
@@ -4594,6 +4597,11 @@ private fun ZenithApp(
                     selectedTab >= TAB_LIBRARY -> selectedTab + 1
                     else -> selectedTab
                 }
+                // Remember the last tab that was not Search. Read only off a
+                // tab, never off Search, so the morph always has a tab to fold to.
+                LaunchedEffect(selectedTab, selectedBarIndex) {
+                    if (selectedTab != TAB_SEARCH) lastBarTab = selectedBarIndex
+                }
                 val onTabSelected: (Int) -> Unit = tabSelected@{ barIndex ->
                     if (listenTogetherTab && barIndex == TAB_LIBRARY) {
                         if (route != AppRoute.ListenTogether) {
@@ -4621,7 +4629,10 @@ private fun ZenithApp(
 
                 // Field search melayang di atas nav bar (gaya Apple Music), baik
                 // Search terpisah maupun menyatu di pill. Naik mengikuti keyboard.
-                if (selectedTab == TAB_SEARCH && route == null && detail == null && selectedMoodGenre == null) {
+                val searchActive = selectedTab == TAB_SEARCH && route == null && detail == null && selectedMoodGenre == null
+                // Separate Search on liquid glass: the bar itself becomes the search morph.
+                val searchMorph = searchActive && glassActive && searchTabSeparate
+                if (searchActive && !searchMorph) {
                     SearchBottomField(
                         query = query,
                         onQueryChange = viewModel::onQueryChange,
@@ -4647,7 +4658,33 @@ private fun ZenithApp(
                     )
                 }
 
-                if (glassActive) Column(
+                if (searchMorph) {
+                    GlassSearchMorph(
+                        lastTab = barTabs[lastBarTab.coerceIn(0, barTabs.lastIndex)],
+                        onLastTabClick = { onTabSelected(lastBarTab) },
+                        query = query,
+                        onQueryChange = viewModel::onQueryChange,
+                        onSubmit = viewModel::submitSearch,
+                        focusRequester = searchFieldFocus,
+                        focusRequested = searchFocusRequested,
+                        onFocusHandled = { searchFocusRequested = false },
+                        onFocusChange = { searchFieldFocused = it },
+                        placeholder = org.jetbrains.compose.resources.stringResource(
+                            if (searchSource == SearchSource.LIBRARY) {
+                                SharedRes.string.search_library_hint
+                            } else if (searchSource == SearchSource.ADDONS) {
+                                SharedRes.string.search_addons_hint
+                            } else {
+                                SharedRes.string.search_hint
+                            },
+                        ),
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .widthIn(max = FLOATING_BAR_MAX_WIDTH)
+                            .fillMaxWidth()
+                            .onSizeChanged { floatingBarsHeight.intValue = it.height },
+                    )
+                } else if (glassActive) Column(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .widthIn(max = FLOATING_BAR_MAX_WIDTH)
