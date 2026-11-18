@@ -260,6 +260,7 @@ import com.music.zenith.ui.components.GlassMiniPlayer
 import com.music.zenith.ui.components.GlassNavBar
 import com.music.zenith.ui.components.GlassSearchBar
 import com.music.zenith.ui.components.searchMiniRise
+import com.music.zenith.ui.components.searchMiniHide
 import com.music.zenith.ui.components.GlassSearchMorph
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.offset
@@ -4700,6 +4701,20 @@ private fun ZenithApp(
 
                 // Read here, in composition: WindowInsets.ime is a @Composable getter.
                 val imeInsets = WindowInsets.ime
+                // The mini player steps aside while the input is focused with the
+                // keyboard up, and returns when the keyboard closes or focus leaves.
+                val searchDensity = LocalDensity.current
+                val searchImeOpen by remember {
+                    androidx.compose.runtime.derivedStateOf { imeInsets.getBottom(searchDensity) > 0 }
+                }
+                val miniHide by androidx.compose.animation.core.animateFloatAsState(
+                    targetValue = if (searchFieldFocused && searchImeOpen) 1f else 0f,
+                    animationSpec = androidx.compose.animation.core.spring(
+                        dampingRatio = 0.85f,
+                        stiffness = 380f,
+                    ),
+                    label = "searchMiniHide",
+                )
                 if (searchMorph) Column(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
@@ -4734,6 +4749,7 @@ private fun ZenithApp(
                             // the circles and rises while the Search circle opens leftward.
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .searchMiniHide { miniHide }
                                 .searchMiniRise { if (searchFromInline) searchBarFraction else 1f },
                         )
                         Spacer(Modifier.height(8.dp))

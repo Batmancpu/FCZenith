@@ -95,6 +95,27 @@ internal fun Modifier.searchMiniRise(progress: () -> Float): Modifier =
     }
 
 /**
+ * Folds the mini player away while the keyboard is up: it sinks toward the bar
+ * and fades, and its layout height closes with it so the page behind gets the
+ * room. [hide] is 0 = shown, 1 = gone; read at layout and draw time only.
+ */
+internal fun Modifier.searchMiniHide(hide: () -> Float): Modifier =
+    layout { measurable, constraints ->
+        val placeable = measurable.measure(constraints)
+        val reported = (placeable.height * (1f - hide().coerceIn(0f, 1f))).toInt()
+        layout(placeable.width, reported) {
+            placeable.placeWithLayer(0, 0) {
+                val h = hide().coerceIn(0f, 1f)
+                alpha = 1f - h
+                translationY = h * placeable.height * 0.6f
+                val s = 1f - 0.08f * h
+                scaleX = s
+                scaleY = s
+            }
+        }
+    }
+
+/**
  * The separate Search tab's bar on liquid glass, with ONE progress driving it.
  *
  * At rest (progress 0) it is shaped like the expanded [GlassNavBar]: a tab pill
