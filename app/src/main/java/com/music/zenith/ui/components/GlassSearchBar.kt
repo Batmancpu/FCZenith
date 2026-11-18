@@ -1,6 +1,7 @@
 package com.music.zenith.ui.components
 
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import com.music.zenith.ui.player.LocalLyricsMenuPopover
 import com.music.zenith.ui.player.LyricsMenuEntry
