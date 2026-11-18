@@ -1,13 +1,14 @@
 package com.music.zenith.ui.screens
 
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Extension
 import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material.icons.rounded.SmartDisplay
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import com.music.zenith.ui.player.LocalLyricsMenuPopover
 import com.music.zenith.ui.player.LyricsMenuEntry
 
