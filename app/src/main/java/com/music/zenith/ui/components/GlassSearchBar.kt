@@ -92,9 +92,15 @@ fun GlassSearchBar(
     // Starts at rest and springs open on the frame it arrives.
     var entered by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { entered = true }
+    // Opening is softer with a little overshoot (liquid feel); closing is
+    // firmer and nearly critically damped so the bar swap is not delayed.
     val openFraction by animateFloatAsState(
         targetValue = if (open && entered) 1f else 0f,
-        animationSpec = spring(dampingRatio = 0.72f, stiffness = 320f),
+        animationSpec = if (open) {
+            spring(dampingRatio = 0.74f, stiffness = 240f)
+        } else {
+            spring(dampingRatio = 0.92f, stiffness = 380f)
+        },
         label = "searchBarOpen",
     )
     val currentOnClosed by rememberUpdatedState(onClosed)
@@ -128,6 +134,9 @@ fun GlassSearchBar(
     }
     // Controls only answer once the bar has opened, not while it is folding.
     val interactive = open && openFraction > 0.9f
+    // The field's contents fade in after the capsule has started to widen,
+    // and out before it folds back, so text never squeezes mid-morph.
+    val contentAlpha = ((openFraction - 0.3f) / 0.6f).coerceIn(0f, 1f)
 
     BoxWithConstraints(
         modifier = modifier
@@ -236,7 +245,7 @@ fun GlassSearchBar(
                     modifier = Modifier
                         .align(Alignment.CenterStart)
                         .size(BAR_FIELD_CONTROL)
-                        .graphicsLayer { alpha = openFraction.coerceIn(0f, 1f) }
+                        .graphicsLayer { alpha = contentAlpha }
                         .clickable(
                             enabled = interactive,
                             interactionSource = remember { MutableInteractionSource() },
@@ -263,7 +272,7 @@ fun GlassSearchBar(
                         .padding(start = BAR_FIELD_CONTROL)
                         .requiredWidth(fieldWidth - BAR_FIELD_CONTROL * 2)
                         .fillMaxHeight()
-                        .graphicsLayer { alpha = openFraction.coerceIn(0f, 1f) },
+                        .graphicsLayer { alpha = contentAlpha },
                     contentAlignment = Alignment.CenterStart,
                 ) {
                     MaterialTheme(
@@ -291,7 +300,7 @@ fun GlassSearchBar(
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
                         .size(BAR_FIELD_CONTROL)
-                        .graphicsLayer { alpha = openFraction.coerceIn(0f, 1f) }
+                        .graphicsLayer { alpha = contentAlpha }
                         .clickable(
                             enabled = interactive,
                             interactionSource = remember { MutableInteractionSource() },
