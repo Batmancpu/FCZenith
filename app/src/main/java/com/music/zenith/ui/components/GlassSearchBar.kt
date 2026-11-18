@@ -253,6 +253,7 @@ fun GlassSearchBar(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
                 ) {
+                    onQueryChange("")
                     focusManager.clearFocus()
                     keyboard?.hide()
                     onLastTabClick()
@@ -327,26 +328,25 @@ fun GlassSearchBar(
             // Everything below keeps its full width the whole time, so nothing
             // reflows while the capsule springs; only its reveal changes.
             CompositionLocalProvider(LocalSearchFieldOnSurface provides true) {
-                // Back: clears the query and closes the field. The tab stays.
+                // Search glyph where the back arrow used to sit; the circle on the
+                // left closes the field. Tapping the glyph submits a non-blank query.
                 Box(
                     modifier = Modifier
                         .align(Alignment.CenterStart)
                         .size(BAR_FIELD_CONTROL)
                         .graphicsLayer { alpha = contentAlpha }
                         .clickable(
-                            enabled = interactive,
+                            enabled = interactive && query.isNotBlank(),
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
                         ) {
-                            onQueryChange("")
+                            onSubmit()
                             focusManager.clearFocus()
-                            keyboard?.hide()
-                            onClose()
                         },
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
-                        imageVector = SfIcons.ArrowBack,
+                        imageVector = SfIcons.Search,
                         contentDescription = null,
                         tint = tint,
                         modifier = Modifier.size(TAB_ICON_SIZE),
@@ -378,6 +378,7 @@ fun GlassSearchBar(
                             focusRequester = focusRequester,
                             placeholder = placeholder,
                             onFocusChange = onFocusChange,
+                            showSearchIcon = false,
                         )
                     }
                 }
