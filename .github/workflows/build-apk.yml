@@ -90,11 +90,12 @@ jobs:
           LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
           LASTFM_SECRET: ${{ secrets.LASTFM_SECRET }}
         run: |
+          set -o pipefail
           chmod +x gradlew
           # Ulangi sampai 3 kali: unduhan dependensi native (libusb) kadang gagal sementara.
           n=0
           until ./gradlew :app:assembleProdRelease --parallel --build-cache --stacktrace \
-            -Dorg.gradle.jvmargs="-Xmx5g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8"; do
+            -Dorg.gradle.jvmargs="-Xmx5g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8" 2>&1 | tee build-full.log; do
             n=$((n + 1))
             if [ "$n" -ge 3 ]; then
               echo "::error::Build gagal setelah $n percobaan."
@@ -103,6 +104,20 @@ jobs:
             echo "::warning::Build gagal, mengulang ($n/3) dalam 20 detik..."
             sleep 20
           done
+
+      - name: Extract build errors
+        if: failure()
+        run: |
+          : > build-error.txt
+          if [ -f build-full.log ]; then
+            grep -E "^e: |What went wrong|Execution failed|Caused by|FAILURE:|FAILED|error:" build-full.log \
+              | awk '!seen[$0]++' | tail -n 40 >> build-error.txt || true
+            if [ ! -s build-error.txt ]; then
+              tail -n 40 build-full.log >> build-error.txt
+            fi
+          else
+            echo "Log build tidak tersedia." >> build-error.txt
+          fi
 
       - name: ccache stats
         if: always()
@@ -229,3 +244,17 @@ jobs:
             ARGS+=(--data-urlencode "message_thread_id=${TG_TOPIC_ID}")
           fi
           curl -sS --fail-with-body -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" "${ARGS[@]}"
+
+          if [ "$JOB_STATUS" != "success" ] && [ -s build-error.txt ]; then
+            ERR_HTML=$(head -c 3500 build-error.txt | esc "$(cat)")
+            ERR_ARGS=(
+              --data-urlencode "chat_id=${TG_CHAT_ID}"
+              --data-urlencode "parse_mode=HTML"
+              --data-urlencode "disable_web_page_preview=true"
+              --data-urlencode "text=<b>Error log</b> (tekan lama untuk salin)${NL}<pre>${ERR_HTML}</pre>"
+            )
+            if [ -n "${TG_TOPIC_ID:-}" ]; then
+              ERR_ARGS+=(--data-urlencode "message_thread_id=${TG_TOPIC_ID}")
+            fi
+            curl -sS --fail-with-body -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" "${ERR_ARGS[@]}" > /dev/null
+          fi
