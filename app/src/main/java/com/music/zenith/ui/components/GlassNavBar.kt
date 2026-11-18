@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -591,7 +592,12 @@ fun GlassMiniPlayer(
             onBlockedControl = onBlockedControl,
             dock = dock,
             pull = pull,
-            modifier = Modifier.fillMaxWidth().then(Modifier.liquidGlass(shape = pillShape)),
+            // 48dp seperti tinggi baris tab: di nav bar, accessory inline diregangkan ke tinggi itu,
+            // sedangkan di sini tidak ada yang meregangkannya (inline 40dp, expanded 48dp).
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .then(Modifier.liquidGlass(shape = pillShape)),
         )
     }
 }
