@@ -372,6 +372,15 @@ fun SearchScreen(
             // The big title scrolls with the list, the way the New page's heading does.
             item {
                 AnimatedVisibility(
+                    // Lifted by [SEARCH_TITLE_LIFT] so the heading sits where New's does;
+                    // the height shrinks with it, so everything below rises with the title.
+                    modifier = Modifier.layout { measurable, constraints ->
+                        val placeable = measurable.measure(constraints)
+                        val lift = SEARCH_TITLE_LIFT.roundToPx()
+                        layout(placeable.width, (placeable.height - lift).coerceAtLeast(0)) {
+                            placeable.place(0, -lift)
+                        }
+                    },
                     visible = showTitle && query.isEmpty() && results == null && !fieldFocused,
                     enter = fadeIn() + expandVertically(),
                     exit = fadeOut() + shrinkVertically(),
@@ -577,6 +586,13 @@ fun SearchScreen(
 
 /** The soft top edge of the anchored suggestion list; also the room kept for it. */
 private val ANCHORED_FADE_HEIGHT = 24.dp
+
+/**
+ * How far the Search heading is raised to meet New's: that page lifts everything by
+ * HOME_TITLE_LIFT (28dp) from a content start of bar + 12dp, this one starts at
+ * bar + 4dp with the same 8dp above its heading, so the difference is 20dp.
+ */
+private val SEARCH_TITLE_LIFT = 20.dp
 
 private data class SearchSection(val title: String?, val rows: List<SearchResult>)
 
