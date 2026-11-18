@@ -981,6 +981,16 @@ private fun ZenithApp(
     val searchListInset: () -> Int = remember(searchListImeInsets, searchListDensity) {
         { searchStackHeightPx + searchListImeInsets.getBottom(searchListDensity) }
     }
+    // Height of the bars under the plain bottom search field (no morph), reported
+    // by the floating bars. The field sits above the taller of these and the
+    // keyboard, so the suggestions leave that room plus the field's own height.
+    var searchBottomBarsPx by remember { mutableIntStateOf(0) }
+    val searchBottomFieldInset: () -> Int = remember(searchListImeInsets, searchListDensity) {
+        {
+            maxOf(searchBottomBarsPx, searchListImeInsets.getBottom(searchListDensity)) +
+                with(searchListDensity) { (10.dp + 48.dp).roundToPx() }
+        }
+    }
     var searchOpenState by remember { mutableStateOf<androidx.compose.runtime.State<Float>?>(null) }
     // Invalidates an in-flight radio lookup when a later play request wins.
     var playRequestGeneration by remember { mutableIntStateOf(0) }
@@ -4017,10 +4027,11 @@ private fun ZenithApp(
                                 showTitle = true,
                                 // Filter control rises to where the profile was (status bar + gap).
                                 filterBarTopPadding = topBarHeight() - com.music.zenith.ui.components.TopBarContentHeight + 8.dp,
-                                bottomAnchorInset = if (glassActive && searchTabSeparate && searchFieldOpen) {
-                                    searchListInset
+                                bottomAnchorInset = if (glassActive && searchTabSeparate) {
+                                    if (searchFieldOpen) searchListInset else null
                                 } else {
-                                    null
+                                    // The plain bottom field: suggestions grow up from it too.
+                                    searchBottomFieldInset
                                 },
                                 listModifier = if (glassSamplesBackdrop) {
                                     Modifier.layerBackdrop(searchBackdrop)
@@ -4687,6 +4698,10 @@ private fun ZenithApp(
                 // Whichever bar is drawing reports its height here, for the
                 // guard to read at layout — never in composition, see the guard.
                 val floatingBarsHeight = remember { mutableIntStateOf(0) }
+                LaunchedEffect(Unit) {
+                    androidx.compose.runtime.snapshotFlow { floatingBarsHeight.intValue }
+                        .collect { searchBottomBarsPx = it }
+                }
                 FloatingBarsTapGuard(
                     barsHeight = { floatingBarsHeight.intValue },
                     modifier = Modifier.align(Alignment.BottomCenter),
