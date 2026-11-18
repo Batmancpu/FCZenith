@@ -56,6 +56,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -2029,10 +2030,14 @@ private fun LosslessLabel(
             }
             .then(
                 if (chip) {
+                    // The slot is only as tall as the timestamp row, so the chip
+                    // is measured without a height cap and centred in it; capped,
+                    // the label's padding clipped the bottom of the text.
                     Modifier
-                        .clip(RoundedCornerShape(6.dp))
+                        .wrapContentHeight(align = Alignment.CenterVertically, unbounded = true)
+                        .clip(CircleShape)
                         .background(LocalPlayerTint.current.copy(alpha = 0.16f))
-                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                        .padding(horizontal = 10.dp, vertical = 3.dp)
                 } else {
                     Modifier
                 },
