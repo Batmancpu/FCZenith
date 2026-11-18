@@ -2171,22 +2171,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val again = feed.indexOfFirst { key(it) == "shelf:listen-again" }
         if (again < 0) return feed
         val skipTitles = setOf("recents", "recently played", "my speed dial", "speed dial")
+        val listenAgainIds = feed[again].items.mapNotNull { it.videoId }.toSet()
         val songs = feed
             .filter { key(it) != "shelf:listen-again" && it.title.trim().lowercase(Locale.ROOT) !in skipTitles }
             .flatMap { it.items }
             .filter { it.videoId != null && !it.isVideo && !it.thumbnailUrl.isNullOrBlank() }
+            .filter { it.videoId !in listenAgainIds }
             .distinctBy { it.videoId }
             .shuffled()
             .take(20)
-            .let { picked ->
-                if (picked.size >= 6) {
-                    picked
-                } else {
-                    (picked + feed[again].items.filter { it.videoId != null && !it.isVideo && !it.thumbnailUrl.isNullOrBlank() })
-                        .distinctBy { it.videoId }
-                        .take(20)
-                }
-            }
         if (songs.size < 4) return feed
         val shelf = HomeShelf(title = "Quick picks", items = songs)
         return feed.toMutableList().also { it.add(again + 1, shelf) }
