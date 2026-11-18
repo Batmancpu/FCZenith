@@ -317,10 +317,16 @@ fun SearchScreen(
         if (sourceLabels != null && sourcePopover != null) {
             val sourceIcons = listOf(Icons.Rounded.SmartDisplay, Icons.Rounded.LibraryMusic, Icons.Rounded.Extension)
             val sourceEntries = sourceLabels.mapIndexed { index, label ->
-                LyricsMenuEntry(label, sourceIcons.getOrElse(index) { Icons.Rounded.Public }, true) {
-                    sourceMenuOpen = false
-                    onSourceSelect(index)
-                }
+                LyricsMenuEntry(
+                    label = label,
+                    icon = sourceIcons.getOrElse(index) { Icons.Rounded.Public },
+                    enabled = true,
+                    onClick = {
+                        sourceMenuOpen = false
+                        onSourceSelect(index)
+                    },
+                    selected = index == sourceIndex,
+                )
             }
             val anchorInRoot = sourceMenuAnchor?.translate(-rootOrigin.x, -rootOrigin.y)
             sourcePopover(sourceMenuOpen, anchorInRoot, { sourceMenuOpen = false }, sourceEntries, frost)

@@ -300,6 +300,7 @@ import com.music.zenith.ui.components.lyricsGlassDiscSurface
 import com.music.zenith.ui.components.lyricsGlassSource
 import com.music.zenith.ui.player.LocalLyricsGlassSource
 import com.music.zenith.ui.player.LocalLyricsMenuPopover
+import androidx.compose.material.icons.rounded.Check
 import com.music.zenith.ui.player.LocalQueueInfoPopover
 import com.motion.lyrics.MotionLyricLine
 import com.motion.lyrics.toMotionWords
@@ -518,6 +519,15 @@ class MainActivity : AppCompatActivity() {
                                     icon = entry.icon,
                                     onClick = entry.onClick,
                                     enabled = entry.enabled,
+                                    labelColor = if (entry.selected) MaterialTheme.colorScheme.primary else null,
+                                    trailing = if (entry.selected) ({
+                                        Icon(
+                                            imageVector = Icons.Rounded.Check,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(20.dp),
+                                        )
+                                    }) else null,
                                 )
                             }
                         }
