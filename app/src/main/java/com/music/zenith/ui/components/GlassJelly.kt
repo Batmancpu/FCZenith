@@ -38,14 +38,14 @@ internal fun Modifier.glassJelly(pressScale: Float = GLASS_JELLY_PRESS): Modifie
     val offY = remember { Animatable(0f) }
     val stX = remember { Animatable(1f) }
     val stY = remember { Animatable(1f) }
-    val maxShift = with(LocalDensity.current) { 5.dp.toPx() }
+    val maxShift = with(LocalDensity.current) { 2.5.dp.toPx() }
     return this
         .pointerInput(reduce, pressScale) {
             if (reduce) return@pointerInput
             val slop = viewConfiguration.touchSlop
             awaitEachGesture {
                 val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-                val press = spring<Float>(dampingRatio = 0.6f, stiffness = 500f)
+                val press = spring<Float>(dampingRatio = 0.75f, stiffness = 600f)
                 scope.launch { stX.animateTo(pressScale, press) }
                 scope.launch { stY.animateTo(pressScale, press) }
                 var total = Offset.Zero
@@ -60,16 +60,16 @@ internal fun Modifier.glassJelly(pressScale: Float = GLASS_JELLY_PRESS): Modifie
                     val dy = soft(total.y)
                     val w = size.width.coerceAtLeast(1).toFloat()
                     val h = size.height.coerceAtLeast(1).toFloat()
-                    val ax = (abs(dx) / w * 0.5f).coerceAtMost(0.12f)
-                    val ay = (abs(dy) / h * 0.5f).coerceAtMost(0.12f)
-                    val tx = (dx * 0.12f).coerceIn(-maxShift, maxShift)
-                    val ty = (dy * 0.12f).coerceIn(-maxShift, maxShift)
+                    val ax = (abs(dx) / w * 0.25f).coerceAtMost(0.05f)
+                    val ay = (abs(dy) / h * 0.25f).coerceAtMost(0.05f)
+                    val tx = (dx * 0.06f).coerceIn(-maxShift, maxShift)
+                    val ty = (dy * 0.06f).coerceIn(-maxShift, maxShift)
                     scope.launch { offX.snapTo(tx) }
                     scope.launch { offY.snapTo(ty) }
                     scope.launch { stX.snapTo(pressScale + ax - ay * 0.5f) }
                     scope.launch { stY.snapTo(pressScale + ay - ax * 0.5f) }
                 }
-                val wobble = spring<Float>(dampingRatio = 0.34f, stiffness = 260f)
+                val wobble = spring<Float>(dampingRatio = 0.55f, stiffness = 380f)
                 scope.launch { offX.animateTo(0f, wobble) }
                 scope.launch { offY.animateTo(0f, wobble) }
                 scope.launch { stX.animateTo(1f, wobble) }
@@ -85,4 +85,4 @@ internal fun Modifier.glassJelly(pressScale: Float = GLASS_JELLY_PRESS): Modifie
 }
 
 /** Skala tombol saat ditekan, sebelum regangan mengikuti jari. */
-internal const val GLASS_JELLY_PRESS = 0.92f
+internal const val GLASS_JELLY_PRESS = 0.95f
