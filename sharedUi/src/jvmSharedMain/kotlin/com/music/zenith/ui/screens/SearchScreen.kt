@@ -193,6 +193,8 @@ fun SearchScreen(
     sourceLabels: List<String>? = null,
     sourceIndex: Int = 0,
     onSourceSelect: (Int) -> Unit = {},
+    /** Renders the source picker popover with the search screen's own backdrop (supplied by the app). */
+    sourceMenu: (@Composable (Boolean, Rect?, () -> Unit, List<LyricsMenuEntry>) -> Unit)? = null,
     /** The mood and genre categories, shown while the field is empty and has no focus. */
     exploreState: UiState<List<MoodGenreSection>>? = null,
     onCategoryClick: ((MoodGenre) -> Unit)? = null,
@@ -314,8 +316,7 @@ fun SearchScreen(
 
         // Source picker: the lyrics globe popover, hosted at the screen root so the
         // anchor and the blur both line up with the globe in the field.
-        val sourcePopover = LocalLyricsMenuPopover.current
-        if (sourceLabels != null && sourcePopover != null) {
+        if (sourceLabels != null && sourceMenu != null) {
             val sourceIcons = listOf(Icons.Rounded.SmartDisplay, Icons.Rounded.LibraryMusic, Icons.Rounded.Extension)
             val sourceEntries = sourceLabels.mapIndexed { index, label ->
                 LyricsMenuEntry(
@@ -330,7 +331,7 @@ fun SearchScreen(
                 )
             }
             val anchorInRoot = sourceMenuAnchor?.translate(-rootOrigin.x, -rootOrigin.y)
-            sourcePopover(sourceMenuOpen, anchorInRoot, { sourceMenuOpen = false }, sourceEntries, frost)
+            sourceMenu(sourceMenuOpen, anchorInRoot, { sourceMenuOpen = false }, sourceEntries)
         }
 
         LazyColumn(

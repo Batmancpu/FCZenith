@@ -4020,6 +4020,37 @@ private fun ZenithApp(
                                 ),
                                 sourceIndex = searchSource.ordinal,
                                 onSourceSelect = { index -> onSearchSourceChange(SearchSource.entries[index]) },
+                                sourceMenu = { open, anchor, onDismiss, entries ->
+                                    IosMenuPopover(
+                                        item = if (open) Unit else null,
+                                        anchor = anchor,
+                                        onDismiss = onDismiss,
+                                        backdrop = searchBackdrop,
+                                        placement = IosMenuPlacement.AboveStart,
+                                        dimBackground = false,
+                                        glassRim = true,
+                                        frostAlpha = 0.3f,
+                                        startOffset = (-32).dp,
+                                    ) {
+                                        entries.forEach { entry ->
+                                            IosMenuRow(
+                                                label = entry.label,
+                                                icon = entry.icon,
+                                                onClick = entry.onClick,
+                                                enabled = entry.enabled,
+                                                labelColor = if (entry.selected) MaterialTheme.colorScheme.primary else null,
+                                                trailing = if (entry.selected) ({
+                                                    Icon(
+                                                        imageVector = Icons.Rounded.Check,
+                                                        contentDescription = null,
+                                                        tint = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.size(20.dp),
+                                                    )
+                                                }) else null,
+                                            )
+                                        }
+                                    }
+                                },
                                 exploreState = exploreState,
                                 onCategoryClick = viewModel::openMoodGenre,
                                 onExploreRetry = viewModel::loadExplore,
