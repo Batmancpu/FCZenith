@@ -1279,9 +1279,22 @@ private fun SharedTransitionScope.ExpandedTabs(
                                 onDragEnd = {
                                     if (!holding) return@detectHorizontalDragGestures
                                     holding = false
+                                    val standalone = scope.standaloneTab
+                                    val dragMax = scope.tabs.lastIndex.toFloat() +
+                                        (if (standalone != null) STANDALONE_DRAG_REACH else 0f)
                                     val absoluteIndexFloat = (dragStartIndex + totalDrag / step)
-                                        .coerceIn(0f, scope.tabs.lastIndex.toFloat())
+                                        .coerceIn(0f, dragMax)
+                                    // Carried past the last tab, the indicator was dragged onto
+                                    // the standalone tab (Search): choose it.
+                                    if (standalone != null &&
+                                        absoluteIndexFloat > scope.tabs.lastIndex + 0.5f
+                                    ) {
+                                        pill.release(scope.tabs.lastIndex)
+                                        standalone.onClick()
+                                        return@detectHorizontalDragGestures
+                                    }
                                     val newIndex = absoluteIndexFloat.roundToInt()
+                                        .coerceAtMost(scope.tabs.lastIndex)
                                     pill.release(newIndex)
                                     if (newIndex != currentSelectedTabIndex) {
                                         scope.tabs[newIndex].onClick()
@@ -1290,8 +1303,10 @@ private fun SharedTransitionScope.ExpandedTabs(
                                 onHorizontalDrag = { _, delta ->
                                     if (!holding) return@detectHorizontalDragGestures
                                     totalDrag += delta * direction
+                                    val dragMax = scope.tabs.lastIndex.toFloat() +
+                                        (if (scope.standaloneTab != null) STANDALONE_DRAG_REACH else 0f)
                                     val absoluteIndexFloat = (dragStartIndex + totalDrag / step)
-                                        .coerceIn(0f, scope.tabs.lastIndex.toFloat())
+                                        .coerceIn(0f, dragMax)
                                     pill.dragTo(absoluteIndexFloat)
 
                                     val approximateTab = absoluteIndexFloat.roundToInt()
@@ -1550,6 +1565,9 @@ private fun Modifier.animateEnterExitTab(
         }
     }
 }
+
+/** How far past the last tab, in tab steps, a drag may carry the indicator towards the standalone tab. */
+private const val STANDALONE_DRAG_REACH = 1f
 
 private class FloatingTabBarScopeImpl(
     private val inlineSplitLast: Boolean = false,
