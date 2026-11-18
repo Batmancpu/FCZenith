@@ -229,8 +229,10 @@ jobs:
             KEYBOARD=$(jq -nc --arg r "$RUN_URL" --arg c "${REPO_URL}/commit/${SHA}" --arg l "${REPO_URL}/releases" \
               '{inline_keyboard: [[{text: "Workflow run", url: $r}, {text: "Commit", url: $c}], [{text: "Releases", url: $l}]]}')
           else
-            KEYBOARD=$(jq -nc --arg r "$RUN_URL" --arg c "${REPO_URL}/commit/${SHA}" \
-              '{inline_keyboard: [[{text: "Workflow run", url: $r}, {text: "Commit", url: $c}]]}')
+            ERR_COPY=$(tr '\n' ' ' < build-error.txt 2>/dev/null | sed 's/  */ /g' | head -c 256)
+            [ -n "$ERR_COPY" ] || ERR_COPY="Log tidak tersedia"
+            KEYBOARD=$(jq -nc --arg r "$RUN_URL" --arg c "${REPO_URL}/commit/${SHA}" --arg t "$ERR_COPY" \
+              '{inline_keyboard: [[{text: "Workflow run", url: $r}, {text: "Commit", url: $c}], [{text: "Salin error", copy_text: {text: $t}}]]}')
           fi
 
           ARGS=(
@@ -245,16 +247,4 @@ jobs:
           fi
           curl -sS --fail-with-body -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" "${ARGS[@]}"
 
-          if [ "$JOB_STATUS" != "success" ] && [ -s build-error.txt ]; then
-            ERR_HTML=$(head -c 3500 build-error.txt | esc "$(cat)")
-            ERR_ARGS=(
-              --data-urlencode "chat_id=${TG_CHAT_ID}"
-              --data-urlencode "parse_mode=HTML"
-              --data-urlencode "disable_web_page_preview=true"
-              --data-urlencode "text=<b>Error log</b> (tekan lama untuk salin)${NL}<pre>${ERR_HTML}</pre>"
-            )
-            if [ -n "${TG_TOPIC_ID:-}" ]; then
-              ERR_ARGS+=(--data-urlencode "message_thread_id=${TG_TOPIC_ID}")
-            fi
-            curl -sS --fail-with-body -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" "${ERR_ARGS[@]}" > /dev/null
-          fi
+
