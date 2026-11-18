@@ -111,6 +111,19 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.graphics.BlurEffect
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.TileMode
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.layer.GraphicsLayer
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
+import androidx.compose.ui.unit.IntSize
+import kotlin.math.roundToInt
 import java.util.Locale
 
 @Composable
@@ -205,6 +218,8 @@ fun SearchScreen(
     fieldFocused: Boolean = true,
     /** Applied to the scrolling list; the app uses it to record the list as a blur source. */
     listModifier: Modifier = Modifier,
+    /** Whether the header band blurs the list under it; false draws a plain scrim instead. */
+    headerBlur: Boolean = true,
     /** Large "Search" heading at the head of the page while the field is empty and unfocused. */
     showTitle: Boolean = false,
     /**
@@ -292,27 +307,16 @@ fun SearchScreen(
         label = "searchHeaderShapeAlpha",
     )
     val headerHeight = with(LocalDensity.current) { headerHeightPx.toDp() }
+    val contentLayer = rememberGraphicsLayer()
+    val blurLayer = rememberGraphicsLayer()
+    val headerRadiusPx = with(LocalDensity.current) { HEADER_SHAPE_RADIUS.toPx() }
+    val headerBlurPx = with(LocalDensity.current) { HEADER_BLUR_RADIUS.toPx() }
     var sourceMenuOpen by remember { mutableStateOf(false) }
     var sourceMenuAnchor by remember { mutableStateOf<Rect?>(null) }
     var rootOrigin by remember { mutableStateOf(Offset.Zero) }
     Box(modifier = modifier.fillMaxSize().onGloballyPositioned { rootOrigin = it.positionInWindow() }) {
-        // Header shape behind the filter control: the page colour (black in dark,
-        // white in light) over a blur of the list, bottom corners rounded, so rows
-        // scroll away beneath it instead of running through the control.
-        if (headerShapeAlpha > 0f) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .fillMaxWidth()
-                    .height(headerHeight)
-                    .zIndex(0.5f)
-                    .graphicsLayer { alpha = headerShapeAlpha }
-                    .clip(RoundedCornerShape(bottomStart = HEADER_SHAPE_RADIUS, bottomEnd = HEADER_SHAPE_RADIUS))
-                    // Page colour behind the filter control, so rows scroll away beneath it
-                    // instead of running through the control.
-                    .background(frostFill.copy(alpha = 0.82f)),
-            )
-        }
+        // The frosted band behind the filter control is drawn by the list itself
+        // (see frostedHeaderBand), so it shares the list's coordinates and cannot miss it.
         // Search field and filter tabs stay fixed at the top, outside the
         // scrolling list, so they're always reachable rather than scrolling
         // away with the results or recent searches beneath them.
@@ -391,6 +395,16 @@ fun SearchScreen(
             state = listState,
             modifier = Modifier
                 .fillMaxSize()
+                .frostedHeaderBand(
+                    contentLayer = contentLayer,
+                    blurLayer = blurLayer,
+                    blurEnabled = headerBlur,
+                    bandHeightPx = { headerHeightPx.toFloat() },
+                    amount = { headerShapeAlpha },
+                    cornerRadiusPx = headerRadiusPx,
+                    blurRadiusPx = headerBlurPx,
+                    fill = frostFill,
+                )
                 .then(listModifier)
                 .onSizeChanged { listWidthPx = it.width },
             reverseLayout = anchored,
@@ -621,6 +635,67 @@ private val ANCHORED_FADE_HEIGHT = 24.dp
 
 /** Corner radius of the frosted header shape behind the filter control. */
 private val HEADER_SHAPE_RADIUS = 36.dp
+
+/** Blur radius of the frosted header band. */
+private val HEADER_BLUR_RADIUS = 24.dp
+
+/**
+ * Draws the list, then a frosted band over its top [bandHeightPx] with rounded bottom
+ * corners: the page colour under a blurred copy of the same list, so rows scroll away
+ * into frost beneath the filter control. The list is recorded once and the blur layer
+ * redraws that recording, so the band is in the list's own coordinates. [amount] fades
+ * the band in and out; with [blurEnabled] false it is a plain scrim instead.
+ */
+private fun Modifier.frostedHeaderBand(
+    contentLayer: GraphicsLayer,
+    blurLayer: GraphicsLayer,
+    blurEnabled: Boolean,
+    bandHeightPx: () -> Float,
+    amount: () -> Float,
+    cornerRadiusPx: Float,
+    blurRadiusPx: Float,
+    fill: Color,
+): Modifier = drawWithContent {
+    val a = amount()
+    val bandH = bandHeightPx().coerceAtMost(size.height)
+    if (a <= 0.01f || bandH <= 0f) {
+        drawContent()
+        return@drawWithContent
+    }
+    val band = Path().apply {
+        addRoundRect(
+            RoundRect(
+                left = 0f,
+                top = 0f,
+                right = size.width,
+                bottom = bandH,
+                bottomLeftCornerRadius = CornerRadius(cornerRadiusPx),
+                bottomRightCornerRadius = CornerRadius(cornerRadiusPx),
+            ),
+        )
+    }
+    if (!blurEnabled) {
+        drawContent()
+        clipPath(band) { drawRect(fill.copy(alpha = 0.82f * a)) }
+        return@drawWithContent
+    }
+    val w = size.width.roundToInt().coerceAtLeast(1)
+    contentLayer.record(size = IntSize(w, size.height.roundToInt().coerceAtLeast(1))) {
+        this@drawWithContent.drawContent()
+    }
+    drawLayer(contentLayer)
+    // The band plus enough below it for the blur to sample real rows at its edge.
+    val sampleH = (bandH + blurRadiusPx * 2f).coerceAtMost(size.height).roundToInt().coerceAtLeast(1)
+    blurLayer.clip = true
+    blurLayer.renderEffect = BlurEffect(null, blurRadiusPx, blurRadiusPx, TileMode.Clamp)
+    blurLayer.alpha = a
+    blurLayer.record(size = IntSize(w, sampleH)) { drawLayer(contentLayer) }
+    clipPath(band) {
+        drawRect(fill.copy(alpha = a))
+        drawLayer(blurLayer)
+        drawRect(fill.copy(alpha = 0.4f * a))
+    }
+}
 
 /**
  * How far the Search heading is raised to meet New's: that page lifts everything by

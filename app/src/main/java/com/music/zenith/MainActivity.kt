@@ -4027,6 +4027,8 @@ private fun ZenithApp(
                                 } else {
                                     Modifier
                                 },
+                                headerBlur = !reduceDynamicBlur &&
+                                    android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S,
 
                                 // The settings page's own two-state selector, so the
                                 // app has one look for "pick one of these".
