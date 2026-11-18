@@ -4808,6 +4808,10 @@ private fun ZenithApp(
                         onClosed = {
                             searchFieldFocused = false
                             searchFieldOpen = false
+                            // Selama morph tampil, scroll halaman Search tetap menggerakkan
+                            // navBarScroll padahal bar yang terlihat bukan GlassNavBar. Pulihkan
+                            // bentuk saat morph dibuka, supaya mini player tidak loncat ke inline.
+                            if (searchFromInline) navBarScroll.inline() else navBarScroll.expand()
                         },
                         query = query,
                         onQueryChange = viewModel::onQueryChange,
