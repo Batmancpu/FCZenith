@@ -973,6 +973,14 @@ private fun ZenithApp(
     // Whether the field opened out of the collapsed (inline) nav bar, and how far
     // the bar has opened: the mini player rises and widens on that same spring.
     var searchFromInline by remember { mutableStateOf(false) }
+    // Height of the bar stack that floats over the Search page (mini player, notice,
+    // the search bar); with the keyboard it is the room the suggestions must leave.
+    var searchStackHeightPx by remember { mutableIntStateOf(0) }
+    val searchListImeInsets = WindowInsets.ime
+    val searchListDensity = LocalDensity.current
+    val searchListInset: () -> Int = remember(searchListImeInsets, searchListDensity) {
+        { searchStackHeightPx + searchListImeInsets.getBottom(searchListDensity) }
+    }
     var searchOpenState by remember { mutableStateOf<androidx.compose.runtime.State<Float>?>(null) }
     // Invalidates an in-flight radio lookup when a later play request wins.
     var playRequestGeneration by remember { mutableIntStateOf(0) }
@@ -4007,6 +4015,11 @@ private fun ZenithApp(
                                 topPadding = topBarHeight() + 4.dp,
                                 showField = false,
                                 showTitle = true,
+                                bottomAnchorInset = if (glassActive && searchTabSeparate && searchFieldOpen) {
+                                    searchListInset
+                                } else {
+                                    null
+                                },
                                 listModifier = if (glassSamplesBackdrop) {
                                     Modifier.layerBackdrop(searchBackdrop)
                                 } else {
@@ -4760,7 +4773,10 @@ private fun ZenithApp(
                         .fillMaxWidth()
                         // Lifts the whole stack, mini player included, above the keyboard.
                         .offset { IntOffset(0, -imeInsets.getBottom(this)) }
-                        .onSizeChanged { floatingBarsHeight.intValue = it.height },
+                        .onSizeChanged {
+                            floatingBarsHeight.intValue = it.height
+                            searchStackHeightPx = it.height
+                        },
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     QueueActionNoticeHost(queueNotice)

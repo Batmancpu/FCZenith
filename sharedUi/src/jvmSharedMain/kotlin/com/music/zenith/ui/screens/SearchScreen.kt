@@ -69,6 +69,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import com.music.zenith.data.model.MoodGenre
@@ -207,6 +208,13 @@ fun SearchScreen(
     headerModifier: Modifier = Modifier,
     /** Large "Search" heading at the head of the page while the field is empty and unfocused. */
     showTitle: Boolean = false,
+    /**
+     * Pixels from the bottom of the page up to the top of a search field that floats
+     * over it (phone, liquid glass), read at layout so it follows the keyboard frame by
+     * frame. Non-null: while suggestions are up they are laid out from the bottom, the
+     * best match right above the field. Null (desktop, other bars): unchanged.
+     */
+    bottomAnchorInset: (() -> Int)? = null,
 ) {
     val focusRequester = remember { FocusRequester() }
     var listWidthPx by remember { mutableIntStateOf(0) }
@@ -238,6 +246,17 @@ fun SearchScreen(
     // appear as a dropdown beneath the text completions rather than floating
     // after the search has committed.
     val showTypeahead = typeaheadResults.isNotEmpty() && suggesting
+    // Suggestions grow upward from the field: the list is reversed, so item 0 sits
+    // against the field and a long typeahead list overflows away from the thumb.
+    val anchored = suggesting && bottomAnchorInset != null
+    // Only a flip resets the scroll; a page that is merely re-entered keeps its place.
+    val anchoredBefore = remember { booleanArrayOf(anchored) }
+    LaunchedEffect(anchored) {
+        if (anchoredBefore[0] != anchored) {
+            anchoredBefore[0] = anchored
+            listState.scrollToItem(0)
+        }
+    }
     LaunchedEffect(listState, results, loadingMore, searchingLibrary, searchingAddons) {
         if (results !is UiState.Success || searchingLibrary || searchingAddons) return@LaunchedEffect
         snapshotFlow {
@@ -342,7 +361,13 @@ fun SearchScreen(
                 .then(if (headerModifier === Modifier) Modifier.hazeSource(frost) else Modifier)
                 .then(listModifier)
                 .onSizeChanged { listWidthPx = it.width },
-            contentPadding = PaddingValues(top = headerHeight, bottom = contentPadding.calculateBottomPadding()),
+            reverseLayout = anchored,
+            // Anchored, the bottom room is the live inset item below, and the top keeps a
+            // little extra so the first row at the end of the scroll clears the fade.
+            contentPadding = PaddingValues(
+                top = headerHeight + if (anchored) ANCHORED_FADE_HEIGHT else 0.dp,
+                bottom = if (anchored) 0.dp else contentPadding.calculateBottomPadding(),
+            ),
         ) {
             // The big title scrolls with the list, the way the New page's heading does.
             item {
@@ -382,6 +407,17 @@ fun SearchScreen(
                     onBlockedSongClick = onBlockedSongClick,
                 )
                 suggesting -> {
+                    if (bottomAnchorInset != null) {
+                        // First item of the reversed list: the room under it down to the
+                        // field, measured at layout so the rows ride up with the keyboard.
+                        item(key = "suggestions:field-inset") {
+                            Spacer(
+                                Modifier.layout { _, constraints ->
+                                    layout(constraints.maxWidth, bottomAnchorInset().coerceAtLeast(0)) {}
+                                },
+                            )
+                        }
+                    }
                     searchSuggestions(
                         suggestions = suggestions,
                         // Picking one is done typing, so the keyboard comes down
@@ -518,8 +554,28 @@ fun SearchScreen(
                 }
             }
         }
+        // Rows leaving through the top fade out instead of being cut by the top bar.
+        // Drawn over the list and never touched, so it takes no input.
+        if (anchored) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .fillMaxWidth()
+                    .padding(top = topPadding)
+                    .height(ANCHORED_FADE_HEIGHT)
+                    .zIndex(1f)
+                    .background(
+                        androidx.compose.ui.graphics.Brush.verticalGradient(
+                            listOf(frostFill, frostFill.copy(alpha = 0f)),
+                        ),
+                    ),
+            )
+        }
     }
 }
+
+/** The soft top edge of the anchored suggestion list; also the room kept for it. */
+private val ANCHORED_FADE_HEIGHT = 24.dp
 
 private data class SearchSection(val title: String?, val rows: List<SearchResult>)
 
