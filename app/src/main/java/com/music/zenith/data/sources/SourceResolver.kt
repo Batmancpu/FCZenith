@@ -873,8 +873,8 @@ object SourceResolver {
      * [AudioCache][com.music.zenith.playback.AudioCache] decide how to treat
      * a YouTube id before anyone has asked a source for it.
      */
-    fun canSubstituteForYouTube(): Boolean =
-        SourceRegistry.activeForPlayback().indexOfFirst { it.kind == SourceKind.YOUTUBE } > 0
+    fun canSubstituteForYouTube(track: String? = TrackLog.current()): Boolean =
+        SourceRegistry.activeForPlayback(track).indexOfFirst { it.kind == SourceKind.YOUTUBE } > 0
 
     /**
      * The sources ranked above [configId], in order.
