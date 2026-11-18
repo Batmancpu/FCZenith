@@ -334,10 +334,18 @@ fun SearchScreen(
                     .zIndex(0.5f)
                     .graphicsLayer { alpha = headerShapeAlpha }
                     .clip(RoundedCornerShape(bottomStart = HEADER_SHAPE_RADIUS, bottomEnd = HEADER_SHAPE_RADIUS))
-                    // Page colour under the blur: the shape stays visible and covers the
-                    // control even where the blur itself is not drawn.
-                    .background(frostFill.copy(alpha = 0.82f))
-                    .optimizedHazeEffect(frost, headerFrostStyle),
+                    .then(
+                        if (headerModifier === Modifier) {
+                            // Page colour under the blur: the shape stays visible and covers the
+                            // control even where the blur itself is not drawn.
+                            Modifier
+                                .background(frostFill.copy(alpha = 0.82f))
+                                .optimizedHazeEffect(frost, headerFrostStyle)
+                        } else {
+                            // The app's own frost, drawn from the recorded list.
+                            headerModifier
+                        },
+                    ),
             )
         }
         // Search field and filter tabs stay fixed at the top, outside the

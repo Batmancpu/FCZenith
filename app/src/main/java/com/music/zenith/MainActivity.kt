@@ -284,6 +284,7 @@ import com.music.zenith.ui.components.backdrop.backdrops.snapshotBackdropSource
 
 import com.music.zenith.ui.components.backdrop.drawPlainBackdrop
 import com.music.zenith.ui.components.backdrop.effects.blur
+import com.music.zenith.ui.components.backdrop.drawBackdrop
 import com.music.zenith.ui.components.isGlassSupported
 import com.music.zenith.data.sources.SourceConfig
 import com.music.zenith.data.sources.SourceKind
@@ -4027,7 +4028,28 @@ private fun ZenithApp(
                                 } else {
                                     Modifier
                                 },
-                                headerModifier = Modifier,
+                                headerModifier = if (glassSamplesBackdrop) {
+                                    val headerFill = MaterialTheme.colorScheme.background
+                                    // Blurred copy of the list under the filter control. The opaque
+                                    // fill behind it hides the sharp rows, so only the frost shows.
+                                    Modifier.drawBackdrop(
+                                        backdrop = searchBackdrop,
+                                        shape = {
+                                            androidx.compose.foundation.shape.RoundedCornerShape(
+                                                bottomStart = 36.dp,
+                                                bottomEnd = 36.dp,
+                                            )
+                                        },
+                                        effects = { blur(24.dp.toPx() * 0.33f) },
+                                        highlight = null,
+                                        shadow = null,
+                                        onDrawBehind = { drawRect(headerFill) },
+                                        onDrawSurface = { drawRect(headerFill.copy(alpha = 0.35f)) },
+                                        backdropScale = 0.33f,
+                                    )
+                                } else {
+                                    Modifier
+                                },
 
                                 // The settings page's own two-state selector, so the
                                 // app has one look for "pick one of these".
