@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -33,7 +35,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -54,6 +57,9 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.lerp as lerpDp
 import com.music.zenith.ui.icons.SfIcons
 import kotlinx.coroutines.flow.first
@@ -110,6 +116,57 @@ private fun softFloor(
  * (28 + 48 + 14 = 90dp), less the pill's own 19dp margin.
  */
 private val MINI_INLINE_SIDE = 71.dp
+
+/** Isi field baru muncul setelah kapsul mulai melebar, dan hilang sebelum melipat. */
+private fun searchContentAlpha(p: Float): Float = ((p - 0.3f) / 0.6f).coerceIn(0f, 1f)
+
+/** Tab yang tidak ikut meluncur memudar cepat selagi pill menyempit. */
+private fun searchTabFade(p: Float): Float = (1f - p * 2.2f).coerceIn(0f, 1f)
+
+/**
+ * Ukuran kotak yang dihitung di fase layout dari progres animasi: satu frame animasi
+ * hanya mengukur ulang kotak ini, tanpa merekomposisi isinya.
+ */
+private fun Modifier.searchMorphSize(width: () -> Dp, height: () -> Dp): Modifier =
+    layout { measurable, constraints ->
+        val w = width().roundToPx().coerceIn(0, constraints.maxWidth)
+        val h = height().roundToPx().coerceIn(0, constraints.maxHeight)
+        val placeable = measurable.measure(Constraints.fixed(w, h))
+        layout(w, h) { placeable.placeRelative(0, 0) }
+    }
+
+/**
+ * Glyph search yang meluncur dari tengah lingkaran ke slot awal field. Warna dibaca
+ * di sini saja, jadi hanya satu ikon ini yang direkomposisi per frame.
+ */
+@Composable
+private fun SearchMorphGlyph(
+    open: State<Float>,
+    restColor: Color,
+    openColor: Color,
+    restStart: Dp,
+    openStart: Dp,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Icon(
+        imageVector = SfIcons.Search,
+        contentDescription = null,
+        tint = lerp(restColor, openColor, open.value.coerceIn(0f, 1f)),
+        modifier = modifier
+            .size(TAB_ICON_SIZE)
+            .graphicsLayer {
+                translationX = lerpDp(restStart, openStart, open.value.coerceAtLeast(0f)).toPx()
+            }
+            .clickable(
+                enabled = enabled,
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick,
+            ),
+    )
+}
 
 /**
  * Moves the mini player from its slot between the two circles of the collapsed
@@ -197,14 +254,18 @@ fun GlassSearchBar(
     LaunchedEffect(Unit) { entered = true }
     // Opening is softer with a little overshoot (liquid feel); closing is
     // firmer and nearly critically damped so the bar swap is not delayed.
-    val openFraction by animateFloatAsState(
+    val openState = animateFloatAsState(
         targetValue = if (open && entered) 1f else 0f,
         animationSpec = spring(dampingRatio = 1f, stiffness = 340f),
         label = "searchBarOpen",
     )
     val currentOnClosed by rememberUpdatedState(onClosed)
+    val currentOnOpenFraction by rememberUpdatedState(onOpenFraction)
     val inlineStart = remember { startInline }
-    SideEffect { onOpenFraction(openFraction) }
+    // Fraksi dilaporkan ke atas lewat snapshotFlow, tanpa merekomposisi bar tiap frame.
+    LaunchedEffect(Unit) {
+        snapshotFlow { openState.value }.collect { currentOnOpenFraction(it) }
+    }
     // The resting row is as tall as GlassNavBar's own tab row: glyph + gap + label,
     // padded. That is whatever the label measures at this font scale, not a fixed
     // 62dp, so it is measured the same way here and the mini player above does not
@@ -219,7 +280,7 @@ fun GlassSearchBar(
     }
     LaunchedEffect(open) {
         if (!open) {
-            snapshotFlow { openFraction }.first { it <= 0.01f }
+            snapshotFlow { openState.value }.first { it <= 0.01f }
             currentOnClosed()
         }
     }
@@ -280,10 +341,14 @@ fun GlassSearchBar(
         MaterialTheme.colorScheme.primary
     }
     // Controls only answer once the bar has opened, not while it is folding.
-    val interactive = open && openFraction > 0.9f
-    // The field's contents fade in after the capsule has started to widen,
-    // and out before it folds back, so text never squeezes mid-morph.
-    val contentAlpha = ((openFraction - 0.3f) / 0.6f).coerceIn(0f, 1f)
+    val interactive by remember(open) { derivedStateOf { open && openState.value > 0.9f } }
+
+    // Progres hanya dibaca di fase layout/draw (lambda di bawah), jadi satu frame animasi
+    // tidak merekomposisi bar dan field-nya: yang berubah cuma ukuran, posisi, dan alpha.
+    val progress: () -> Float = { openState.value.coerceAtLeast(0f) }
+    val lastIndex = remember(tabs, lastTab) { tabs.indexOf(lastTab) }
+    // Selisih tinggi ikon di pill dengan titik tengah lingkaran: setengah (label + jaraknya).
+    val tabRise = (restHeight - PILL_INSET * 2 - TAB_VERTICAL_PADDING * 2 - TAB_ICON_SIZE) / 2
 
     BoxWithConstraints(
         modifier = modifier
@@ -294,49 +359,48 @@ fun GlassSearchBar(
             // line, so the mini player above does not move while this folds.
             .height(restHeight),
     ) {
-        val p = openFraction.coerceAtLeast(0f)
         // From the collapsed row the sides start 9dp further in and ease out to
         // the open bar's margin as the field widens.
-        val inset = if (inlineStart) {
-            lerpDp(BAR_INLINE_INSET, 0.dp, p).coerceAtLeast(0.dp)
-        } else {
-            0.dp
+        val inset: (Float) -> Dp = { p ->
+            if (inlineStart) lerpDp(BAR_INLINE_INSET, 0.dp, p).coerceAtLeast(0.dp) else 0.dp
         }
-        val fullWidth = maxWidth - inset * 2
+        val fullWidth: (Float) -> Dp = { p -> maxWidth - inset(p) * 2 }
         // The field's width once fully open; fixed so nothing reflows while it springs.
         val fieldWidth = maxWidth - BAR_FIELD_CIRCLE - BAR_FIELD_GAP
         // The pill's width at rest: whatever the Search circle leaves.
-        val restLeft = fullWidth - restHeight - BAR_SPACING
-        val gap = if (inlineStart) BAR_FIELD_GAP else lerpDp(BAR_SPACING, BAR_FIELD_GAP, p)
-        // The spring no longer overshoots, so the last-tab circle keeps its width
-        // and the mini player's rise follows the same smooth progress.
-        val leftWidth = if (inlineStart) {
-            BAR_FIELD_CIRCLE
-        } else {
-            lerpDp(restLeft, BAR_FIELD_CIRCLE, p)
+        val restLeft = maxWidth - restHeight - BAR_SPACING
+        val gap: (Float) -> Dp = { p ->
+            if (inlineStart) BAR_FIELD_GAP else lerpDp(BAR_SPACING, BAR_FIELD_GAP, p)
         }
-        // Collapsed start: a 48dp circle that grows leftward into the field.
-        val rightWidth = if (inlineStart) {
-            minOf(
-                maxOf(BAR_FIELD_CIRCLE, lerpDp(BAR_FIELD_CIRCLE, fieldWidth, p)),
-                fullWidth - leftWidth - gap,
-            )
-        } else {
-            fullWidth - leftWidth - gap
+        val leftWidth: (Float) -> Dp = { p ->
+            if (inlineStart) BAR_FIELD_CIRCLE else lerpDp(restLeft, BAR_FIELD_CIRCLE, p)
         }
-        val rowHeight = if (inlineStart) {
-            BAR_FIELD_HEIGHT
-        } else {
-            lerpDp(restHeight, BAR_FIELD_HEIGHT, p)
+        val rightWidth: (Float) -> Dp = { p ->
+            val room = fullWidth(p) - leftWidth(p) - gap(p)
+            val w = if (inlineStart) {
+                minOf(maxOf(BAR_FIELD_CIRCLE, lerpDp(BAR_FIELD_CIRCLE, fieldWidth, p)), room)
+            } else {
+                room
+            }
+            w.coerceAtLeast(0.dp)
         }
+        val rowHeight: (Float) -> Dp = { p ->
+            if (inlineStart) BAR_FIELD_HEIGHT else lerpDp(restHeight, BAR_FIELD_HEIGHT, p)
+        }
+        // Pusat slot tab terakhir terhadap pusat baris tab (baris tab selalu terpusat di
+        // kotak yang menyempit): sejauh itu ikonnya meluncur ke tengah lingkaran.
+        val tabSlot = (restLeft - PILL_INSET * 2) / tabs.size.coerceAtLeast(1)
+        val slotShift = PILL_INSET + tabSlot * (lastIndex.coerceAtLeast(0) + 0.5f) - restLeft / 2
 
         // Left: the tab pill, folding down to the last tab's circle.
         Box(
             modifier = Modifier
                 .align(Alignment.CenterStart)
-                .padding(start = inset)
-                .width(leftWidth)
-                .height(rowHeight)
+                .offset { IntOffset(inset(progress()).roundToPx(), 0) }
+                .searchMorphSize(
+                    width = { leftWidth(progress()) },
+                    height = { rowHeight(progress()) },
+                )
                 .clip(shape)
                 .then(Modifier.liquidGlass(shape = shape))
                 .clickable(
@@ -350,58 +414,78 @@ fun GlassSearchBar(
                     onLastTabClick()
                 },
         ) {
-            Row(
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .requiredWidth(restLeft)
-                    .padding(PILL_INSET)
-                    .graphicsLayer {
-                        alpha = if (inlineStart) 0f else (1f - openFraction * 2.2f).coerceIn(0f, 1f)
-                    },
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                tabs.forEach { tab ->
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        Icon(
-                            imageVector = tab.icon,
-                            contentDescription = tab.label,
-                            tint = tint,
-                            modifier = Modifier.size(TAB_ICON_SIZE),
-                        )
-                        Text(
-                            text = tab.label,
-                            style = tabLabelStyle(),
-                            color = tint,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.padding(top = TAB_ICON_LABEL_GAP),
-                        )
+            if (inlineStart || lastIndex < 0) {
+                // Collapsed start: the one tab is already a lone glyph in its circle.
+                Icon(
+                    imageVector = lastTab.icon,
+                    contentDescription = lastTab.label,
+                    tint = tint,
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .size(TAB_ICON_SIZE)
+                        .graphicsLayer {
+                            alpha = if (inlineStart) 1f else ((progress() - 0.45f) * 2.2f).coerceIn(0f, 1f)
+                        },
+                )
+            }
+            if (!inlineStart) {
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .requiredWidth(restLeft)
+                        .requiredHeight(restHeight)
+                        .padding(PILL_INSET),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    tabs.forEachIndexed { index, tab ->
+                        val moving = index == lastIndex
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            // Ikon tab terakhir adalah SATU ikon yang sama: tidak memudar,
+                            // hanya meluncur ke tengah lingkaran. Tab lain memudar.
+                            Icon(
+                                imageVector = tab.icon,
+                                contentDescription = tab.label,
+                                tint = tint,
+                                modifier = Modifier
+                                    .size(TAB_ICON_SIZE)
+                                    .graphicsLayer {
+                                        val p = progress()
+                                        if (moving) {
+                                            translationX = -slotShift.toPx() * p
+                                            translationY = tabRise.toPx() * p
+                                        } else {
+                                            alpha = searchTabFade(p)
+                                        }
+                                    },
+                            )
+                            Text(
+                                text = tab.label,
+                                style = tabLabelStyle(),
+                                color = tint,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier
+                                    .padding(top = TAB_ICON_LABEL_GAP)
+                                    .graphicsLayer { alpha = searchTabFade(progress()) },
+                            )
+                        }
                     }
                 }
             }
-            Icon(
-                imageVector = lastTab.icon,
-                contentDescription = lastTab.label,
-                tint = tint,
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .size(TAB_ICON_SIZE)
-                    .graphicsLayer {
-                        alpha = if (inlineStart) 1f else ((openFraction - 0.45f) * 2.2f).coerceIn(0f, 1f)
-                    },
-            )
         }
 
         // Right: the Search circle, growing leftward into the field.
         Box(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
-                .padding(end = inset)
-                .width(rightWidth)
-                .height(rowHeight)
+                .offset { IntOffset(-inset(progress()).roundToPx(), 0) }
+                .searchMorphSize(
+                    width = { rightWidth(progress()) },
+                    height = { rowHeight(progress()) },
+                )
                 .clip(shape)
                 .then(Modifier.liquidGlass(shape = shape)),
             contentAlignment = Alignment.CenterStart,
@@ -410,27 +494,18 @@ fun GlassSearchBar(
             // and, as the capsule opens, slides left with the capsule's edge into the
             // field's start slot. It is never swapped for a second icon or faded.
             val restRight = if (inlineStart) BAR_FIELD_CIRCLE else BAR_CIRCLE
-            val glyphStart = lerpDp(
-                (restRight - TAB_ICON_SIZE) / 2,
-                (BAR_FIELD_CONTROL - TAB_ICON_SIZE) / 2,
-                p,
-            ).coerceAtLeast(0.dp)
-            Icon(
-                imageVector = SfIcons.Search,
-                contentDescription = null,
-                tint = lerp(selectedColor, tint, p.coerceIn(0f, 1f)),
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .padding(start = glyphStart)
-                    .size(TAB_ICON_SIZE)
-                    .clickable(
-                        enabled = interactive && query.isNotBlank(),
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                    ) {
-                        onSubmit()
-                        focusManager.clearFocus()
-                    },
+            SearchMorphGlyph(
+                open = openState,
+                restColor = selectedColor,
+                openColor = tint,
+                restStart = ((restRight - TAB_ICON_SIZE) / 2).coerceAtLeast(0.dp),
+                openStart = ((BAR_FIELD_CONTROL - TAB_ICON_SIZE) / 2).coerceAtLeast(0.dp),
+                enabled = interactive && query.isNotBlank(),
+                onClick = {
+                    onSubmit()
+                    focusManager.clearFocus()
+                },
+                modifier = Modifier.align(Alignment.CenterStart),
             )
 
             // Everything below keeps its full width the whole time, so nothing
@@ -444,7 +519,7 @@ fun GlassSearchBar(
                         .padding(start = BAR_FIELD_CONTROL)
                         .requiredWidth(fieldWidth - BAR_FIELD_CONTROL * 2)
                         .fillMaxHeight()
-                        .graphicsLayer { alpha = contentAlpha },
+                        .graphicsLayer { alpha = searchContentAlpha(progress()) },
                     contentAlignment = Alignment.CenterStart,
                 ) {
                     MaterialTheme(
@@ -473,7 +548,7 @@ fun GlassSearchBar(
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
                         .size(BAR_FIELD_CONTROL)
-                        .graphicsLayer { alpha = contentAlpha }
+                        .graphicsLayer { alpha = searchContentAlpha(progress()) }
                         .onGloballyPositioned { sourceAnchor = it.boundsInWindow() }
                         .clickable(
                             enabled = interactive,
