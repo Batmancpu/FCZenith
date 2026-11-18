@@ -5705,7 +5705,9 @@ private fun ZenithApp(
                 item = searchSourceMenu,
                 anchor = searchSourceMenu?.anchor,
                 onDismiss = { searchSourceMenu?.onDismiss?.invoke() },
-                backdrop = pageBackdrop,
+                // Without liquid glass the page's haze does the frosting, as in
+                // the other non-glass panels; a recorded still would draw nothing.
+                backdrop = if (glassActive) pageBackdrop else null,
                 hazeState = hazeState,
                 placement = IosMenuPlacement.AboveStart,
                 dimBackground = false,
