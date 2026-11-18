@@ -289,7 +289,10 @@ fun SearchScreen(
             fallbackTint = HazeTint(frostFill),
         )
     }
-    var headerHeightPx by remember { mutableIntStateOf(0) }
+    // Until onSizeChanged reports, the header is just the top padding it starts
+    // with. Seeding it stops the list drawing one frame at 0 and then jumping down.
+    val seededHeaderPx = with(LocalDensity.current) { topPadding.roundToPx() }
+    var headerHeightPx by remember { mutableIntStateOf(seededHeaderPx) }
     val filterBarShown = filterBarTopPadding != null && results != null && !suggesting &&
         !searchingLibrary && !searchingAddons
     val headerTopPadding by animateDpAsState(

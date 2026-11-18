@@ -4732,6 +4732,9 @@ private fun ZenithApp(
                     navigator.clear()
                     viewModel.closeMoodGenre()
                     selectedTab = index
+                    // Search keeps its list state across tabs; rewind it before the
+                    // page's first frame instead of after it, so there is no visible jump.
+                    if (index == TAB_SEARCH) searchListState.requestScrollToItem(0)
                     searchFieldFocused = false
                     searchFromInline = glassActive && searchTabSeparate &&
                         index == TAB_SEARCH && navBarScroll.isInline
