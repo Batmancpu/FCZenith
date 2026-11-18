@@ -60,6 +60,18 @@ import androidx.compose.ui.unit.lerp as lerpDp
 import com.music.zenith.ui.icons.SfIcons
 import kotlinx.coroutines.flow.first
 
+/**
+ * Permintaan menu sumber pencarian dari globe di bar. Bar hanya melaporkan ini;
+ * menunya digambar host di root layar, bukan di dalam Column bar (popover
+ * fillMaxSize di dalam Column memakan seluruh tinggi dan mendorong bar).
+ */
+@androidx.compose.runtime.Stable
+class SourceMenuRequest(
+    val anchor: androidx.compose.ui.geometry.Rect?,
+    val entries: List<LyricsMenuEntry>,
+    val onDismiss: () -> Unit,
+)
+
 /** The bar at rest: the tab pill and the Search circle are both 62dp tall. */
 private val BAR_ROW_HEIGHT = 62.dp
 private val BAR_CIRCLE = 62.dp
@@ -174,8 +186,8 @@ fun GlassSearchBar(
     sourceLabels: List<String>,
     sourceIndex: Int,
     onSourceSelect: (Int) -> Unit,
-    /** Renders the source picker with the search backdrop (supplied by the app). */
-    sourceMenu: (@Composable (Boolean, androidx.compose.ui.geometry.Rect?, () -> Unit, List<LyricsMenuEntry>) -> Unit)? = null,
+    /** Melaporkan menu sumber yang sedang dibuka (null = tertutup); host yang menggambarnya. */
+    onSourceMenu: (SourceMenuRequest?) -> Unit = {},
     /** true = the bar opens out of the collapsed row: two 48dp circles with the mini player between. */
     startInline: Boolean = false,
     /** Reports the open fraction each frame so the mini player above can rise on the same spring. */
@@ -246,8 +258,22 @@ fun GlassSearchBar(
             selected = index == sourceIndex,
         )
     }
-    if (sourceMenu != null) {
-        sourceMenu(sourceMenuOpen, sourceAnchor, { sourceMenuOpen = false }, sourceEntries)
+    val currentOnSourceMenu by rememberUpdatedState(onSourceMenu)
+    LaunchedEffect(sourceMenuOpen, if (sourceMenuOpen) sourceAnchor else null, sourceIndex) {
+        currentOnSourceMenu(
+            if (sourceMenuOpen) {
+                SourceMenuRequest(
+                    anchor = sourceAnchor,
+                    entries = sourceEntries,
+                    onDismiss = { sourceMenuOpen = false },
+                )
+            } else {
+                null
+            },
+        )
+    }
+    DisposableEffect(Unit) {
+        onDispose { currentOnSourceMenu(null) }
     }
     val selectedColor = if (contentColor == Color.White) {
         lerp(MaterialTheme.colorScheme.primary, Color.White, 0.06f)

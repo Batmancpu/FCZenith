@@ -237,6 +237,7 @@ import com.music.zenith.ui.components.macOSPopupMorph
 import com.music.zenith.ui.components.IosMenuPlacement
 import com.music.zenith.ui.components.IosMenuPopover
 import com.music.zenith.ui.components.IosMenuRow
+import com.music.zenith.ui.components.SourceMenuRequest
 import com.music.zenith.ui.components.SongActionsMenu
 import com.music.zenith.ui.components.HeldContextMenu
 import com.music.zenith.ui.components.cancelCoverFlight
@@ -967,6 +968,9 @@ private fun ZenithApp(
     // The target the search bar animates to; searchFieldOpen stays true until
     // the close animation has finished, so the bar is not swapped out mid-fold.
     var searchFieldExpanded by remember { mutableStateOf(false) }
+    // Menu sumber (YouTube / Library / Addons) yang diminta globe di bar pencarian.
+    // Digambar di root, di luar Column bar, supaya tidak memakan layout bar.
+    var searchSourceMenu by remember { mutableStateOf<SourceMenuRequest?>(null) }
     // Whether the field opened out of the collapsed (inline) nav bar, and how far
     // the bar has opened: the mini player rises and widens on that same spring.
     var searchFromInline by remember { mutableStateOf(false) }
@@ -4831,37 +4835,7 @@ private fun ZenithApp(
                             viewModel.setSearchSource(SearchSource.entries[index])
                             if (query.isNotBlank()) viewModel.submitSearch()
                         },
-                        sourceMenu = { open, anchor, onDismiss, entries ->
-                            IosMenuPopover(
-                                item = if (open) Unit else null,
-                                anchor = anchor,
-                                onDismiss = onDismiss,
-                                backdrop = searchBackdrop,
-                                placement = IosMenuPlacement.AboveStart,
-                                dimBackground = false,
-                                glassRim = true,
-                                frostAlpha = 0.3f,
-                                startOffset = (-32).dp,
-                            ) {
-                                entries.forEach { entry ->
-                                    IosMenuRow(
-                                        label = entry.label,
-                                        icon = entry.icon,
-                                        onClick = entry.onClick,
-                                        enabled = entry.enabled,
-                                        labelColor = if (entry.selected) MaterialTheme.colorScheme.primary else null,
-                                        trailing = if (entry.selected) ({
-                                            Icon(
-                                                imageVector = Icons.Rounded.Check,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.size(20.dp),
-                                            )
-                                        }) else null,
-                                    )
-                                }
-                            }
-                        },
+                        onSourceMenu = { searchSourceMenu = it },
                         modifier = Modifier.fillMaxWidth(),
                     )
                 } else if (glassActive) Column(
@@ -4961,7 +4935,8 @@ private fun ZenithApp(
             val pageMenuUp =
                 (songActions != null && songMenuOrigin == null && !(menuFromPlayer && playerRaised)) ||
                     (browseActions != null && browseMenuOrigin == null && !browseRenameInSheet) ||
-                    songInfoTarget != null
+                    songInfoTarget != null ||
+                    searchSourceMenu != null
             LaunchedEffect(pageMenuUp, reduceDynamicBlur) {
                 if (pageMenuUp && !reduceDynamicBlur && isGlassSupported()) {
                     pageBackdrop.capture()
@@ -5612,6 +5587,37 @@ private fun ZenithApp(
                 hazeState = hazeState,
             ) { song ->
                 songMenuBody(song)
+            }
+            // Menu sumber pencarian dari globe di bar kaca: sibling layar penuh di atas
+            // bar (bukan anak Column bar), frost dari still halaman seperti menu ⋯ lain.
+            IosMenuPopover(
+                item = searchSourceMenu,
+                anchor = searchSourceMenu?.anchor,
+                onDismiss = { searchSourceMenu?.onDismiss?.invoke() },
+                backdrop = pageBackdrop,
+                hazeState = hazeState,
+                placement = IosMenuPlacement.AboveStart,
+                dimBackground = false,
+                glassRim = true,
+                frostAlpha = 0.45f,
+            ) { request ->
+                request.entries.forEach { entry ->
+                    IosMenuRow(
+                        label = entry.label,
+                        icon = entry.icon,
+                        onClick = entry.onClick,
+                        enabled = entry.enabled,
+                        labelColor = if (entry.selected) MaterialTheme.colorScheme.primary else null,
+                        trailing = if (entry.selected) ({
+                            Icon(
+                                imageVector = Icons.Rounded.Check,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }) else null,
+                    )
+                }
             }
             // A closed menu forgets where it was held and what it hung off, so
             // whatever opens it next starts from nothing.
