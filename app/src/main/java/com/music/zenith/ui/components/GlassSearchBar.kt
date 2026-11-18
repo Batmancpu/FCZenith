@@ -26,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,6 +40,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.style.TextOverflow
@@ -59,6 +61,38 @@ private val BAR_FIELD_GAP = 14.dp
 
 /** The field's own end controls: the back arrow and the source switch. */
 private val BAR_FIELD_CONTROL = 44.dp
+
+/** The collapsed row's side margin (28dp) over the open bar's (19dp). */
+private val BAR_INLINE_INSET = 9.dp
+
+/**
+ * The mini player's side inset in the collapsed row: gutter + circle + spacing
+ * (28 + 48 + 14 = 90dp), less the pill's own 19dp margin.
+ */
+private val MINI_INLINE_SIDE = 71.dp
+
+/**
+ * Moves the mini player from its slot between the two circles of the collapsed
+ * row up to its place above the bar, on the same [progress] (0..1) that opens
+ * the search field: it widens to full width while it rises. Read at layout and
+ * draw time only, so nothing recomposes per frame.
+ */
+internal fun Modifier.searchMiniRise(progress: () -> Float): Modifier =
+    layout { measurable, constraints ->
+        val side = MINI_INLINE_SIDE.roundToPx()
+        val inset = (side * (1f - progress().coerceIn(0f, 1f))).toInt()
+        val width = (constraints.maxWidth - inset * 2).coerceAtLeast(0)
+        val placeable = measurable.measure(
+            constraints.copy(minWidth = width, maxWidth = width),
+        )
+        // From the pill's own centre down to the row's centre line.
+        val dy = placeable.height / 2f + (BAR_ROW_HEIGHT / 2 + 8.dp).toPx()
+        layout(constraints.maxWidth, placeable.height) {
+            placeable.placeWithLayer(inset, 0) {
+                translationY = (1f - progress().coerceAtLeast(0f)) * dy
+            }
+        }
+    }
 
 /**
  * The separate Search tab's bar on liquid glass, with ONE progress driving it.
@@ -87,6 +121,10 @@ fun GlassSearchBar(
     onFocusChange: (Boolean) -> Unit,
     placeholder: String,
     onSourceClick: () -> Unit,
+    /** true = the bar opens out of the collapsed row: two 48dp circles with the mini player between. */
+    startInline: Boolean = false,
+    /** Reports the open fraction each frame so the mini player above can rise on the same spring. */
+    onOpenFraction: (Float) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     // Starts at rest and springs open on the frame it arrives.
@@ -104,6 +142,8 @@ fun GlassSearchBar(
         label = "searchBarOpen",
     )
     val currentOnClosed by rememberUpdatedState(onClosed)
+    val inlineStart = remember { startInline }
+    SideEffect { onOpenFraction(openFraction) }
     LaunchedEffect(open) {
         if (!open) {
             snapshotFlow { openFraction }.first { it <= 0.01f }
@@ -147,21 +187,42 @@ fun GlassSearchBar(
             // line, so the mini player above does not move while this folds.
             .height(BAR_ROW_HEIGHT),
     ) {
-        val fullWidth = maxWidth
         val p = openFraction.coerceAtLeast(0f)
+        // From the collapsed row the sides start 9dp further in and ease out to
+        // the open bar's margin as the field widens.
+        val inset = if (inlineStart) {
+            lerpDp(BAR_INLINE_INSET, 0.dp, p).coerceAtLeast(0.dp)
+        } else {
+            0.dp
+        }
+        val fullWidth = maxWidth - inset * 2
+        // The field's width once fully open; fixed so nothing reflows while it springs.
+        val fieldWidth = maxWidth - BAR_FIELD_CIRCLE - BAR_FIELD_GAP
         // The pill's width at rest: whatever the Search circle leaves.
         val restLeft = fullWidth - BAR_CIRCLE - BAR_SPACING
-        val leftWidth = maxOf(BAR_FIELD_CIRCLE, lerpDp(restLeft, BAR_FIELD_CIRCLE, p))
-        val gap = lerpDp(BAR_SPACING, BAR_FIELD_GAP, p)
-        val rightWidth = fullWidth - leftWidth - gap
-        val rowHeight = lerpDp(BAR_ROW_HEIGHT, BAR_FIELD_HEIGHT, p.coerceAtMost(1f))
-        // The field's width once fully open.
-        val fieldWidth = fullWidth - BAR_FIELD_CIRCLE - BAR_FIELD_GAP
+        val leftWidth = if (inlineStart) {
+            BAR_FIELD_CIRCLE
+        } else {
+            maxOf(BAR_FIELD_CIRCLE, lerpDp(restLeft, BAR_FIELD_CIRCLE, p))
+        }
+        val gap = if (inlineStart) BAR_FIELD_GAP else lerpDp(BAR_SPACING, BAR_FIELD_GAP, p)
+        // Collapsed start: a 48dp circle that grows leftward into the field.
+        val rightWidth = if (inlineStart) {
+            maxOf(BAR_FIELD_CIRCLE, lerpDp(BAR_FIELD_CIRCLE, fieldWidth, p))
+        } else {
+            fullWidth - leftWidth - gap
+        }
+        val rowHeight = if (inlineStart) {
+            BAR_FIELD_HEIGHT
+        } else {
+            lerpDp(BAR_ROW_HEIGHT, BAR_FIELD_HEIGHT, p.coerceAtMost(1f))
+        }
 
         // Left: the tab pill, folding down to the last tab's circle.
         Box(
             modifier = Modifier
                 .align(Alignment.CenterStart)
+                .padding(start = inset)
                 .width(leftWidth)
                 .height(rowHeight)
                 .clip(shape)
@@ -181,7 +242,9 @@ fun GlassSearchBar(
                     .align(Alignment.CenterStart)
                     .requiredWidth(restLeft)
                     .padding(PILL_INSET)
-                    .graphicsLayer { alpha = (1f - openFraction * 2.2f).coerceIn(0f, 1f) },
+                    .graphicsLayer {
+                        alpha = if (inlineStart) 0f else (1f - openFraction * 2.2f).coerceIn(0f, 1f)
+                    },
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 tabs.forEach { tab ->
@@ -213,7 +276,9 @@ fun GlassSearchBar(
                 modifier = Modifier
                     .align(Alignment.Center)
                     .size(TAB_ICON_SIZE)
-                    .graphicsLayer { alpha = ((openFraction - 0.45f) * 2.2f).coerceIn(0f, 1f) },
+                    .graphicsLayer {
+                        alpha = if (inlineStart) 1f else ((openFraction - 0.45f) * 2.2f).coerceIn(0f, 1f)
+                    },
             )
         }
 
@@ -221,6 +286,7 @@ fun GlassSearchBar(
         Box(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
+                .padding(end = inset)
                 .width(rightWidth)
                 .height(rowHeight)
                 .clip(shape)

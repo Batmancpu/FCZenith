@@ -259,6 +259,7 @@ import com.music.zenith.ui.components.FloatingBottomBar
 import com.music.zenith.ui.components.GlassMiniPlayer
 import com.music.zenith.ui.components.GlassNavBar
 import com.music.zenith.ui.components.GlassSearchBar
+import com.music.zenith.ui.components.searchMiniRise
 import com.music.zenith.ui.components.GlassSearchMorph
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.offset
@@ -955,6 +956,10 @@ private fun ZenithApp(
     // The target the search bar animates to; searchFieldOpen stays true until
     // the close animation has finished, so the bar is not swapped out mid-fold.
     var searchFieldExpanded by remember { mutableStateOf(false) }
+    // Whether the field opened out of the collapsed (inline) nav bar, and how far
+    // the bar has opened: the mini player rises and widens on that same spring.
+    var searchFromInline by remember { mutableStateOf(false) }
+    var searchBarFraction by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
     // Invalidates an in-flight radio lookup when a later play request wins.
     var playRequestGeneration by remember { mutableIntStateOf(0) }
     // Starting radio from the item already playing must not replace that media
@@ -4637,6 +4642,8 @@ private fun ZenithApp(
                     viewModel.closeMoodGenre()
                     selectedTab = index
                     searchFieldFocused = false
+                    searchFromInline = glassActive && searchTabSeparate &&
+                        index == TAB_SEARCH && navBarScroll.isInline
                     searchFieldOpen = reopenField
                     searchFieldExpanded = reopenField
 
@@ -4659,6 +4666,7 @@ private fun ZenithApp(
                         searchFieldOpen = false
                     } else if (glassActive && searchTabSeparate && !searchFieldOpen) {
                         // Back from a category page or route: expand again, unfocused.
+                        searchFromInline = navBarScroll.isInline
                         searchFieldFocused = false
                         searchFieldOpen = true
                         searchFieldExpanded = true
@@ -4722,11 +4730,17 @@ private fun ZenithApp(
                             onBlockedControl = showHostOnlyNotice,
                             dock = activeDock,
                             pull = playerSheetMotion.takeIf { !reducePlayerMotion },
-                            modifier = Modifier.fillMaxWidth(),
+                            // From the collapsed bar the pill starts in its slot between
+                            // the circles and rises while the Search circle opens leftward.
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .searchMiniRise { if (searchFromInline) searchBarFraction else 1f },
                         )
                         Spacer(Modifier.height(8.dp))
                     }
                     GlassSearchBar(
+                        startInline = searchFromInline,
+                        onOpenFraction = { searchBarFraction = it },
                         tabs = barTabs.dropLast(1),
                         lastTab = barTabs[lastBarTab.coerceIn(0, barTabs.lastIndex)],
                         open = searchFieldExpanded,
