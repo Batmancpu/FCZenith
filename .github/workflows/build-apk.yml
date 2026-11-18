@@ -229,7 +229,8 @@ jobs:
             KEYBOARD=$(jq -nc --arg r "$RUN_URL" --arg c "${REPO_URL}/commit/${SHA}" --arg l "${REPO_URL}/releases" \
               '{inline_keyboard: [[{text: "Workflow run", url: $r}, {text: "Commit", url: $c}], [{text: "Releases", url: $l}]]}')
           else
-            ERR_COPY=$(tr '\n' ' ' < build-error.txt 2>/dev/null | sed 's/  */ /g' | head -c 256)
+            ERR_COPY=$(grep "^e: " build-error.txt | head -n 3 | sed -E 's#^e: file://[^ ]*/##' | tr '\n' ' ' | sed 's/ *$//' | head -c 256)
+            [ -n "$ERR_COPY" ] || ERR_COPY=$(grep -m1 -E "What went wrong|Execution failed|Caused by" build-error.txt | head -c 256)
             [ -n "$ERR_COPY" ] || ERR_COPY="Log tidak tersedia"
             KEYBOARD=$(jq -nc --arg r "$RUN_URL" --arg c "${REPO_URL}/commit/${SHA}" --arg t "$ERR_COPY" \
               '{inline_keyboard: [[{text: "Workflow run", url: $r}, {text: "Commit", url: $c}], [{text: "Salin error", copy_text: {text: $t}}]]}')
@@ -245,6 +246,21 @@ jobs:
           if [ -n "${TG_TOPIC_ID:-}" ]; then
             ARGS+=(--data-urlencode "message_thread_id=${TG_TOPIC_ID}")
           fi
-          curl -sS --fail-with-body -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" "${ARGS[@]}"
+          if [ "$JOB_STATUS" != "success" ] && [ -f build-full.log ]; then
+            CAPTION=$(printf '%s' "$MSG" | head -c 1000)
+            DOC_ARGS=(
+              -F "chat_id=${TG_CHAT_ID}"
+              -F "parse_mode=HTML"
+              -F "caption=${CAPTION}"
+              -F "reply_markup=${KEYBOARD}"
+              -F "document=@build-full.log;filename=build-log-${RUN_NUMBER}.txt"
+            )
+            if [ -n "${TG_TOPIC_ID:-}" ]; then
+              DOC_ARGS+=(-F "message_thread_id=${TG_TOPIC_ID}")
+            fi
+            curl -sS --fail-with-body -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendDocument" "${DOC_ARGS[@]}"
+          else
+            curl -sS --fail-with-body -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" "${ARGS[@]}"
+          fi
 
 
