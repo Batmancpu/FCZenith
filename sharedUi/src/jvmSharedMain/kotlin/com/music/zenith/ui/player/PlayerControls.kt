@@ -2035,7 +2035,7 @@ private fun LosslessLabel(
                     // the label's padding clipped the bottom of the text.
                     Modifier
                         .wrapContentHeight(align = Alignment.CenterVertically, unbounded = true)
-                        .clip(CircleShape)
+                        .clip(RoundedCornerShape(8.dp))
                         .background(LocalPlayerTint.current.copy(alpha = 0.16f))
                         .padding(horizontal = 10.dp, vertical = 3.dp)
                 } else {
