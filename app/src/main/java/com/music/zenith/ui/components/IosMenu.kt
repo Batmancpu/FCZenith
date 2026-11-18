@@ -338,9 +338,9 @@ fun IosMenuRow(
     labelColor: Color? = null,
     valueColor: Color? = null,
     enabled: Boolean = true,
-    trailing: (@Composable () -> Unit)? = null,
     /** Baris lebih rapat (tinggi minimum 36dp) untuk menu pendek. */
     compact: Boolean = false,
+    trailing: (@Composable () -> Unit)? = null,
 ) {
     val colors = iosMenuColors()
     val interaction = remember { MutableInteractionSource() }
