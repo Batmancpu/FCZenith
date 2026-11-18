@@ -973,7 +973,7 @@ private fun ZenithApp(
     // Whether the field opened out of the collapsed (inline) nav bar, and how far
     // the bar has opened: the mini player rises and widens on that same spring.
     var searchFromInline by remember { mutableStateOf(false) }
-    var searchBarFraction by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
+    var searchOpenState by remember { mutableStateOf<androidx.compose.runtime.State<Float>?>(null) }
     // Invalidates an in-flight radio lookup when a later play request wins.
     var playRequestGeneration by remember { mutableIntStateOf(0) }
     // Starting radio from the item already playing must not replace that media
@@ -4749,13 +4749,10 @@ private fun ZenithApp(
                     ),
                     label = "searchMiniHide",
                 )
-                // Opening from the collapsed bar, the mini player starts at the row's
-                // own (inline) density, so frame zero matches what was just on screen,
-                // then glides to full density as the bar opens; closing reverses it.
-                val miniOpening by remember {
-                    androidx.compose.runtime.derivedStateOf { searchBarFraction > 0.02f }
-                }
-                val miniInlineDensity = searchFromInline && !(searchFieldExpanded && miniOpening)
+                // The bar's own open progress, read straight from its spring (no hoisted
+                // copy that lags a frame, no recomposition mid-animation): the mini
+                // player's rise, width and density all follow this one value.
+                val miniOpenProgress: () -> Float = { searchOpenState?.value?.coerceIn(0f, 1f) ?: 0f }
                 if (searchMorph) Column(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
@@ -4786,19 +4783,24 @@ private fun ZenithApp(
                             onBlockedControl = showHostOnlyNotice,
                             dock = activeDock,
                             pull = playerSheetMotion.takeIf { !reducePlayerMotion },
-                            inlineDensity = miniInlineDensity,
+                            inlineDensity = searchFromInline,
+                            inlineProgress = if (searchFromInline) {
+                                { 1f - miniOpenProgress() }
+                            } else {
+                                null
+                            },
                             // From the collapsed bar the pill starts in its slot between
                             // the circles and rises while the Search circle opens leftward.
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .searchMiniHide { miniHide }
-                                .searchMiniRise { if (searchFromInline) searchBarFraction else 1f },
+                                .searchMiniRise { if (searchFromInline) miniOpenProgress() else 1f },
                         )
                         Spacer(Modifier.height(8.dp))
                     }
                     GlassSearchBar(
                         startInline = searchFromInline,
-                        onOpenFraction = { searchBarFraction = it },
+                        onOpenState = { searchOpenState = it },
                         tabs = barTabs.dropLast(1),
                         lastTab = barTabs[lastBarTab.coerceIn(0, barTabs.lastIndex)],
                         open = searchFieldExpanded,

@@ -228,6 +228,8 @@ fun GlassSearchBar(
     startInline: Boolean = false,
     /** Reports the open fraction each frame so the mini player above can rise on the same spring. */
     onOpenFraction: (Float) -> Unit = {},
+    /** Hands the bar's own open progress up (null once it leaves), so the mini player reads the very same value. */
+    onOpenState: (State<Float>?) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     // Starts at rest and springs open on the frame it arrives.
@@ -243,6 +245,9 @@ fun GlassSearchBar(
     )
     val currentOnClosed by rememberUpdatedState(onClosed)
     val currentOnOpenFraction by rememberUpdatedState(onOpenFraction)
+    val currentOnOpenState by rememberUpdatedState(onOpenState)
+    LaunchedEffect(openState) { currentOnOpenState(openState) }
+    DisposableEffect(Unit) { onDispose { currentOnOpenState(null) } }
     val inlineStart = remember { startInline }
     // Fraksi dilaporkan ke atas lewat snapshotFlow, tanpa merekomposisi bar tiap frame.
     LaunchedEffect(Unit) {
@@ -262,7 +267,7 @@ fun GlassSearchBar(
     }
     LaunchedEffect(open) {
         if (!open) {
-            snapshotFlow { openState.value }.first { it <= 0.01f }
+            snapshotFlow { openState.value }.first { it <= 0.001f }
             currentOnClosed()
         }
     }

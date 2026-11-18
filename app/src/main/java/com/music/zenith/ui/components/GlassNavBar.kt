@@ -352,6 +352,8 @@ private fun GlassNowPlaying(
     dock: PlayerDock?,
     pull: MiniPlayerPull?,
     jellyPush: JellyPush? = null,
+    /** When given, the density blend itself (1 = inline, 0 = expanded), read from the value that moves the bar. */
+    inlineProgress: (() -> Float)? = null,
     modifier: Modifier = Modifier,
 ) {
     val haptics = rememberHaptics()
@@ -376,11 +378,14 @@ private fun GlassNowPlaying(
     // player leaving the collapsed bar for the search morph) glides between them
     // instead of reflowing in one frame. A row that never switches starts and stays
     // at its target, so nothing animates there.
-    val inlineMix by animateFloatAsState(
+    val inlineMixSpring by animateFloatAsState(
         targetValue = if (isInline) 1f else 0f,
         animationSpec = spring(dampingRatio = 0.9f, stiffness = 700f),
         label = "accessoryDensity",
     )
+    // [inlineProgress] is the blend itself when given: no second spring that starts
+    // late or settles apart from the bar it is following.
+    val inlineMix = inlineProgress?.invoke() ?: inlineMixSpring
     val glyphSlot = lerpDp(40.dp, 32.dp, inlineMix)
     val glyphSize = lerpDp(EXPANDED_GLYPH_SIZE, 24.dp, inlineMix)
 
@@ -574,6 +579,8 @@ fun GlassMiniPlayer(
     pull: MiniPlayerPull? = null,
     /** true = draw at the collapsed row's density; flipping it glides to the other density. */
     inlineDensity: Boolean = false,
+    /** Drives the density blend directly (1 = inline, 0 = expanded); overrides the spring of [inlineDensity]. */
+    inlineProgress: (() -> Float)? = null,
     modifier: Modifier = Modifier,
 ) {
     val pillShape = remember { RoundedCornerShape(percent = 50) }
@@ -581,6 +588,7 @@ fun GlassMiniPlayer(
         GlassNowPlaying(
             song = song,
             isInline = inlineDensity,
+            inlineProgress = inlineProgress,
             isPlaying = isPlaying,
             isLoading = isLoading,
             contentColor = glassContentColor(),
