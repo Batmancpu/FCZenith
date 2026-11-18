@@ -51,6 +51,7 @@ import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.sin
+import kotlin.math.sqrt
 
 private val FallbackColors = listOf(
     Color(0xFF3A1C71),
@@ -379,13 +380,14 @@ private fun paletteOf(source: ImageBitmap): List<Color> {
     val bitmap = source.bottomWeighted()
     fun swatchesOf(clearFilters: Boolean): List<Color> {
         val all = paletteSwatches(bitmap, 24, clearFilters)
-            .sortedByDescending { it.population }
         val total = all.sumOf { it.population }.coerceAtLeast(1)
-        // A colour covering only a sliver of the sleeve (a dress, a logo) must not
-        // get a whole blob; the backdrop follows what dominates the picture.
-        val minorShare = 0.10f
-        val major = all.filter { it.population >= total * minorShare }
-        return major.ifEmpty { all }.map { Color(it.rgb) }
+        // Only specks are dropped; a small but vivid accent (the orange of a logo)
+        // still deserves a blob. Ranking is by share weighted by vividness, so a
+        // dominant black sleeve no longer pushes the coloured notes out.
+        val major = all.filter { it.population >= total * MIN_SWATCH_SHARE }
+        return major.ifEmpty { all }
+            .sortedByDescending { swatchScore(it.rgb, it.population.toFloat() / total) }
+            .map { Color(it.rgb) }
     }
 
     val found = swatchesOf(clearFilters = false).ifEmpty {
@@ -400,6 +402,20 @@ private fun paletteOf(source: ImageBitmap): List<Color> {
         distinct.size >= 4 -> distinct.take(4)
         else -> distinct.expandedToFour()
     }
+}
+
+/** A swatch below this share of the sleeve is treated as noise. */
+private const val MIN_SWATCH_SHARE = 0.03f
+
+/**
+ * Ranks a swatch by how much of the sleeve it covers and how visible its colour
+ * is. Near-black and washed-out swatches score low however common they are, so
+ * the mesh follows the colours the eye actually reads on the cover.
+ */
+private fun swatchScore(rgb: Int, share: Float): Float {
+    val hsl = FloatArray(3).also { ColorUtils.colorToHSL(rgb, it) }
+    val vividness = hsl[1] * (1f - abs(2f * hsl[2] - 1f))
+    return sqrt(share) * (0.25f + vividness)
 }
 
 /** Drop near-duplicates, so the four blobs don't collapse into one wash. */
@@ -431,7 +447,7 @@ private fun List<Color>.expandedToFour(): List<Color> {
 private const val BOTTOM_PALETTE_SHARE = 0.4f
 
 /** How many extra times that foot is counted, so the colours track where the cover meets the backdrop. */
-private const val BOTTOM_PALETTE_COPIES = 2
+private const val BOTTOM_PALETTE_COPIES = 1
 
 /**
  * The same picture with its bottom rows repeated, so the quantiser sees more of
