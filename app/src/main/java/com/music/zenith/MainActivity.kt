@@ -4623,10 +4623,16 @@ private fun ZenithApp(
                         return@tabSelected
                     }
                     val index = if (listenTogetherTab && barIndex > TAB_LIBRARY) barIndex - 1 else barIndex
-                    // Coming in from another tab, or back from a category page, shows
-                    // the categories. Tapping Search while already on them opens the field.
-                    val reopenField = index == TAB_SEARCH && selectedTab == TAB_SEARCH &&
-                        route == null && detail == null && selectedMoodGenre == null
+                    // Liquid glass separate Search: entering the tab expands the Search
+                    // circle into the field right away, still unfocused (categories stay).
+                    // Otherwise, tapping Search while already on the categories opens the field.
+                    val glassSeparateSearch = glassActive && searchTabSeparate
+                    val reopenField = index == TAB_SEARCH && (
+                        glassSeparateSearch || (
+                            selectedTab == TAB_SEARCH &&
+                                route == null && detail == null && selectedMoodGenre == null
+                            )
+                        )
                     navigator.clear()
                     viewModel.closeMoodGenre()
                     selectedTab = index
@@ -4649,7 +4655,14 @@ private fun ZenithApp(
                 val searchMorph = searchActive && glassActive && searchTabSeparate && searchFieldOpen
                 // Leaving the categories (tab, category page, route) closes the field.
                 LaunchedEffect(searchActive) {
-                    if (!searchActive) searchFieldOpen = false
+                    if (!searchActive) {
+                        searchFieldOpen = false
+                    } else if (glassActive && searchTabSeparate && !searchFieldOpen) {
+                        // Back from a category page or route: expand again, unfocused.
+                        searchFieldFocused = false
+                        searchFieldOpen = true
+                        searchFieldExpanded = true
+                    }
                 }
                 if (searchActive && !searchMorph && !(glassActive && searchTabSeparate)) {
                     SearchBottomField(
