@@ -4793,10 +4793,15 @@ private fun ZenithApp(
                                 SharedRes.string.search_hint
                             },
                         ),
-                        onSourceClick = {
-                            viewModel.setSearchSource(
-                                SearchSource.values()[(searchSource.ordinal + 1) % SearchSource.values().size],
-                            )
+                        sourceLabels = listOf(
+                            stringResource(R.string.search_source_youtube),
+                            stringResource(R.string.library),
+                            stringResource(R.string.search_source_addons),
+                        ),
+                        sourceIndex = searchSource.ordinal,
+                        onSourceSelect = { index ->
+                            viewModel.setSearchSource(SearchSource.entries[index])
+                            if (query.isNotBlank()) viewModel.submitSearch()
                         },
                         modifier = Modifier.fillMaxWidth(),
                     )

@@ -1,5 +1,10 @@
 package com.music.zenith.ui.components
 
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.ui.layout.onGloballyPositioned
+import com.music.zenith.ui.player.LocalLyricsMenuPopover
+import com.music.zenith.ui.player.LyricsMenuEntry
+
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.clickable
@@ -162,7 +167,9 @@ fun GlassSearchBar(
     onFocusHandled: () -> Unit,
     onFocusChange: (Boolean) -> Unit,
     placeholder: String,
-    onSourceClick: () -> Unit,
+    sourceLabels: List<String>,
+    sourceIndex: Int,
+    onSourceSelect: (Int) -> Unit,
     /** true = the bar opens out of the collapsed row: two 48dp circles with the mini player between. */
     startInline: Boolean = false,
     /** Reports the open fraction each frame so the mini player above can rise on the same spring. */
@@ -217,6 +224,21 @@ fun GlassSearchBar(
     val shape = remember { RoundedCornerShape(percent = 50) }
     val contentColor = glassContentColor()
     val tint = contentColor.copy(alpha = 0.88f)
+    // Source picker: the same globe popover as the lyrics controls, anchored to this button.
+    var sourceMenuOpen by remember { mutableStateOf(false) }
+    var sourceAnchor by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
+    val sourcePopover = LocalLyricsMenuPopover.current
+    val sourceEntries = sourceLabels.mapIndexed { index, label ->
+        LyricsMenuEntry(
+            label = label,
+            icon = if (index == sourceIndex) Icons.Rounded.Check else Icons.Rounded.Public,
+            enabled = true,
+        ) {
+            sourceMenuOpen = false
+            onSourceSelect(index)
+        }
+    }
+    sourcePopover?.invoke(sourceMenuOpen, sourceAnchor, { sourceMenuOpen = false }, sourceEntries, null)
     val selectedColor = if (contentColor == Color.White) {
         lerp(MaterialTheme.colorScheme.primary, Color.White, 0.06f)
     } else {
@@ -417,11 +439,12 @@ fun GlassSearchBar(
                         .align(Alignment.CenterEnd)
                         .size(BAR_FIELD_CONTROL)
                         .graphicsLayer { alpha = contentAlpha }
+                        .onGloballyPositioned { sourceAnchor = it.boundsInWindow() }
                         .clickable(
                             enabled = interactive,
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
-                            onClick = onSourceClick,
+                            onClick = { sourceMenuOpen = true },
                         ),
                     contentAlignment = Alignment.Center,
                 ) {
