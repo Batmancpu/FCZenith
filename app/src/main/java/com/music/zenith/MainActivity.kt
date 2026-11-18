@@ -4715,6 +4715,13 @@ private fun ZenithApp(
                     ),
                     label = "searchMiniHide",
                 )
+                // Opening from the collapsed bar, the mini player starts at the row's
+                // own (inline) density, so frame zero matches what was just on screen,
+                // then glides to full density as the bar opens; closing reverses it.
+                val miniOpening by remember {
+                    androidx.compose.runtime.derivedStateOf { searchBarFraction > 0.02f }
+                }
+                val miniInlineDensity = searchFromInline && !(searchFieldExpanded && miniOpening)
                 if (searchMorph) Column(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
@@ -4745,6 +4752,7 @@ private fun ZenithApp(
                             onBlockedControl = showHostOnlyNotice,
                             dock = activeDock,
                             pull = playerSheetMotion.takeIf { !reducePlayerMotion },
+                            inlineDensity = miniInlineDensity,
                             // From the collapsed bar the pill starts in its slot between
                             // the circles and rises while the Search circle opens leftward.
                             modifier = Modifier
