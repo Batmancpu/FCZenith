@@ -65,6 +65,25 @@ private val BAR_FIELD_CONTROL = 44.dp
 /** The collapsed row's side margin (28dp) over the open bar's (19dp). */
 private val BAR_INLINE_INSET = 9.dp
 
+/** How far the last-tab circle may squash narrower than 48dp while the open spring overshoots. */
+private val BAR_BOUNCE_GIVE = 10.dp
+
+/**
+ * A width floor that gives way a little instead of stopping dead: below [floor]
+ * the width keeps shrinking, but ever more slowly, up to [give]. An overshooting
+ * spring then squashes the circle softly rather than clipping flat.
+ */
+private fun softFloor(
+    width: androidx.compose.ui.unit.Dp,
+    floor: androidx.compose.ui.unit.Dp,
+    give: androidx.compose.ui.unit.Dp,
+): androidx.compose.ui.unit.Dp {
+    if (width >= floor) return width
+    val over = (floor - width).value
+    val g = give.value
+    return floor - (g * (1f - kotlin.math.exp(-over / g))).dp
+}
+
 /**
  * The mini player's side inset in the collapsed row: gutter + circle + spacing
  * (28 + 48 + 14 = 90dp), less the pill's own 19dp margin.
@@ -156,7 +175,7 @@ fun GlassSearchBar(
     val openFraction by animateFloatAsState(
         targetValue = if (open && entered) 1f else 0f,
         animationSpec = if (open) {
-            spring(dampingRatio = 0.74f, stiffness = 240f)
+            spring(dampingRatio = 0.58f, stiffness = 290f)
         } else {
             spring(dampingRatio = 0.92f, stiffness = 380f)
         },
@@ -221,22 +240,30 @@ fun GlassSearchBar(
         val fieldWidth = maxWidth - BAR_FIELD_CIRCLE - BAR_FIELD_GAP
         // The pill's width at rest: whatever the Search circle leaves.
         val restLeft = fullWidth - BAR_CIRCLE - BAR_SPACING
-        val leftWidth = if (inlineStart) {
-            BAR_FIELD_CIRCLE
-        } else {
-            maxOf(BAR_FIELD_CIRCLE, lerpDp(restLeft, BAR_FIELD_CIRCLE, p))
-        }
         val gap = if (inlineStart) BAR_FIELD_GAP else lerpDp(BAR_SPACING, BAR_FIELD_GAP, p)
+        // The spring overshoots, and the overshoot shows as the last-tab circle
+        // squashing a little narrower (softly, never flat-clamped) as the capsule
+        // pushes past its open width, then settling back.
+        val leftWidth = if (inlineStart) {
+            val grown = lerpDp(BAR_FIELD_CIRCLE, fieldWidth, p)
+            val pushed = (grown - fieldWidth).coerceAtLeast(0.dp)
+            softFloor(BAR_FIELD_CIRCLE - pushed, BAR_FIELD_CIRCLE, BAR_BOUNCE_GIVE)
+        } else {
+            softFloor(lerpDp(restLeft, BAR_FIELD_CIRCLE, p), BAR_FIELD_CIRCLE, BAR_BOUNCE_GIVE)
+        }
         // Collapsed start: a 48dp circle that grows leftward into the field.
         val rightWidth = if (inlineStart) {
-            maxOf(BAR_FIELD_CIRCLE, lerpDp(BAR_FIELD_CIRCLE, fieldWidth, p))
+            minOf(
+                maxOf(BAR_FIELD_CIRCLE, lerpDp(BAR_FIELD_CIRCLE, fieldWidth, p)),
+                fullWidth - leftWidth - gap,
+            )
         } else {
             fullWidth - leftWidth - gap
         }
         val rowHeight = if (inlineStart) {
             BAR_FIELD_HEIGHT
         } else {
-            lerpDp(BAR_ROW_HEIGHT, BAR_FIELD_HEIGHT, p.coerceAtMost(1f))
+            lerpDp(BAR_ROW_HEIGHT, BAR_FIELD_HEIGHT, p)
         }
 
         // Left: the tab pill, folding down to the last tab's circle.
