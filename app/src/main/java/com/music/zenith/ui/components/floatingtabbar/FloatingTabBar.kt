@@ -1117,6 +1117,8 @@ private fun SharedTransitionScope.ExpandedTabs(
     val currentTabStepPx by rememberUpdatedState(tabStepPx)
     val currentIsRtl by rememberUpdatedState(isRtl)
     val currentTabWidthPx by rememberUpdatedState(tabWidthPx)
+    // The tab a finger last landed on, so a drag can tell whether it began on the selected one.
+    val pressedTab = remember { IntArray(1) { -1 } }
 
     // The pill rests in its tab's cell and lifts to stand [PILL_GROW_HEIGHT]
     // taller than the whole bar, keeping the cell's proportions as it grows.
@@ -1222,6 +1224,10 @@ private fun SharedTransitionScope.ExpandedTabs(
                                 val pressedAt = SystemClock.uptimeMillis()
                                 val x = if (currentIsRtl) size.width - down.position.x else down.position.x
                                 val tapped = (x / currentTabStepPx).toInt().coerceIn(0, scope.tabs.lastIndex)
+                                pressedTab[0] = tapped
+                                // Only the selected tab's pill lifts under a finger; pressing
+                                // another tab leaves the indicator alone until the tap carries it over.
+                                if (tapped != currentSelectedTabIndex) return@awaitEachGesture
                                 pill.startDrag()
                                 var dragged = false
                                 while (true) {
@@ -1257,7 +1263,8 @@ private fun SharedTransitionScope.ExpandedTabs(
                             detectHorizontalDragGestures(
                                 onDragStart = {
                                     step = currentTabStepPx
-                                    holding = currentSelectedTabIndex >= 0 && step > 0f
+                                    holding = currentSelectedTabIndex >= 0 && step > 0f &&
+                                        pressedTab[0] == currentSelectedTabIndex
                                     if (!holding) return@detectHorizontalDragGestures
                                     // In tab order, whichever way the row runs.
                                     direction = if (currentIsRtl) -1f else 1f
