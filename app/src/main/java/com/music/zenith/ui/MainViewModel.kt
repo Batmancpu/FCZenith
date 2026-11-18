@@ -2988,20 +2988,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         const val SEARCH_CACHE_ENTRIES = 100
 
         /**
-         * How long any one source gets to answer a search.
-         *
-         * Short on purpose: these run alongside the YouTube search, and their
-         * only job is to be *there* when it lands. A home server reached over
-         * a VPN that takes eight seconds has effectively not answered, and
-         * holding the whole result list for it would make search feel worse
-         * for the sake of results the user can still get by searching again.
-         */
-        const val SOURCE_SEARCH_TIMEOUT_MS = 4000L
-
-        /** Enough to be worth scrolling, short enough not to bury YouTube's own rows. */
-        const val SOURCE_SEARCH_LIMIT = 12
-
-        /**
          * What a page with an empty listing says.
          *
          * Named because it is a state one can be got *out* of, not just a

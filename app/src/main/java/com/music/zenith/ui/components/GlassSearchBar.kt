@@ -92,25 +92,6 @@ private val BAR_FIELD_CONTROL = 44.dp
 /** The collapsed row's side margin (28dp) over the open bar's (19dp). */
 private val BAR_INLINE_INSET = 9.dp
 
-/** How far the last-tab circle may squash narrower than 48dp while the open spring overshoots. */
-private val BAR_BOUNCE_GIVE = 10.dp
-
-/**
- * A width floor that gives way a little instead of stopping dead: below [floor]
- * the width keeps shrinking, but ever more slowly, up to [give]. An overshooting
- * spring then squashes the circle softly rather than clipping flat.
- */
-private fun softFloor(
-    width: androidx.compose.ui.unit.Dp,
-    floor: androidx.compose.ui.unit.Dp,
-    give: androidx.compose.ui.unit.Dp,
-): androidx.compose.ui.unit.Dp {
-    if (width >= floor) return width
-    val over = (floor - width).value
-    val g = give.value
-    return floor - (g * (1f - kotlin.math.exp(-over / g))).dp
-}
-
 /**
  * The mini player's side inset in the collapsed row: gutter + circle + spacing
  * (28 + 48 + 14 = 90dp), less the pill's own 19dp margin.

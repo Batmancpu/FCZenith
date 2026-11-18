@@ -701,7 +701,6 @@ private fun ZenithApp(
     // Local backdrop for the Search tab: records the mood grid so the fixed
     // header above it can draw a blurred copy of what scrolls underneath.
     val searchBackdrop = rememberLayerBackdrop()
-    val searchHeaderTint = MaterialTheme.colorScheme.background.copy(alpha = 0.55f)
     // What folds [GlassNavBar] between its expanded and inline shapes. Held here
     // rather than inside the bar because the page's scroll is what drives it,
     // and the page is a sibling of the bar rather than a child.

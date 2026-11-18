@@ -247,8 +247,6 @@ fun FadingText(text: String, style: TextStyle, color: Color, maxLines: Int, modi
  */
 val LINE_FADE = 36.dp
 
-private val FullFade = { 1f }
-
 /**
  * The explicit mark, as Apple Music draws it: a filled tile with the E cut
  * out of it, so whatever sits behind — a list row, the player's artwork —
