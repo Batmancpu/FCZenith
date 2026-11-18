@@ -19,7 +19,12 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Public
+import androidx.compose.ui.layout.onGloballyPositioned
+import com.music.zenith.ui.player.LocalLyricsMenuPopover
+import com.music.zenith.ui.player.LyricsMenuEntry
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -78,7 +83,27 @@ fun SearchField(
     onFocusChange: ((Boolean) -> Unit)? = null,
     /** false = no leading magnifier, for a host that already shows the search affordance elsewhere. */
     showSearchIcon: Boolean = true,
+    /** Source picker for the globe at the field's end; null leaves the field as it was. */
+    sourceLabels: List<String>? = null,
+    sourceIndex: Int = 0,
+    onSourceSelect: (Int) -> Unit = {},
 ) {
+    var sourceMenuOpen by remember { mutableStateOf(false) }
+    var sourceAnchor by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
+    val sourcePopover = LocalLyricsMenuPopover.current
+    if (sourceLabels != null) {
+        val sourceEntries = sourceLabels.mapIndexed { index, label ->
+            LyricsMenuEntry(
+                label = label,
+                icon = if (index == sourceIndex) Icons.Rounded.Check else Icons.Rounded.Public,
+                enabled = true,
+            ) {
+                sourceMenuOpen = false
+                onSourceSelect(index)
+            }
+        }
+        sourcePopover?.invoke(sourceMenuOpen, sourceAnchor, { sourceMenuOpen = false }, sourceEntries, null)
+    }
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     // Teks yang diganti dari luar (panah saran, riwayat) membawa kursor ke akhir;
@@ -181,6 +206,25 @@ fun SearchField(
                     contentDescription = stringResource(Res.string.clear_search),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(18.dp),
+                )
+            }
+        }
+        if (sourceLabels != null) {
+            Spacer(Modifier.width(4.dp))
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .onGloballyPositioned { sourceAnchor = it.boundsInWindow() }
+                    .clickable { sourceMenuOpen = true }
+                    .padding(6.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Rounded.Public,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp),
                 )
             }
         }

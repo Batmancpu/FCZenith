@@ -178,7 +178,9 @@ fun SearchScreen(
      * only while the field is empty: once something is typed the page is
      * about the results, and the switcher would just push them down.
      */
-    sourceSwitcher: (@Composable () -> Unit)? = null,
+    sourceLabels: List<String>? = null,
+    sourceIndex: Int = 0,
+    onSourceSelect: (Int) -> Unit = {},
     /** The mood and genre categories, shown while the field is empty and has no focus. */
     exploreState: UiState<List<MoodGenreSection>>? = null,
     onCategoryClick: ((MoodGenre) -> Unit)? = null,
@@ -300,19 +302,12 @@ fun SearchScreen(
                         stringResource(Res.string.search_hint)
                     },
                     modifier = Modifier.padding(start = PAGE_GUTTER, end = PAGE_GUTTER, bottom = 4.dp),
+                    sourceLabels = sourceLabels,
+                    sourceIndex = sourceIndex,
+                    onSourceSelect = onSourceSelect,
                 )
             }
-            if (sourceSwitcher != null) {
-                AnimatedVisibility(
-                    visible = query.isEmpty(),
-                    enter = fadeIn() + expandVertically(),
-                    exit = fadeOut() + shrinkVertically(),
-                ) {
-                    Box(Modifier.padding(start = PAGE_GUTTER, end = PAGE_GUTTER, bottom = 4.dp)) {
-                        sourceSwitcher()
-                    }
-                }
-            }
+
             // The filters only mean something once there is a result set to narrow;
             // they stay up for an empty or failed search too, or picking a filter
             // that finds nothing would take away the control needed to leave it.
