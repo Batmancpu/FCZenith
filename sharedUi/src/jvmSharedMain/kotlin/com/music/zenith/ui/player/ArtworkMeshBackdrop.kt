@@ -219,9 +219,9 @@ fun FullArtworkBlurBackdrop(
                 // so the blur keeps moving instead of easing in and stopping per
                 // frame. A track change or a stray refresh keeps the slow ease.
                 val spec = if (gapMs < LIVE_BLUR_GAP_MS) {
-                    tween((gapMs * 0.9f).toInt().coerceIn(LIVE_FADE_MIN_MS, 700), easing = LinearEasing)
+                    tween<Float>((gapMs * 0.9f).toInt().coerceIn(LIVE_FADE_MIN_MS, 700), easing = LinearEasing)
                 } else {
-                    tween(700, easing = FastOutSlowInEasing)
+                    tween<Float>(700, easing = FastOutSlowInEasing)
                 }
                 incomingAlpha.animateTo(1f, spec)
                 base = next
