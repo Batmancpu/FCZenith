@@ -1110,22 +1110,12 @@ private fun OutputPartyPill(
     val badge = rememberPartyBadge()
     val shown by PlayerSettings.showListenTogetherButton.collectAsStateWithLifecycle()
     val output = rememberOutputGlyph()
-    // Lit in a colour opposite the sleeve's own while the sound leaves by
-    // another device, so it reads as "connected" on any cover.
-    val external = rememberOutputIsExternal()
-    val outputAccent by animateColorAsState(
-        targetValue = outputAccentFor(LocalPlayerTint.current),
-        animationSpec = tween(durationMillis = 300),
-        label = "outputAccent",
-    )
-    val outputTint = if (external) outputAccent else null
     // Party half hidden only outside a party: once in one, this is the way to
     // who's in it. Without it the output glyph stands alone, drawn like the
     // lyrics and queue glyphs either side rather than as half a capsule.
     if (!shown && !badge.inParty) {
         BottomGlyph(
             icon = output.icon,
-            tintOverride = outputTint,
             iconSize = output.size * (BOTTOM_ICON_SIZE / PILL_OUTPUT_SIZE),
             fluidPress = true,
             contentDescription = stringResource(Res.string.audio_output),
@@ -1136,7 +1126,6 @@ private fun OutputPartyPill(
     Pill {
         PillSegment(
             icon = output.icon,
-            tintOverride = outputTint,
             iconSize = output.size,
             fluidPress = true,
             contentDescription = stringResource(Res.string.audio_output),
