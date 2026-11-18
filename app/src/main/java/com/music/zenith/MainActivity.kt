@@ -4788,6 +4788,31 @@ private fun ZenithApp(
                             },
                         ),
                         barsHeight = { floatingBarsHeight.intValue },
+                        onSourceMenuClick = { anchor ->
+                            val sourceIcons = listOf(SfIcons.PlayCircle, ZenithIcons.TabLibrary, SfIcons.Extension)
+                            val sourceNames = listOf(
+                                context.getString(R.string.search_source_youtube),
+                                context.getString(R.string.library),
+                                context.getString(R.string.search_source_addons),
+                            )
+                            searchSourceMenu = SourceMenuRequest(
+                                anchor = anchor,
+                                entries = sourceNames.mapIndexed { index, label ->
+                                    com.music.zenith.ui.player.LyricsMenuEntry(
+                                        label = label,
+                                        icon = sourceIcons[index],
+                                        enabled = true,
+                                        selected = index == searchSource.ordinal,
+                                        onClick = {
+                                            searchSourceMenu = null
+                                            viewModel.setSearchSource(SearchSource.entries[index])
+                                            if (query.isNotBlank()) viewModel.submitSearch()
+                                        },
+                                    )
+                                },
+                                onDismiss = { searchSourceMenu = null },
+                            )
+                        },
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .widthIn(max = FLOATING_BAR_MAX_WIDTH)

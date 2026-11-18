@@ -195,12 +195,17 @@ fun SearchField(
         }
         if (onSourceMenuClick != null) {
             Spacer(Modifier.width(4.dp))
+            val globe = rememberGlobeTouch()
             Box(
                 modifier = Modifier
                     .size(32.dp)
                     .clip(CircleShape)
                     .onGloballyPositioned { sourceAnchor = it.boundsInWindow() }
-                    .clickable { sourceAnchor?.let { onSourceMenuClick?.invoke(it) } }
+                    .clickable(
+                        interactionSource = globe.interactionSource,
+                        indication = null,
+                        onClick = globe.onTap { sourceAnchor?.let { onSourceMenuClick?.invoke(it) } },
+                    )
                     .padding(6.dp),
                 contentAlignment = Alignment.Center,
             ) {
@@ -208,7 +213,7 @@ fun SearchField(
                     Icons.Rounded.Public,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp),
+                    modifier = Modifier.size(20.dp).globeTouch(globe),
                 )
             }
         }

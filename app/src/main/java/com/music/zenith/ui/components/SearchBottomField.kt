@@ -42,6 +42,7 @@ fun SearchBottomField(
     onFocusChange: (Boolean) -> Unit,
     placeholder: String,
     barsHeight: () -> Int,
+    onSourceMenuClick: ((androidx.compose.ui.geometry.Rect) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val keyboard = LocalSoftwareKeyboardController.current
@@ -84,6 +85,7 @@ fun SearchBottomField(
                     focusRequester = focusRequester,
                     placeholder = placeholder,
                     onFocusChange = onFocusChange,
+                    onSourceMenuClick = onSourceMenuClick,
                 )
             }
             if (glass) {
