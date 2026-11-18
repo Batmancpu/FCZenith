@@ -423,6 +423,7 @@ private fun ArtworkPageBackButton(
     IconButton(
         onClick = onClick,
         modifier = modifier
+            .glassJelly()
             .size(TOP_CONTROL_SIZE)
             .then(artworkPageSurface(shape = shape, hazeState = hazeState)),
     ) {
@@ -484,6 +485,7 @@ private fun ArtworkPageActions(
     val readExtraActions = remember { { extraActions.floatValue } }
     ActionsRow(
         modifier = modifier
+            .glassJelly()
             .then(artworkPageSurface(shape = CircleShape, hazeState = hazeState))
             // Keep the right edge fixed while a new action opens room to its
             // left. The surface itself therefore grows instead of jumping to
