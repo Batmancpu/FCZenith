@@ -378,7 +378,7 @@ private fun GlassNowPlaying(
     // at its target, so nothing animates there.
     val inlineMix by animateFloatAsState(
         targetValue = if (isInline) 1f else 0f,
-        animationSpec = spring(dampingRatio = 0.82f, stiffness = 300f),
+        animationSpec = spring(dampingRatio = 0.9f, stiffness = 700f),
         label = "accessoryDensity",
     )
     val glyphSlot = lerpDp(40.dp, 32.dp, inlineMix)

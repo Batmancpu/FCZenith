@@ -4744,8 +4744,8 @@ private fun ZenithApp(
                 val miniHide by androidx.compose.animation.core.animateFloatAsState(
                     targetValue = if (searchFieldFocused && searchImeOpen) 1f else 0f,
                     animationSpec = androidx.compose.animation.core.spring(
-                        dampingRatio = 0.85f,
-                        stiffness = 380f,
+                        dampingRatio = 0.9f,
+                        stiffness = 600f,
                     ),
                     label = "searchMiniHide",
                 )

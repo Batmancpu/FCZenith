@@ -233,11 +233,12 @@ fun GlassSearchBar(
     // Starts at rest and springs open on the frame it arrives.
     var entered by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { entered = true }
-    // Opening is softer with a little overshoot (liquid feel); closing is
-    // firmer and nearly critically damped so the bar swap is not delayed.
+    // Critically damped (no overshoot, so nothing clips) but stiff, so both the
+    // open and the close settle quickly and the bar swap is not delayed. The mini
+    // player's density spring in GlassNowPlaying is kept on the same stiffness.
     val openState = animateFloatAsState(
         targetValue = if (open && entered) 1f else 0f,
-        animationSpec = spring(dampingRatio = 1f, stiffness = 340f),
+        animationSpec = spring(dampingRatio = 1f, stiffness = 700f),
         label = "searchBarOpen",
     )
     val currentOnClosed by rememberUpdatedState(onClosed)
