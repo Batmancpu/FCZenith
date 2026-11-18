@@ -889,29 +889,8 @@ private fun SharedTransitionScope.StandaloneTabBody(
             )
         }
 
-        if (w > 0f && !pill.isFlat) {
-            val pillModifier = Modifier
-                .matchParentSize()
-                .pillPlacement(
-                    center = { Offset(w / 2f, h / 2f) },
-                    size = { pill.liveSize(restSize, liftedSize) },
-                )
-            if (glassPill) {
-                GlassSelectionPill(
-                    motion = pill,
-                    fillColor = Color.Transparent,
-                    barGlass = barGlass,
-                    tabRow = iconLayer,
-                    modifier = pillModifier,
-                    iconTint = colors.selectedContentColor,
-                )
-            } else {
-                FlatSelectionPill(
-                    color = colors.indicatorColor,
-                    modifier = pillModifier.graphicsLayer { alpha = pill.material },
-                )
-            }
-        }
+        // No selection pill / lens on the standalone Search tab: pressing it only
+        // gives the light swell above, never the indicator drawn over the circle.
     }
 }
 
