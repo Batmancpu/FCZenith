@@ -41,7 +41,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -184,6 +186,18 @@ fun GlassSearchBar(
     val currentOnClosed by rememberUpdatedState(onClosed)
     val inlineStart = remember { startInline }
     SideEffect { onOpenFraction(openFraction) }
+    // The resting row is as tall as GlassNavBar's own tab row: glyph + gap + label,
+    // padded. That is whatever the label measures at this font scale, not a fixed
+    // 62dp, so it is measured the same way here and the mini player above does not
+    // shift when the nav bar and this bar swap places.
+    val density = LocalDensity.current
+    val textMeasurer = rememberTextMeasurer()
+    val labelStyle = tabLabelStyle()
+    val restHeight = remember(labelStyle, density) {
+        val labelPx = textMeasurer.measure(text = "Ag", style = labelStyle, maxLines = 1).size.height
+        PILL_INSET * 2 + TAB_VERTICAL_PADDING * 2 + TAB_ICON_SIZE + TAB_ICON_LABEL_GAP +
+            with(density) { labelPx.toDp() }
+    }
     LaunchedEffect(open) {
         if (!open) {
             snapshotFlow { openFraction }.first { it <= 0.01f }
@@ -225,7 +239,7 @@ fun GlassSearchBar(
             .padding(bottom = NAV_BAR_LIFT)
             // Fixed at the resting height: the 48dp pieces centre on the same
             // line, so the mini player above does not move while this folds.
-            .height(BAR_ROW_HEIGHT),
+            .height(restHeight),
     ) {
         val p = openFraction.coerceAtLeast(0f)
         // From the collapsed row the sides start 9dp further in and ease out to
@@ -239,7 +253,7 @@ fun GlassSearchBar(
         // The field's width once fully open; fixed so nothing reflows while it springs.
         val fieldWidth = maxWidth - BAR_FIELD_CIRCLE - BAR_FIELD_GAP
         // The pill's width at rest: whatever the Search circle leaves.
-        val restLeft = fullWidth - BAR_CIRCLE - BAR_SPACING
+        val restLeft = fullWidth - restHeight - BAR_SPACING
         val gap = if (inlineStart) BAR_FIELD_GAP else lerpDp(BAR_SPACING, BAR_FIELD_GAP, p)
         // The spring overshoots, and the overshoot shows as the last-tab circle
         // squashing a little narrower (softly, never flat-clamped) as the capsule
@@ -263,7 +277,7 @@ fun GlassSearchBar(
         val rowHeight = if (inlineStart) {
             BAR_FIELD_HEIGHT
         } else {
-            lerpDp(BAR_ROW_HEIGHT, BAR_FIELD_HEIGHT, p)
+            lerpDp(restHeight, BAR_FIELD_HEIGHT, p)
         }
 
         // Left: the tab pill, folding down to the last tab's circle.
