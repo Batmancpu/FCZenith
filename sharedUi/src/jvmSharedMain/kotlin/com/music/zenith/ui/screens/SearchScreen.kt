@@ -352,7 +352,7 @@ fun SearchScreen(
                     exit = fadeOut() + shrinkVertically(),
                 ) {
                     Text(
-                        text = stringResource(Res.string.search),
+                        text = "Zeuxxi",
                         style = MaterialTheme.typography.displayLarge,
                         color = MaterialTheme.colorScheme.onBackground,
                         modifier = Modifier.padding(
