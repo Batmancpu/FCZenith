@@ -331,6 +331,9 @@ fun SearchScreen(
                     .zIndex(0.5f)
                     .graphicsLayer { alpha = headerShapeAlpha }
                     .clip(RoundedCornerShape(bottomStart = HEADER_SHAPE_RADIUS, bottomEnd = HEADER_SHAPE_RADIUS))
+                    // Page colour under the blur: the shape stays visible and covers the
+                    // control even where the blur itself is not drawn.
+                    .background(frostFill.copy(alpha = 0.82f))
                     .optimizedHazeEffect(frost, headerFrostStyle),
             )
         }
@@ -629,8 +632,8 @@ fun SearchScreen(
                     .zIndex(1f)
                     .background(
                         androidx.compose.ui.graphics.Brush.verticalGradient(
-                            0f to frostFill,
-                            topPadding.value / (topPadding + ANCHORED_FADE_HEIGHT).value to frostFill,
+                            0f to frostFill.copy(alpha = 0.9f),
+                            0.5f to frostFill.copy(alpha = 0.55f),
                             1f to frostFill.copy(alpha = 0f),
                         ),
                     ),
