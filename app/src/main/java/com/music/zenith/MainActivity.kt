@@ -5600,9 +5600,11 @@ private fun ZenithApp(
                 dimBackground = false,
                 glassRim = true,
                 frostAlpha = 0.45f,
+                compact = true,
             ) { request ->
                 request.entries.forEach { entry ->
                     IosMenuRow(
+                        compact = true,
                         label = entry.label,
                         icon = entry.icon,
                         onClick = entry.onClick,

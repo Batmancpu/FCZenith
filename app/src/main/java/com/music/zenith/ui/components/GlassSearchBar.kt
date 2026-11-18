@@ -1,9 +1,7 @@
 package com.music.zenith.ui.components
 
 import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.Extension
-import androidx.compose.material.icons.rounded.LibraryMusic
-import androidx.compose.material.icons.rounded.SmartDisplay
+import com.music.zenith.ui.icons.ZenithIcons
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import com.music.zenith.ui.player.LocalLyricsMenuPopover
@@ -245,7 +243,8 @@ fun GlassSearchBar(
     // Source picker: the same globe popover as the lyrics controls, anchored to this button.
     var sourceMenuOpen by remember { mutableStateOf(false) }
     var sourceAnchor by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
-    val sourceIcons = listOf(Icons.Rounded.SmartDisplay, Icons.Rounded.LibraryMusic, Icons.Rounded.Extension)
+    // Ikon yang sama dengan yang dipakai app: tab Library, dan ikon sumber YouTube / Addons.
+    val sourceIcons = listOf(SfIcons.PlayCircle, ZenithIcons.TabLibrary, SfIcons.Extension)
     val sourceEntries = sourceLabels.mapIndexed { index, label ->
         LyricsMenuEntry(
             label = label,
