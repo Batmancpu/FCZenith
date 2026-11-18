@@ -84,27 +84,10 @@ fun SearchField(
     onFocusChange: ((Boolean) -> Unit)? = null,
     /** false = no leading magnifier, for a host that already shows the search affordance elsewhere. */
     showSearchIcon: Boolean = true,
-    /** Source picker for the globe at the field's end; null leaves the field as it was. */
-    sourceLabels: List<String>? = null,
-    sourceIndex: Int = 0,
-    onSourceSelect: (Int) -> Unit = {},
+    /** Opens the source picker from the globe; gets the globe's bounds in window. Null hides the globe. */
+    onSourceMenuClick: ((androidx.compose.ui.geometry.Rect) -> Unit)? = null,
 ) {
-    var sourceMenuOpen by remember { mutableStateOf(false) }
     var sourceAnchor by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
-    val sourcePopover = LocalLyricsMenuPopover.current
-    if (sourceLabels != null) {
-        val sourceEntries = sourceLabels.mapIndexed { index, label ->
-            LyricsMenuEntry(
-                label = label,
-                icon = if (index == sourceIndex) Icons.Rounded.Check else Icons.Rounded.Public,
-                enabled = true,
-            ) {
-                sourceMenuOpen = false
-                onSourceSelect(index)
-            }
-        }
-        sourcePopover?.invoke(sourceMenuOpen, sourceAnchor, { sourceMenuOpen = false }, sourceEntries, null)
-    }
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     // Teks yang diganti dari luar (panah saran, riwayat) membawa kursor ke akhir;
@@ -210,14 +193,14 @@ fun SearchField(
                 )
             }
         }
-        if (sourceLabels != null) {
+        if (onSourceMenuClick != null) {
             Spacer(Modifier.width(4.dp))
             Box(
                 modifier = Modifier
                     .size(32.dp)
                     .clip(CircleShape)
                     .onGloballyPositioned { sourceAnchor = it.boundsInWindow() }
-                    .clickable { sourceMenuOpen = true }
+                    .clickable { sourceAnchor?.let { onSourceMenuClick?.invoke(it) } }
                     .padding(6.dp),
                 contentAlignment = Alignment.Center,
             ) {

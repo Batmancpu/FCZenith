@@ -1,5 +1,16 @@
 package com.music.zenith.ui.screens
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Extension
+import androidx.compose.material.icons.rounded.LibraryMusic
+import androidx.compose.material.icons.rounded.Public
+import androidx.compose.material.icons.rounded.SmartDisplay
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.onGloballyPositioned
+import com.music.zenith.ui.player.LocalLyricsMenuPopover
+import com.music.zenith.ui.player.LyricsMenuEntry
+
 import com.music.zenith.ui.components.trackArtSize
 import androidx.compose.ui.layout.ContentScale
 import com.music.zenith.data.model.toSong
@@ -246,7 +257,10 @@ fun SearchScreen(
     }
     var headerHeightPx by remember { mutableIntStateOf(0) }
     val headerHeight = with(LocalDensity.current) { headerHeightPx.toDp() }
-    Box(modifier = modifier.fillMaxSize()) {
+    var sourceMenuOpen by remember { mutableStateOf(false) }
+    var sourceMenuAnchor by remember { mutableStateOf<Rect?>(null) }
+    var rootOrigin by remember { mutableStateOf(Offset.Zero) }
+    Box(modifier = modifier.fillMaxSize().onGloballyPositioned { rootOrigin = it.positionInWindow() }) {
         // Search field and filter tabs stay fixed at the top, outside the
         // scrolling list, so they're always reachable rather than scrolling
         // away with the results or recent searches beneath them.
@@ -274,9 +288,10 @@ fun SearchScreen(
                         stringResource(Res.string.search_hint)
                     },
                     modifier = Modifier.padding(start = PAGE_GUTTER, end = PAGE_GUTTER, bottom = 4.dp),
-                    sourceLabels = sourceLabels,
-                    sourceIndex = sourceIndex,
-                    onSourceSelect = onSourceSelect,
+                    onSourceMenuClick = { rect ->
+                        sourceMenuAnchor = rect
+                        sourceMenuOpen = true
+                    },
                 )
             }
 
@@ -294,6 +309,21 @@ fun SearchScreen(
                     modifier = Modifier.padding(start = PAGE_GUTTER, end = PAGE_GUTTER, bottom = 6.dp),
                 )
             }
+        }
+
+        // Source picker: the lyrics globe popover, hosted at the screen root so the
+        // anchor and the blur both line up with the globe in the field.
+        val sourcePopover = LocalLyricsMenuPopover.current
+        if (sourceLabels != null && sourcePopover != null) {
+            val sourceIcons = listOf(Icons.Rounded.SmartDisplay, Icons.Rounded.LibraryMusic, Icons.Rounded.Extension)
+            val sourceEntries = sourceLabels.mapIndexed { index, label ->
+                LyricsMenuEntry(label, sourceIcons.getOrElse(index) { Icons.Rounded.Public }, true) {
+                    sourceMenuOpen = false
+                    onSourceSelect(index)
+                }
+            }
+            val anchorInRoot = sourceMenuAnchor?.translate(-rootOrigin.x, -rootOrigin.y)
+            sourcePopover(sourceMenuOpen, anchorInRoot, { sourceMenuOpen = false }, sourceEntries, frost)
         }
 
         LazyColumn(
