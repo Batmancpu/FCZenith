@@ -4645,6 +4645,9 @@ private fun ZenithApp(
                     searchFieldFocused = false
                     searchFromInline = glassActive && searchTabSeparate &&
                         index == TAB_SEARCH && navBarScroll.isInline
+                    // The inline state belongs to Search's own scrolling. Leaving Search
+                    // expands the bar again, so Home shows the mini player above it.
+                    if (index != TAB_SEARCH && navBarScroll.isInline) navBarScroll.expand()
                     searchFieldOpen = reopenField
                     searchFieldExpanded = reopenField
 
