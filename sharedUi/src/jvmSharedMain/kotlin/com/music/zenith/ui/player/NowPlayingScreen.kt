@@ -4325,6 +4325,33 @@ fun NowPlayingScreen(
                                 .drawWithContent {
                                     drawContent()
                                     val shown = sleeveShown()
+                                    // A hairline rim light on the card's edge, like Apple
+                                    // Music: tinted by the cover, brightest at the top-left
+                                    // corner and fainter at the bottom-right, almost gone
+                                    // between. Card only: it fades out with the shadow
+                                    // as the banner or the mini player takes over.
+                                    val rimAlpha = if (art.loaded) {
+                                        (1f - 2f * shown).coerceAtLeast(0f) * dockT()
+                                    } else {
+                                        0f
+                                    }
+                                    if (rimAlpha > 0f) {
+                                        // Centred on the edge, so half falls outside the
+                                        // clip: 2dp drawn leaves a 1dp line inside.
+                                        drawOutline(
+                                            outline = dockFrame.cornerShape(sleeveCorner())
+                                                .createOutline(size, layoutDirection, this),
+                                            brush = Brush.linearGradient(
+                                                0f to playerTint.copy(alpha = 0.34f * rimAlpha),
+                                                0.35f to playerTint.copy(alpha = 0.06f * rimAlpha),
+                                                0.65f to playerTint.copy(alpha = 0.06f * rimAlpha),
+                                                1f to playerTint.copy(alpha = 0.22f * rimAlpha),
+                                                start = Offset.Zero,
+                                                end = Offset(size.width, size.height),
+                                            ),
+                                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx()),
+                                        )
+                                    }
                                     if (shown > 0f) {
                                         drawRect(
                                             // Along smootherstep, not a straight ramp,
