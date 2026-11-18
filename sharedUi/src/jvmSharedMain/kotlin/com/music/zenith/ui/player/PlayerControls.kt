@@ -1971,6 +1971,8 @@ private fun LosslessOrStats(
             // confirmed. It is what makes the badge read as an achievement
             // rather than a label, which only one of these two is.
             animated = true,
+            // Lossless and Hi-Res Lossless sit in a chip, as in Apple Music.
+            chip = true,
             modifier = modifier,
         )
         nerdStats?.isDolbyAtmos == true || dolbyAtmosActive -> LosslessLabel(
@@ -2007,6 +2009,8 @@ private fun LosslessLabel(
     pulsing: Boolean = false,
     /** Unspecified draws [iconPainter] at its own size. */
     iconSize: Dp = Dp.Unspecified,
+    /** Wraps the label in a small rounded chip tinted by the player tint. */
+    chip: Boolean = false,
 ) {
     // Only while asked for, and not at all under "Reduce animation": the
     // label then just holds still, which says "waiting" well enough.
@@ -2029,10 +2033,21 @@ private fun LosslessLabel(
         // label — no recomposition, no relayout. ModulateAlpha fades each draw
         // call in place rather than through an offscreen buffer: the glyph and
         // the word never overlap, so there is nothing a buffer would fix.
-        modifier = modifier.graphicsLayer {
-            alpha = pulse?.value ?: 1f
-            compositingStrategy = CompositingStrategy.ModulateAlpha
-        },
+        modifier = modifier
+            .graphicsLayer {
+                alpha = pulse?.value ?: 1f
+                compositingStrategy = CompositingStrategy.ModulateAlpha
+            }
+            .then(
+                if (chip) {
+                    Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(LocalPlayerTint.current.copy(alpha = 0.16f))
+                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                } else {
+                    Modifier
+                },
+            ),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
