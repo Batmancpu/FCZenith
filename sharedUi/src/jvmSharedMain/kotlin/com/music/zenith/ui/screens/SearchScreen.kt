@@ -553,10 +553,12 @@ fun SearchScreen(
                                     modifier = Modifier.padding(
                                         start = PAGE_GUTTER,
                                         end = PAGE_GUTTER,
-                                        top = 16.dp,
-                                        bottom = 6.dp,
+                                        top = 20.dp,
+                                        bottom = 8.dp,
                                     ),
-                                    style = MaterialTheme.typography.titleSmall,
+                                    style = MaterialTheme.typography.titleLarge.copy(
+                                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                                    ),
                                     color = MaterialTheme.colorScheme.onSurface,
                                 )
                             }
@@ -818,7 +820,9 @@ private fun TopResultCard(
     ) {
         Text(
             text = stringResource(Res.string.search_top_result),
-            style = MaterialTheme.typography.labelLarge,
+            style = MaterialTheme.typography.titleLarge.copy(
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+            ),
             color = MaterialTheme.colorScheme.onSurface,
         )
         Spacer(Modifier.height(10.dp))
