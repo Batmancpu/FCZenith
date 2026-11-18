@@ -342,43 +342,37 @@ fun GlassSearchBar(
                 .then(Modifier.liquidGlass(shape = shape)),
             contentAlignment = Alignment.CenterStart,
         ) {
+            // One search glyph for both states: it rests centred in the Search circle
+            // and, as the capsule opens, slides left with the capsule's edge into the
+            // field's start slot. It is never swapped for a second icon or faded.
+            val restRight = if (inlineStart) BAR_FIELD_CIRCLE else BAR_CIRCLE
+            val glyphStart = lerpDp(
+                (restRight - TAB_ICON_SIZE) / 2,
+                (BAR_FIELD_CONTROL - TAB_ICON_SIZE) / 2,
+                p,
+            ).coerceAtLeast(0.dp)
             Icon(
-                imageVector = Icons.Rounded.Search,
+                imageVector = SfIcons.Search,
                 contentDescription = null,
                 tint = lerp(selectedColor, tint, p.coerceIn(0f, 1f)),
                 modifier = Modifier
-                    .align(Alignment.Center)
+                    .align(Alignment.CenterStart)
+                    .padding(start = glyphStart)
                     .size(TAB_ICON_SIZE)
-                    .graphicsLayer { alpha = (1f - openFraction * 1.6f).coerceIn(0f, 1f) },
+                    .clickable(
+                        enabled = interactive && query.isNotBlank(),
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                    ) {
+                        onSubmit()
+                        focusManager.clearFocus()
+                    },
             )
 
             // Everything below keeps its full width the whole time, so nothing
             // reflows while the capsule springs; only its reveal changes.
             CompositionLocalProvider(LocalSearchFieldOnSurface provides true) {
-                // Search glyph where the back arrow used to sit; the circle on the
-                // left closes the field. Tapping the glyph submits a non-blank query.
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.CenterStart)
-                        .size(BAR_FIELD_CONTROL)
-                        .graphicsLayer { alpha = contentAlpha }
-                        .clickable(
-                            enabled = interactive && query.isNotBlank(),
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                        ) {
-                            onSubmit()
-                            focusManager.clearFocus()
-                        },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = SfIcons.Search,
-                        contentDescription = null,
-                        tint = tint,
-                        modifier = Modifier.size(TAB_ICON_SIZE),
-                    )
-                }
+                // The search glyph is the one drawn above, sliding in from the circle.
 
                 Box(
                     modifier = Modifier
