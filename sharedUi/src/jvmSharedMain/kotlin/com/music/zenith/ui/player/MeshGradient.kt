@@ -227,12 +227,13 @@ fun MeshGradientBackground(
             )
         }
 
-        // Gentle scrim so white text stays legible over bright art.
+        // Light scrim only: the colours are already deep, so a heavy one
+        // would turn the mesh muddy instead of Apple Music's dark plum.
         drawRect(
             brush = Brush.verticalGradient(
                 colors = listOf(
-                    Color.Black.copy(alpha = 0.10f),
-                    Color.Black.copy(alpha = 0.38f),
+                    Color.Black.copy(alpha = 0.04f),
+                    Color.Black.copy(alpha = 0.20f),
                 ),
             ),
         )
@@ -478,12 +479,17 @@ private fun Color.shifted(hue: Float, lightness: Float): Color {
 private fun Color.hsl(): FloatArray =
     FloatArray(3).also { ColorUtils.colorToHSL(toArgb(), it) }
 
-/** Boost saturation and clamp lightness so any artwork yields a rich, non-muddy mesh. */
+/**
+ * Apple Music's Now Playing mesh: the cover's own hues, taken down to a deep,
+ * moderately saturated band instead of a luminous one. Lightness keeps the
+ * source's ordering (brighter notes stay brighter) inside 0.16..0.32, and
+ * neutral swatches stay neutral rather than being given a hue.
+ */
 private fun Color.tuned(): Color {
     val hsl = FloatArray(3)
     ColorUtils.colorToHSL(toArgb(), hsl)
-    hsl[1] = (hsl[1] * 1.12f).coerceAtMost(1f)
-    hsl[2] = hsl[2].coerceIn(0.28f, 0.58f)
+    hsl[1] = if (hsl[1] < 0.12f) hsl[1] else (hsl[1] * 0.85f).coerceIn(0.35f, 0.62f)
+    hsl[2] = 0.16f + 0.16f * hsl[2].coerceIn(0f, 1f)
     return Color(ColorUtils.HSLToColor(hsl))
 }
 
