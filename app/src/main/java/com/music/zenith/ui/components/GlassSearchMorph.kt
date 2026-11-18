@@ -213,6 +213,7 @@ fun GlassSearchMorph(
                 }
 
                 // Source switch: YouTube, Library, Addons in turn.
+                val globe = rememberGlobeTouch()
                 Box(
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
@@ -220,9 +221,9 @@ fun GlassSearchMorph(
                         .graphicsLayer { alpha = openFraction }
                         .clickable(
                             enabled = entered,
-                            interactionSource = remember { MutableInteractionSource() },
+                            interactionSource = globe.interactionSource,
                             indication = null,
-                            onClick = onSourceClick,
+                            onClick = globe.onTap(onSourceClick),
                         ),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -230,7 +231,7 @@ fun GlassSearchMorph(
                         imageVector = Icons.Rounded.Public,
                         contentDescription = null,
                         tint = tint,
-                        modifier = Modifier.size(TAB_ICON_SIZE),
+                        modifier = Modifier.size(TAB_ICON_SIZE).globeTouch(globe),
                     )
                 }
             }

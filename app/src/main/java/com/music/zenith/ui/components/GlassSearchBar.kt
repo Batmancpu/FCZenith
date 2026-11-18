@@ -531,6 +531,7 @@ fun GlassSearchBar(
                 }
 
                 // Source switch: YouTube, Library, Addons in turn.
+                val globe = rememberGlobeTouch()
                 Box(
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
@@ -539,9 +540,9 @@ fun GlassSearchBar(
                         .onGloballyPositioned { sourceAnchor = it.boundsInWindow() }
                         .clickable(
                             enabled = interactive,
-                            interactionSource = remember { MutableInteractionSource() },
+                            interactionSource = globe.interactionSource,
                             indication = null,
-                            onClick = { sourceMenuOpen = true },
+                            onClick = globe.onTap { sourceMenuOpen = true },
                         ),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -549,7 +550,7 @@ fun GlassSearchBar(
                         imageVector = Icons.Rounded.Public,
                         contentDescription = null,
                         tint = tint,
-                        modifier = Modifier.size(TAB_ICON_SIZE),
+                        modifier = Modifier.size(TAB_ICON_SIZE).globeTouch(globe),
                     )
                 }
             }
