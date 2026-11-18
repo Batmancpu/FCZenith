@@ -4208,6 +4208,16 @@ private fun ZenithApp(
                     ?.takeIf { isDetailVisible && it.type == BrowseType.ARTIST }
                     ?.let { detailListStates.getOrPut(it.browseId) { LazyListState() } }
                 val homeHeadingVisible = route == null && detail == null && selectedTab == TAB_HOME
+                // Search's large heading is up (field empty, unfocused, nothing searched):
+                // the pill sits level with it as it does on Home. Derived, so typing
+                // recomposes this only when the heading appears or goes.
+                val searchTitleShown by remember(route, detail, selectedMoodGenre, selectedTab) {
+                    derivedStateOf {
+                        route == null && detail == null && selectedMoodGenre == null &&
+                            selectedTab == TAB_SEARCH &&
+                            query.isEmpty() && results == null && !searchFieldFocused
+                    }
+                }
                 val headerListState = artistListState ?: homeListState.takeIf { homeHeadingVisible }
                 // Header (foto profil + pill) turun/naik antara posisi Home dan tab lain
                 // dengan spring sedikit membal, bukan loncat saat tab berpindah.
@@ -4218,6 +4228,16 @@ private fun ZenithApp(
                         stiffness = 260f,
                     ),
                     label = "homeHeaderBlend",
+                )
+                // Its own blend, so going between Home and Search hands the pill over
+                // on the same spring instead of jumping when Home was scrolled.
+                val searchHeaderBlend = animateFloatAsState(
+                    targetValue = if (searchTitleShown) 1f else 0f,
+                    animationSpec = androidx.compose.animation.core.spring(
+                        dampingRatio = 0.5f,
+                        stiffness = 260f,
+                    ),
+                    label = "searchHeaderBlend",
                 )
                 val fadeStart = if (artistListState != null) TOP_FADE_START else 0f
                 val fadeRamp = if (artistListState != null) TOP_FADE_RAMP else 1f
@@ -4338,14 +4358,27 @@ private fun ZenithApp(
                         .align(Alignment.TopCenter)
                         .graphicsLayer {
                             val blend = homeHeaderBlend.value
-                            if (blend != 0f) {
+                            val searchBlend = searchHeaderBlend.value
+                            if (blend != 0f || searchBlend != 0f) {
                                 val rest = (18.dp + homeLogoHalf).toPx()
-                                val scrolledPx = if (homeListState.firstVisibleItemIndex > 0) {
-                                    rest
-                                } else {
-                                    homeListState.firstVisibleItemScrollOffset.toFloat()
+                                var shift = 0f
+                                if (blend != 0f) {
+                                    val scrolledPx = if (homeListState.firstVisibleItemIndex > 0) {
+                                        rest
+                                    } else {
+                                        homeListState.firstVisibleItemScrollOffset.toFloat()
+                                    }
+                                    shift += blend * (rest - scrolledPx).coerceAtLeast(0f)
                                 }
-                                translationY = blend * (rest - scrolledPx).coerceAtLeast(0f)
+                                if (searchBlend != 0f) {
+                                    val scrolledPx = if (searchListState.firstVisibleItemIndex > 0) {
+                                        rest
+                                    } else {
+                                        searchListState.firstVisibleItemScrollOffset.toFloat()
+                                    }
+                                    shift += searchBlend * (rest - scrolledPx).coerceAtLeast(0f)
+                                }
+                                translationY = shift
                             }
                         },
                     // Field search pindah ke bawah (SearchBottomField), bukan lagi di bar atas.
