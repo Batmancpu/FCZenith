@@ -252,16 +252,16 @@ jobs:
             if [ "${#CAPTION}" -gt 1000 ]; then
               CAPTION="<b>BUILD FAILED</b> run #${RUN_NUMBER} (${REF_NAME})"
             fi
-DOC_ARGS=(
-  --form-string "chat_id=${TG_CHAT_ID}"
-  --form-string "parse_mode=HTML"
-  --form-string "caption=${CAPTION}"
-  --form-string "reply_markup=${KEYBOARD}"
-  -F "document=@build-full.log;filename=build-log-${RUN_NUMBER}.txt"
-)
-if [ -n "${TG_TOPIC_ID:-}" ]; then
-  DOC_ARGS+=(--form-string "message_thread_id=${TG_TOPIC_ID}")
-fi
+            DOC_ARGS=(
+              --form-string "chat_id=${TG_CHAT_ID}"
+              --form-string "parse_mode=HTML"
+              --form-string "caption=${CAPTION}"
+              --form-string "reply_markup=${KEYBOARD}"
+              -F "document=@build-full.log;filename=build-log-${RUN_NUMBER}.txt"
+            )
+            if [ -n "${TG_TOPIC_ID:-}" ]; then
+              DOC_ARGS+=(--form-string "message_thread_id=${TG_TOPIC_ID}")
+            fi
             curl -sS --fail-with-body -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendDocument" "${DOC_ARGS[@]}"
           else
             curl -sS --fail-with-body -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" "${ARGS[@]}"
