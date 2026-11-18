@@ -104,7 +104,6 @@ import com.music.zenith.ui.components.SongRow
 import com.music.zenith.ui.components.SearchPlayingBars
 import com.music.zenith.ui.components.thumbnailBorder
 import com.music.zenith.ui.components.songListSkeleton
-import com.music.zenith.ui.components.optimizedHazeEffect
 import androidx.compose.ui.zIndex
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
@@ -112,10 +111,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.ui.graphics.graphicsLayer
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.HazeStyle
-import dev.chrisbanes.haze.HazeTint
-import dev.chrisbanes.haze.hazeSource
 import java.util.Locale
 
 @Composable
@@ -210,8 +205,6 @@ fun SearchScreen(
     fieldFocused: Boolean = true,
     /** Applied to the scrolling list; the app uses it to record the list as a blur source. */
     listModifier: Modifier = Modifier,
-    /** Applied to the fixed header; the app uses it to draw the blurred list behind the header. */
-    headerModifier: Modifier = Modifier,
     /** Large "Search" heading at the head of the page while the field is empty and unfocused. */
     showTitle: Boolean = false,
     /**
@@ -278,17 +271,7 @@ fun SearchScreen(
             if (!loadingMore && total > 0 && lastVisible >= total - 4) onLoadMore()
         }
     }
-    val frost = remember { HazeState() }
     val frostFill = MaterialTheme.colorScheme.background
-    val frostStyle = remember(frostFill) {
-        HazeStyle(
-            backgroundColor = frostFill,
-            tints = listOf(HazeTint(frostFill.copy(alpha = 0.55f))),
-            blurRadius = 24.dp,
-            noiseFactor = 0f,
-            fallbackTint = HazeTint(frostFill),
-        )
-    }
     // Until onSizeChanged reports, the header is just the top padding it starts
     // with. Seeding it stops the list drawing one frame at 0 and then jumping down.
     val seededHeaderPx = with(LocalDensity.current) { topPadding.roundToPx() }
@@ -308,15 +291,6 @@ fun SearchScreen(
         animationSpec = tween(durationMillis = 260),
         label = "searchHeaderShapeAlpha",
     )
-    val headerFrostStyle = remember(frostFill) {
-        HazeStyle(
-            backgroundColor = frostFill,
-            tints = listOf(HazeTint(frostFill.copy(alpha = 0.72f))),
-            blurRadius = 28.dp,
-            noiseFactor = 0f,
-            fallbackTint = HazeTint(frostFill),
-        )
-    }
     val headerHeight = with(LocalDensity.current) { headerHeightPx.toDp() }
     var sourceMenuOpen by remember { mutableStateOf(false) }
     var sourceMenuAnchor by remember { mutableStateOf<Rect?>(null) }
@@ -334,18 +308,9 @@ fun SearchScreen(
                     .zIndex(0.5f)
                     .graphicsLayer { alpha = headerShapeAlpha }
                     .clip(RoundedCornerShape(bottomStart = HEADER_SHAPE_RADIUS, bottomEnd = HEADER_SHAPE_RADIUS))
-                    .then(
-                        if (headerModifier === Modifier) {
-                            // Page colour under the blur: the shape stays visible and covers the
-                            // control even where the blur itself is not drawn.
-                            Modifier
-                                .background(frostFill.copy(alpha = 0.82f))
-                                .optimizedHazeEffect(frost, headerFrostStyle)
-                        } else {
-                            // The app's own frost, drawn from the recorded list.
-                            headerModifier
-                        },
-                    ),
+                    // Page colour behind the filter control, so rows scroll away beneath it
+                    // instead of running through the control.
+                    .background(frostFill.copy(alpha = 0.82f)),
             )
         }
         // Search field and filter tabs stay fixed at the top, outside the
@@ -426,8 +391,6 @@ fun SearchScreen(
             state = listState,
             modifier = Modifier
                 .fillMaxSize()
-                // Only recorded while Haze is the one blurring the header.
-                .then(if (headerModifier === Modifier) Modifier.hazeSource(frost) else Modifier)
                 .then(listModifier)
                 .onSizeChanged { listWidthPx = it.width },
             reverseLayout = anchored,
