@@ -4015,6 +4015,8 @@ private fun ZenithApp(
                                 topPadding = topBarHeight() + 4.dp,
                                 showField = false,
                                 showTitle = true,
+                                // Filter control rises to where the profile was (status bar + gap).
+                                filterBarTopPadding = topBarHeight() - com.music.zenith.ui.components.TopBarContentHeight + 8.dp,
                                 bottomAnchorInset = if (glassActive && searchTabSeparate && searchFieldOpen) {
                                     searchListInset
                                 } else {
@@ -4218,6 +4220,16 @@ private fun ZenithApp(
                             query.isEmpty() && results == null && !searchFieldFocused
                     }
                 }
+                // Search results with the filter control up top: the profile pill folds away
+                // for it. Mirrors the page's own condition (results up, no suggestions, YouTube source).
+                val searchFilterBarShown by remember(route, detail, selectedMoodGenre, selectedTab, searchSource) {
+                    derivedStateOf {
+                        route == null && detail == null && selectedMoodGenre == null &&
+                            selectedTab == TAB_SEARCH &&
+                            searchSource != SearchSource.LIBRARY && searchSource != SearchSource.ADDONS &&
+                            results != null && searchSuggestions.isEmpty()
+                    }
+                }
                 val headerListState = artistListState ?: homeListState.takeIf { homeHeadingVisible }
                 // Header (foto profil + pill) turun/naik antara posisi Home dan tab lain
                 // dengan spring sedikit membal, bukan loncat saat tab berpindah.
@@ -4330,6 +4342,7 @@ private fun ZenithApp(
                         (1f - pageScroll.floatValue / pageTitleFadePx).coerceIn(0f, 1f)
                     },
                     actionsHidden = showAccountSelector && !accountSelectorLeaving,
+                    actionsCollapsed = searchFilterBarShown,
                     // Judul besar "Search" ada di header halaman selama field kosong
                     // dan belum fokus; judul bar baru naik setelah itu hilang.
                     scrolled = {

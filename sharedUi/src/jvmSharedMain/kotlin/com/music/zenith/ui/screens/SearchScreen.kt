@@ -106,6 +106,12 @@ import com.music.zenith.ui.components.thumbnailBorder
 import com.music.zenith.ui.components.songListSkeleton
 import com.music.zenith.ui.components.optimizedHazeEffect
 import androidx.compose.ui.zIndex
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.graphics.graphicsLayer
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.HazeTint
@@ -215,6 +221,12 @@ fun SearchScreen(
      * best match right above the field. Null (desktop, other bars): unchanged.
      */
     bottomAnchorInset: (() -> Int)? = null,
+    /**
+     * Non-null (phone): while the filter control is showing it rises to this top
+     * padding, up where the profile was, over a frosted header shape with rounded
+     * bottom corners. Null (desktop): the control stays under [topPadding].
+     */
+    filterBarTopPadding: Dp? = null,
 ) {
     val focusRequester = remember { FocusRequester() }
     var listWidthPx by remember { mutableIntStateOf(0) }
@@ -278,11 +290,50 @@ fun SearchScreen(
         )
     }
     var headerHeightPx by remember { mutableIntStateOf(0) }
+    val filterBarShown = filterBarTopPadding != null && results != null && !suggesting &&
+        !searchingLibrary && !searchingAddons
+    val headerTopPadding by animateDpAsState(
+        targetValue = if (filterBarShown && filterBarTopPadding != null) filterBarTopPadding else topPadding,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMediumLow,
+        ),
+        label = "searchHeaderTopPadding",
+    )
+    val headerShapeAlpha by animateFloatAsState(
+        targetValue = if (filterBarShown) 1f else 0f,
+        animationSpec = tween(durationMillis = 260),
+        label = "searchHeaderShapeAlpha",
+    )
+    val headerFrostStyle = remember(frostFill) {
+        HazeStyle(
+            backgroundColor = frostFill,
+            tints = listOf(HazeTint(frostFill.copy(alpha = 0.72f))),
+            blurRadius = 28.dp,
+            noiseFactor = 0f,
+            fallbackTint = HazeTint(frostFill),
+        )
+    }
     val headerHeight = with(LocalDensity.current) { headerHeightPx.toDp() }
     var sourceMenuOpen by remember { mutableStateOf(false) }
     var sourceMenuAnchor by remember { mutableStateOf<Rect?>(null) }
     var rootOrigin by remember { mutableStateOf(Offset.Zero) }
     Box(modifier = modifier.fillMaxSize().onGloballyPositioned { rootOrigin = it.positionInWindow() }) {
+        // Header shape behind the filter control: the page colour (black in dark,
+        // white in light) over a blur of the list, bottom corners rounded, so rows
+        // scroll away beneath it instead of running through the control.
+        if (headerShapeAlpha > 0f) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .height(headerHeight)
+                    .zIndex(0.5f)
+                    .graphicsLayer { alpha = headerShapeAlpha }
+                    .clip(RoundedCornerShape(bottomStart = HEADER_SHAPE_RADIUS, bottomEnd = HEADER_SHAPE_RADIUS))
+                    .optimizedHazeEffect(frost, headerFrostStyle),
+            )
+        }
         // Search field and filter tabs stay fixed at the top, outside the
         // scrolling list, so they're always reachable rather than scrolling
         // away with the results or recent searches beneath them.
@@ -294,7 +345,7 @@ fun SearchScreen(
                 .zIndex(1f)
                 .fillMaxWidth()
                 .onSizeChanged { headerHeightPx = it.height }
-                .padding(top = topPadding),
+                .padding(top = headerTopPadding),
         ) {
             if (showField) {
                 SearchField(
@@ -328,7 +379,11 @@ fun SearchScreen(
                     options = SearchFilter.entries.map { it.label },
                     selectedIndex = filter.ordinal,
                     onSelect = { onFilterChange(SearchFilter.entries[it]) },
-                    modifier = Modifier.padding(start = PAGE_GUTTER, end = PAGE_GUTTER, bottom = 6.dp),
+                    modifier = Modifier.padding(
+                        start = PAGE_GUTTER,
+                        end = PAGE_GUTTER,
+                        bottom = if (filterBarTopPadding != null) 16.dp else 6.dp,
+                    ),
                 )
             }
         }
@@ -586,6 +641,9 @@ fun SearchScreen(
 
 /** The soft top edge of the anchored suggestion list; also the room kept for it. */
 private val ANCHORED_FADE_HEIGHT = 24.dp
+
+/** Corner radius of the frosted header shape behind the filter control. */
+private val HEADER_SHAPE_RADIUS = 36.dp
 
 /**
  * How far the Search heading is raised to meet New's: that page lifts everything by
