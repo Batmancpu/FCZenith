@@ -561,12 +561,13 @@ fun SearchScreen(
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .fillMaxWidth()
-                    .padding(top = topPadding)
-                    .height(ANCHORED_FADE_HEIGHT)
+                    .height(topPadding + ANCHORED_FADE_HEIGHT)
                     .zIndex(1f)
                     .background(
                         androidx.compose.ui.graphics.Brush.verticalGradient(
-                            listOf(frostFill, frostFill.copy(alpha = 0f)),
+                            0f to frostFill,
+                            topPadding.value / (topPadding + ANCHORED_FADE_HEIGHT).value to frostFill,
+                            1f to frostFill.copy(alpha = 0f),
                         ),
                     ),
             )
