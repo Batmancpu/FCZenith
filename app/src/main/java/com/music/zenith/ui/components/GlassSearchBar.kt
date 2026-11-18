@@ -1,6 +1,9 @@
 package com.music.zenith.ui.components
 
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Extension
+import androidx.compose.material.icons.rounded.LibraryMusic
+import androidx.compose.material.icons.rounded.SmartDisplay
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import com.music.zenith.ui.player.LocalLyricsMenuPopover
@@ -171,6 +174,8 @@ fun GlassSearchBar(
     sourceLabels: List<String>,
     sourceIndex: Int,
     onSourceSelect: (Int) -> Unit,
+    /** Renders the source picker with the search backdrop (supplied by the app). */
+    sourceMenu: (@Composable (Boolean, androidx.compose.ui.geometry.Rect?, () -> Unit, List<LyricsMenuEntry>) -> Unit)? = null,
     /** true = the bar opens out of the collapsed row: two 48dp circles with the mini player between. */
     startInline: Boolean = false,
     /** Reports the open fraction each frame so the mini player above can rise on the same spring. */
@@ -228,18 +233,22 @@ fun GlassSearchBar(
     // Source picker: the same globe popover as the lyrics controls, anchored to this button.
     var sourceMenuOpen by remember { mutableStateOf(false) }
     var sourceAnchor by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
-    val sourcePopover = LocalLyricsMenuPopover.current
+    val sourceIcons = listOf(Icons.Rounded.SmartDisplay, Icons.Rounded.LibraryMusic, Icons.Rounded.Extension)
     val sourceEntries = sourceLabels.mapIndexed { index, label ->
         LyricsMenuEntry(
             label = label,
-            icon = if (index == sourceIndex) Icons.Rounded.Check else Icons.Rounded.Public,
+            icon = sourceIcons.getOrElse(index) { Icons.Rounded.Public },
             enabled = true,
-        ) {
-            sourceMenuOpen = false
-            onSourceSelect(index)
-        }
+            onClick = {
+                sourceMenuOpen = false
+                onSourceSelect(index)
+            },
+            selected = index == sourceIndex,
+        )
     }
-    sourcePopover?.invoke(sourceMenuOpen, sourceAnchor, { sourceMenuOpen = false }, sourceEntries, null)
+    if (sourceMenu != null) {
+        sourceMenu(sourceMenuOpen, sourceAnchor, { sourceMenuOpen = false }, sourceEntries)
+    }
     val selectedColor = if (contentColor == Color.White) {
         lerp(MaterialTheme.colorScheme.primary, Color.White, 0.06f)
     } else {
