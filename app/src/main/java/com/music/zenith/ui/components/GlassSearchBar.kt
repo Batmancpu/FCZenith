@@ -176,11 +176,7 @@ fun GlassSearchBar(
     // firmer and nearly critically damped so the bar swap is not delayed.
     val openFraction by animateFloatAsState(
         targetValue = if (open && entered) 1f else 0f,
-        animationSpec = if (open) {
-            spring(dampingRatio = 0.58f, stiffness = 290f)
-        } else {
-            spring(dampingRatio = 0.92f, stiffness = 380f)
-        },
+        animationSpec = spring(dampingRatio = 1f, stiffness = 340f),
         label = "searchBarOpen",
     )
     val currentOnClosed by rememberUpdatedState(onClosed)
@@ -255,15 +251,12 @@ fun GlassSearchBar(
         // The pill's width at rest: whatever the Search circle leaves.
         val restLeft = fullWidth - restHeight - BAR_SPACING
         val gap = if (inlineStart) BAR_FIELD_GAP else lerpDp(BAR_SPACING, BAR_FIELD_GAP, p)
-        // The spring overshoots, and the overshoot shows as the last-tab circle
-        // squashing a little narrower (softly, never flat-clamped) as the capsule
-        // pushes past its open width, then settling back.
+        // The spring no longer overshoots, so the last-tab circle keeps its width
+        // and the mini player's rise follows the same smooth progress.
         val leftWidth = if (inlineStart) {
-            val grown = lerpDp(BAR_FIELD_CIRCLE, fieldWidth, p)
-            val pushed = (grown - fieldWidth).coerceAtLeast(0.dp)
-            softFloor(BAR_FIELD_CIRCLE - pushed, BAR_FIELD_CIRCLE, BAR_BOUNCE_GIVE)
+            BAR_FIELD_CIRCLE
         } else {
-            softFloor(lerpDp(restLeft, BAR_FIELD_CIRCLE, p), BAR_FIELD_CIRCLE, BAR_BOUNCE_GIVE)
+            lerpDp(restLeft, BAR_FIELD_CIRCLE, p)
         }
         // Collapsed start: a 48dp circle that grows leftward into the field.
         val rightWidth = if (inlineStart) {
