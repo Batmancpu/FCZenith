@@ -309,7 +309,7 @@ fun SearchScreen(
     val headerHeight = with(LocalDensity.current) { headerHeightPx.toDp() }
     val contentLayer = rememberGraphicsLayer()
     val blurLayer = rememberGraphicsLayer()
-    val headerRadiusPx = with(LocalDensity.current) { HEADER_SHAPE_RADIUS.toPx() }
+    val headerFadePx = with(LocalDensity.current) { HEADER_FADE_HEIGHT.toPx() }
     val headerBlurPx = with(LocalDensity.current) { HEADER_BLUR_RADIUS.toPx() }
     var sourceMenuOpen by remember { mutableStateOf(false) }
     var sourceMenuAnchor by remember { mutableStateOf<Rect?>(null) }
@@ -401,7 +401,7 @@ fun SearchScreen(
                     blurEnabled = headerBlur,
                     bandHeightPx = { headerHeightPx.toFloat() },
                     amount = { headerShapeAlpha },
-                    cornerRadiusPx = headerRadiusPx,
+                    fadePx = headerFadePx,
                     blurRadiusPx = headerBlurPx,
                     fill = frostFill,
                 )
@@ -635,16 +635,17 @@ fun SearchScreen(
 /** The soft top edge of the anchored suggestion list; also the room kept for it. */
 private val ANCHORED_FADE_HEIGHT = 24.dp
 
-/** Corner radius of the frosted header shape behind the filter control. */
-private val HEADER_SHAPE_RADIUS = 36.dp
+/** Height of the soft fade below the frosted header band behind the filter control. */
+private val HEADER_FADE_HEIGHT = 28.dp
 
 /** Blur radius of the frosted header band. */
 private val HEADER_BLUR_RADIUS = 24.dp
 
 /**
- * Draws the list, then a frosted band over its top [bandHeightPx] with rounded bottom
- * corners: the page colour under a blurred copy of the same list, so rows scroll away
- * into frost beneath the filter control. The list is recorded once and the blur layer
+ * Draws the list, then a frosted band over its top [bandHeightPx]: the page colour
+ * under a blurred copy of the same list, so rows scroll away into frost beneath the
+ * filter control. Below the control the band keeps its blur but fades out over [fadePx]
+ * instead of ending in a hard edge. The list is recorded once and the blur layer
  * redraws that recording, so the band is in the list's own coordinates. [amount] fades
  * the band in and out; with [blurEnabled] false it is a plain scrim instead.
  */
@@ -654,31 +655,41 @@ private fun Modifier.frostedHeaderBand(
     blurEnabled: Boolean,
     bandHeightPx: () -> Float,
     amount: () -> Float,
-    cornerRadiusPx: Float,
+    fadePx: Float,
     blurRadiusPx: Float,
     fill: Color,
 ): Modifier = drawWithContent {
     val a = amount()
-    val bandH = bandHeightPx().coerceAtMost(size.height)
-    if (a <= 0.01f || bandH <= 0f) {
+    val solidH = bandHeightPx().coerceAtMost(size.height)
+    if (a <= 0.01f || solidH <= 0f) {
         drawContent()
         return@drawWithContent
     }
-    val band = Path().apply {
-        addRoundRect(
-            RoundRect(
-                left = 0f,
-                top = 0f,
-                right = size.width,
-                bottom = bandH,
-                bottomLeftCornerRadius = CornerRadius(cornerRadiusPx),
-                bottomRightCornerRadius = CornerRadius(cornerRadiusPx),
-            ),
+    val bandH = (solidH + fadePx).coerceAtMost(size.height)
+    val bandSize = androidx.compose.ui.geometry.Size(size.width, bandH)
+    val mask = androidx.compose.ui.graphics.Brush.verticalGradient(
+        colorStops = arrayOf(
+            0f to Color.Black,
+            (solidH / bandH).coerceIn(0f, 0.99f) to Color.Black,
+            1f to Color.Transparent,
+        ),
+        startY = 0f,
+        endY = bandH,
+    )
+    // Draws [block] into an offscreen layer, then multiplies it by the fade mask.
+    fun masked(block: () -> Unit) {
+        drawContext.canvas.saveLayer(Rect(0f, 0f, size.width, bandH), androidx.compose.ui.graphics.Paint())
+        block()
+        drawRect(
+            brush = mask,
+            size = bandSize,
+            blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
         )
+        drawContext.canvas.restore()
     }
     if (!blurEnabled) {
         drawContent()
-        clipPath(band) { drawRect(fill.copy(alpha = 0.82f * a)) }
+        masked { drawRect(fill.copy(alpha = 0.82f * a), size = bandSize) }
         return@drawWithContent
     }
     val w = size.width.roundToInt().coerceAtLeast(1)
@@ -692,10 +703,10 @@ private fun Modifier.frostedHeaderBand(
     blurLayer.renderEffect = BlurEffect(null, blurRadiusPx, blurRadiusPx, TileMode.Clamp)
     blurLayer.alpha = a
     blurLayer.record(size = IntSize(w, sampleH)) { drawLayer(contentLayer) }
-    clipPath(band) {
-        drawRect(fill.copy(alpha = a))
+    masked {
+        drawRect(fill.copy(alpha = a), size = bandSize)
         drawLayer(blurLayer)
-        drawRect(fill.copy(alpha = 0.4f * a))
+        drawRect(fill.copy(alpha = 0.4f * a), size = bandSize)
     }
 }
 
