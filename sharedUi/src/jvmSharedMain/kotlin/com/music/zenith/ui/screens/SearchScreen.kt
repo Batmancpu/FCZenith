@@ -258,36 +258,8 @@ fun SearchScreen(
                 .zIndex(1f)
                 .fillMaxWidth()
                 .onSizeChanged { headerHeightPx = it.height }
-                .clip(RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp))
-                .background(frostFill.copy(alpha = 0.9f))
-                .then(headerModifier)
-                // When the app supplies its own backdrop blur it is the frost;
-                // Haze on top would blur the same list a second time.
-                .then(
-                    if (headerModifier === Modifier) {
-                        Modifier.optimizedHazeEffect(frost, frostStyle)
-                    } else {
-                        Modifier
-                    },
-                )
                 .padding(top = topPadding),
         ) {
-            AnimatedVisibility(
-                visible = showTitle && query.isEmpty() && results == null && !fieldFocused,
-                enter = fadeIn() + expandVertically(),
-                exit = fadeOut() + shrinkVertically(),
-            ) {
-                Text(
-                    text = stringResource(Res.string.search),
-                    style = MaterialTheme.typography.displayLarge,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    modifier = Modifier.padding(
-                        start = PAGE_GUTTER,
-                        end = PAGE_GUTTER,
-                        bottom = 8.dp,
-                    ),
-                )
-            }
             if (showField) {
                 SearchField(
                     query = query,
@@ -334,6 +306,26 @@ fun SearchScreen(
                 .onSizeChanged { listWidthPx = it.width },
             contentPadding = PaddingValues(top = headerHeight, bottom = contentPadding.calculateBottomPadding()),
         ) {
+            // The big title scrolls with the list, the way the New page's heading does.
+            item {
+                AnimatedVisibility(
+                    visible = showTitle && query.isEmpty() && results == null && !fieldFocused,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically(),
+                ) {
+                    Text(
+                        text = stringResource(Res.string.search),
+                        style = MaterialTheme.typography.displayLarge,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        modifier = Modifier.padding(
+                            start = PAGE_GUTTER,
+                            end = PAGE_GUTTER,
+                            top = 8.dp,
+                            bottom = 14.dp,
+                        ),
+                    )
+                }
+            }
             when {
                 searchingLibrary || searchingAddons -> librarySearchResults(
                     query = query.trim(),

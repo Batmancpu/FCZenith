@@ -3999,16 +3999,7 @@ private fun ZenithApp(
                                 } else {
                                     Modifier
                                 },
-                                headerModifier = if (glassSamplesBackdrop) {
-                                    Modifier.drawPlainBackdrop(
-                                        backdrop = searchBackdrop,
-                                        shape = { androidx.compose.ui.graphics.RectangleShape },
-                                        effects = { blur(24.dp.toPx()) },
-                                        onDrawSurface = { drawRect(searchHeaderTint) },
-                                    )
-                                } else {
-                                    Modifier
-                                },
+                                headerModifier = Modifier,
 
                                 // The settings page's own two-state selector, so the
                                 // app has one look for "pick one of these".
