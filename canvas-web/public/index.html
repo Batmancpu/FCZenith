@@ -158,8 +158,25 @@ const RULES = { width: 1280, height: 1280, minSec: 3, maxSec: 8, maxBytes: 3 * 1
 const db = getFirestore(initializeApp(FIREBASE_CONFIG));
 const $ = (id) => document.getElementById(id);
 
+const DEV = !/[?&]dev=0/.test(location.search) &&
+  (/[?&]dev=1/.test(location.search) || ["localhost", "127.0.0.1"].includes(location.hostname));
+const DEV_VIDEO = "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4";
+const DEV_FEED = [
+  { id: "devfeed00001", data: { song: "Contoh Lagu Satu", artist: "Artis Contoh", album: "Album A", url: DEV_VIDEO, likes: 12 } },
+  { id: "devfeed00002", data: { song: "Contoh Lagu Dua", artist: "Artis Lain", album: "", url: DEV_VIDEO, likes: 5 } },
+  { id: "devfeed00003", data: { song: "Contoh Lagu Tiga", artist: "Artis Contoh", album: "Album B", url: DEV_VIDEO, likes: 0 } }
+];
+const DEV_MINE = [
+  { id: "devmine00001", song: "Contoh Disetujui", artist: "Artis Contoh", album: "", url: DEV_VIDEO, status: "approved", likes: 8, createdAt: "" },
+  { id: "devmine00002", song: "Contoh Menunggu", artist: "Artis Lain", album: "", url: DEV_VIDEO, status: "pending", likes: 0, createdAt: "" },
+  { id: "devmine00003", song: "Contoh Ditolak", artist: "Artis Lain", album: "", url: DEV_VIDEO, status: "rejected", likes: 0, createdAt: "" }
+];
+
 function session() {
-  try { return JSON.parse(localStorage.getItem("zc_session") || "null"); } catch (e) { return null; }
+  let real = null;
+  try { real = JSON.parse(localStorage.getItem("zc_session") || "null"); } catch (e) { real = null; }
+  if (real) return real;
+  return DEV ? { token: "dev", name: "Dev Preview" } : null;
 }
 
 function renderAuth() {
@@ -173,6 +190,12 @@ function renderAuth() {
 
 async function api(path, body) {
   const s = session();
+  if (DEV && s && s.token === "dev") {
+    await new Promise((r) => setTimeout(r, 400));
+    if (path === "mine") return { items: DEV_MINE };
+    if (path === "upload") return { ok: true, name: "dev.mp4", uploadUrl: "", remaining: 5 };
+    return { ok: true };
+  }
   const headers = { "Content-Type": "application/json" };
   if (s) headers.Authorization = "Bearer " + s.token;
   const res = await fetch("/api/" + path, { method: "POST", headers, body: JSON.stringify(body) });
@@ -289,6 +312,7 @@ function inspect(file) {
 
 async function uploadVideo(file) {
   const ticket = await api("upload", { action: "ticket" });
+  if (DEV && ticket.name === "dev.mp4") return ticket.name;
   if (!ticket.uploadUrl || !ticket.name) throw new Error("izin upload tidak diberikan");
   const res = await fetch(ticket.uploadUrl, { method: "PUT", headers: { "Content-Type": "video/mp4" }, body: file });
   if (!res.ok) throw new Error("upload gagal (" + res.status + ")");
@@ -482,6 +506,7 @@ async function loadFeed() {
   try {
     const snap = await getDocs(query(collection(db, "canvases"), where("status", "==", "approved"), limit(50)));
     feedItems = snap.docs.map((d) => ({ id: d.id, data: d.data() }));
+    if (DEV && feedItems.length < 4) feedItems = feedItems.concat(DEV_FEED);
     feedItems.sort((a, b) => (b.data.likes || 0) - (a.data.likes || 0));
     feedLoaded = true;
     renderFeed();
