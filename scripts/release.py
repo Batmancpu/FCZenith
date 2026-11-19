@@ -277,7 +277,9 @@ def menu_args(config, test=False, dry=False):
         argv += ["--app", config["RELEASE_APP"]]
     if config.get("RELEASE_TAGLINE"):
         argv += ["--tagline", config["RELEASE_TAGLINE"]]
-    if config.get("RELEASE_IMAGES"):
+    if config.get("RELEASE_NO_IMAGES") == "1":
+        argv.append("--no-images")
+    elif config.get("RELEASE_IMAGES"):
         argv += ["--images", config["RELEASE_IMAGES"]]
     if test:
         argv.append("--test")
@@ -369,6 +371,7 @@ MENU_PAGES = {
     "3": "Tujuan tes",
     "4": "Deteksi chat & topic",
     "5": "Konten rilis",
+    "6": "Gambar",
     "p": "Pratinjau",
     "t": "Kirim tes",
     "r": "Kirim rilis",
@@ -440,7 +443,10 @@ def draw_menu(config):
     section("KONTEN")
     info_row("App", config.get("RELEASE_APP") or "BitChord")
     info_row("Tagline", config.get("RELEASE_TAGLINE") or "-")
-    info_row("Gambar", config.get("RELEASE_IMAGES") or "bawaan repo")
+    if config.get("RELEASE_NO_IMAGES") == "1":
+        info_row("Gambar", "mati (hanya teks)")
+    else:
+        info_row("Gambar", config.get("RELEASE_IMAGES") or "bawaan repo")
 
     saved = str(ENV_FILE).replace(str(Path.home()), "~")
     print(paint(f"\n  {saved}", "2"))
@@ -451,7 +457,8 @@ def draw_menu(config):
     menu_key("2", "Tujuan rilis (chat & topic)")
     menu_key("3", "Tujuan tes (chat & topic)")
     menu_key("4", "Deteksi chat & topic otomatis")
-    menu_key("5", "Nama app, tagline, gambar")
+    menu_key("5", "Nama app, tagline, folder gambar")
+    menu_key("6", "Gambar nyala / mati")
 
     section("KIRIM")
     menu_key("p", "Pratinjau (dry run)")
@@ -459,6 +466,12 @@ def draw_menu(config):
     menu_key("r", "Kirim rilis ke chat rilis")
     menu_key("c", "Cek bot")
     menu_key("q", "Keluar")
+
+
+def toggle_images():
+    off = read_env_file().get("RELEASE_NO_IMAGES") == "1"
+    save_env_value("RELEASE_NO_IMAGES", "" if off else "1")
+    print("Gambar: nyala." if off else "Gambar: mati, rilis dikirim hanya teks.")
 
 
 def run_menu():
@@ -486,6 +499,8 @@ def run_menu():
         elif choice == "5":
             for field in MENU_FIELDS[5:]:
                 edit_field(*field)
+        elif choice == "6":
+            toggle_images()
         elif choice == "p":
             run_cli(menu_args(config, dry=True))
         elif choice == "t":
