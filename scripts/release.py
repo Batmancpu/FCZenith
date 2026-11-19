@@ -30,6 +30,7 @@ import urllib.request
 from pathlib import Path
 
 ENV_FILE = Path.home() / ".zenith_release.env"
+ROOT = Path(__file__).resolve().parent.parent
 IMAGE_TYPES = {".jpg", ".jpeg", ".png"}
 TEXT_LIMIT = 4000
 ALBUM_MAX = 10
@@ -420,9 +421,13 @@ def main():
     parser.add_argument("--app", default="BitChord", help="app name in the title")
     parser.add_argument("--version", help="override the version read from build.gradle.kts")
     parser.add_argument("--tagline", default="", help="one line under the title")
-    parser.add_argument("--notes", default="RELEASE_NOTES.md")
-    parser.add_argument("--gradle", default="build.gradle.kts")
-    parser.add_argument("--images", default=".github/assets/release", help="folder with release images")
+    parser.add_argument("--notes", default=str(ROOT / "RELEASE_NOTES.md"))
+    parser.add_argument("--gradle", default=str(ROOT / "build.gradle.kts"))
+    parser.add_argument(
+        "--images",
+        default=str(ROOT / ".github" / "assets" / "release"),
+        help="folder with release images",
+    )
     parser.add_argument("--no-images", action="store_true")
     parser.add_argument("--test", action="store_true", help="send to the test chat")
     parser.add_argument("--dry-run", action="store_true", help="print the message, send nothing")
