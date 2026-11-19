@@ -3207,7 +3207,39 @@ fun NowPlayingScreen(
                                         0f
                                     }
                                     if (dimAmount > 0f) {
-                                        drawRect(Color.Black.copy(alpha = CANVAS_PANEL_DIM * dimAmount))
+                                        val dimFade = when {
+                                            clipFullscreen || clipFillsPanels -> 0f
+                                            clipPortrait -> clipFadeFraction
+                                            else -> HERO_FADE_FRACTION
+                                        }
+                                        if (dimFade <= 0.001f) {
+                                            drawRect(Color.Black.copy(alpha = CANVAS_PANEL_DIM * dimAmount))
+                                        } else {
+                                            // Dim mengikuti fade bawah klip (kurva smootherStep yang
+                                            // sama), supaya tidak ada tepi flat di batas kotak hero
+                                            // saat panel lirik/antrean menutup.
+                                            val fadeEnd = if (clipPortrait && !clipFillsPanels) {
+                                                clipBottom.toPx().coerceIn(1f, size.height)
+                                            } else {
+                                                size.height
+                                            }
+                                            val fadeStart = fadeEnd * (1f - dimFade.coerceAtMost(1f))
+                                            val dimAlpha = CANVAS_PANEL_DIM * dimAmount
+                                            val steps = 8
+                                            val stops = Array(steps + 1) { i ->
+                                                val t = i / steps.toFloat()
+                                                val y = fadeStart + (fadeEnd - fadeStart) * t
+                                                (y / size.height).coerceIn(0f, 1f) to
+                                                    Color.Black.copy(alpha = dimAlpha * (1f - smootherStep(t)))
+                                            }
+                                            drawRect(
+                                                brush = Brush.verticalGradient(
+                                                    0f to Color.Black.copy(alpha = dimAlpha),
+                                                    *stops,
+                                                    1f to Color.Transparent,
+                                                ),
+                                            )
+                                        }
                                     }
                                 }
                                 .hazeSource(playerHaze),
