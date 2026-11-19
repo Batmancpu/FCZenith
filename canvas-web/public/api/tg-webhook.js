@@ -69,7 +69,12 @@ async function handleStart(msg) {
   const isMember = status === "creator" || status === "administrator" || status === "member" ||
     (status === "restricted" && member.result.is_member === true);
   if (!isMember) {
-    await reply("Your account is not a member of the Zenith group.");
+    const link = process.env.TELEGRAM_GROUP_LINK;
+    const extra = link ? { reply_markup: { inline_keyboard: [[{ text: "Join Zenith Group", url: link }]] } } : {};
+    await tg("sendMessage", Object.assign({
+      chat_id: msg.chat.id,
+      text: "Your account is not a member of the Zenith group. Join the group first, then sign in again from the website."
+    }, extra));
     return;
   }
   const token = await googleToken();
