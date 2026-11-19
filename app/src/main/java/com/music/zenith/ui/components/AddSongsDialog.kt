@@ -192,11 +192,14 @@ fun AddSongsDialog(
             modifier = Modifier.align(Alignment.Center),
             enter = fadeIn(tween(160)) +
                 (if (reduceMotion) EnterTransition.None else scaleIn(
-                    animationSpec = spring(dampingRatio = 0.82f, stiffness = 520f),
-                    initialScale = 0.9f,
+                    animationSpec = spring(dampingRatio = 0.58f, stiffness = 380f),
+                    initialScale = 0.8f,
                 )),
-            exit = fadeOut(tween(120)) +
-                (if (reduceMotion) ExitTransition.None else scaleOut(tween(140), targetScale = 0.94f)),
+            exit = fadeOut(tween(140)) +
+                (if (reduceMotion) ExitTransition.None else scaleOut(
+                    animationSpec = spring(dampingRatio = 0.8f, stiffness = 500f),
+                    targetScale = 0.88f,
+                )),
         ) {
             val touch = rememberJellyMenuTouch()
             IosMenuScrollEnvironment(touch) {
