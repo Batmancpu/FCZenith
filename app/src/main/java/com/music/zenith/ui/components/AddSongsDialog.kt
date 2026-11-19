@@ -216,6 +216,7 @@ fun AddSongsDialog(
                     // Ketukan di panel tidak boleh jatuh ke scrim di bawahnya.
                     .pointerInput(Unit) {}
                     .iosMenuPanel(translucent = true, backdrop = backdrop, hazeState = hazeState)
+                    .touchGlow()
                     .iosMenuTouchHost(touch, colors.pressed),
             ) {
                 Column(
