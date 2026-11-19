@@ -232,9 +232,10 @@ def save_env_value(key, value):
 
 
 def edit_field(key, label, secret):
-    value = ask(f"{label} (kosong = batal, - = hapus): ", secret)
+    current = mask(read_env_file().get(key, ""), secret)
+    value = ask(f"{label} [{current}] (Enter = tetap, - = hapus): ", secret)
     if not value:
-        print("Dibatalkan.")
+        print("Tidak diubah.")
         return
     if value == "-":
         save_env_value(key, "")
@@ -291,14 +292,88 @@ def check_bot(config):
         print("Gagal:", result.get("description", "unknown error"))
 
 
+def shown(config, key):
+    return config.get(key) or "(kosong)"
+
+
+def edit_target(chat_key, thread_key, title):
+    edit_field(chat_key, f"Chat ID {title}", False)
+    edit_field(thread_key, f"Topic ID {title}", False)
+
+
+def detect_chats(config):
+    token = config.get("TELEGRAM_BOT_TOKEN")
+    if not token:
+        print("Isi bot token dulu (menu 1).")
+        return
+    result = call(token, "getUpdates", {"limit": 100})
+    if not result.get("ok"):
+        print("Gagal:", result.get("description", "unknown error"))
+        return
+    seen = {}
+    for update in result.get("result", []):
+        message = (
+            update.get("message")
+            or update.get("channel_post")
+            or update.get("edited_message")
+            or {}
+        )
+        chat = message.get("chat")
+        if not chat:
+            continue
+        topic = ""
+        if message.get("is_topic_message"):
+            topic = str(message.get("message_thread_id", ""))
+        seen[(chat["id"], topic)] = chat
+    if not seen:
+        print("Belum ada pesan masuk.")
+        print("Kirim satu pesan ke grup / topic yang dituju, lalu coba lagi.")
+        return
+    items = list(seen.items())
+    for number, ((chat_id, topic), chat) in enumerate(items, 1):
+        name = chat.get("title") or chat.get("username") or chat.get("first_name") or "?"
+        extra = f" | topic {topic}" if topic else ""
+        print(f"[{number}] {name} ({chat.get('type', '?')}) id {chat_id}{extra}")
+    pick = ask("Pilih nomor (kosong = batal): ")
+    if not pick or not pick.isdigit() or not 1 <= int(pick) <= len(items):
+        print("Dibatalkan.")
+        return
+    (chat_id, topic), _ = items[int(pick) - 1]
+    target = ask("Simpan sebagai [1] rilis, [2] tes (kosong = batal): ")
+    if target == "1":
+        chat_key, thread_key = "TELEGRAM_CHAT_ID", "TELEGRAM_THREAD_ID"
+    elif target == "2":
+        chat_key, thread_key = "TELEGRAM_TEST_CHAT_ID", "TELEGRAM_TEST_THREAD_ID"
+    else:
+        print("Dibatalkan.")
+        return
+    save_env_value(chat_key, str(chat_id))
+    save_env_value(thread_key, topic)
+    print(f"Tersimpan: chat {chat_id}, topic {topic or '(kosong)'}.")
+
+
 def menu():
     while True:
         config = read_env_file()
         print("\n=== Zenith Release Notify ===")
-        for number, (key, label, secret) in enumerate(MENU_FIELDS, 1):
-            print(f"[{number}] {label}: {mask(config.get(key, ''), secret)}")
-        print(f"Simpan di: {ENV_FILE}")
+        print(f"Bot token : {mask(config.get('TELEGRAM_BOT_TOKEN', ''), True)}")
+        print(
+            f"Rilis     : chat {shown(config, 'TELEGRAM_CHAT_ID')}"
+            f" | topic {shown(config, 'TELEGRAM_THREAD_ID')}"
+        )
+        print(
+            f"Tes       : chat {shown(config, 'TELEGRAM_TEST_CHAT_ID')}"
+            f" | topic {shown(config, 'TELEGRAM_TEST_THREAD_ID')}"
+        )
+        print(f"App       : {shown(config, 'RELEASE_APP')} | tagline {shown(config, 'RELEASE_TAGLINE')}")
+        print(f"Gambar    : {shown(config, 'RELEASE_IMAGES')}")
+        print(f"Simpan di : {ENV_FILE}")
         print("-" * 29)
+        print("[1] Ubah bot token")
+        print("[2] Ubah Chat ID & Topic ID rilis")
+        print("[3] Ubah Chat ID & Topic ID tes")
+        print("[4] Deteksi Chat ID & Topic otomatis")
+        print("[5] Ubah nama app, tagline, folder gambar")
         print("[p] Pratinjau (dry run)")
         print("[t] Kirim tes ke chat tes")
         print("[r] Kirim rilis ke chat rilis")
@@ -310,8 +385,22 @@ def menu():
             return
         choice = choice.lower()
         print()
-        if choice.isdigit() and 1 <= int(choice) <= len(MENU_FIELDS):
-            edit_field(*MENU_FIELDS[int(choice) - 1])
+        wait = True
+        if choice == "1":
+            edit_field(*MENU_FIELDS[0])
+            wait = False
+        elif choice == "2":
+            edit_target("TELEGRAM_CHAT_ID", "TELEGRAM_THREAD_ID", "rilis")
+            wait = False
+        elif choice == "3":
+            edit_target("TELEGRAM_TEST_CHAT_ID", "TELEGRAM_TEST_THREAD_ID", "tes")
+            wait = False
+        elif choice == "4":
+            detect_chats(config)
+        elif choice == "5":
+            for field in MENU_FIELDS[5:]:
+                edit_field(*field)
+            wait = False
         elif choice == "p":
             run_cli(menu_args(config, dry=True))
         elif choice == "t":
@@ -322,7 +411,8 @@ def menu():
             check_bot(load_config())
         else:
             print("Menu tidak dikenal.")
-        ask("\nTekan Enter untuk lanjut...")
+        if wait:
+            ask("\nTekan Enter untuk lanjut...")
 
 
 def main():
