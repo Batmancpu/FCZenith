@@ -1,6 +1,23 @@
 const PROJECT_ID = "zenith-canvas-17133";
 const API_KEY = "AIzaSyCO8txNS4UPwjrRKplPenuL-RA557gGhco";
 const OLD_MANIFEST = "https://vivimusicanvas.mkmdevilmi.workers.dev/canvas.json";
+const crypto = require("crypto");
+const CACHE_MS = 10 * 60 * 1000;
+const MAX_SKEW_SECONDS = 12 * 60 * 60;
+const cache = { items: null, at: 0 };
+
+function authorized(req) {
+  const secret = process.env.CANVAS_SECRET;
+  if (!secret) return true;
+  const time = String(req.headers["x-zenith-time"] || "");
+  const sig = String(req.headers["x-zenith-sig"] || "");
+  if (!/^\d+$/.test(time)) return false;
+  if (Math.abs(Date.now() / 1000 - Number(time)) > MAX_SKEW_SECONDS) return false;
+  const want = crypto.createHmac("sha256", secret).update(time).digest("hex");
+  const a = Buffer.from(sig);
+  const b = Buffer.from(want);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
 
 function norm(text) {
   return String(text || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
@@ -70,13 +87,22 @@ async function loadOld() {
 }
 
 module.exports = async (req, res) => {
+  if (!authorized(req)) {
+    res.setHeader("Cache-Control", "no-store");
+    res.status(401).json({ error: "unauthorized" });
+    return;
+  }
   try {
-    const own = await loadOwn();
-    const old = await loadOld();
-    const seen = new Set(own.map((item) => item.url));
-    const items = own.concat(old.filter((item) => item && item.url && !seen.has(item.url)));
+    if (!cache.items || Date.now() - cache.at > CACHE_MS) {
+      const own = await loadOwn();
+      const old = await loadOld();
+      const seen = new Set(own.map((item) => item.url));
+      cache.items = own.concat(old.filter((item) => item && item.url && !seen.has(item.url)));
+      cache.at = Date.now();
+    }
+    const items = cache.items;
     res.setHeader("Content-Type", "application/json; charset=utf-8");
-    res.setHeader("Cache-Control", "public, s-maxage=3600, stale-while-revalidate=600");
+    res.setHeader("Cache-Control", "private, no-store");
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.status(200).send(JSON.stringify({ items }));
   } catch (error) {
