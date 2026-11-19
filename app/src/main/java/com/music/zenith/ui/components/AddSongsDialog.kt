@@ -10,6 +10,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
@@ -197,15 +198,20 @@ fun AddSongsDialog(
             exit = fadeOut(tween(120)) +
                 (if (reduceMotion) ExitTransition.None else scaleOut(tween(140), targetScale = 0.94f)),
         ) {
+            val touch = rememberJellyMenuTouch()
+            IosMenuScrollEnvironment(touch) {
             Column(
                 Modifier
                     .padding(horizontal = 20.dp)
                     .widthIn(max = 420.dp)
                     .fillMaxWidth()
                     .fillMaxHeight(0.66f)
+                    // Panel bergoyang jelly mengikuti jari, seperti popup titik tiga.
+                    .iosMenuJelly(touch, 0.5f, 0.5f)
                     // Ketukan di panel tidak boleh jatuh ke scrim di bawahnya.
                     .pointerInput(Unit) {}
-                    .iosMenuPanel(translucent = true, backdrop = backdrop, hazeState = hazeState),
+                    .iosMenuPanel(translucent = true, backdrop = backdrop, hazeState = hazeState)
+                    .iosMenuTouchHost(touch, colors.pressed),
             ) {
                 Row(
                     Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 14.dp),
@@ -336,6 +342,7 @@ fun AddSongsDialog(
                     }
                 }
             }
+            }
         }
     }
 }
@@ -347,7 +354,15 @@ private fun AddSongRow(song: Song, added: Boolean, colors: IosMenuColors, onClic
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(enabled = !added, onClick = onClick)
+            // Terdaftar ke pil sentuhan panel; tanpa ripple bila host jelly aktif.
+            .iosMenuTouchTarget(!added, 14.dp, onClick)
+            .clip(RoundedCornerShape(14.dp))
+            .clickable(
+                enabled = !added,
+                interactionSource = remember { MutableInteractionSource() },
+                indication = if (LocalIosMenuTouch.current == null) LocalIndication.current else null,
+                onClick = onClick,
+            )
             .padding(horizontal = 16.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
