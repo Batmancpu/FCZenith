@@ -1,0 +1,5 @@
+{
+  "rewrites": [
+    { "source": "/canvas.json", "destination": "/api/canvas" }
+  ]
+}
