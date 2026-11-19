@@ -56,7 +56,7 @@ internal fun Modifier.glassJelly(pressScale: Float = GLASS_JELLY_PRESS): Modifie
                 releaseJob[0]?.cancel()
                 var lastUp = down.uptimeMillis
                 // Pegas lembut, overshoot kecil: membesar mengalir tanpa loncat.
-                scope.launch { press.animateTo(1f, spring(dampingRatio = 0.82f, stiffness = 380f)) }
+                scope.launch { press.animateTo(1f, spring(dampingRatio = 0.9f, stiffness = 450f)) }
                 // Pegas pengikut jari: animateTo mewarisi kecepatan sebelumnya,
                 // jadi tidak ada lompatan seperti snapTo.
                 val follow = spring<Float>(dampingRatio = 0.9f, stiffness = 500f)
@@ -73,8 +73,8 @@ internal fun Modifier.glassJelly(pressScale: Float = GLASS_JELLY_PRESS): Modifie
                     val dy = soft(total.y)
                     val w = size.width.coerceAtLeast(1).toFloat()
                     val h = size.height.coerceAtLeast(1).toFloat()
-                    val ax = (abs(dx) / w * 0.12f).coerceAtMost(0.025f)
-                    val ay = (abs(dy) / h * 0.12f).coerceAtMost(0.025f)
+                    val ax = (abs(dx) / w * 0.12f).coerceAtMost(0.012f)
+                    val ay = (abs(dy) / h * 0.12f).coerceAtMost(0.012f)
                     val tx = (dx * 0.05f).coerceIn(-maxShift, maxShift)
                     val ty = (dy * 0.05f).coerceIn(-maxShift, maxShift)
                     scope.launch { offX.animateTo(tx, follow) }
@@ -82,7 +82,7 @@ internal fun Modifier.glassJelly(pressScale: Float = GLASS_JELLY_PRESS): Modifie
                     scope.launch { stX.animateTo(ax - ay * 0.5f, follow) }
                     scope.launch { stY.animateTo(ay - ax * 0.5f, follow) }
                 }
-                val wobble = spring<Float>(dampingRatio = 0.62f, stiffness = 300f)
+                val wobble = spring<Float>(dampingRatio = 0.78f, stiffness = 380f)
                 // Ketukan singkat tetap sempat membesar sebelum kembali.
                 val held = lastUp - down.uptimeMillis
                 releaseJob[0] = scope.launch {
@@ -109,13 +109,13 @@ internal fun Modifier.glassJelly(pressScale: Float = GLASS_JELLY_PRESS): Modifie
 }
 
 /** Skala tombol saat ditekan (membesar), sebelum regangan mengikuti jari. */
-internal const val GLASS_JELLY_PRESS = 1.12f
+internal const val GLASS_JELLY_PRESS = 1.06f
 
 /** Skala untuk elemen lebar (kolom search, pil Play/Shuffle) agar tidak terlalu melebar. */
-internal const val GLASS_JELLY_PRESS_WIDE = 1.05f
+internal const val GLASS_JELLY_PRESS_WIDE = 1.04f
 
 /** Lama minimal fase membesar sebelum memantul, supaya ketukan singkat tetap terasa. */
 internal const val GLASS_JELLY_MIN_HOLD_MS = 90L
 
 /** Pertambahan ukuran maksimum per sumbu saat ditekan, dalam dp, agar pil lebar dan tombol bulat terasa sama. */
-internal val GLASS_JELLY_GROW = 8.dp
+internal val GLASS_JELLY_GROW = 5.dp
