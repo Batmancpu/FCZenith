@@ -319,6 +319,7 @@ $("upClose").onclick = () => show("browse");
 $("tabBrowse").onclick = () => show("browse");
 $("tabMine").onclick = () => show("mine");
 window.addEventListener("popstate", (e) => {
+  if (!$("viewer").hidden) { closeViewer(); return; }
   show(e.state && e.state.zc ? e.state.zc : "browse", true);
 });
 renderAuth();
@@ -620,6 +621,7 @@ function openViewer(items, index) {
   }
   $("viewer").hidden = false;
   document.body.classList.add("feed");
+  history.pushState({ zc: current, viewer: 1 }, "");
   feed.scrollTop = index * feed.clientHeight;
 }
 
@@ -634,7 +636,10 @@ function closeViewer() {
   $("viewer").hidden = true;
   document.body.classList.toggle("feed", current === "browse");
 }
-$("viewerClose").onclick = closeViewer;
+$("viewerClose").onclick = () => {
+  if (history.state && history.state.viewer) history.back();
+  else closeViewer();
+};
 
 async function loadMine() {
   const list = $("mineList");
