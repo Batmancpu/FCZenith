@@ -22,7 +22,7 @@ import kotlinx.serialization.json.jsonPrimitive
 object CommunityCanvas {
 
     private const val TAG = "CommunityCanvas"
-    private const val MANIFEST = "https://vivimusicanvas.mkmdevilmi.workers.dev/canvas.json"
+    private const val MANIFEST = "https://zenith-canvas.vercel.app/canvas.json"
     private const val TTL_MS = 30L * 60 * 1000
 
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
