@@ -24,6 +24,7 @@
   .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 12px; }
   .card video { width: 100%; aspect-ratio: 1 / 1; border-radius: 8px; background: #000; }
   .row { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
+  #auth { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; min-height: 40px; }
 </style>
 </head>
 <body>
@@ -34,6 +35,14 @@
     <button id="tabUpload" class="on">Upload</button>
     <button id="tabBrowse">Jelajah</button>
   </nav>
+
+  <div id="auth">
+    <div id="loginBox">
+      <script async src="https://telegram.org/js/telegram-widget.js?22" data-telegram-login="Kakenawu_bot" data-size="large" data-onauth="onTelegramAuth(user)"></script>
+    </div>
+    <span id="who" class="note" hidden></span>
+    <button id="logout" hidden>Keluar</button>
+  </div>
 
   <section id="upload">
     <label>Judul lagu<input id="song" placeholder="Persis seperti di app"></label>
@@ -57,7 +66,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs, query, where, doc, setDoc, updateDoc, increment, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import { getFirestore, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyCO8txNS4UPwjrRKplPenuL-RA557gGhco",
@@ -67,18 +76,61 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "992141009224",
   appId: "1:992141009224:web:6f27b1b2e2dd9cdeb5937d"
 };
-const SUPABASE_URL = "https://ljckgisqhlypvszlckvf.supabase.co";
-const SUPABASE_KEY = "sb_publishable_FYDrANBKImrFKNoYpQI0MQ_MqMA-Jhr";
 const RULES = { width: 1280, height: 1280, minSec: 3, maxSec: 8, maxBytes: 3 * 1024 * 1024 };
 
 const db = getFirestore(initializeApp(FIREBASE_CONFIG));
 const $ = (id) => document.getElementById(id);
 
-function deviceId() {
-  let id = localStorage.getItem("zc_device");
-  if (!id) { id = crypto.randomUUID(); localStorage.setItem("zc_device", id); }
-  return id;
+function session() {
+  try { return JSON.parse(localStorage.getItem("zc_session") || "null"); } catch (e) { return null; }
 }
+
+function renderAuth() {
+  const s = session();
+  $("loginBox").hidden = !!s;
+  $("who").hidden = !s;
+  $("logout").hidden = !s;
+  $("who").textContent = s ? "Masuk sebagai " + (s.name || "anggota") : "";
+}
+
+async function api(path, body) {
+  const s = session();
+  const headers = { "Content-Type": "application/json" };
+  if (s) headers.Authorization = "Bearer " + s.token;
+  const res = await fetch("/api/" + path, { method: "POST", headers, body: JSON.stringify(body) });
+  let data = {};
+  try { data = await res.json(); } catch (e) {}
+  if (res.status === 401) { localStorage.removeItem("zc_session"); renderAuth(); }
+  if (!res.ok) {
+    const err = new Error(data.error || data.message || "HTTP " + res.status);
+    err.status = res.status;
+    throw err;
+  }
+  return data;
+}
+
+window.onTelegramAuth = async (user) => {
+  $("status").textContent = "Memeriksa login...";
+  try {
+    const res = await fetch("/api/auth", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(user)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.token) throw new Error(data.error || data.message || "HTTP " + res.status);
+    localStorage.setItem("zc_session", JSON.stringify({ token: data.token, name: user.first_name || user.username || "" }));
+    $("status").textContent = "";
+    renderAuth();
+  } catch (error) {
+    $("status").textContent = "Login gagal: " + error.message;
+  }
+};
+
+$("logout").onclick = () => {
+  localStorage.removeItem("zc_session");
+  renderAuth();
+};
 
 function liked() {
   try { return JSON.parse(localStorage.getItem("zc_liked") || "[]"); } catch (e) { return []; }
@@ -97,6 +149,7 @@ function show(tab) {
 }
 $("tabUpload").onclick = () => show("upload");
 $("tabBrowse").onclick = () => show("browse");
+renderAuth();
 
 function inspect(file) {
   return new Promise((resolve) => {
@@ -113,21 +166,13 @@ function inspect(file) {
 }
 
 async function uploadVideo(file) {
-  const name = crypto.randomUUID() + ".mp4";
-  const endpoint = SUPABASE_URL + "/storage/v1/object/canvas/" + name;
-  const attempt = (withBearer) => {
-    const headers = { apikey: SUPABASE_KEY, "Content-Type": "video/mp4" };
-    if (withBearer) headers.Authorization = "Bearer " + SUPABASE_KEY;
-    return fetch(endpoint, { method: "POST", headers, body: file });
-  };
-  let res = await attempt(false);
-  if (!res.ok && [400, 401, 403].includes(res.status)) res = await attempt(true);
-  if (!res.ok) {
-    let detail = "";
-    try { detail = (await res.json()).message || ""; } catch (e) {}
-    throw new Error("upload gagal (" + res.status + ") " + detail);
-  }
-  return SUPABASE_URL + "/storage/v1/object/public/canvas/" + name;
+  const ticket = await api("upload", { action: "ticket" });
+  if (!ticket.uploadUrl) throw new Error("izin upload tidak diberikan");
+  const res = await fetch(ticket.uploadUrl, { method: "PUT", headers: { "Content-Type": "video/mp4" }, body: file });
+  if (!res.ok) throw new Error("upload gagal (" + res.status + ")");
+  const url = ticket.publicUrl || ticket.url;
+  if (!url) throw new Error("alamat video tidak diterima dari server");
+  return url;
 }
 
 let picked = null;
@@ -170,17 +215,16 @@ $("send").onclick = async () => {
   const album = $("album").value.trim();
   if (!song || !artist) { $("status").textContent = "Isi judul lagu dan artis dulu."; return; }
   if (!picked) return;
+  if (!session()) { $("status").textContent = "Login Telegram dulu."; return; }
   $("send").disabled = true;
   $("status").textContent = "Mengunggah...";
   try {
     const url = await uploadVideo(picked.file);
-    await addDoc(collection(db, "canvases"), {
+    await api("upload", {
+      action: "submit",
       song, artist, album,
       key: norm(song) + "|" + norm(artist),
       url,
-      status: "pending",
-      likes: 0,
-      createdAt: serverTimestamp(),
       size: picked.meta.size,
       duration: picked.meta.duration,
       width: picked.meta.width,
@@ -216,22 +260,25 @@ function card(id, data) {
   button.textContent = already ? "Sudah di-like" : "Like";
   button.disabled = already;
   button.onclick = async () => {
+    if (!session()) { button.textContent = "Login dulu"; return; }
     button.disabled = true;
     try {
-      await setDoc(doc(db, "votes", deviceId() + "_" + id), { canvasId: id, at: serverTimestamp() });
-    } catch (error) {
-      button.textContent = "Sudah di-like";
-      return;
-    }
-    try {
-      await updateDoc(doc(db, "canvases", id), { likes: increment(1) });
-      data.likes = (data.likes || 0) + 1;
+      const result = await api("like", { canvasId: id });
+      data.likes = typeof result.likes === "number" ? result.likes : (data.likes || 0) + 1;
       count.textContent = data.likes + " like";
       localStorage.setItem("zc_liked", JSON.stringify([...liked(), id]));
       button.textContent = "Sudah di-like";
     } catch (error) {
-      button.textContent = "Gagal, coba lagi";
-      button.disabled = false;
+      if (error.status === 409) {
+        localStorage.setItem("zc_liked", JSON.stringify([...liked(), id]));
+        button.textContent = "Sudah di-like";
+      } else if (error.status === 401 || error.status === 403) {
+        button.textContent = "Login dulu";
+        button.disabled = false;
+      } else {
+        button.textContent = "Gagal, coba lagi";
+        button.disabled = false;
+      }
     }
   };
   row.append(count, button);
