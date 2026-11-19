@@ -56,6 +56,57 @@ function secretOk(req) {
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
+async function handleStart(msg) {
+  const reply = (text) => tg("sendMessage", { chat_id: msg.chat.id, text });
+  const m = /^\/start(?:@\w+)?\s+([A-Za-z0-9_-]{8,40})$/.exec(String(msg.text || "").trim());
+  if (!m || !msg.from || !msg.chat || msg.chat.type !== "private") return;
+  const member = await tg("getChatMember", { chat_id: process.env.TELEGRAM_CHAT_ID, user_id: msg.from.id });
+  if (!member.ok) {
+    await reply("Failed to verify account.");
+    return;
+  }
+  const status = member.result.status;
+  const isMember = status === "creator" || status === "administrator" || status === "member" ||
+    (status === "restricted" && member.result.is_member === true);
+  if (!isMember) {
+    await reply("Your account is not a member of the Zenith group.");
+    return;
+  }
+  const token = await googleToken();
+  const headers = { Authorization: "Bearer " + token, "Content-Type": "application/json" };
+  const code = m[1];
+  const found = await fetch(FS + "/logins/" + code, { headers, signal: AbortSignal.timeout(8000) });
+  if (!found.ok) {
+    await reply("Login code is invalid or expired.");
+    return;
+  }
+  const doc = await found.json();
+  const f = doc.fields || {};
+  const created = f.createdAt && f.createdAt.timestampValue ? Date.parse(f.createdAt.timestampValue) : 0;
+  if (!f.status || f.status.stringValue !== "pending" || !(Date.now() - created < 5 * 60 * 1000)) {
+    await reply("Login code is invalid or expired.");
+    return;
+  }
+  const name = String(msg.from.first_name || msg.from.username || "user").slice(0, 60);
+  const patch = await fetch(
+    FS + "/logins/" + code + "?updateMask.fieldPaths=status&updateMask.fieldPaths=uid&updateMask.fieldPaths=name&currentDocument.exists=true",
+    {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({
+        fields: {
+          status: { stringValue: "done" },
+          uid: { stringValue: String(msg.from.id) },
+          name: { stringValue: name }
+        }
+      }),
+      signal: AbortSignal.timeout(8000)
+    }
+  );
+  if (!patch.ok) throw new Error("firestore patch " + patch.status);
+  await reply("Login successful. Return to the Zenith Canvas page.");
+}
+
 async function handle(cb) {
   const answer = (text) => tg("answerCallbackQuery", { callback_query_id: cb.id, text, show_alert: false });
   const m = /^(ok|no):([A-Za-z0-9]{10,40})$/.exec(String(cb.data || ""));
@@ -133,6 +184,12 @@ module.exports = async (req, res) => {
   if (!secretOk(req)) {
     res.status(401).json({ error: "unauthorized" });
     return;
+  }
+  const message = req.body && typeof req.body === "object" ? req.body.message : null;
+  if (message) {
+    try {
+      await handleStart(message);
+    } catch (error) {}
   }
   const cb = req.body && typeof req.body === "object" ? req.body.callback_query : null;
   if (cb) {

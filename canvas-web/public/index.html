@@ -196,9 +196,9 @@
           <div class="perk"><i><svg viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 4.5-3.2 7.6-8 9-4.8-1.4-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg></i><div><b>Members only</b><span>Only Zenith group members can sign in.</span></div></div>
         </div>
         <div id="tgWrap" class="tgWrap">
-          <div class="tgSkel"></div>
-          <script async src="https://telegram.org/js/telegram-widget.js?22" data-telegram-login="Kakenawu_bot" data-size="large" data-radius="12" data-userpic="false" data-onauth="onTelegramAuth(user)"></script>
+          <button id="tgLogin" class="primary" type="button">Sign in with Telegram Bot</button>
         </div>
+        <a id="tgOpen" class="note" href="#" target="_blank" rel="noopener" hidden>Open Telegram bot</a>
         <div id="loginStatus" class="loginStatus"></div>
         <button id="tgRetry" class="chipBtn" type="button" hidden>Reload</button>
         <div class="loginFoot">No password. Only your Telegram name and ID are used.</div>
@@ -321,30 +321,72 @@ function trackGlow(e) {
 $("loginBox").addEventListener("pointermove", trackGlow);
 $("loginBox").addEventListener("pointerdown", trackGlow);
 $("tgRetry").onclick = () => location.reload();
-setTimeout(() => {
-  if (!session() && !$("tgWrap").querySelector("iframe")) {
-    loginState("err", "Telegram button failed to load. Check your connection.");
-    $("tgRetry").hidden = false;
-  }
-}, 8000);
 
-window.onTelegramAuth = async (user) => {
-  loginState("busy", "Checking login...");
+let loginRun = 0;
+
+async function authCall(body) {
+  const res = await fetch("/api/auth", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  let data = {};
+  try { data = await res.json(); } catch (e) {}
+  if (!res.ok) throw new Error(data.error || data.message || "HTTP " + res.status);
+  return data;
+}
+
+function endLogin() {
+  try { localStorage.removeItem("zc_login_code"); } catch (e) {}
+  $("tgOpen").hidden = true;
+}
+
+async function pollLogin(code) {
+  const run = ++loginRun;
+  const until = Date.now() + 5 * 60 * 1000;
+  loginState("busy", "Waiting for confirmation in Telegram...");
+  while (run === loginRun && Date.now() < until) {
+    await new Promise((r) => setTimeout(r, 2000));
+    if (run !== loginRun) return;
+    try {
+      const data = await authCall({ action: "poll", code });
+      if (data.token) {
+        localStorage.setItem("zc_session", JSON.stringify({ token: data.token, name: (data.user && data.user.name) || "" }));
+        endLogin();
+        loginState("", "");
+        renderAuth();
+        return;
+      }
+    } catch (error) {
+      endLogin();
+      loginState("err", loginErrors[error.message] || "Login failed: " + error.message);
+      return;
+    }
+  }
+  if (run === loginRun) {
+    endLogin();
+    loginState("err", loginErrors.login_expired);
+  }
+}
+
+$("tgLogin").onclick = async () => {
+  loginState("busy", "Preparing login...");
   try {
-    const res = await fetch("/api/auth", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(user)
-    });
-    const data = await res.json();
-    if (!res.ok || !data.token) throw new Error(data.error || data.message || "HTTP " + res.status);
-    localStorage.setItem("zc_session", JSON.stringify({ token: data.token, name: user.first_name || user.username || "" }));
-    loginState("", "");
-    renderAuth();
+    const data = await authCall({ action: "start" });
+    try { localStorage.setItem("zc_login_code", data.code); } catch (e) {}
+    $("tgOpen").href = data.link;
+    $("tgOpen").hidden = false;
+    window.open(data.link, "_blank");
+    pollLogin(data.code);
   } catch (error) {
     loginState("err", loginErrors[error.message] || "Login failed: " + error.message);
   }
 };
+
+try {
+  const pendingCode = localStorage.getItem("zc_login_code");
+  if (pendingCode && !localStorage.getItem("zc_session")) pollLogin(pendingCode);
+} catch (e) {}
 
 $("logout").onclick = () => {
   localStorage.removeItem("zc_session");
