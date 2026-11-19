@@ -157,10 +157,16 @@ jobs:
               print(f"{qualifier}: added {added} English fallback entries for this build.")
           PY
 
+      - name: Exercise missing Gradle wrapper executable permission
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod -x gradlew
+          test ! -x gradlew
+
       - name: Run all production unit tests, including new audio regressions
         run: |
           set -euo pipefail
-          chmod +x gradlew
           FC_VERSION_CODE="$(sed -n 's/^versionCode=//p' fc/version.properties)" \
           FC_VERSION_NAME="$(sed -n 's/^versionName=//p' fc/version.properties)" \
-            ./gradlew :app:testProdReleaseUnitTest --no-daemon --stacktrace
+            bash ./gradlew :app:testProdReleaseUnitTest --no-daemon --stacktrace
