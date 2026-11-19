@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const { guard } = require("./_guard");
 
 const PROJECT_ID = "zenith-canvas-17133";
 const SUPABASE_URL = "https://ljckgisqhlypvszlckvf.supabase.co";
@@ -98,6 +99,7 @@ async function recentUploads(uid) {
 
 module.exports = async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
+  if (!guard(req, res, "upload", 20, 60 * 1000)) return;
   if (req.method !== "POST") {
     res.status(405).json({ error: "method_not_allowed" });
     return;

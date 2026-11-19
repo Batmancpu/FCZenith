@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const { guard } = require("./_guard");
 
 const MAX_AUTH_AGE_SECONDS = 24 * 60 * 60;
 const SESSION_SECONDS = 7 * 24 * 60 * 60;
@@ -35,6 +36,7 @@ function signSession(payload, secret) {
 
 module.exports = async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
+  if (!guard(req, res, "auth", 10, 60 * 1000)) return;
   if (req.method !== "POST") {
     res.status(405).json({ error: "method_not_allowed" });
     return;

@@ -3,6 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.gstatic.com https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob: https://ljckgisqhlypvszlckvf.supabase.co https://interactive-examples.mdn.mozilla.net; connect-src 'self' https://ljckgisqhlypvszlckvf.supabase.co https://*.googleapis.com; frame-src https://oauth.telegram.org; object-src 'none'; base-uri 'none'; form-action 'none'">
+<script>try { if (window.top !== window.self && !/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) window.top.location = window.location.href; } catch (e) {}</script>
 <title>Zenith Canvas</title>
 <style>
   :root { color-scheme: dark; --bg: #0b0b0f; --card: #16161c; --card2: #1d1d25; --line: rgba(255,255,255,0.1); --text: #f4f4f7; --muted: #9a9aab; --accent: #fa586a; --ok: #30d158; --bad: #ff453a; --warn: #ff9f0a; }
@@ -202,8 +204,7 @@ const RULES = { width: 1280, height: 1280, minSec: 3, maxSec: 8, maxBytes: 3 * 1
 const db = getFirestore(initializeApp(FIREBASE_CONFIG));
 const $ = (id) => document.getElementById(id);
 
-const DEV = !/[?&]dev=0/.test(location.search) &&
-  (/[?&]dev=1/.test(location.search) || ["localhost", "127.0.0.1"].includes(location.hostname));
+const DEV = !/[?&]dev=0/.test(location.search) && ["localhost", "127.0.0.1"].includes(location.hostname);
 const DEV_VIDEO = "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4";
 const DEV_FEED = [
   { id: "devfeed00001", data: { song: "Contoh Lagu Satu", artist: "Artis Contoh", album: "Album A", url: DEV_VIDEO, likes: 12 } },

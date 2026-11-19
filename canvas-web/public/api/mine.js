@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const { guard } = require("./_guard");
 
 const PROJECT_ID = "zenith-canvas-17133";
 const FS = "https://firestore.googleapis.com/v1/projects/" + PROJECT_ID + "/databases/(default)/documents";
@@ -60,6 +61,7 @@ function str(field) {
 
 module.exports = async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
+  if (!guard(req, res, "mine", 30, 60 * 1000)) return;
   if (req.method !== "POST") {
     res.status(405).json({ error: "method_not_allowed" });
     return;
