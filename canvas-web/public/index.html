@@ -10,6 +10,11 @@
   [hidden] { display: none !important; }
   body { margin: 0; font: 15px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif; color: var(--text); background: var(--bg); min-height: 100vh; -webkit-font-smoothing: antialiased; }
   body.feed, body.up { overflow: hidden; }
+  * { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.24) transparent; }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.24); border-radius: 999px; border: 1.5px solid transparent; background-clip: padding-box; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.38); background-clip: padding-box; }
   main { max-width: 640px; margin: 0 auto; padding: 0 0 calc(60px + env(safe-area-inset-bottom, 0px)); }
   button { font: inherit; color: var(--text); border: 0; background: var(--card2); padding: 10px 16px; border-radius: 10px; cursor: pointer; transition: opacity 0.15s ease; }
   button:active { opacity: 0.6; }
@@ -273,7 +278,19 @@ function norm(text) {
     .replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
 }
 
-function show(tab) {
+let current = "browse";
+
+function show(tab, fromPop) {
+  if (!fromPop && tab !== current) {
+    if (tab === "browse") {
+      if (history.state && history.state.zc) { history.back(); return; }
+    } else if (current === "browse") {
+      history.pushState({ zc: tab }, "");
+    } else {
+      history.replaceState({ zc: tab }, "");
+    }
+  }
+  current = tab;
   for (const name of ["upload", "browse", "mine"]) $(name).hidden = tab !== name;
   $("tabUpload").classList.toggle("on", tab === "upload");
   $("tabBrowse").classList.toggle("on", tab === "browse");
@@ -292,6 +309,9 @@ $("tabUpload").onclick = () => {
 $("upClose").onclick = () => show("browse");
 $("tabBrowse").onclick = () => show("browse");
 $("tabMine").onclick = () => show("mine");
+window.addEventListener("popstate", (e) => {
+  show(e.state && e.state.zc ? e.state.zc : "browse", true);
+});
 renderAuth();
 
 function parseSongInfo(text) {
