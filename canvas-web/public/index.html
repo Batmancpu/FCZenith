@@ -76,30 +76,35 @@
   .plusBig { width: 64px; height: 64px; display: grid; place-items: center; border-radius: 50%; font-size: 36px; color: #fff; background: linear-gradient(135deg, var(--accent), var(--accent2)); }
   .chip { display: block; margin: 0 auto 14px; padding: 8px 16px; border-radius: 999px; font-size: 13.5px; color: var(--accent); background: rgba(250,88,106,0.1); border-color: rgba(250,88,106,0.4); }
   .upFoot { padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--line); background: var(--bg); }
+  main { max-width: 640px; padding: env(safe-area-inset-top, 0px) 0 calc(70px + env(safe-area-inset-bottom, 0px)); }
+  .tabs { background: #000; backdrop-filter: none; border-top: 1px solid #1c1c22; padding: 4px 8px calc(4px + env(safe-area-inset-bottom, 0px)); gap: 0; align-items: center; }
+  .tabs button.tb { display: grid; justify-items: center; align-content: center; gap: 2px; height: 50px; padding: 0; border: 0; border-radius: 0; background: transparent; color: #8a8a96; font-size: 11px; font-weight: 600; }
+  .tabs button.tb svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .tabs button.tb.on { background: transparent; color: #fff; box-shadow: none; }
+  .tabs button.plus, .tabs button.plus.on { width: 50px; height: 34px; align-self: center; justify-self: center; padding: 0; border: 0; border-radius: 10px; background: #fff; color: #000; font-size: 26px; font-weight: 500; box-shadow: -3px 0 0 #25f4ee, 3px 0 0 #fe2c55; }
+  .prof { padding: 28px 16px 8px; text-align: center; }
+  .avatar { width: 96px; height: 96px; margin: 0 auto 12px; border-radius: 50%; display: grid; place-items: center; font-size: 40px; font-weight: 800; color: #fff; background: linear-gradient(135deg, var(--accent), var(--accent2)); }
+  .prof h2 { margin: 0 0 14px; font-size: 18px; }
+  .stats { display: flex; justify-content: center; gap: 36px; margin-bottom: 14px; }
+  .stats div { display: grid; gap: 2px; }
+  .stats b { font-size: 18px; }
+  .stats span { font-size: 13px; color: var(--muted); }
+  .chipBtn { padding: 8px 28px; border-radius: 8px; }
+  #mine .note { text-align: center; padding: 8px 16px; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; margin-top: 8px; }
+  .cell { position: relative; aspect-ratio: 3 / 4; background: #111; overflow: hidden; }
+  .cell video { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .badge { position: absolute; top: 6px; left: 6px; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 700; color: #fff; background: var(--accent); }
+  .badge.rejected { background: #555; }
+  .likes { position: absolute; left: 8px; bottom: 6px; font-size: 13px; font-weight: 700; text-shadow: 0 1px 6px rgba(0,0,0,0.9); }
 </style>
 </head>
 <body>
 <main>
-  <header class="top">
-    <div class="logo">Z</div>
-    <div>
-      <h1>Zenith Canvas</h1>
-      <p class="sub">Upload canvas lagu dan pilih yang terbaik.</p>
-    </div>
-  </header>
-
-  <div id="auth" class="panel">
-    <div id="loginBox">
-      <script async src="https://telegram.org/js/telegram-widget.js?22" data-telegram-login="Kakenawu_bot" data-size="large" data-onauth="onTelegramAuth(user)"></script>
-    </div>
-    <span id="who" class="note" hidden></span>
-    <button id="logout" hidden>Keluar</button>
-  </div>
-
   <nav class="tabs">
-    <button id="tabBrowse" class="on">Jelajah</button>
+    <button id="tabBrowse" class="tb on"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg>Jelajah</button>
     <button id="tabUpload" class="plus" aria-label="Upload">+</button>
-    <button id="tabMine">Saya</button>
+    <button id="tabMine" class="tb"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>Saya</button>
   </nav>
 
   <section id="upload" hidden>
@@ -136,8 +141,23 @@
   </section>
 
   <section id="mine" hidden>
+    <div class="prof">
+      <div id="loginBox">
+        <script async src="https://telegram.org/js/telegram-widget.js?22" data-telegram-login="Kakenawu_bot" data-size="large" data-onauth="onTelegramAuth(user)"></script>
+      </div>
+      <div id="profHead" hidden>
+        <div id="avatar" class="avatar">Z</div>
+        <h2 id="profName"></h2>
+        <div class="stats">
+          <div><b id="stUp">0</b><span>Upload</span></div>
+          <div><b id="stLike">0</b><span>Suka</span></div>
+          <div><b id="stOk">0</b><span>Disetujui</span></div>
+        </div>
+        <button id="logout" class="chipBtn">Keluar</button>
+      </div>
+    </div>
     <p id="mineStatus" class="note"></p>
-    <div id="mineList"></div>
+    <div id="mineList" class="grid"></div>
   </section>
 </main>
 
@@ -182,9 +202,10 @@ function session() {
 function renderAuth() {
   const s = session();
   $("loginBox").hidden = !!s;
-  $("who").hidden = !s;
-  $("logout").hidden = !s;
-  $("who").textContent = s ? "Masuk sebagai " + (s.name || "anggota") : "";
+  $("profHead").hidden = !s;
+  const nm = s ? (s.name || "anggota") : "";
+  $("profName").textContent = nm;
+  $("avatar").textContent = nm.slice(0, 1).toUpperCase() || "Z";
   if (!$("mine").hidden) loadMine();
 }
 
@@ -245,8 +266,8 @@ function norm(text) {
 function show(tab) {
   for (const name of ["upload", "browse", "mine"]) $(name).hidden = tab !== name;
   $("tabUpload").classList.toggle("on", tab === "upload");
-  $("tabBrowse").className = tab === "browse" ? "on" : "";
-  $("tabMine").className = tab === "mine" ? "on" : "";
+  $("tabBrowse").classList.toggle("on", tab === "browse");
+  $("tabMine").classList.toggle("on", tab === "mine");
   document.body.classList.toggle("feed", tab === "browse");
   document.body.classList.toggle("up", tab === "upload");
   if (tab !== "upload") $("preview").pause();
@@ -523,27 +544,32 @@ async function loadMine() {
   try {
     const data = await api("mine", {});
     const labels = { approved: "Disetujui", pending: "Menunggu", rejected: "Ditolak" };
-    $("mineStatus").textContent = data.items.length ? data.items.length + " upload." : "Kamu belum upload canvas.";
+    $("mineStatus").textContent = data.items.length ? "" : "Kamu belum upload canvas.";
+    $("stUp").textContent = String(data.items.length);
+    $("stOk").textContent = String(data.items.filter((i) => i.status === "approved").length);
+    $("stLike").textContent = String(data.items.reduce((n, i) => n + (i.likes || 0), 0));
     for (const it of data.items) {
-      const box = document.createElement("div");
-      box.className = "card";
+      const cell = document.createElement("div");
+      cell.className = "cell";
       const video = document.createElement("video");
-      video.src = it.url;
+      video.src = it.url + "#t=0.1";
       video.muted = true;
       video.loop = true;
       video.playsInline = true;
-      video.controls = true;
       video.preload = "metadata";
-      const row = document.createElement("div");
-      row.className = "row";
-      const name = document.createElement("span");
-      name.textContent = it.song + " - " + it.artist;
-      const st = document.createElement("span");
-      st.className = "st-" + it.status;
-      st.textContent = (labels[it.status] || it.status) + " | " + it.likes + " like";
-      row.append(name, st);
-      box.append(video, row);
-      list.appendChild(box);
+      video.onclick = () => { if (video.paused) video.play().catch(() => {}); else video.pause(); };
+      cell.appendChild(video);
+      if (it.status !== "approved") {
+        const badge = document.createElement("span");
+        badge.className = "badge " + it.status;
+        badge.textContent = labels[it.status] || it.status;
+        cell.appendChild(badge);
+      }
+      const likes = document.createElement("span");
+      likes.className = "likes";
+      likes.textContent = "\u2665 " + (it.likes || 0);
+      cell.appendChild(likes);
+      list.appendChild(cell);
     }
   } catch (error) {
     $("mineStatus").textContent = "Gagal memuat: " + error.message;
