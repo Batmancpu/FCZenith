@@ -1,0 +1,805 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.gstatic.com https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob: https://ljckgisqhlypvszlckvf.supabase.co https://interactive-examples.mdn.mozilla.net; connect-src 'self' https://ljckgisqhlypvszlckvf.supabase.co https://*.googleapis.com; frame-src https://oauth.telegram.org; object-src 'none'; base-uri 'none'; form-action 'none'">
+<script>try { if (window.top !== window.self && !/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) window.top.location = window.location.href; } catch (e) {}</script>
+<title>Zenith Canvas</title>
+<style>
+  :root { color-scheme: dark; --bg: #0b0b0f; --card: #16161c; --card2: #1d1d25; --line: rgba(255,255,255,0.1); --text: #f4f4f7; --muted: #9a9aab; --accent: #fa586a; --ok: #30d158; --bad: #ff453a; --warn: #ff9f0a; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  [hidden] { display: none !important; }
+  body { margin: 0; font: 15px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif; color: var(--text); background: var(--bg); min-height: 100vh; -webkit-font-smoothing: antialiased; }
+  body.feed, body.up { overflow: hidden; }
+  html, * { scrollbar-width: none; -ms-overflow-style: none; }
+  html::-webkit-scrollbar, *::-webkit-scrollbar { display: none; width: 0; height: 0; }
+  main { max-width: 640px; margin: 0 auto; padding: 0 0 calc(60px + env(safe-area-inset-bottom, 0px)); }
+  button { font: inherit; color: var(--text); border: 0; background: var(--card2); padding: 10px 16px; border-radius: 10px; cursor: pointer; transition: opacity 0.15s ease; }
+  button:active { opacity: 0.6; }
+  button:disabled { opacity: 0.35; cursor: default; }
+  button.primary { width: 100%; padding: 14px 16px; border-radius: 14px; font-size: 17px; font-weight: 600; color: #fff; background: var(--accent); }
+  button.secondary { width: 100%; padding: 13px 16px; border-radius: 14px; font-size: 16px; font-weight: 600; color: var(--accent); background: var(--card); }
+  .note { color: var(--muted); font-size: 13px; }
+  .hint { color: var(--muted); font-size: 13px; text-align: center; margin: 10px 0 0; }
+
+  .tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; display: grid; grid-template-columns: repeat(3, 1fr); padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px)); background: rgba(11,11,15,0.85); backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); border-top: 0.5px solid var(--line); }
+  .tabs button.tb { display: grid; justify-items: center; align-content: center; gap: 3px; height: 48px; padding: 0; border-radius: 0; background: transparent; color: var(--muted); font-size: 10px; font-weight: 500; }
+  .tabs button.tb svg { width: 25px; height: 25px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .tabs button.tb.on { color: var(--accent); }
+
+  #browse { position: fixed; inset: 0 0 calc(56px + env(safe-area-inset-bottom, 0px)) 0; z-index: 10; background: #000; }
+  .feed { height: 100%; overflow-y: scroll; scroll-snap-type: y mandatory; overscroll-behavior: contain; scrollbar-width: none; }
+  .feed::-webkit-scrollbar { display: none; }
+  .slide { height: 100%; scroll-snap-align: start; scroll-snap-stop: always; position: relative; display: grid; place-items: center; background: #000; }
+  .slide::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 34%; background: linear-gradient(to top, rgba(0,0,0,0.7), transparent); pointer-events: none; }
+  .slide video { width: min(calc(100% - 24px), calc(100dvh - 200px)); aspect-ratio: 1 / 1; object-fit: cover; background: #111; border-radius: 18px; }
+  .meta { position: absolute; z-index: 2; left: 18px; right: 84px; bottom: 24px; display: grid; gap: 2px; text-shadow: 0 1px 8px rgba(0,0,0,0.8); }
+  .meta b { font-size: 17px; font-weight: 600; }
+  .meta span { color: #d4d4de; font-size: 14px; }
+  .side { position: absolute; z-index: 2; right: 14px; bottom: 24px; display: grid; justify-items: center; gap: 4px; }
+  .likeBtn { width: 48px; height: 48px; padding: 0; border-radius: 50%; font-size: 22px; color: #fff; background: rgba(120,120,128,0.36); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+  .likeBtn.on { color: var(--accent); }
+  .side span { font-size: 12.5px; font-weight: 600; text-shadow: 0 1px 6px rgba(0,0,0,0.8); }
+  .feedSearch { position: absolute; top: calc(8px + env(safe-area-inset-top, 0px)); left: 14px; right: 14px; z-index: 5; }
+  .feedSearch input { display: block; width: 100%; margin: 0; padding: 9px 14px 9px 38px; font: inherit; color: var(--text); border: 0; border-radius: 10px; outline: none; background: rgba(120,120,128,0.32) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239a9aab' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-3.5-3.5'/%3E%3C/svg%3E") no-repeat 12px center / 17px; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+  .feedMsg { position: absolute; top: 50%; left: 0; right: 0; margin: 0; text-align: center; color: var(--muted); pointer-events: none; }
+
+  #upload { position: fixed; inset: 0; z-index: 30; overflow-y: auto; overscroll-behavior: contain; background: var(--bg); }
+  body.up .tabs { display: none; }
+  .upBar { position: fixed; top: calc(10px + env(safe-area-inset-top, 0px)); left: 14px; z-index: 40; }
+  .navBtn { width: 38px; height: 38px; padding: 0; display: grid; place-items: center; border-radius: 50%; color: var(--text); background: rgba(60,60,67,0.55); backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); }
+  .upTitle { margin: 0 0 18px 2px; font-size: 28px; font-weight: 700; letter-spacing: -0.4px; }
+  .upBody { width: 100%; max-width: 560px; margin: 0 auto; padding: calc(60px + env(safe-area-inset-top, 0px)) 16px calc(110px + env(safe-area-inset-bottom, 0px)); }
+  .drop { position: relative; display: grid; place-items: center; width: min(70%, 260px); aspect-ratio: 1 / 1; margin: 0 auto 12px; border: 1.5px dashed rgba(255,255,255,0.22); border-radius: 18px; background: var(--card); overflow: hidden; cursor: pointer; }
+  .drop:has(video:not([hidden])) { border: 0; }
+  .drop video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #000; }
+  .dropHint { display: grid; justify-items: center; gap: 4px; padding: 16px; text-align: center; }
+  .dropHint b { font-size: 16px; font-weight: 600; }
+  .dropHint span { color: var(--muted); font-size: 13px; }
+  .plusBig { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 50%; font-size: 26px; font-weight: 300; color: var(--accent); background: rgba(250,88,106,0.14); }
+  .swap { display: none; position: absolute; top: 10px; right: 10px; padding: 5px 12px; border-radius: 999px; font-size: 12px; font-weight: 500; color: #fff; background: rgba(0,0,0,0.5); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+  .dropHint[hidden] ~ .swap { display: block; }
+  .rules { display: flex; justify-content: center; gap: 5px; margin: 0 0 16px; white-space: nowrap; }
+  .rules span { font-size: 11px; color: var(--muted); padding: 4px 8px; border-radius: 999px; background: var(--card); }
+  ul { list-style: none; padding: 0; margin: 0 0 14px; background: var(--card); border-radius: 12px; overflow: hidden; }
+  ul:empty { display: none; }
+  li { padding: 11px 14px; font-size: 14px; border-bottom: 0.5px solid var(--line); }
+  li:last-child { border-bottom: 0; }
+  li.ok { color: var(--ok); }
+  li.bad { color: var(--bad); }
+  .secTitle { margin: 4px 0 6px 14px; color: var(--muted); font-size: 12.5px; text-transform: uppercase; letter-spacing: 0.4px; }
+  .info { margin-bottom: 10px; background: var(--card); border-radius: 12px; overflow: hidden; }
+  .infoRow { display: grid; grid-template-columns: 70px 1fr; gap: 10px; align-items: baseline; padding: 12px 14px; border-bottom: 0.5px solid var(--line); }
+  .infoRow:last-child { border-bottom: 0; }
+  .infoRow span { color: var(--muted); font-size: 14px; }
+  .infoRow b { font-weight: 500; font-size: 15px; word-break: break-word; }
+  .infoRow b.empty { color: var(--muted); font-weight: 400; }
+  .prog { height: 4px; margin: 12px 0 8px; border-radius: 999px; background: var(--card2); overflow: hidden; }
+  .prog i { display: block; height: 100%; width: 0; border-radius: 999px; background: var(--accent); transition: width 0.15s ease; }
+  #status, #findStatus { min-height: 20px; margin: 8px 0 0; text-align: center; }
+  .upFoot { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; padding: 0 16px calc(14px + env(safe-area-inset-bottom, 0px)); pointer-events: none; }
+  .upFoot button { display: block; pointer-events: auto; max-width: 560px; margin: 0 auto; background: rgba(250,88,106,0.92); backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+  .upFoot button:disabled { opacity: 1; color: rgba(255,255,255,0.45); background: rgba(58,58,64,0.62); box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
+
+  .prof { padding: calc(32px + env(safe-area-inset-top, 0px)) 16px 8px; text-align: center; }
+  .loginCard { position: relative; isolation: isolate; overflow: hidden; display: grid; justify-items: center; gap: 10px; padding: 34px 18px 22px; border-radius: 22px; border: 0.5px solid var(--line); background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015)), var(--card); box-shadow: 0 20px 50px rgba(0,0,0,0.45); text-align: center; }
+  .loginCard::before { content: ""; position: absolute; inset: 0; z-index: -1; background: radial-gradient(260px circle at var(--mx, 50%) var(--my, 0%), rgba(250,88,106,0.22), transparent 70%); }
+  .loginCard::after { content: ""; position: absolute; z-index: -1; top: -70px; right: -50px; width: 180px; height: 180px; border-radius: 50%; background: rgba(250,88,106,0.28); filter: blur(50px); animation: orb 8s ease-in-out infinite alternate; }
+  .loginCard.shake { animation: shake 0.4s ease; }
+  .loginLogo { position: relative; width: 68px; height: 68px; display: grid; place-items: center; border-radius: 18px; font-size: 30px; font-weight: 700; color: #fff; background: linear-gradient(135deg, #fa586a, #ff8a5c); box-shadow: 0 10px 28px rgba(250,88,106,0.4); }
+  .loginLogo::after { content: ""; position: absolute; inset: 0; border-radius: inherit; border: 2px solid rgba(250,88,106,0.6); animation: ring 2.4s ease-out infinite; }
+  .loginCard h2 { margin: 8px 0 0; font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
+  .loginCard p { margin: 0 0 4px; max-width: 300px; color: var(--muted); font-size: 14px; }
+  .perks { display: grid; gap: 8px; width: 100%; margin: 10px 0 6px; text-align: left; }
+  .perk { display: grid; grid-template-columns: 36px 1fr; gap: 12px; align-items: center; padding: 10px 12px; border-radius: 14px; border: 0.5px solid var(--line); background: rgba(255,255,255,0.04); transition: transform 0.2s ease, background 0.2s ease; animation: perkIn 0.5s ease both; }
+  .perk:nth-child(2) { animation-delay: 0.08s; }
+  .perk:nth-child(3) { animation-delay: 0.16s; }
+  .perk:active { transform: scale(0.98); background: rgba(255,255,255,0.08); }
+  .perk i { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 10px; color: var(--accent); background: rgba(250,88,106,0.14); }
+  .perk i svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .perk b { display: block; font-size: 14px; font-weight: 600; }
+  .perk span { display: block; color: var(--muted); font-size: 12.5px; }
+  .tgWrap { position: relative; display: grid; place-items: center; width: 100%; min-height: 48px; margin-top: 8px; transition: opacity 0.2s ease; }
+  .tgSkel { position: absolute; inset: 4px 0; max-width: 250px; margin: 0 auto; border-radius: 12px; background: linear-gradient(90deg, rgba(255,255,255,0.05), rgba(255,255,255,0.13), rgba(255,255,255,0.05)); background-size: 200% 100%; animation: shimmer 1.2s linear infinite; }
+  .tgWrap:has(iframe) .tgSkel { display: none; }
+  .loginCard.busy .tgWrap { opacity: 0.4; pointer-events: none; }
+  .loginStatus { min-height: 18px; font-size: 13px; color: var(--muted); }
+  .loginStatus.err { color: var(--bad); }
+  .loginStatus.busy::before { content: ""; display: inline-block; width: 12px; height: 12px; margin-right: 8px; vertical-align: -2px; border: 2px solid rgba(255,255,255,0.25); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
+  .loginFoot { font-size: 12px; color: var(--muted); }
+  @keyframes shimmer { to { background-position: -200% 0; } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes ring { from { transform: scale(1); opacity: 0.8; } to { transform: scale(1.5); opacity: 0; } }
+  @keyframes orb { to { transform: translate(-40px, 30px) scale(1.2); } }
+  @keyframes perkIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  @keyframes shake { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
+  @media (prefers-reduced-motion: reduce) { .loginCard, .loginCard::after, .loginLogo::after, .perk, .tgSkel { animation: none !important; } }
+  .avatar { width: 84px; height: 84px; margin: 0 auto 10px; border-radius: 50%; display: grid; place-items: center; font-size: 34px; font-weight: 700; color: #fff; background: var(--accent); }
+  .prof h2 { margin: 0 0 16px; font-size: 20px; font-weight: 700; }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); margin-bottom: 14px; border-radius: 12px; background: var(--card); }
+  .stats div { display: grid; gap: 2px; padding: 12px 6px; border-right: 0.5px solid var(--line); }
+  .stats div:last-child { border-right: 0; }
+  .stats b { font-size: 19px; font-weight: 600; }
+  .stats span { font-size: 12px; color: var(--muted); }
+  .chipBtn { padding: 9px 26px; border-radius: 10px; font-size: 15px; color: var(--accent); background: var(--card); }
+  #mine .note { text-align: center; padding: 8px 16px; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; padding-top: 8px; }
+  .cell { position: relative; aspect-ratio: 3 / 4; background: var(--card); overflow: hidden; }
+  .cell video { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .cell::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 36%; background: linear-gradient(to top, rgba(0,0,0,0.65), transparent); pointer-events: none; }
+  .badge { position: absolute; z-index: 2; top: 6px; left: 6px; padding: 2px 8px; border-radius: 6px; font-size: 11.5px; font-weight: 600; color: #000; background: var(--warn); }
+  .badge.rejected { color: #fff; background: var(--bad); }
+  .likes { position: absolute; z-index: 2; left: 8px; bottom: 6px; font-size: 13px; font-weight: 600; text-shadow: 0 1px 6px rgba(0,0,0,0.9); }
+  .cell { cursor: pointer; }
+  .cell video { pointer-events: none; }
+  #viewer { position: fixed; inset: 0; z-index: 35; background: #000; }
+  #viewer .feed { height: 100%; }
+  #viewer .upBar { z-index: 45; }
+</style>
+</head>
+<body>
+<main>
+  <nav class="tabs">
+    <button id="tabBrowse" class="tb on"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg>Explore</button>
+    <button id="tabUpload" class="tb"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>Upload</button>
+    <button id="tabMine" class="tb"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>Me</button>
+  </nav>
+
+  <section id="upload" hidden>
+    <div class="upBar">
+      <button id="upClose" class="navBtn" aria-label="Close"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div class="upBody">
+      <h1 class="upTitle">New Canvas</h1>
+      <label id="drop" class="drop" for="file">
+        <video id="preview" muted loop playsinline hidden></video>
+        <div id="dropHint" class="dropHint">
+          <div class="plusBig">+</div>
+          <b>Choose Video</b>
+          <span>Tap to choose from your gallery</span>
+        </div>
+        <span class="swap">Change video</span>
+      </label>
+      <input id="file" type="file" accept="video/mp4" hidden>
+      <div class="rules"><span>1280x1280</span><span>3-8 seconds</span><span>No audio</span><span>Max 3 MB</span></div>
+      <ul id="checks"></ul>
+      <div class="secTitle">Song info</div>
+      <div class="info">
+        <div class="infoRow"><span>Title</span><b id="iSong" class="empty">Not pasted yet</b></div>
+        <div class="infoRow"><span>Artist</span><b id="iArtist" class="empty">Not pasted yet</b></div>
+        <div class="infoRow"><span>Album</span><b id="iAlbum" class="empty">Not pasted yet</b></div>
+      </div>
+      <button id="paste" class="secondary" type="button">Paste Song Info from App</button>
+      <div id="prog" class="prog" hidden><i id="progBar"></i></div>
+      <p id="status" class="note"></p>
+      <p class="hint">Song info can only be pasted from the app to avoid typos. Your canvas appears after admin approval.</p>
+    </div>
+    <div class="upFoot"><button id="send" class="primary" disabled>Post</button></div>
+  </section>
+
+  <section id="browse" hidden>
+    <div class="feedSearch"><input id="qSearch" placeholder="Search title or artist"></div>
+    <div id="feed" class="feed"></div>
+    <p id="findStatus" class="feedMsg"></p>
+  </section>
+
+  <section id="mine" hidden>
+    <div class="prof">
+      <div id="loginBox" class="loginCard">
+        <div class="loginLogo">Z</div>
+        <h2>Sign in to Zenith Canvas</h2>
+        <p>Sign in with Telegram to upload and like canvases.</p>
+        <div class="perks">
+          <div class="perk"><i><svg viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M5 20h14"/></svg></i><div><b>Upload canvases</b><span>Share looping videos for your favorite songs.</span></div></div>
+          <div class="perk"><i><svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg></i><div><b>Like canvases</b><span>Support the best work from the community.</span></div></div>
+          <div class="perk"><i><svg viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 4.5-3.2 7.6-8 9-4.8-1.4-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg></i><div><b>Members only</b><span>Only Zenith group members can sign in.</span></div></div>
+        </div>
+        <div id="tgWrap" class="tgWrap">
+          <button id="tgLogin" class="primary" type="button">Sign in with Telegram Bot</button>
+        </div>
+        <a id="tgOpen" class="note" href="#" target="_blank" rel="noopener" hidden>Open Telegram bot</a>
+        <div id="loginStatus" class="loginStatus"></div>
+        <button id="tgRetry" class="chipBtn" type="button" hidden>Reload</button>
+        <div class="loginFoot">No password. Only your Telegram name and ID are used.</div>
+      </div>
+      <div id="profHead" hidden>
+        <div id="avatar" class="avatar">Z</div>
+        <h2 id="profName"></h2>
+        <div class="stats">
+          <div><b id="stUp">0</b><span>Uploads</span></div>
+          <div><b id="stLike">0</b><span>Likes</span></div>
+          <div><b id="stOk">0</b><span>Approved</span></div>
+        </div>
+        <button id="logout" class="chipBtn">Sign out</button>
+      </div>
+    </div>
+    <p id="mineStatus" class="note"></p>
+    <div id="mineList" class="grid"></div>
+  </section>
+
+  <section id="viewer" hidden>
+    <div class="upBar">
+      <button id="viewerClose" class="navBtn" aria-label="Close"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div id="viewerFeed" class="feed"></div>
+  </section>
+</main>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import { getFirestore, collection, getDocs, query, where, limit } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCO8txNS4UPwjrRKplPenuL-RA557gGhco",
+  authDomain: "zenith-canvas-17133.firebaseapp.com",
+  projectId: "zenith-canvas-17133",
+  storageBucket: "zenith-canvas-17133.firebasestorage.app",
+  messagingSenderId: "992141009224",
+  appId: "1:992141009224:web:6f27b1b2e2dd9cdeb5937d"
+};
+const RULES = { width: 1280, height: 1280, minSec: 3, maxSec: 8, maxBytes: 3 * 1024 * 1024 };
+
+const db = getFirestore(initializeApp(FIREBASE_CONFIG));
+const $ = (id) => document.getElementById(id);
+
+const DEV = !/[?&]dev=0/.test(location.search) && ["localhost", "127.0.0.1"].includes(location.hostname);
+const DEV_VIDEO = "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4";
+const DEV_FEED = [
+  { id: "devfeed00001", data: { song: "Contoh Lagu Satu", artist: "Artis Contoh", album: "Album A", url: DEV_VIDEO, likes: 12 } },
+  { id: "devfeed00002", data: { song: "Contoh Lagu Dua", artist: "Artis Lain", album: "", url: DEV_VIDEO, likes: 5 } },
+  { id: "devfeed00003", data: { song: "Contoh Lagu Tiga", artist: "Artis Contoh", album: "Album B", url: DEV_VIDEO, likes: 0 } }
+];
+const DEV_MINE = [
+  { id: "devmine00001", song: "Contoh Disetujui", artist: "Artis Contoh", album: "", url: DEV_VIDEO, status: "approved", likes: 8, createdAt: "" },
+  { id: "devmine00002", song: "Contoh Menunggu", artist: "Artis Lain", album: "", url: DEV_VIDEO, status: "pending", likes: 0, createdAt: "" },
+  { id: "devmine00003", song: "Contoh Ditolak", artist: "Artis Lain", album: "", url: DEV_VIDEO, status: "rejected", likes: 0, createdAt: "" }
+];
+
+function session() {
+  let real = null;
+  try { real = JSON.parse(localStorage.getItem("zc_session") || "null"); } catch (e) { real = null; }
+  if (real) return real;
+  return DEV ? { token: "dev", name: "Dev Preview" } : null;
+}
+
+function renderAuth() {
+  const s = session();
+  $("loginBox").hidden = !!s;
+  $("profHead").hidden = !s;
+  const nm = s ? (s.name || "member") : "";
+  $("profName").textContent = nm;
+  $("avatar").textContent = nm.slice(0, 1).toUpperCase() || "Z";
+  if (!$("mine").hidden) loadMine();
+}
+
+async function api(path, body) {
+  const s = session();
+  if (DEV && s && s.token === "dev") {
+    await new Promise((r) => setTimeout(r, 400));
+    if (path === "mine") return { items: DEV_MINE };
+    if (path === "upload") return { ok: true, name: "dev.mp4", uploadUrl: "", remaining: 5 };
+    return { ok: true };
+  }
+  const headers = { "Content-Type": "application/json" };
+  if (s) headers.Authorization = "Bearer " + s.token;
+  const res = await fetch("/api/" + path, { method: "POST", headers, body: JSON.stringify(body) });
+  let data = {};
+  try { data = await res.json(); } catch (e) {}
+  if (res.status === 401) { localStorage.removeItem("zc_session"); renderAuth(); }
+  if (!res.ok) {
+    const err = new Error(data.error || data.message || "HTTP " + res.status);
+    err.status = res.status;
+    throw err;
+  }
+  return data;
+}
+
+const loginErrors = {
+  not_member: "Your account is not a member of the Zenith group.",
+  login_expired: "Login expired. Please try again.",
+  invalid_login: "Invalid login data.",
+  membership_check_failed: "Failed to check membership. Please try again.",
+  rate_limited: "Too many attempts. Please wait a moment."
+};
+
+function loginState(kind, text) {
+  const box = $("loginBox");
+  const st = $("loginStatus");
+  st.className = "loginStatus" + (kind ? " " + kind : "");
+  st.textContent = text;
+  box.classList.toggle("busy", kind === "busy");
+  box.classList.remove("shake");
+  if (kind === "err") { void box.offsetWidth; box.classList.add("shake"); }
+}
+
+function trackGlow(e) {
+  const r = e.currentTarget.getBoundingClientRect();
+  e.currentTarget.style.setProperty("--mx", (e.clientX - r.left) + "px");
+  e.currentTarget.style.setProperty("--my", (e.clientY - r.top) + "px");
+}
+$("loginBox").addEventListener("pointermove", trackGlow);
+$("loginBox").addEventListener("pointerdown", trackGlow);
+$("tgRetry").onclick = () => location.reload();
+
+let loginRun = 0;
+
+async function authCall(body) {
+  const res = await fetch("/api/auth", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  let data = {};
+  try { data = await res.json(); } catch (e) {}
+  if (!res.ok) throw new Error(data.error || data.message || "HTTP " + res.status);
+  return data;
+}
+
+function endLogin() {
+  try { localStorage.removeItem("zc_login_code"); } catch (e) {}
+  $("tgOpen").hidden = true;
+}
+
+async function pollLogin(code) {
+  const run = ++loginRun;
+  const until = Date.now() + 5 * 60 * 1000;
+  loginState("busy", "Waiting for confirmation in Telegram...");
+  while (run === loginRun && Date.now() < until) {
+    await new Promise((r) => setTimeout(r, 2000));
+    if (run !== loginRun) return;
+    try {
+      const data = await authCall({ action: "poll", code });
+      if (data.token) {
+        localStorage.setItem("zc_session", JSON.stringify({ token: data.token, name: (data.user && data.user.name) || "" }));
+        endLogin();
+        loginState("", "");
+        renderAuth();
+        return;
+      }
+    } catch (error) {
+      endLogin();
+      loginState("err", loginErrors[error.message] || "Login failed: " + error.message);
+      return;
+    }
+  }
+  if (run === loginRun) {
+    endLogin();
+    loginState("err", loginErrors.login_expired);
+  }
+}
+
+$("tgLogin").onclick = async () => {
+  loginState("busy", "Preparing login...");
+  try {
+    const data = await authCall({ action: "start" });
+    try { localStorage.setItem("zc_login_code", data.code); } catch (e) {}
+    $("tgOpen").href = data.link;
+    $("tgOpen").hidden = false;
+    window.open(data.link, "_blank");
+    pollLogin(data.code);
+  } catch (error) {
+    loginState("err", loginErrors[error.message] || "Login failed: " + error.message);
+  }
+};
+
+try {
+  const pendingCode = localStorage.getItem("zc_login_code");
+  if (pendingCode && !localStorage.getItem("zc_session")) pollLogin(pendingCode);
+} catch (e) {}
+
+$("logout").onclick = () => {
+  localStorage.removeItem("zc_session");
+  renderAuth();
+};
+
+function liked() {
+  try { return JSON.parse(localStorage.getItem("zc_liked") || "[]"); } catch (e) { return []; }
+}
+
+function norm(text) {
+  return text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+let current = "browse";
+
+function show(tab, fromPop) {
+  if (!fromPop && tab !== current) {
+    if (tab === "browse") {
+      if (history.state && history.state.zc) { history.back(); return; }
+    } else if (current === "browse") {
+      history.pushState({ zc: tab }, "");
+    } else {
+      history.replaceState({ zc: tab }, "");
+    }
+  }
+  current = tab;
+  for (const name of ["upload", "browse", "mine"]) $(name).hidden = tab !== name;
+  $("tabUpload").classList.toggle("on", tab === "upload");
+  $("tabBrowse").classList.toggle("on", tab === "browse");
+  $("tabMine").classList.toggle("on", tab === "mine");
+  document.body.classList.toggle("feed", tab === "browse");
+  document.body.classList.toggle("up", tab === "upload");
+  if (tab !== "upload") $("preview").pause();
+  if (tab !== "browse") for (const v of document.querySelectorAll(".slide video")) v.pause();
+  if (tab === "browse") loadFeed();
+  if (tab === "mine") loadMine();
+}
+$("tabUpload").onclick = () => {
+  if (!session()) { show("mine"); return; }
+  show("upload");
+};
+$("upClose").onclick = () => show("browse");
+$("tabBrowse").onclick = () => show("browse");
+$("tabMine").onclick = () => show("mine");
+window.addEventListener("popstate", (e) => {
+  if (!$("viewer").hidden) { closeViewer(); return; }
+  show(e.state && e.state.zc ? e.state.zc : "browse", true);
+});
+renderAuth();
+
+function parseSongInfo(text) {
+  const out = { song: "", artist: "", album: "" };
+  const map = { judul: "song", title: "song", song: "song", lagu: "song", artis: "artist", artist: "artist", album: "album" };
+  for (const line of String(text || "").split(/\r?\n/)) {
+    const m = line.match(/^\s*([A-Za-z]+)\s*[:=]\s*(.*)$/);
+    if (!m) continue;
+    const key = map[m[1].toLowerCase()];
+    if (key) out[key] = m[2].trim();
+  }
+  return out;
+}
+
+async function readClipboardInfo() {
+  let text = "";
+  try {
+    text = await navigator.clipboard.readText();
+  } catch (e) {
+    text = prompt("Paste the song info here:") || "";
+  }
+  return parseSongInfo(text);
+}
+
+let info = null;
+
+function updateSend() {
+  $("send").disabled = !(picked && info);
+}
+
+function renderInfo() {
+  const rows = [["iSong", info && info.song], ["iArtist", info && info.artist], ["iAlbum", info && info.album]];
+  for (const [id, value] of rows) {
+    const el = $(id);
+    el.textContent = value || (info && id === "iAlbum" ? "-" : "Not pasted yet");
+    el.classList.toggle("empty", !value);
+  }
+  updateSend();
+}
+
+$("paste").onclick = async () => {
+  const parsed = await readClipboardInfo();
+  if (!parsed.song || !parsed.artist) {
+    $("status").textContent = "Copied format not recognized. Copy the song info from the app and try again.";
+    return;
+  }
+  info = parsed;
+  renderInfo();
+  $("status").textContent = "Song info pasted successfully.";
+};
+
+
+
+function inspect(file) {
+  return new Promise((resolve) => {
+    const video = document.createElement("video");
+    const objectUrl = URL.createObjectURL(file);
+    video.preload = "metadata";
+    video.onloadedmetadata = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve({ width: video.videoWidth, height: video.videoHeight, duration: Math.round(video.duration * 10) / 10, size: file.size });
+    };
+    video.onerror = () => { URL.revokeObjectURL(objectUrl); resolve(null); };
+    video.src = objectUrl;
+  });
+}
+
+async function uploadVideo(file) {
+  const ticket = await api("upload", { action: "ticket" });
+  if (DEV && ticket.name === "dev.mp4") return ticket.name;
+  if (!ticket.uploadUrl || !ticket.name) throw new Error("upload permission was not granted");
+  const prog = $("prog");
+  const bar = $("progBar");
+  bar.style.width = "0%";
+  prog.hidden = false;
+  try {
+    await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("PUT", ticket.uploadUrl);
+      xhr.setRequestHeader("Content-Type", "video/mp4");
+      xhr.setRequestHeader("cache-control", "max-age=31536000");
+      xhr.upload.onprogress = (e) => {
+        if (!e.lengthComputable) return;
+        const pct = Math.round((e.loaded / e.total) * 100);
+        bar.style.width = pct + "%";
+        $("status").textContent = "Uploading " + pct + "%";
+      };
+      xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error("upload failed (" + xhr.status + ")")));
+      xhr.onerror = () => reject(new Error("connection lost"));
+      xhr.send(file);
+    });
+  } finally {
+    prog.hidden = true;
+  }
+  return ticket.name;
+}
+
+let previewUrl = "";
+
+function setPreview(file) {
+  const v = $("preview");
+  if (previewUrl) { URL.revokeObjectURL(previewUrl); previewUrl = ""; }
+  if (!file) {
+    v.pause();
+    v.removeAttribute("src");
+    v.load();
+    v.hidden = true;
+    $("dropHint").hidden = false;
+    return;
+  }
+  previewUrl = URL.createObjectURL(file);
+  v.src = previewUrl;
+  v.hidden = false;
+  $("dropHint").hidden = true;
+  v.play().catch(() => {});
+}
+
+let picked = null;
+
+$("file").onchange = async () => {
+  const file = $("file").files[0];
+  const list = $("checks");
+  list.innerHTML = "";
+  picked = null;
+  $("send").disabled = true;
+  if (!file) { setPreview(null); return; }
+  setPreview(file);
+  const meta = await inspect(file);
+  if (!meta) {
+    const li = document.createElement("li");
+    li.className = "bad";
+    li.textContent = "Video could not be read";
+    list.appendChild(li);
+    return;
+  }
+  const checks = [
+    ["Format MP4", file.type === "video/mp4"],
+    ["Size " + meta.width + "x" + meta.height + " (must be 1280x1280)", meta.width === RULES.width && meta.height === RULES.height],
+    ["Duration " + meta.duration + " seconds (3 to 8)", meta.duration >= RULES.minSec && meta.duration <= RULES.maxSec],
+    ["File " + (meta.size / 1048576).toFixed(2) + " MB (max 3 MB)", meta.size <= RULES.maxBytes]
+  ];
+  let allOk = true;
+  for (const [label, ok] of checks) {
+    const li = document.createElement("li");
+    li.className = ok ? "ok" : "bad";
+    li.textContent = (ok ? "\u2713  " : "\u2715  ") + label;
+    list.appendChild(li);
+    if (!ok) allOk = false;
+  }
+  if (allOk) { picked = { file, meta }; updateSend(); }
+};
+
+$("send").onclick = async () => {
+  if (!info) { $("status").textContent = "Paste the song info from the app first."; return; }
+  const { song, artist, album } = info;
+  if (!picked) return;
+  if (!session()) { $("status").textContent = "Sign in with Telegram first."; return; }
+  $("send").disabled = true;
+  $("status").textContent = "Uploading...";
+  try {
+    const name = await uploadVideo(picked.file);
+    await api("upload", {
+      action: "submit",
+      name,
+      song, artist, album,
+      duration: picked.meta.duration,
+      width: picked.meta.width,
+      height: picked.meta.height
+    });
+    $("status").textContent = "";
+    $("file").value = "";
+    $("checks").innerHTML = "";
+    info = null;
+    renderInfo();
+    setPreview(null);
+    picked = null;
+    show("mine");
+  } catch (error) {
+    const known = {
+      limit_reached: "Daily upload limit reached (5 per day).",
+      not_member: "Your account is not a member of the Zenith group.",
+      login_required: "Sign in with Telegram first.",
+      spec_invalid: "Video specifications do not match.",
+      file_invalid: "Invalid video file.",
+      bad_text: "Title, artist, or album is too long."
+    };
+    $("status").textContent = "Failed: " + (known[error.message] || error.message);
+    $("send").disabled = false;
+  }
+};
+
+let feedItems = [];
+let feedLoaded = false;
+
+const feedObserver = new IntersectionObserver((entries) => {
+  for (const e of entries) {
+    const v = e.target.querySelector("video");
+    if (!v) continue;
+    if (e.isIntersecting && e.intersectionRatio > 0.6) {
+      if (!v.getAttribute("src")) v.src = v.dataset.src;
+      v.play().catch(() => {});
+    } else {
+      v.pause();
+      if (e.intersectionRatio === 0 && v.getAttribute("src")) {
+        v.removeAttribute("src");
+        v.load();
+      }
+    }
+  }
+}, { threshold: [0, 0.6] });
+
+function slide(id, data) {
+  const box = document.createElement("div");
+  box.className = "slide";
+  const video = document.createElement("video");
+  video.dataset.src = data.url;
+  video.muted = true;
+  video.loop = true;
+  video.playsInline = true;
+  video.preload = "none";
+  video.onclick = () => { if (video.paused) video.play().catch(() => {}); else video.pause(); };
+  const meta = document.createElement("div");
+  meta.className = "meta";
+  const title = document.createElement("b");
+  title.textContent = data.song || "";
+  const sub = document.createElement("span");
+  sub.textContent = [data.artist, data.album].filter(Boolean).join(" - ");
+  meta.append(title, sub);
+  const side = document.createElement("div");
+  side.className = "side";
+  const button = document.createElement("button");
+  button.className = "likeBtn" + (liked().includes(id) ? " on" : "");
+  button.textContent = "\u2665";
+  const count = document.createElement("span");
+  count.textContent = String(data.likes || 0);
+  button.onclick = async () => {
+    if (!session()) { show("mine"); return; }
+    if (liked().includes(id)) return;
+    button.disabled = true;
+    try {
+      await api("like", { id });
+      data.likes = (data.likes || 0) + 1;
+      count.textContent = String(data.likes);
+      localStorage.setItem("zc_liked", JSON.stringify([...liked(), id]));
+      button.classList.add("on");
+    } catch (error) {
+      if (error.status === 409) {
+        localStorage.setItem("zc_liked", JSON.stringify([...liked(), id]));
+        button.classList.add("on");
+      } else if (error.status === 401 || error.status === 403) {
+        show("mine");
+      }
+    }
+    button.disabled = false;
+  };
+  side.append(button, count);
+  box.append(video, meta, side);
+  return box;
+}
+
+function renderFeed() {
+  const q = norm($("qSearch").value);
+  const feed = $("feed");
+  feedObserver.disconnect();
+  feed.innerHTML = "";
+  const list = feedItems.filter((i) => !q || norm((i.data.song || "") + " " + (i.data.artist || "")).includes(q));
+  $("findStatus").textContent = list.length ? "" : "No canvases yet.";
+  for (const item of list) {
+    const el = slide(item.id, item.data);
+    feed.appendChild(el);
+    feedObserver.observe(el);
+  }
+}
+$("qSearch").oninput = renderFeed;
+
+async function loadFeed() {
+  if (feedLoaded) { for (const v of document.querySelectorAll(".slide video")) if (v.getAttribute("src")) v.play().catch(() => {}); return; }
+  $("findStatus").textContent = "Loading...";
+  try {
+    const snap = await getDocs(query(collection(db, "canvases"), where("status", "==", "approved"), limit(50)));
+    feedItems = snap.docs.map((d) => ({ id: d.id, data: d.data() }));
+    if (DEV && feedItems.length < 4) feedItems = feedItems.concat(DEV_FEED);
+    feedItems.sort((a, b) => (b.data.likes || 0) - (a.data.likes || 0));
+    feedLoaded = true;
+    renderFeed();
+  } catch (error) {
+    $("findStatus").textContent = "Failed to load: " + error.message;
+  }
+}
+
+function openViewer(items, index) {
+  const feed = $("viewerFeed");
+  feed.innerHTML = "";
+  for (const it of items) {
+    const el = slide(it.id, it);
+    feed.appendChild(el);
+    feedObserver.observe(el);
+  }
+  $("viewer").hidden = false;
+  document.body.classList.add("feed");
+  history.pushState({ zc: current, viewer: 1 }, "");
+  feed.scrollTop = index * feed.clientHeight;
+}
+
+function closeViewer() {
+  const feed = $("viewerFeed");
+  for (const el of feed.querySelectorAll(".slide")) {
+    feedObserver.unobserve(el);
+    const v = el.querySelector("video");
+    if (v) { v.pause(); v.removeAttribute("src"); v.load(); }
+  }
+  feed.innerHTML = "";
+  $("viewer").hidden = true;
+  document.body.classList.toggle("feed", current === "browse");
+}
+$("viewerClose").onclick = () => {
+  if (history.state && history.state.viewer) history.back();
+  else closeViewer();
+};
+
+async function loadMine() {
+  const list = $("mineList");
+  list.innerHTML = "";
+  if (!session()) { $("mineStatus").textContent = "Sign in with Telegram to see your uploads."; return; }
+  $("mineStatus").textContent = "Loading...";
+  try {
+    const data = await api("mine", {});
+    const labels = { approved: "Approved", pending: "Pending", rejected: "Rejected" };
+    $("mineStatus").textContent = data.items.length ? "" : "You haven't uploaded any canvases yet.";
+    $("stUp").textContent = String(data.items.length);
+    $("stOk").textContent = String(data.items.filter((i) => i.status === "approved").length);
+    $("stLike").textContent = String(data.items.reduce((n, i) => n + (i.likes || 0), 0));
+    for (const it of data.items) {
+      const cell = document.createElement("div");
+      cell.className = "cell";
+      const video = document.createElement("video");
+      video.src = it.url + "#t=0.1";
+      video.muted = true;
+      video.playsInline = true;
+      video.controls = false;
+      video.disablePictureInPicture = true;
+      video.preload = "metadata";
+      cell.appendChild(video);
+      const itemIndex = data.items.indexOf(it);
+      cell.onclick = () => openViewer(data.items, itemIndex);
+      if (it.status !== "approved") {
+        const badge = document.createElement("span");
+        badge.className = "badge " + it.status;
+        badge.textContent = labels[it.status] || it.status;
+        cell.appendChild(badge);
+      }
+      const likes = document.createElement("span");
+      likes.className = "likes";
+      likes.textContent = "\u2665 " + (it.likes || 0);
+      cell.appendChild(likes);
+      list.appendChild(cell);
+    }
+  } catch (error) {
+    $("mineStatus").textContent = "Failed to load: " + error.message;
+  }
+}
+
+show("browse");
+</script>
+</body>
+</html>

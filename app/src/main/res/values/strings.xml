@@ -354,6 +354,7 @@
     <string name="app_icon_default">Default</string>
 
     <string name="app_icon_liquid_glass" translatable="false">Liquid Glass</string>
+    <string name="app_icon_dark_glass" translatable="false">Dark Glass</string>
     <string name="theme">Theme</string>
     <string name="font">Font</string>
     <string name="font_default">Default</string>
@@ -1391,6 +1392,8 @@
     <string name="song_info_unavailable">Not available</string>
     <string name="song_info_error">Some information could not be loaded.</string>
     <string name="song_info_retry">Retry</string>
+    <string name="song_info_copy">Copy song info</string>
+    <string name="song_info_copied">Copied</string>
     <string name="song_info_credits">Credits</string>
     <string name="song_info_writers">Writers</string>
     <string name="song_info_producers">Producers</string>
