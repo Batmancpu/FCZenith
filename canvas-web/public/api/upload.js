@@ -104,20 +104,20 @@ function esc(text) {
 async function notifyGroup(docId, item) {
   try {
     const base = "https://api.telegram.org/bot" + process.env.TELEGRAM_BOT_TOKEN;
-    const text = "\uD83C\uDFAC <b>Canvas baru menunggu persetujuan</b>\n\n" +
-      "<b>Judul:</b> " + esc(item.song) + "\n" +
-      "<b>Artis:</b> " + esc(item.artist) + "\n" +
+    const text = "\uD83C\uDFAC <b>New canvas awaiting approval</b>\n\n" +
+      "<b>Title:</b> " + esc(item.song) + "\n" +
+      "<b>Artist:</b> " + esc(item.artist) + "\n" +
       "<b>Album:</b> " + esc(item.album || "-") + "\n" +
-      "<b>Pengunggah:</b> " + esc(item.uname || "-") + "\n" +
-      "<b>Durasi:</b> " + item.duration + " detik\n\n" +
-      '<a href="' + esc(item.url) + '">Buka video</a>';
+      "<b>Uploader:</b> " + esc(item.uname || "-") + "\n" +
+      "<b>Duration:</b> " + item.duration + " seconds\n\n" +
+      '<a href="' + esc(item.url) + '">Open video</a>';
     const common = {
       chat_id: process.env.TELEGRAM_CHAT_ID,
       parse_mode: "HTML",
       reply_markup: {
         inline_keyboard: [[
-          { text: "\u2705 Setujui", callback_data: "ok:" + docId },
-          { text: "\u274C Tolak", callback_data: "no:" + docId }
+          { text: "\u2705 Approve", callback_data: "ok:" + docId },
+          { text: "\u274C Reject", callback_data: "no:" + docId }
         ]]
       }
     };

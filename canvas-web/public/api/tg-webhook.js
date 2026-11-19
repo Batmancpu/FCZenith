@@ -61,19 +61,19 @@ async function handle(cb) {
   const m = /^(ok|no):([A-Za-z0-9]{10,40})$/.exec(String(cb.data || ""));
   const msg = cb.message;
   if (!m || !msg || String(msg.chat.id) !== String(process.env.TELEGRAM_CHAT_ID)) {
-    await answer("Aksi tidak valid.");
+    await answer("Invalid action.");
     return;
   }
   const member = await tg("getChatMember", { chat_id: process.env.TELEGRAM_CHAT_ID, user_id: cb.from.id });
   if (!member.ok) {
-    await answer("Gagal memeriksa akun.");
+    await answer("Failed to verify account.");
     return;
   }
   const status = member.result.status;
   const isAdmin = status === "creator" || status === "administrator";
   const isMember = isAdmin || status === "member" || (status === "restricted" && member.result.is_member === true);
   if (!isMember || (process.env.TELEGRAM_APPROVE_ADMIN_ONLY === "1" && !isAdmin)) {
-    await answer("Kamu tidak punya izin.");
+    await answer("You don't have permission.");
     return;
   }
   const approve = m[1] === "ok";
@@ -82,7 +82,7 @@ async function handle(cb) {
   const headers = { Authorization: "Bearer " + token, "Content-Type": "application/json" };
   const found = await fetch(FS + "/canvases/" + id, { headers, signal: AbortSignal.timeout(8000) });
   if (found.status === 404) {
-    await answer("Canvas tidak ditemukan.");
+    await answer("Canvas not found.");
     return;
   }
   if (!found.ok) throw new Error("firestore get " + found.status);
@@ -96,7 +96,7 @@ async function handle(cb) {
     return tg("editMessageText", Object.assign(body, { text: original + "\n\n" + suffix }));
   };
   if (current !== "pending") {
-    await answer("Sudah diproses sebelumnya.");
+    await answer("Already processed.");
     await edit("Status: " + current);
     return;
   }
@@ -115,8 +115,8 @@ async function handle(cb) {
     }
   );
   if (!patch.ok) throw new Error("firestore patch " + patch.status);
-  await answer(approve ? "Canvas disetujui." : "Canvas ditolak.");
-  await edit((approve ? "\u2705 Disetujui oleh " : "\u274C Ditolak oleh ") + by);
+  await answer(approve ? "Canvas approved." : "Canvas rejected.");
+  await edit((approve ? "\u2705 Approved by " : "\u274C Rejected by ") + by);
 }
 
 module.exports = async (req, res) => {
@@ -140,7 +140,7 @@ module.exports = async (req, res) => {
       await handle(cb);
     } catch (error) {
       try {
-        await tg("answerCallbackQuery", { callback_query_id: cb.id, text: "Terjadi kesalahan server." });
+        await tg("answerCallbackQuery", { callback_query_id: cb.id, text: "A server error occurred." });
       } catch (e) {}
     }
   }
