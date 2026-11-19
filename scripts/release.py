@@ -11,11 +11,13 @@ Secrets live in ~/.zenith_release.env (never in the repo):
     TELEGRAM_TEST_THREAD_ID=...
 
 Usage:
+    python scripts/release.py                 (interactive menu)
     python scripts/release.py --dry-run
     python scripts/release.py --test --images /storage/emulated/0/CodeOnTheGoProjects/png
     python scripts/release.py --images /storage/emulated/0/CodeOnTheGoProjects/png
 """
 import argparse
+import getpass
 import html
 import json
 import os
@@ -37,7 +39,7 @@ def esc(text):
     return html.escape(text, quote=False)
 
 
-def load_config():
+def read_env_file():
     config = {}
     if ENV_FILE.exists():
         for line in ENV_FILE.read_text(encoding="utf-8").splitlines():
@@ -45,6 +47,11 @@ def load_config():
             if line and not line.startswith("#") and "=" in line:
                 key, value = line.split("=", 1)
                 config[key.strip()] = value.strip().strip("\"'")
+    return config
+
+
+def load_config():
+    config = read_env_file()
     for key, value in os.environ.items():
         if key.startswith("TELEGRAM_"):
             config[key] = value
@@ -177,6 +184,147 @@ def check(result, what):
     print(f"Sent: {what}")
 
 
+MENU_FIELDS = [
+    ("TELEGRAM_BOT_TOKEN", "Bot token", True),
+    ("TELEGRAM_CHAT_ID", "Chat ID rilis", False),
+    ("TELEGRAM_THREAD_ID", "Topic ID rilis", False),
+    ("TELEGRAM_TEST_CHAT_ID", "Chat ID tes", False),
+    ("TELEGRAM_TEST_THREAD_ID", "Topic ID tes", False),
+    ("RELEASE_APP", "Nama app", False),
+    ("RELEASE_TAGLINE", "Tagline", False),
+    ("RELEASE_IMAGES", "Folder gambar", False),
+]
+
+
+def mask(value, secret):
+    if not value:
+        return "(kosong)"
+    if secret:
+        return value[:6] + "…" + value[-4:] if len(value) > 12 else "*" * len(value)
+    return value
+
+
+def ask(text, secret=False):
+    try:
+        return (getpass.getpass(text) if secret else input(text)).strip()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return None
+
+
+def save_env_value(key, value):
+    lines = ENV_FILE.read_text(encoding="utf-8").splitlines() if ENV_FILE.exists() else []
+    out = []
+    done = False
+    for line in lines:
+        name = line.split("=", 1)[0].strip()
+        if "=" in line and not line.lstrip().startswith("#") and name == key:
+            if value and not done:
+                out.append(f"{key}={value}")
+            done = True
+            continue
+        out.append(line)
+    if value and not done:
+        out.append(f"{key}={value}")
+    fd = os.open(str(ENV_FILE), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        handle.write("\n".join(out) + "\n")
+
+
+def edit_field(key, label, secret):
+    value = ask(f"{label} (kosong = batal, - = hapus): ", secret)
+    if not value:
+        print("Dibatalkan.")
+        return
+    if value == "-":
+        save_env_value(key, "")
+        print("Dihapus.")
+        return
+    if key == "TELEGRAM_BOT_TOKEN" and ":" not in value:
+        print("Token tidak valid, formatnya 123456:ABC...")
+        return
+    if key.endswith("THREAD_ID") and not value.isdigit():
+        print("Topic ID harus berupa angka.")
+        return
+    save_env_value(key, value)
+    print("Tersimpan.")
+    if key == "RELEASE_IMAGES" and not Path(value).expanduser().is_dir():
+        print("Peringatan: folder tidak ditemukan.")
+
+
+def run_cli(argv):
+    saved = sys.argv
+    sys.argv = ["release.py"] + argv
+    try:
+        main()
+    except SystemExit as error:
+        if error.code not in (None, 0):
+            print(error.code)
+    finally:
+        sys.argv = saved
+
+
+def menu_args(config, test=False, dry=False):
+    argv = []
+    if config.get("RELEASE_APP"):
+        argv += ["--app", config["RELEASE_APP"]]
+    if config.get("RELEASE_TAGLINE"):
+        argv += ["--tagline", config["RELEASE_TAGLINE"]]
+    if config.get("RELEASE_IMAGES"):
+        argv += ["--images", config["RELEASE_IMAGES"]]
+    if test:
+        argv.append("--test")
+    if dry:
+        argv.append("--dry-run")
+    return argv
+
+
+def check_bot(config):
+    token = config.get("TELEGRAM_BOT_TOKEN")
+    if not token:
+        print("Isi bot token dulu (menu 1).")
+        return
+    result = call(token, "getMe", {})
+    if result.get("ok"):
+        print(f"Bot aktif: @{result['result'].get('username', '?')}")
+    else:
+        print("Gagal:", result.get("description", "unknown error"))
+
+
+def menu():
+    while True:
+        config = read_env_file()
+        print("\n=== Zenith Release Notify ===")
+        for number, (key, label, secret) in enumerate(MENU_FIELDS, 1):
+            print(f"[{number}] {label}: {mask(config.get(key, ''), secret)}")
+        print(f"Simpan di: {ENV_FILE}")
+        print("-" * 29)
+        print("[p] Pratinjau (dry run)")
+        print("[t] Kirim tes ke chat tes")
+        print("[r] Kirim rilis ke chat rilis")
+        print("[c] Cek bot")
+        print("[q] Keluar")
+        choice = ask("Pilih: ")
+        if choice is None or choice.lower() == "q":
+            print("Sampai jumpa.")
+            return
+        choice = choice.lower()
+        print()
+        if choice.isdigit() and 1 <= int(choice) <= len(MENU_FIELDS):
+            edit_field(*MENU_FIELDS[int(choice) - 1])
+        elif choice == "p":
+            run_cli(menu_args(config, dry=True))
+        elif choice == "t":
+            run_cli(menu_args(config, test=True))
+        elif choice == "r":
+            run_cli(menu_args(config))
+        elif choice == "c":
+            check_bot(load_config())
+        else:
+            print("Menu tidak dikenal.")
+        ask("\nTekan Enter untuk lanjut...")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Send the release announcement to Telegram.")
     parser.add_argument("--app", default="BitChord", help="app name in the title")
@@ -245,4 +393,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) > 1:
+        main()
+    else:
+        menu()
