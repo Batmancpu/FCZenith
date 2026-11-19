@@ -360,55 +360,108 @@ def detect_chats(config):
     print(f"Tersimpan: chat {chat_id}, topic {topic or '(kosong)'}.")
 
 
+USE_COLOR = sys.stdout.isatty() and not os.environ.get("NO_COLOR")
+MENU_WIDTH = 34
+
+
+def paint(text, code):
+    return f"\033[{code}m{text}\033[0m" if USE_COLOR else text
+
+
+def target_text(config, chat_key, thread_key):
+    chat = config.get(chat_key)
+    if not chat:
+        return "belum diisi"
+    topic = config.get(thread_key)
+    return f"{chat} #{topic}" if topic else chat
+
+
+def info_row(label, value, ok=None):
+    mark = ""
+    if ok is not None:
+        mark = " " + (paint("●", "32") if ok else paint("○", "31"))
+    print(f"  {paint(label.ljust(8), '2')}{value}{mark}")
+
+
+def section(title):
+    print(f"\n {paint(title, '1;36')}")
+
+
+def menu_key(key, text):
+    print(f"  {paint('[' + key + ']', '33')} {text}")
+
+
+def draw_menu(config):
+    token = config.get("TELEGRAM_BOT_TOKEN", "")
+    release_ok = bool(token and config.get("TELEGRAM_CHAT_ID"))
+    test_ok = bool(token and config.get("TELEGRAM_TEST_CHAT_ID"))
+    if USE_COLOR:
+        print("\033[2J\033[H", end="")
+    print(paint("╭" + "─" * MENU_WIDTH + "╮", "36"))
+    title = paint("ZENITH RELEASE NOTIFY".center(MENU_WIDTH), "1")
+    print(paint("│", "36") + title + paint("│", "36"))
+    print(paint("╰" + "─" * MENU_WIDTH + "╯", "36"))
+
+    section("BOT")
+    info_row("Token", mask(token, True), bool(token))
+
+    section("TUJUAN")
+    info_row(
+        "Rilis",
+        target_text(config, "TELEGRAM_CHAT_ID", "TELEGRAM_THREAD_ID"),
+        release_ok,
+    )
+    info_row(
+        "Tes",
+        target_text(config, "TELEGRAM_TEST_CHAT_ID", "TELEGRAM_TEST_THREAD_ID"),
+        test_ok,
+    )
+
+    section("KONTEN")
+    info_row("App", config.get("RELEASE_APP") or "BitChord")
+    info_row("Tagline", config.get("RELEASE_TAGLINE") or "-")
+    info_row("Gambar", config.get("RELEASE_IMAGES") or "bawaan repo")
+
+    saved = str(ENV_FILE).replace(str(Path.home()), "~")
+    print(paint(f"\n  {saved}", "2"))
+    print(paint("  ● siap   ○ belum lengkap", "2"))
+
+    section("SETELAN")
+    menu_key("1", "Bot token")
+    menu_key("2", "Tujuan rilis (chat & topic)")
+    menu_key("3", "Tujuan tes (chat & topic)")
+    menu_key("4", "Deteksi chat & topic otomatis")
+    menu_key("5", "Nama app, tagline, gambar")
+
+    section("KIRIM")
+    menu_key("p", "Pratinjau (dry run)")
+    menu_key("t", "Kirim tes ke chat tes")
+    menu_key("r", "Kirim rilis ke chat rilis")
+    menu_key("c", "Cek bot")
+    menu_key("q", "Keluar")
+
+
 def menu():
     while True:
         config = read_env_file()
-        print("\n=== Zenith Release Notify ===")
-        print(f"Bot token : {mask(config.get('TELEGRAM_BOT_TOKEN', ''), True)}")
-        print(
-            f"Rilis     : chat {shown(config, 'TELEGRAM_CHAT_ID')}"
-            f" | topic {shown(config, 'TELEGRAM_THREAD_ID')}"
-        )
-        print(
-            f"Tes       : chat {shown(config, 'TELEGRAM_TEST_CHAT_ID')}"
-            f" | topic {shown(config, 'TELEGRAM_TEST_THREAD_ID')}"
-        )
-        print(f"App       : {shown(config, 'RELEASE_APP')} | tagline {shown(config, 'RELEASE_TAGLINE')}")
-        print(f"Gambar    : {shown(config, 'RELEASE_IMAGES')}")
-        print(f"Simpan di : {ENV_FILE}")
-        print("-" * 29)
-        print("[1] Ubah bot token")
-        print("[2] Ubah Chat ID & Topic ID rilis")
-        print("[3] Ubah Chat ID & Topic ID tes")
-        print("[4] Deteksi Chat ID & Topic otomatis")
-        print("[5] Ubah nama app, tagline, folder gambar")
-        print("[p] Pratinjau (dry run)")
-        print("[t] Kirim tes ke chat tes")
-        print("[r] Kirim rilis ke chat rilis")
-        print("[c] Cek bot")
-        print("[q] Keluar")
-        choice = ask("Pilih: ")
+        draw_menu(config)
+        choice = ask("\n> Pilih: ")
         if choice is None or choice.lower() == "q":
             print("Sampai jumpa.")
             return
         choice = choice.lower()
         print()
-        wait = True
         if choice == "1":
             edit_field(*MENU_FIELDS[0])
-            wait = False
         elif choice == "2":
             edit_target("TELEGRAM_CHAT_ID", "TELEGRAM_THREAD_ID", "rilis")
-            wait = False
         elif choice == "3":
             edit_target("TELEGRAM_TEST_CHAT_ID", "TELEGRAM_TEST_THREAD_ID", "tes")
-            wait = False
         elif choice == "4":
             detect_chats(config)
         elif choice == "5":
             for field in MENU_FIELDS[5:]:
                 edit_field(*field)
-            wait = False
         elif choice == "p":
             run_cli(menu_args(config, dry=True))
         elif choice == "t":
@@ -419,8 +472,7 @@ def menu():
             check_bot(load_config())
         else:
             print("Menu tidak dikenal.")
-        if wait:
-            ask("\nTekan Enter untuk lanjut...")
+        ask(paint("\nEnter untuk kembali ke menu...", "2"))
 
 
 def main():
