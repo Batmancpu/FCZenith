@@ -97,6 +97,45 @@ async function recentUploads(uid) {
   }).length;
 }
 
+function esc(text) {
+  return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+async function notifyGroup(docId, item) {
+  try {
+    const base = "https://api.telegram.org/bot" + process.env.TELEGRAM_BOT_TOKEN;
+    const text = "\uD83C\uDFAC <b>Canvas baru menunggu persetujuan</b>\n\n" +
+      "<b>Judul:</b> " + esc(item.song) + "\n" +
+      "<b>Artis:</b> " + esc(item.artist) + "\n" +
+      "<b>Album:</b> " + esc(item.album || "-") + "\n" +
+      "<b>Pengunggah:</b> " + esc(item.uname || "-") + "\n" +
+      "<b>Durasi:</b> " + item.duration + " detik\n\n" +
+      '<a href="' + esc(item.url) + '">Buka video</a>';
+    const common = {
+      chat_id: process.env.TELEGRAM_CHAT_ID,
+      parse_mode: "HTML",
+      reply_markup: {
+        inline_keyboard: [[
+          { text: "\u2705 Setujui", callback_data: "ok:" + docId },
+          { text: "\u274C Tolak", callback_data: "no:" + docId }
+        ]]
+      }
+    };
+    if (process.env.TELEGRAM_THREAD_ID) common.message_thread_id = Number(process.env.TELEGRAM_THREAD_ID);
+    const send = async (method, extra) => {
+      const r = await fetch(base + "/" + method, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(Object.assign({}, common, extra)),
+        signal: AbortSignal.timeout(8000)
+      });
+      return r.json();
+    };
+    const sent = await send("sendVideo", { video: item.url, caption: text, supports_streaming: true });
+    if (!sent.ok) await send("sendMessage", { text, disable_web_page_preview: false });
+  } catch (error) {}
+}
+
 module.exports = async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   if (!guard(req, res, "upload", 20, 60 * 1000)) return;
@@ -194,6 +233,9 @@ module.exports = async (req, res) => {
         signal: AbortSignal.timeout(8000)
       });
       if (!created.ok) throw new Error("firestore create " + created.status);
+      const createdDoc = await created.json();
+      const docId = String(createdDoc.name || "").split("/").pop();
+      if (docId) await notifyGroup(docId, { song, artist, album, url, duration, uname: session.name });
       res.status(200).json({ ok: true });
       return;
     }
