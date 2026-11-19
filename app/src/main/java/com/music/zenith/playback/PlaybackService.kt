@@ -1575,7 +1575,7 @@ class PlaybackService : MediaLibraryService() {
             // [raceYouTubeOrModule]. Only worth the extra lookup when
             // something actually outranks YouTube; otherwise this is the
             // plain resolve every build before this one made.
-            if (!SourceResolver.canSubstituteForYouTube()) {
+            if (!SourceResolver.canSubstituteForYouTube(videoId)) {
                 val streamUrl = try {
                     runBlocking(about) {
                         withTimeout(RESOLVE_TIMEOUT_MS) { StreamResolver.resolve(videoId) }
@@ -6015,6 +6015,14 @@ class PlaybackService : MediaLibraryService() {
             else ->
                 NerdStats.sourceBitrate(mediaId) { measuredStreamKbps(player) }
                     ?: Pair(null, TelemetryProvenance.UNKNOWN)
+        }
+
+        if (mediaId != null && !isLocalPlayback(mediaId, player.currentMediaItem)) {
+            com.music.zenith.data.settings.TrackQualityMemory.noteSeen(
+                track = mediaId,
+                lossless = isLossless,
+                sourceName = currentSourceName(mediaId, player.currentMediaItem),
+            )
         }
 
         NerdStats.publish(NerdStats.Snapshot(
