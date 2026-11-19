@@ -181,7 +181,10 @@ def send_images(token, chat, thread, images, caption):
 
 def check(result, what):
     if not result.get("ok"):
-        sys.exit(f"{what} failed: {result.get('description', 'unknown error')}")
+        reason = result.get("description", "unknown error")
+        if reason == "Not Found":
+            reason += " (bot token salah atau bot sudah dihapus, cek menu [c])"
+        sys.exit(f"{what} failed: {reason}")
     print(f"Sent: {what}")
 
 
@@ -250,6 +253,8 @@ def edit_field(key, label, secret):
         return
     save_env_value(key, value)
     print("Tersimpan.")
+    if key == "TELEGRAM_BOT_TOKEN":
+        check_bot({"TELEGRAM_BOT_TOKEN": value})
     if key == "RELEASE_IMAGES" and not Path(value).expanduser().is_dir():
         print("Peringatan: folder tidak ditemukan.")
 
@@ -289,6 +294,8 @@ def check_bot(config):
     result = call(token, "getMe", {})
     if result.get("ok"):
         print(f"Bot aktif: @{result['result'].get('username', '?')}")
+    elif result.get("description") == "Not Found":
+        print("Gagal: token salah atau bot sudah dihapus. Ambil token baru dari @BotFather.")
     else:
         print("Gagal:", result.get("description", "unknown error"))
 
