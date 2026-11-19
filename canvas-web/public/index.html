@@ -167,12 +167,10 @@ function inspect(file) {
 
 async function uploadVideo(file) {
   const ticket = await api("upload", { action: "ticket" });
-  if (!ticket.uploadUrl) throw new Error("izin upload tidak diberikan");
+  if (!ticket.uploadUrl || !ticket.name) throw new Error("izin upload tidak diberikan");
   const res = await fetch(ticket.uploadUrl, { method: "PUT", headers: { "Content-Type": "video/mp4" }, body: file });
   if (!res.ok) throw new Error("upload gagal (" + res.status + ")");
-  const url = ticket.publicUrl || ticket.url;
-  if (!url) throw new Error("alamat video tidak diterima dari server");
-  return url;
+  return ticket.name;
 }
 
 let picked = null;
@@ -219,24 +217,29 @@ $("send").onclick = async () => {
   $("send").disabled = true;
   $("status").textContent = "Mengunggah...";
   try {
-    const url = await uploadVideo(picked.file);
+    const name = await uploadVideo(picked.file);
     await api("upload", {
       action: "submit",
+      name,
       song, artist, album,
-      key: norm(song) + "|" + norm(artist),
-      url,
-      size: picked.meta.size,
       duration: picked.meta.duration,
       width: picked.meta.width,
-      height: picked.meta.height,
-      specVersion: 1
+      height: picked.meta.height
     });
     $("status").textContent = "Terkirim. Menunggu persetujuan admin.";
     $("file").value = "";
     $("checks").innerHTML = "";
     picked = null;
   } catch (error) {
-    $("status").textContent = "Gagal: " + error.message;
+    const known = {
+      limit_reached: "Batas upload harian tercapai (5 per hari).",
+      not_member: "Akunmu bukan anggota grup Zenith.",
+      login_required: "Login Telegram dulu.",
+      spec_invalid: "Spesifikasi video tidak sesuai.",
+      file_invalid: "File video tidak valid.",
+      bad_text: "Judul, artis, atau album terlalu panjang."
+    };
+    $("status").textContent = "Gagal: " + (known[error.message] || error.message);
     $("send").disabled = false;
   }
 };
@@ -263,8 +266,8 @@ function card(id, data) {
     if (!session()) { button.textContent = "Login dulu"; return; }
     button.disabled = true;
     try {
-      const result = await api("like", { canvasId: id });
-      data.likes = typeof result.likes === "number" ? result.likes : (data.likes || 0) + 1;
+      await api("like", { id });
+      data.likes = (data.likes || 0) + 1;
       count.textContent = data.likes + " like";
       localStorage.setItem("zc_liked", JSON.stringify([...liked(), id]));
       button.textContent = "Sudah di-like";
