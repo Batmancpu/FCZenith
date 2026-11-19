@@ -357,7 +357,8 @@ jobs:
           LASTFM_SECRET: ${{ secrets.LASTFM_SECRET }}
         run: |
           set -euo pipefail
-          ./gradlew :app:testProdReleaseUnitTest --no-daemon --stacktrace
+          # Run through bash: upstream may strip gradlew's executable bit.
+          bash ./gradlew :app:testProdReleaseUnitTest --no-daemon --stacktrace
 
       - name: Build the Music production APK before signing
         if: steps.decision.outputs.should_release == 'true'
@@ -368,8 +369,8 @@ jobs:
           LASTFM_SECRET: ${{ secrets.LASTFM_SECRET }}
         run: |
           set -euo pipefail
-          chmod +x gradlew
-          ./gradlew :app:assembleProdRelease --parallel --build-cache --stacktrace \
+          # Keep the same permission-independent invocation for the APK build.
+          bash ./gradlew :app:assembleProdRelease --parallel --build-cache --stacktrace \
             -Dorg.gradle.jvmargs="-Xmx5g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8"
 
       - name: Validate and sign the production APK
