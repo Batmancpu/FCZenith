@@ -19,6 +19,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
+import com.music.zenith.ui.components.GLASS_JELLY_PRESS_WIDE
 import com.music.zenith.ui.components.glassJelly
 import com.music.zenith.ui.components.liquidGlassRim
 import com.music.zenith.ui.components.continuous
@@ -1427,6 +1428,7 @@ private fun DetailSearchField(
             .fillMaxWidth()
             .padding(horizontal = HEADER_GUTTER)
             .padding(bottom = 10.dp)
+            .glassJelly(GLASS_JELLY_PRESS_WIDE)
             .height(46.dp)
             .clip(CircleShape)
             // The recipe the Play, Shuffle and Add songs pills above it wear:
@@ -1956,6 +1958,7 @@ private fun ActionPill(
     val content = if (filled) Color.Black else MaterialTheme.colorScheme.onSurface
     Row(
         modifier = modifier
+            .glassJelly(GLASS_JELLY_PRESS_WIDE)
             .height(size)
             .clip(CircleShape)
             .then(
@@ -2007,6 +2010,7 @@ private fun PlayCircle(
     val description = stringResource(R.string.play)
     Box(
         modifier = Modifier
+            .glassJelly()
             .size(size)
             .clip(CircleShape)
             .clickable {

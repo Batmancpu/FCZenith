@@ -326,7 +326,10 @@ fun FrostedTopBar(
                 } else {
                     IconButton(
                         onClick = onBack,
-                        modifier = Modifier.align(Alignment.CenterStart).padding(start = 4.dp),
+                        modifier = Modifier
+                            .align(Alignment.CenterStart)
+                            .padding(start = 4.dp)
+                            .glassJelly(),
                     ) {
                         Icon(
                             SfIcons.ArrowBack,

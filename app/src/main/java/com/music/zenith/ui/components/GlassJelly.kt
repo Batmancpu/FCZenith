@@ -18,12 +18,14 @@ import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.music.zenith.data.settings.AppSettings
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.sign
 
 /**
- * Jelly untuk tombol kaca, sama karakternya dengan popup: menyusut saat
+ * Jelly untuk tombol kaca ala Apple Music: membesar secara fluid saat
  * ditekan, meregang dan bergeser mengikuti jari saat digeser, lalu memantul
  * (spring redaman rendah) saat dilepas. Event hanya diamati, tidak pernah
  * dikonsumsi, jadi klik dan gestur anak tidak berubah. Pasang di awal rantai
@@ -38,20 +40,24 @@ internal fun Modifier.glassJelly(pressScale: Float = GLASS_JELLY_PRESS): Modifie
     val offY = remember { Animatable(0f) }
     val stX = remember { Animatable(1f) }
     val stY = remember { Animatable(1f) }
-    val maxShift = with(LocalDensity.current) { 2.5.dp.toPx() }
+    val maxShift = with(LocalDensity.current) { 3.dp.toPx() }
+    val releaseJob = remember { arrayOfNulls<Job>(1) }
     return this
         .pointerInput(reduce, pressScale) {
             if (reduce) return@pointerInput
             val slop = viewConfiguration.touchSlop
             awaitEachGesture {
                 val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-                val press = spring<Float>(dampingRatio = 0.75f, stiffness = 600f)
+                releaseJob[0]?.cancel()
+                var lastUp = down.uptimeMillis
+                val press = spring<Float>(dampingRatio = 0.6f, stiffness = 520f)
                 scope.launch { stX.animateTo(pressScale, press) }
                 scope.launch { stY.animateTo(pressScale, press) }
                 var total = Offset.Zero
                 while (true) {
                     val event = awaitPointerEvent(PointerEventPass.Final)
                     val change = event.changes.firstOrNull { it.id == down.id }
+                    if (change != null) lastUp = change.uptimeMillis
                     if (change == null || !change.pressed) break
                     if (change.isConsumed) continue
                     total += change.positionChange()
@@ -69,11 +75,16 @@ internal fun Modifier.glassJelly(pressScale: Float = GLASS_JELLY_PRESS): Modifie
                     scope.launch { stX.snapTo(pressScale + ax - ay * 0.5f) }
                     scope.launch { stY.snapTo(pressScale + ay - ax * 0.5f) }
                 }
-                val wobble = spring<Float>(dampingRatio = 0.55f, stiffness = 380f)
-                scope.launch { offX.animateTo(0f, wobble) }
-                scope.launch { offY.animateTo(0f, wobble) }
-                scope.launch { stX.animateTo(1f, wobble) }
-                scope.launch { stY.animateTo(1f, wobble) }
+                val wobble = spring<Float>(dampingRatio = 0.48f, stiffness = 320f)
+                // Ketukan singkat tetap sempat membesar sebelum memantul kembali.
+                val held = lastUp - down.uptimeMillis
+                releaseJob[0] = scope.launch {
+                    if (held < GLASS_JELLY_MIN_HOLD_MS) delay(GLASS_JELLY_MIN_HOLD_MS - held)
+                    launch { offX.animateTo(0f, wobble) }
+                    launch { offY.animateTo(0f, wobble) }
+                    launch { stX.animateTo(1f, wobble) }
+                    launch { stY.animateTo(1f, wobble) }
+                }
             }
         }
         .graphicsLayer {
@@ -84,5 +95,11 @@ internal fun Modifier.glassJelly(pressScale: Float = GLASS_JELLY_PRESS): Modifie
         }
 }
 
-/** Skala tombol saat ditekan, sebelum regangan mengikuti jari. */
-internal const val GLASS_JELLY_PRESS = 0.95f
+/** Skala tombol saat ditekan (membesar), sebelum regangan mengikuti jari. */
+internal const val GLASS_JELLY_PRESS = 1.12f
+
+/** Skala untuk elemen lebar (kolom search, pil Play/Shuffle) agar tidak terlalu melebar. */
+internal const val GLASS_JELLY_PRESS_WIDE = 1.05f
+
+/** Lama minimal fase membesar sebelum memantul, supaya ketukan singkat tetap terasa. */
+internal const val GLASS_JELLY_MIN_HOLD_MS = 90L
