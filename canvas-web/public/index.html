@@ -5,38 +5,56 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Zenith Canvas</title>
 <style>
-  :root { color-scheme: dark; --bg: #0f0f12; --card: #1a1a20; --line: #2c2c35; --text: #f2f2f5; --muted: #9a9aa8; --accent: #fa586a; --ok: #4cc38a; --bad: #ff6b6b; }
-  * { box-sizing: border-box; }
-  body { margin: 0; font: 16px/1.5 system-ui, sans-serif; background: var(--bg); color: var(--text); }
-  main { max-width: 560px; margin: 0 auto; padding: 20px 16px 60px; }
-  h1 { font-size: 22px; margin: 0 0 4px; }
-  .sub { color: var(--muted); margin: 0 0 16px; }
-  nav { display: flex; gap: 8px; margin-bottom: 16px; }
-  button { font: inherit; border: 1px solid var(--line); background: var(--card); color: var(--text); padding: 10px 16px; border-radius: 10px; cursor: pointer; }
-  button.on, button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-  button:disabled { opacity: 0.5; cursor: default; }
-  label { display: block; margin: 0 0 12px; color: var(--muted); font-size: 14px; }
-  input { display: block; width: 100%; margin-top: 4px; padding: 10px 12px; font: inherit; color: var(--text); background: var(--card); border: 1px solid var(--line); border-radius: 10px; }
-  ul { list-style: none; padding: 0; margin: 0 0 12px; font-size: 14px; }
+  :root { color-scheme: dark; --bg: #0b0b0f; --card: #16161c; --card2: #1d1d25; --line: #2a2a34; --text: #f4f4f7; --muted: #9a9aab; --accent: #fa586a; --accent2: #ff8a5c; --ok: #4cc38a; --bad: #ff6b6b; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  [hidden] { display: none !important; }
+  body { margin: 0; font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--text); background: radial-gradient(900px 420px at 50% -120px, rgba(250,88,106,0.22), transparent 70%), var(--bg); min-height: 100vh; }
+  main { max-width: 560px; margin: 0 auto; padding: calc(20px + env(safe-area-inset-top, 0px)) 16px calc(60px + env(safe-area-inset-bottom, 0px)); }
+  .top { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+  .logo { width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; font-weight: 800; font-size: 22px; color: #fff; background: linear-gradient(135deg, var(--accent), var(--accent2)); box-shadow: 0 8px 24px rgba(250,88,106,0.35); }
+  h1 { font-size: 22px; line-height: 1.2; margin: 0; letter-spacing: -0.3px; }
+  .sub { color: var(--muted); margin: 2px 0 0; font-size: 14px; }
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px; margin-bottom: 14px; }
+  #auth { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 40px; }
+  .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; margin-bottom: 14px; }
+  button { font: inherit; font-weight: 600; border: 1px solid var(--line); background: var(--card2); color: var(--text); padding: 10px 16px; border-radius: 10px; cursor: pointer; transition: transform 0.12s ease, opacity 0.12s ease, background 0.12s ease; }
+  button:active { transform: scale(0.97); }
+  .tabs button { border: 0; background: transparent; color: var(--muted); border-radius: 10px; }
+  .tabs button.on { background: var(--card2); color: var(--text); box-shadow: 0 1px 0 rgba(255,255,255,0.06) inset; }
+  button.primary { width: 100%; padding: 13px 16px; border: 0; color: #fff; background: linear-gradient(135deg, var(--accent), var(--accent2)); box-shadow: 0 8px 22px rgba(250,88,106,0.28); }
+  button.ghost { width: 100%; border-style: dashed; border-color: rgba(250,88,106,0.55); color: var(--accent); background: rgba(250,88,106,0.08); }
+  button:disabled { opacity: 0.45; cursor: default; box-shadow: none; }
+  .hint { color: var(--muted); font-size: 12.5px; margin: 6px 2px 14px; }
+  label { display: block; margin: 0 0 12px; color: var(--muted); font-size: 13px; font-weight: 600; letter-spacing: 0.2px; }
+  input { display: block; width: 100%; margin-top: 6px; padding: 12px 14px; font: inherit; font-weight: 400; color: var(--text); background: var(--card2); border: 1px solid var(--line); border-radius: 12px; outline: none; transition: border-color 0.15s ease, box-shadow 0.15s ease; }
+  input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(250,88,106,0.18); }
+  input[type="file"] { padding: 10px; border-style: dashed; }
+  input[type="file"]::file-selector-button { font: inherit; font-weight: 600; margin-right: 12px; padding: 8px 14px; border: 0; border-radius: 8px; color: #fff; background: var(--accent); }
+  ul { list-style: none; padding: 0; margin: 0 0 14px; font-size: 14px; display: grid; gap: 6px; }
+  li { padding: 8px 12px; border-radius: 10px; background: var(--card2); }
   li.ok { color: var(--ok); }
   li.bad { color: var(--bad); }
-  .note { color: var(--muted); font-size: 14px; }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 12px; }
-  .card video { width: 100%; aspect-ratio: 1 / 1; border-radius: 8px; background: #000; }
-  .row { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
-  #auth { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; min-height: 40px; }
+  .note { color: var(--muted); font-size: 13.5px; }
+  #status, #findStatus { min-height: 20px; margin: 10px 0 0; text-align: center; }
+  .rules { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+  .rules span { font-size: 12px; color: var(--muted); padding: 5px 10px; border: 1px solid var(--line); border-radius: 999px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 10px; margin-bottom: 14px; }
+  .card video { width: 100%; aspect-ratio: 1 / 1; border-radius: 12px; background: #000; display: block; }
+  .row { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; padding: 0 4px 2px; }
+  .row button { padding: 8px 16px; }
 </style>
 </head>
 <body>
 <main>
-  <h1>Zenith Canvas</h1>
-  <p class="sub">Upload canvas lagu dan pilih yang terbaik.</p>
-  <nav>
-    <button id="tabUpload" class="on">Upload</button>
-    <button id="tabBrowse">Jelajah</button>
-  </nav>
+  <header class="top">
+    <div class="logo">Z</div>
+    <div>
+      <h1>Zenith Canvas</h1>
+      <p class="sub">Upload canvas lagu dan pilih yang terbaik.</p>
+    </div>
+  </header>
 
-  <div id="auth">
+  <div id="auth" class="panel">
     <div id="loginBox">
       <script async src="https://telegram.org/js/telegram-widget.js?22" data-telegram-login="Kakenawu_bot" data-size="large" data-onauth="onTelegramAuth(user)"></script>
     </div>
@@ -44,7 +62,14 @@
     <button id="logout" hidden>Keluar</button>
   </div>
 
-  <section id="upload">
+  <nav class="tabs">
+    <button id="tabUpload" class="on">Upload</button>
+    <button id="tabBrowse">Jelajah</button>
+  </nav>
+
+  <section id="upload" class="panel">
+    <button id="paste" class="ghost">Tempel info lagu dari app</button>
+    <p class="hint">Buka Song Info di app Zenith, tekan Salin, lalu tempel di sini.</p>
     <label>Judul lagu<input id="song" placeholder="Persis seperti di app"></label>
     <label>Artis<input id="artist"></label>
     <label>Album (kosongkan kalau ragu)<input id="album"></label>
@@ -52,10 +77,15 @@
     <ul id="checks"></ul>
     <button id="send" class="primary" disabled>Kirim</button>
     <p id="status" class="note"></p>
-    <p class="note">Aturan: MP4 H.264 tanpa audio, 1280x1280, 3 sampai 8 detik, maksimal 3 MB. Canvas tampil setelah disetujui admin.</p>
+    <div class="rules">
+      <span>MP4 H.264</span><span>Tanpa audio</span><span>1280x1280</span><span>3 sampai 8 detik</span><span>Maks 3 MB</span>
+    </div>
+    <p class="hint">Canvas tampil setelah disetujui admin.</p>
   </section>
 
-  <section id="browse" hidden>
+  <section id="browse" class="panel" hidden>
+    <button id="pasteFind" class="ghost">Tempel info lagu dari app</button>
+    <p class="hint">Atau isi judul dan artis secara manual.</p>
     <label>Judul lagu<input id="qSong"></label>
     <label>Artis<input id="qArtist"></label>
     <button id="find" class="primary">Cari</button>
@@ -150,6 +180,45 @@ function show(tab) {
 $("tabUpload").onclick = () => show("upload");
 $("tabBrowse").onclick = () => show("browse");
 renderAuth();
+
+function parseSongInfo(text) {
+  const out = { song: "", artist: "", album: "" };
+  const map = { judul: "song", title: "song", song: "song", lagu: "song", artis: "artist", artist: "artist", album: "album" };
+  for (const line of String(text || "").split(/\r?\n/)) {
+    const m = line.match(/^\s*([A-Za-z]+)\s*[:=]\s*(.*)$/);
+    if (!m) continue;
+    const key = map[m[1].toLowerCase()];
+    if (key) out[key] = m[2].trim();
+  }
+  return out;
+}
+
+async function readClipboardInfo() {
+  let text = "";
+  try {
+    text = await navigator.clipboard.readText();
+  } catch (e) {
+    text = prompt("Tempel info lagu di sini:") || "";
+  }
+  return parseSongInfo(text);
+}
+
+$("paste").onclick = async () => {
+  const info = await readClipboardInfo();
+  if (!info.song && !info.artist) { $("status").textContent = "Format salinan tidak dikenali."; return; }
+  $("song").value = info.song;
+  $("artist").value = info.artist;
+  $("album").value = info.album;
+  $("status").textContent = "Info lagu terisi.";
+};
+
+$("pasteFind").onclick = async () => {
+  const info = await readClipboardInfo();
+  if (!info.song && !info.artist) { $("findStatus").textContent = "Format salinan tidak dikenali."; return; }
+  $("qSong").value = info.song;
+  $("qArtist").value = info.artist;
+  $("findStatus").textContent = "Info lagu terisi.";
+};
 
 function inspect(file) {
   return new Promise((resolve) => {
