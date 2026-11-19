@@ -362,6 +362,31 @@ def detect_chats(config):
 
 USE_COLOR = sys.stdout.isatty() and not os.environ.get("NO_COLOR")
 MENU_WIDTH = 34
+IS_TTY = sys.stdout.isatty()
+MENU_PAGES = {
+    "1": "Bot token",
+    "2": "Tujuan rilis",
+    "3": "Tujuan tes",
+    "4": "Deteksi chat & topic",
+    "5": "Konten rilis",
+    "p": "Pratinjau",
+    "t": "Kirim tes",
+    "r": "Kirim rilis",
+    "c": "Cek bot",
+}
+
+
+def clear_screen():
+    if IS_TTY:
+        print("\033[2J\033[H", end="")
+
+
+def page(title):
+    clear_screen()
+    print(paint("╭" + "─" * MENU_WIDTH + "╮", "36"))
+    heading = paint(title.upper().center(MENU_WIDTH), "1")
+    print(paint("│", "36") + heading + paint("│", "36"))
+    print(paint("╰" + "─" * MENU_WIDTH + "╯", "36"))
 
 
 def paint(text, code):
@@ -395,12 +420,7 @@ def draw_menu(config):
     token = config.get("TELEGRAM_BOT_TOKEN", "")
     release_ok = bool(token and config.get("TELEGRAM_CHAT_ID"))
     test_ok = bool(token and config.get("TELEGRAM_TEST_CHAT_ID"))
-    if USE_COLOR:
-        print("\033[2J\033[H", end="")
-    print(paint("╭" + "─" * MENU_WIDTH + "╮", "36"))
-    title = paint("ZENITH RELEASE NOTIFY".center(MENU_WIDTH), "1")
-    print(paint("│", "36") + title + paint("│", "36"))
-    print(paint("╰" + "─" * MENU_WIDTH + "╯", "36"))
+    page("ZENITH RELEASE NOTIFY")
 
     section("BOT")
     info_row("Token", mask(token, True), bool(token))
@@ -447,9 +467,13 @@ def menu():
         draw_menu(config)
         choice = ask("\n> Pilih: ")
         if choice is None or choice.lower() == "q":
+            clear_screen()
             print("Sampai jumpa.")
             return
         choice = choice.lower()
+        if choice not in MENU_PAGES:
+            continue
+        page(MENU_PAGES[choice])
         print()
         if choice == "1":
             edit_field(*MENU_FIELDS[0])
@@ -470,8 +494,6 @@ def menu():
             run_cli(menu_args(config))
         elif choice == "c":
             check_bot(load_config())
-        else:
-            print("Menu tidak dikenal.")
         ask(paint("\nEnter untuk kembali ke menu...", "2"))
 
 
