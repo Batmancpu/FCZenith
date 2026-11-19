@@ -378,7 +378,7 @@ MENU_PAGES = {
 
 def clear_screen():
     if IS_TTY:
-        print("\033[2J\033[H", end="")
+        print("\033[H\033[2J\033[3J", end="", flush=True)
 
 
 def page(title):
@@ -461,7 +461,7 @@ def draw_menu(config):
     menu_key("q", "Keluar")
 
 
-def menu():
+def run_menu():
     while True:
         config = read_env_file()
         draw_menu(config)
@@ -566,6 +566,17 @@ def main():
         check(send_images(token, chat, thread, images, caption), f"{len(images)} image(s)")
     for number, message in enumerate(messages, 1):
         check(send_text(token, chat, thread, message), f"message {number}/{len(messages)}")
+
+
+def menu():
+    if IS_TTY:
+        print("\033[?1049h", end="", flush=True)
+    try:
+        run_menu()
+    finally:
+        if IS_TTY:
+            print("\033[?1049l", end="", flush=True)
+            print("Sampai jumpa.")
 
 
 if __name__ == "__main__":
