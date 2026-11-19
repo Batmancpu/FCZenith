@@ -83,10 +83,38 @@
   .upFoot button:disabled { opacity: 1; color: rgba(255,255,255,0.45); background: rgba(58,58,64,0.62); box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
 
   .prof { padding: calc(32px + env(safe-area-inset-top, 0px)) 16px 8px; text-align: center; }
-  .loginCard { display: grid; justify-items: center; gap: 8px; padding: 28px 18px; border-radius: 16px; background: var(--card); }
-  .loginLogo { width: 60px; height: 60px; display: grid; place-items: center; border-radius: 14px; font-size: 28px; font-weight: 700; color: #fff; background: var(--accent); }
-  .loginCard h2 { margin: 6px 0 0; font-size: 20px; font-weight: 700; }
-  .loginCard p { margin: 0 0 8px; color: var(--muted); font-size: 14px; }
+  .loginCard { position: relative; isolation: isolate; overflow: hidden; display: grid; justify-items: center; gap: 10px; padding: 34px 18px 22px; border-radius: 22px; border: 0.5px solid var(--line); background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015)), var(--card); box-shadow: 0 20px 50px rgba(0,0,0,0.45); text-align: center; }
+  .loginCard::before { content: ""; position: absolute; inset: 0; z-index: -1; background: radial-gradient(260px circle at var(--mx, 50%) var(--my, 0%), rgba(250,88,106,0.22), transparent 70%); }
+  .loginCard::after { content: ""; position: absolute; z-index: -1; top: -70px; right: -50px; width: 180px; height: 180px; border-radius: 50%; background: rgba(250,88,106,0.28); filter: blur(50px); animation: orb 8s ease-in-out infinite alternate; }
+  .loginCard.shake { animation: shake 0.4s ease; }
+  .loginLogo { position: relative; width: 68px; height: 68px; display: grid; place-items: center; border-radius: 18px; font-size: 30px; font-weight: 700; color: #fff; background: linear-gradient(135deg, #fa586a, #ff8a5c); box-shadow: 0 10px 28px rgba(250,88,106,0.4); }
+  .loginLogo::after { content: ""; position: absolute; inset: 0; border-radius: inherit; border: 2px solid rgba(250,88,106,0.6); animation: ring 2.4s ease-out infinite; }
+  .loginCard h2 { margin: 8px 0 0; font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
+  .loginCard p { margin: 0 0 4px; max-width: 300px; color: var(--muted); font-size: 14px; }
+  .perks { display: grid; gap: 8px; width: 100%; margin: 10px 0 6px; text-align: left; }
+  .perk { display: grid; grid-template-columns: 36px 1fr; gap: 12px; align-items: center; padding: 10px 12px; border-radius: 14px; border: 0.5px solid var(--line); background: rgba(255,255,255,0.04); transition: transform 0.2s ease, background 0.2s ease; animation: perkIn 0.5s ease both; }
+  .perk:nth-child(2) { animation-delay: 0.08s; }
+  .perk:nth-child(3) { animation-delay: 0.16s; }
+  .perk:active { transform: scale(0.98); background: rgba(255,255,255,0.08); }
+  .perk i { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 10px; color: var(--accent); background: rgba(250,88,106,0.14); }
+  .perk i svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .perk b { display: block; font-size: 14px; font-weight: 600; }
+  .perk span { display: block; color: var(--muted); font-size: 12.5px; }
+  .tgWrap { position: relative; display: grid; place-items: center; width: 100%; min-height: 48px; margin-top: 8px; transition: opacity 0.2s ease; }
+  .tgSkel { position: absolute; inset: 4px 0; max-width: 250px; margin: 0 auto; border-radius: 12px; background: linear-gradient(90deg, rgba(255,255,255,0.05), rgba(255,255,255,0.13), rgba(255,255,255,0.05)); background-size: 200% 100%; animation: shimmer 1.2s linear infinite; }
+  .tgWrap:has(iframe) .tgSkel { display: none; }
+  .loginCard.busy .tgWrap { opacity: 0.4; pointer-events: none; }
+  .loginStatus { min-height: 18px; font-size: 13px; color: var(--muted); }
+  .loginStatus.err { color: var(--bad); }
+  .loginStatus.busy::before { content: ""; display: inline-block; width: 12px; height: 12px; margin-right: 8px; vertical-align: -2px; border: 2px solid rgba(255,255,255,0.25); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
+  .loginFoot { font-size: 12px; color: var(--muted); }
+  @keyframes shimmer { to { background-position: -200% 0; } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes ring { from { transform: scale(1); opacity: 0.8; } to { transform: scale(1.5); opacity: 0; } }
+  @keyframes orb { to { transform: translate(-40px, 30px) scale(1.2); } }
+  @keyframes perkIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  @keyframes shake { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
+  @media (prefers-reduced-motion: reduce) { .loginCard, .loginCard::after, .loginLogo::after, .perk, .tgSkel { animation: none !important; } }
   .avatar { width: 84px; height: 84px; margin: 0 auto 10px; border-radius: 50%; display: grid; place-items: center; font-size: 34px; font-weight: 700; color: #fff; background: var(--accent); }
   .prof h2 { margin: 0 0 16px; font-size: 20px; font-weight: 700; }
   .stats { display: grid; grid-template-columns: repeat(3, 1fr); margin-bottom: 14px; border-radius: 12px; background: var(--card); }
@@ -161,8 +189,19 @@
       <div id="loginBox" class="loginCard">
         <div class="loginLogo">Z</div>
         <h2>Masuk ke Zenith Canvas</h2>
-        <p>Login Telegram untuk upload dan menyukai canvas. Khusus anggota grup Zenith.</p>
-        <script async src="https://telegram.org/js/telegram-widget.js?22" data-telegram-login="Kakenawu_bot" data-size="large" data-onauth="onTelegramAuth(user)"></script>
+        <p>Masuk dengan Telegram untuk mengunggah dan menyukai canvas.</p>
+        <div class="perks">
+          <div class="perk"><i><svg viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M5 20h14"/></svg></i><div><b>Unggah canvas</b><span>Bagikan video loop untuk lagu favoritmu.</span></div></div>
+          <div class="perk"><i><svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg></i><div><b>Sukai canvas</b><span>Dukung karya terbaik dari komunitas.</span></div></div>
+          <div class="perk"><i><svg viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 4.5-3.2 7.6-8 9-4.8-1.4-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg></i><div><b>Khusus anggota</b><span>Hanya anggota grup Zenith yang bisa masuk.</span></div></div>
+        </div>
+        <div id="tgWrap" class="tgWrap">
+          <div class="tgSkel"></div>
+          <script async src="https://telegram.org/js/telegram-widget.js?22" data-telegram-login="Kakenawu_bot" data-size="large" data-radius="12" data-userpic="false" data-onauth="onTelegramAuth(user)"></script>
+        </div>
+        <div id="loginStatus" class="loginStatus"></div>
+        <button id="tgRetry" class="chipBtn" type="button" hidden>Muat ulang</button>
+        <div class="loginFoot">Tanpa kata sandi. Hanya nama dan ID Telegram yang dipakai.</div>
       </div>
       <div id="profHead" hidden>
         <div id="avatar" class="avatar">Z</div>
@@ -256,8 +295,41 @@ async function api(path, body) {
   return data;
 }
 
+const loginErrors = {
+  not_member: "Akunmu bukan anggota grup Zenith.",
+  login_expired: "Login kedaluwarsa. Coba lagi.",
+  invalid_login: "Data login tidak valid.",
+  membership_check_failed: "Gagal memeriksa keanggotaan. Coba lagi.",
+  rate_limited: "Terlalu banyak percobaan. Tunggu sebentar."
+};
+
+function loginState(kind, text) {
+  const box = $("loginBox");
+  const st = $("loginStatus");
+  st.className = "loginStatus" + (kind ? " " + kind : "");
+  st.textContent = text;
+  box.classList.toggle("busy", kind === "busy");
+  box.classList.remove("shake");
+  if (kind === "err") { void box.offsetWidth; box.classList.add("shake"); }
+}
+
+function trackGlow(e) {
+  const r = e.currentTarget.getBoundingClientRect();
+  e.currentTarget.style.setProperty("--mx", (e.clientX - r.left) + "px");
+  e.currentTarget.style.setProperty("--my", (e.clientY - r.top) + "px");
+}
+$("loginBox").addEventListener("pointermove", trackGlow);
+$("loginBox").addEventListener("pointerdown", trackGlow);
+$("tgRetry").onclick = () => location.reload();
+setTimeout(() => {
+  if (!session() && !$("tgWrap").querySelector("iframe")) {
+    loginState("err", "Tombol Telegram gagal dimuat. Periksa koneksi.");
+    $("tgRetry").hidden = false;
+  }
+}, 8000);
+
 window.onTelegramAuth = async (user) => {
-  $("status").textContent = "Memeriksa login...";
+  loginState("busy", "Memeriksa login...");
   try {
     const res = await fetch("/api/auth", {
       method: "POST",
@@ -267,10 +339,10 @@ window.onTelegramAuth = async (user) => {
     const data = await res.json();
     if (!res.ok || !data.token) throw new Error(data.error || data.message || "HTTP " + res.status);
     localStorage.setItem("zc_session", JSON.stringify({ token: data.token, name: user.first_name || user.username || "" }));
-    $("status").textContent = "";
+    loginState("", "");
     renderAuth();
   } catch (error) {
-    $("status").textContent = "Login gagal: " + error.message;
+    loginState("err", loginErrors[error.message] || "Login gagal: " + error.message);
   }
 };
 
