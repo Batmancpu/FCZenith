@@ -101,6 +101,11 @@
   .badge { position: absolute; z-index: 2; top: 6px; left: 6px; padding: 2px 8px; border-radius: 6px; font-size: 11.5px; font-weight: 600; color: #000; background: var(--warn); }
   .badge.rejected { color: #fff; background: var(--bad); }
   .likes { position: absolute; z-index: 2; left: 8px; bottom: 6px; font-size: 13px; font-weight: 600; text-shadow: 0 1px 6px rgba(0,0,0,0.9); }
+  .cell { cursor: pointer; }
+  .cell video { pointer-events: none; }
+  #viewer { position: fixed; inset: 0; z-index: 35; background: #000; }
+  #viewer .feed { height: 100%; }
+  #viewer .upBar { z-index: 45; }
 </style>
 </head>
 <body>
@@ -170,6 +175,13 @@
     </div>
     <p id="mineStatus" class="note"></p>
     <div id="mineList" class="grid"></div>
+  </section>
+
+  <section id="viewer" hidden>
+    <div class="upBar">
+      <button id="viewerClose" class="navBtn" aria-label="Tutup"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div id="viewerFeed" class="feed"></div>
   </section>
 </main>
 
@@ -598,6 +610,32 @@ async function loadFeed() {
   }
 }
 
+function openViewer(items, index) {
+  const feed = $("viewerFeed");
+  feed.innerHTML = "";
+  for (const it of items) {
+    const el = slide(it.id, it);
+    feed.appendChild(el);
+    feedObserver.observe(el);
+  }
+  $("viewer").hidden = false;
+  document.body.classList.add("feed");
+  feed.scrollTop = index * feed.clientHeight;
+}
+
+function closeViewer() {
+  const feed = $("viewerFeed");
+  for (const el of feed.querySelectorAll(".slide")) {
+    feedObserver.unobserve(el);
+    const v = el.querySelector("video");
+    if (v) { v.pause(); v.removeAttribute("src"); v.load(); }
+  }
+  feed.innerHTML = "";
+  $("viewer").hidden = true;
+  document.body.classList.toggle("feed", current === "browse");
+}
+$("viewerClose").onclick = closeViewer;
+
 async function loadMine() {
   const list = $("mineList");
   list.innerHTML = "";
@@ -616,11 +654,13 @@ async function loadMine() {
       const video = document.createElement("video");
       video.src = it.url + "#t=0.1";
       video.muted = true;
-      video.loop = true;
       video.playsInline = true;
+      video.controls = false;
+      video.disablePictureInPicture = true;
       video.preload = "metadata";
-      video.onclick = () => { if (video.paused) video.play().catch(() => {}); else video.pause(); };
       cell.appendChild(video);
+      const itemIndex = data.items.indexOf(it);
+      cell.onclick = () => openViewer(data.items, itemIndex);
       if (it.status !== "approved") {
         const badge = document.createElement("span");
         badge.className = "badge " + it.status;
