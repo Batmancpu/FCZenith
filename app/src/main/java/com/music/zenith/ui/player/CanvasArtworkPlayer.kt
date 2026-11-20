@@ -76,17 +76,17 @@ private const val TAG = "CanvasArtworkPlayer"
  * as a share of the fade height. The centre keeps the video's bottom, so the
  * boundary reads as a V, as in Apple Music. Android 13+ only.
  */
-private const val CLIP_FADE_CURVE = 0.8f
+private val CLIP_FADE_CURVE: Float get() = CanvasFadeTuning.curve.floatValue
 
 /** Share of the old fade height that is kept, so the dissolve starts a little lower. */
-private const val CLIP_FADE_HEIGHT_SCALE = 0.6f
+private val CLIP_FADE_HEIGHT_SCALE: Float get() = CanvasFadeTuning.heightScale.floatValue
 
 /**
  * Kekuatan kurva fade bawah klip. 1 = smootherstep asli. Makin besar, alpha turun
  * lebih cepat dengan ekor lebih panjang di dalam band yang SAMA, jadi fade terasa
  * lebih kuat dan halus tanpa menggeser batas blur ke atas.
  */
-private const val CLIP_FADE_POWER = 1.3f
+private val CLIP_FADE_POWER: Float get() = CanvasFadeTuning.power.floatValue
 
 /**
  * How long a clip gets to paint itself onto a surface it was just handed back
@@ -1063,6 +1063,7 @@ private class AppliedLook {
     private var fadeBounds = IntSize(-1, -1)
     private var fadeEnd: Float? = Float.NaN
     private var fadeBlur = Float.NaN
+    private var fadeTune = 0
 
     fun transformDiffers(
         clipAspect: Float,
@@ -1085,7 +1086,11 @@ private class AppliedLook {
     }
 
     fun fadeDiffers(fraction: Float, bounds: IntSize, endPx: Float?, blur: Float = 0f): Boolean {
-        if (fraction == fade && bounds == fadeBounds && endPx == fadeEnd && blur == fadeBlur) return false
+        val tune = CanvasFadeTuning.signature()
+        if (fraction == fade && bounds == fadeBounds && endPx == fadeEnd && blur == fadeBlur &&
+            tune == fadeTune
+        ) return false
+        fadeTune = tune
         fade = fraction
         fadeBounds = bounds
         fadeEnd = endPx

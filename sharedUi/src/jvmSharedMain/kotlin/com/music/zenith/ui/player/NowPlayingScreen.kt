@@ -3273,6 +3273,12 @@ fun NowPlayingScreen(
 
                 // Live blur on: the clip itself is blurred live on its TextureView; no static still.
 
+                // Popup debug untuk menyetel fade bawah klip secara langsung.
+                // Matikan lewat CanvasFadeTuning.ENABLED bila sudah tidak dibutuhkan.
+                if (CanvasFadeTuning.ENABLED && heroClipMounted != null && !dockMoving && !lyricsOpen && !queueOpen) {
+                    CanvasFadeDebugTuner()
+                }
+
                 // Frame terakhir Spotify Canvas layar penuh, di atas latar dan di
                 // bawah kontrol. Tak terlihat sampai lagu berganti; lalu menutup
                 // layar dan memudar dengan zoom + blur. Tidak menangkap sentuhan.
