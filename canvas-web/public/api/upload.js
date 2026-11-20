@@ -98,6 +98,36 @@ async function recentUploads(uid) {
   }).length;
 }
 
+async function hasDuplicate(uid, key) {
+  const token = await googleToken();
+  const res = await fetch(FS + ":runQuery", {
+    method: "POST",
+    headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      structuredQuery: {
+        from: [{ collectionId: "canvases" }],
+        where: {
+          compositeFilter: {
+            op: "AND",
+            filters: [
+              { fieldFilter: { field: { fieldPath: "uid" }, op: "EQUAL", value: { stringValue: uid } } },
+              { fieldFilter: { field: { fieldPath: "key" }, op: "EQUAL", value: { stringValue: key } } }
+            ]
+          }
+        },
+        limit: 20
+      }
+    }),
+    signal: AbortSignal.timeout(8000)
+  });
+  if (!res.ok) throw new Error("firestore query " + res.status);
+  const rows = await res.json();
+  return rows.some((row) => {
+    const f = row.document && row.document.fields;
+    return f && !(f.status && f.status.stringValue === "rejected");
+  });
+}
+
 const STALE_TTL_MS = 3 * 24 * 60 * 60 * 1000;
 let lastPurge = 0;
 
@@ -297,10 +327,14 @@ module.exports = async (req, res) => {
         res.status(400).json({ error: "bad_text" });
         return;
       }
+      if (await hasDuplicate(session.uid, norm(song) + "|" + norm(artist))) {
+        res.status(409).json({ error: "duplicate" });
+        return;
+      }
       const duration = Number(body.duration);
       const width = Number(body.width);
       const height = Number(body.height);
-      if (!(duration >= 3 && duration <= 8) || width !== 1280 || height !== 1280) {
+      if (!(duration >= 3 && duration <= 8) || !Number.isInteger(width) || width !== height || width < 720 || width > 1280) {
         res.status(400).json({ error: "spec_invalid" });
         return;
       }
