@@ -49,8 +49,8 @@ import kotlin.math.roundToInt
  * terlihat. Setelah nilai pas, jadikan default permanen lalu matikan [ENABLED].
  */
 object CanvasFadeTuning {
-    /** Tampilkan tombol dan popup debug di player utama. */
-    const val ENABLED = true
+    /** Tombol dan popup debug tampil hanya setelah kode rahasia diketik di pencarian. */
+    val unlocked = mutableStateOf(false)
 
     const val DEFAULT_HEIGHT_SCALE = 0.52f
     const val DEFAULT_CURVE = 0.06f
@@ -192,15 +192,26 @@ private fun FadeTunerPanel() {
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.weight(1f).padding(end = 8.dp),
             )
-            Text(
-                text = "Reset",
-                color = Color.White,
-                fontSize = 13.sp,
-                modifier = Modifier
-                    .background(Color.White.copy(alpha = 0.18f), RoundedCornerShape(50))
-                    .clickable { CanvasFadeTuning.reset() }
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-            )
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = "Reset",
+                    color = Color.White,
+                    fontSize = 13.sp,
+                    modifier = Modifier
+                        .background(Color.White.copy(alpha = 0.18f), RoundedCornerShape(50))
+                        .clickable { CanvasFadeTuning.reset() }
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                )
+                Text(
+                    text = "Nonaktifkan",
+                    color = Color.White,
+                    fontSize = 13.sp,
+                    modifier = Modifier
+                        .background(Color(0xFFB3261E).copy(alpha = 0.8f), RoundedCornerShape(50))
+                        .clickable { CanvasFadeTuning.unlocked.value = false }
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                )
+            }
         }
     }
 }
