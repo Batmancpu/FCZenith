@@ -1,5 +1,6 @@
 package com.music.zenith.ui.components
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -61,6 +62,7 @@ fun CanvasProvidersDialog(
     val savedOrder by AppSettings.canvasProviderOrder.collectAsStateWithLifecycle()
     val shape = RoundedCornerShape(ALERT_CORNER)
     val motion = rememberMacOSPopupState(onClosed = onDismiss)
+    BackHandler { motion.requestClose() }
     val touch = rememberJellyMenuTouch()
 
     Box(
@@ -130,7 +132,7 @@ fun CanvasProvidersDialog(
                         onClick = AppSettings::resetCanvasProviderOrder,
                     )
                     AlertRule()
-                    AlertAction(label = stringResource(R.string.done), emphasised = true, onClick = onDismiss)
+                    AlertAction(label = stringResource(R.string.done), emphasised = true, onClick = motion::requestClose)
                 }
             }
         }
