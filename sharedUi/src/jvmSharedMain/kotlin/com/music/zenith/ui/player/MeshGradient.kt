@@ -256,6 +256,7 @@ private const val EDGE_MEAN_MIX = 0.35f
 private const val EDGE_RISE_START = 0.55f
 private const val EDGE_DROP_SHARE = 0.34f
 private const val EDGE_TINT_MIX = 0.3f
+private const val EDGE_SMOOTH_MILLIS = 380f
 
 internal fun edgeColorsOf(source: ImageBitmap): List<Color> {
     val w = source.width
@@ -306,14 +307,61 @@ fun CoverEdgeBackdrop(
     seam: () -> Float,
     modifier: Modifier = Modifier,
     tint: Color? = null,
+    frame: () -> ImageBitmap? = { null },
 ) {
-    if (edge.size < 2) return
-    val colors = remember(edge, tint) {
-        val target = tint?.tuned()
-        if (target == null) {
-            edge
+    val reduceAnimation by PlayerSettings.reduceAnimation.collectAsStateWithLifecycle()
+    // Warna tepi dari frame klip yang sedang diputar. Frame dibaca lewat lambda
+    // supaya layar induk tidak ikut recompose setiap frame baru.
+    var liveEdge by remember { mutableStateOf<List<Color>>(emptyList()) }
+    val currentFrame by androidx.compose.runtime.rememberUpdatedState(frame)
+    LaunchedEffect(Unit) {
+        androidx.compose.runtime.snapshotFlow { currentFrame() }.collect { grabbed ->
+            if (grabbed == null) {
+                liveEdge = emptyList()
+                return@collect
+            }
+            val computed = withContext(Dispatchers.Default) {
+                if (isLikelyBlackFrame(grabbed)) emptyList() else edgeColorsOf(grabbed)
+            }
+            if (computed.isNotEmpty()) liveEdge = computed
+        }
+    }
+    val target = remember(edge, liveEdge, tint) {
+        val source = liveEdge.ifEmpty { edge }
+        val mix = tint?.tuned()
+        if (mix == null) {
+            source
         } else {
-            edge.map { androidx.compose.ui.graphics.lerp(it, target, EDGE_TINT_MIX) }
+            source.map { androidx.compose.ui.graphics.lerp(it, mix, EDGE_TINT_MIX) }
+        }
+    }
+    // Warna yang benar-benar digambar: mendekati target tiap frame secara
+    // eksponensial, jadi perubahan antar pengambilan frame tidak melompat.
+    val shown = remember { mutableStateOf<List<Color>>(emptyList()) }
+    LaunchedEffect(target, reduceAnimation) {
+        if (target.size < 2 || reduceAnimation || shown.value.size != target.size) {
+            shown.value = target
+            return@LaunchedEffect
+        }
+        var last = 0L
+        while (isActive) {
+            val now = androidx.compose.runtime.withFrameNanos { it }
+            val dtNs = if (last == 0L) 16_000_000L else (now - last).coerceAtMost(64_000_000L)
+            last = now
+            val k = 1f - kotlin.math.exp(-(dtNs / 1_000_000f) / EDGE_SMOOTH_MILLIS)
+            val next = shown.value.mapIndexed { i, c ->
+                androidx.compose.ui.graphics.lerp(c, target[i], k)
+            }
+            shown.value = next
+            val settled = next.indices.all { i ->
+                abs(next[i].red - target[i].red) < 0.004f &&
+                    abs(next[i].green - target[i].green) < 0.004f &&
+                    abs(next[i].blue - target[i].blue) < 0.004f
+            }
+            if (settled) {
+                shown.value = target
+                break
+            }
         }
     }
     Canvas(
@@ -321,6 +369,8 @@ fun CoverEdgeBackdrop(
             .fillMaxSize()
             .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen },
     ) {
+        val drawn = shown.value
+        if (drawn.size < 2) return@Canvas
         val seamY = seam().coerceIn(0f, size.height)
         if (seamY < 1f) return@Canvas
         val top = seamY * EDGE_RISE_START
@@ -339,7 +389,7 @@ fun CoverEdgeBackdrop(
             val keep = 1f - smootherStep(t)
             stops += (seamAt + (1f - seamAt) * t) to Color.Black.copy(alpha = keep * keep)
         }
-        drawRect(brush = Brush.horizontalGradient(colors = colors, startX = 0f, endX = size.width))
+        drawRect(brush = Brush.horizontalGradient(colors = drawn, startX = 0f, endX = size.width))
         drawRect(
             brush = Brush.verticalGradient(colorStops = stops.toTypedArray(), startY = top, endY = bottom),
             blendMode = BlendMode.DstIn,

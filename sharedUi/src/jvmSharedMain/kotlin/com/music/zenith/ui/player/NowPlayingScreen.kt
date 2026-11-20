@@ -1239,6 +1239,8 @@ fun NowPlayingScreen(
     val canvasRenderedState = remember(canvas?.url) { mutableStateOf(false) }
     var canvasRendered by canvasRenderedState
     var canvasFrame by remember(canvas?.url) { mutableStateOf<ImageBitmap?>(null) }
+    // Frame terbaru dari klip, tanpa throttle: dipakai tepi cover agar mengikuti video.
+    var canvasEdgeFrame by remember(canvas?.url) { mutableStateOf<ImageBitmap?>(null) }
     // Spotify's phone presentation starts with the full control deck over its
     // video. It leaves on a Canvas tap, or after the optional idle timeout.
     var spotifyCanvasControlsOpen by remember(canvas?.url) { mutableStateOf(true) }
@@ -1263,10 +1265,22 @@ fun NowPlayingScreen(
     // mesh keeps its own (its colours are quantised, not blurred).
     val liveReduceBlur by PlayerSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
     val liveReduceMotion by PlayerSettings.reduceAnimation.collectAsStateWithLifecycle()
-    val meshRefreshMs: Long? = if (legacyMesh || liveReduceBlur || liveReduceMotion) {
-        MESH_REFRESH_MS
-    } else {
-        LIVE_BLUR_REFRESH_MS
+    val meshRefreshMs: Long? = when {
+        liveReduceMotion -> MESH_REFRESH_MS
+        legacyMesh -> LIVE_BLUR_REFRESH_MS
+        liveReduceBlur -> MESH_REFRESH_MS
+        else -> LIVE_BLUR_REFRESH_MS
+    }
+    // Tepi cover menerima setiap frame; palet mesh tetap diperbarui pelan
+    // (MESH_REFRESH_MS) karena kuantisasinya mahal.
+    val meshFrameClock = remember(canvas?.url) { longArrayOf(0L) }
+    val acceptCanvasFrame: (ImageBitmap) -> Unit = { frame ->
+        canvasEdgeFrame = frame
+        val nowMs = System.nanoTime() / 1_000_000L
+        if (!legacyMesh || canvasFrame == null || nowMs - meshFrameClock[0] >= MESH_REFRESH_MS) {
+            meshFrameClock[0] = nowMs
+            canvasFrame = frame
+        }
     }
 
     val scrub = rememberPlayerScrub(song.videoId, position, durationMs)
@@ -3105,6 +3119,7 @@ fun NowPlayingScreen(
                         CoverEdgeBackdrop(
                             edge = meshPalette?.edge.orEmpty(),
                             tint = meshPalette?.colors?.firstOrNull(),
+                            frame = { canvasEdgeFrame },
                             seam = {
                                 with(density) {
                                     heroHeight.toPx() +
@@ -3232,7 +3247,7 @@ fun NowPlayingScreen(
                             onFrameCaptured = {
                                 if (!clipFullscreen && !tabletArtworkBackdrop &&
                                     !lyricsOpen && !queueOpen && !queueDragging
-                                ) canvasFrame = it
+                                ) acceptCanvasFrame(it)
                             },
                             // The full-screen Spotify video has no mesh to re-tint.
                             // Keeping this null also removes the old three-second GPU
@@ -4859,7 +4874,7 @@ fun NowPlayingScreen(
                                         frameCapturePx = if (legacyMesh) CANVAS_FRAME_CAPTURE_PX else LIVE_BLUR_CAPTURE_PX,
                                         onFrameCaptured = {
                                             if (!tabletArtworkBackdrop && !lyricsOpen && !queueOpen) {
-                                                canvasFrame = it
+                                                acceptCanvasFrame(it)
                                             }
                                         },
                                         refreshFrameEveryMs = if (
