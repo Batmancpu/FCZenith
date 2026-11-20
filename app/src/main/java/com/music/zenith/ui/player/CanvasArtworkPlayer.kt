@@ -89,6 +89,15 @@ private const val CLIP_FADE_HEIGHT_SCALE = 0.62f
  */
 private const val REPAINT_TIMEOUT_MS = 700L
 
+/** Radius blur tambahan (px) yang dicapai penuh di dasar klip, dicampur bertahap dari cover tajam. */
+private const val CLIP_PROGRESSIVE_BLUR_PX = 28f
+
+/** Tinggi rampa blur sebagai kelipatan tinggi fade; >1 membuat blur mulai sebelum fade. */
+private const val CLIP_BLUR_RAMP_SCALE = 1.5f
+
+/** Rampa blur sudah penuh sebelum alpha habis, sebesar bagian ini dari tinggi fade. */
+private const val CLIP_BLUR_RAMP_END_INSET = 0.35f
+
 /** A periodic capture slower than this doubles the wait before the next one. */
 private const val FRAME_CAPTURE_BUDGET_MS = 8L
 
@@ -979,9 +988,46 @@ private fun TextureView.setBottomFade(
     // createOffsetEffect(0, 0) is the identity effect over the node's own
     // content, which is the only way to name "what this view drew" as the
     // destination of a blend.
+    // Progressive blur: versi buram klip dicampur di atas versi tajamnya dengan
+    // mask naik (0 -> 1) ke arah bawah, lalu seluruhnya dilarutkan oleh fade.
+    // Blur sudah penuh sebelum alpha habis, jadi peralihan tajam -> blur -> latar
+    // terasa satu gerakan, bukan cover tajam yang memudar begitu saja.
+    val extra = CLIP_PROGRESSIVE_BLUR_PX
+    val blurred = RenderEffect.createBlurEffect(
+        blurPx + extra,
+        blurPx + extra,
+        Shader.TileMode.CLAMP,
+    )
+    val rampH = (fadeH * CLIP_BLUR_RAMP_SCALE).coerceAtLeast(1f)
+    val rampEnd = endY - fadeH * CLIP_BLUR_RAMP_END_INSET
+    val ramp: Shader = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        curvedRampShader(bounds.width.toFloat(), rampEnd, rampH, rampH * CLIP_FADE_CURVE)
+    } else {
+        LinearGradient(
+            0f,
+            rampEnd - rampH,
+            0f,
+            rampEnd,
+            IntArray(FADE_CURVE_STOPS + 1) { i ->
+                android.graphics.Color.argb(smootherStep(i / FADE_CURVE_STOPS.toFloat()), 0f, 0f, 0f)
+            },
+            FloatArray(FADE_CURVE_STOPS + 1) { i -> i / FADE_CURVE_STOPS.toFloat() },
+            Shader.TileMode.CLAMP,
+        )
+    }
+    val blurredBand = RenderEffect.createBlendModeEffect(
+        blurred,
+        RenderEffect.createShaderEffect(ramp),
+        BlendMode.DST_IN,
+    )
+    val layered = RenderEffect.createBlendModeEffect(
+        content,
+        blurredBand,
+        BlendMode.SRC_OVER,
+    )
     setRenderEffect(
         RenderEffect.createBlendModeEffect(
-            content,
+            layered,
             RenderEffect.createShaderEffect(gradient),
             BlendMode.DST_IN,
         ),
@@ -1005,6 +1051,32 @@ half4 main(float2 p) {
     return half4(0.0, 0.0, 0.0, 1.0 - s);
 }
 """
+
+/**
+ * Mask rampa blur: bentuk kurva yang sama dengan [CURVED_FADE_AGSL], tetapi
+ * alpha-nya naik (0 di atas, 1 di dasar) untuk mencampur versi buram.
+ */
+private const val CURVED_RAMP_AGSL = """
+uniform float width;
+uniform float endY;
+uniform float fadeH;
+uniform float lift;
+half4 main(float2 p) {
+    float u = clamp(p.x / width, 0.0, 1.0) * 2.0 - 1.0;
+    float t = clamp((p.y - (endY - fadeH - lift * u * u)) / fadeH, 0.0, 1.0);
+    float s = t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
+    return half4(0.0, 0.0, 0.0, s);
+}
+"""
+
+@RequiresApi(Build.VERSION_CODES.TIRAMISU)
+private fun curvedRampShader(width: Float, endY: Float, fadeH: Float, lift: Float): RuntimeShader =
+    RuntimeShader(CURVED_RAMP_AGSL).apply {
+        setFloatUniform("width", width.coerceAtLeast(1f))
+        setFloatUniform("endY", endY)
+        setFloatUniform("fadeH", fadeH.coerceAtLeast(1f))
+        setFloatUniform("lift", lift)
+    }
 
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)
 private fun curvedFadeShader(width: Float, endY: Float, fadeH: Float, lift: Float): RuntimeShader =
