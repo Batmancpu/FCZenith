@@ -322,6 +322,7 @@ import com.music.zenith.ui.components.topBarHeight
 import com.music.zenith.ui.components.AppLanguageDialog
 import com.music.zenith.ui.components.HomeLayoutDialog
 import com.music.zenith.ui.components.TranslationLanguageDialog
+import com.music.zenith.ui.components.CanvasProvidersDialog
 import com.music.zenith.ui.components.LyricsSourcesDialog
 import com.music.zenith.ui.components.ServerEditorHost
 import com.music.zenith.ui.components.UpdateAvailableDialog
@@ -828,6 +829,7 @@ private fun ZenithApp(
     var editingSignatureApi by remember { mutableStateOf(false) }
     var librarySortMenuOpen by remember { mutableStateOf(false) }
     var showLyricsSources by remember { mutableStateOf(false) }
+    var showCanvasProviders by remember { mutableStateOf(false) }
     var showAppLanguage by remember { mutableStateOf(false) }
     var showHomeLayout by remember { mutableStateOf(false) }
     var showTranslationLanguage by remember { mutableStateOf(false) }
@@ -3456,6 +3458,7 @@ private fun ZenithApp(
                                 onChosen = { navigator.pop() },
                                 onConfirmBitPerfect = { confirmBitPerfect = it },
                                 onSpotifyCanvasAuth = { showSpotifyCanvasAuth = true },
+                                onCanvasProviders = { showCanvasProviders = true },
                                 contentPadding = listPadding,
                             )
                         } else if (pageRoute == AppRoute.Settings || pageRoute is AppRoute.SettingsSection) {
@@ -6462,6 +6465,14 @@ private fun ZenithApp(
             LyricsSourcesDialog(
                 hazeState = hazeState,
                 onDismiss = { showLyricsSources = false },
+            )
+        }
+
+        if (showCanvasProviders) {
+            BackHandler { showCanvasProviders = false }
+            CanvasProvidersDialog(
+                hazeState = hazeState,
+                onDismiss = { showCanvasProviders = false },
             )
         }
 

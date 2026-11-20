@@ -3853,6 +3853,8 @@ fun SettingsChoicePage(
     onConfirmBitPerfect: (BitPerfectMode) -> Unit,
     /** Opens the Spotify Canvas sign-in, from the Cover animation page. */
     onSpotifyCanvasAuth: () -> Unit = {},
+    /** Opens the canvas provider order dialog, from the Cover animation page. */
+    onCanvasProviders: () -> Unit = {},
     contentPadding: PaddingValues,
     modifier: Modifier = Modifier,
 ) {
@@ -3960,6 +3962,7 @@ fun SettingsChoicePage(
                 val mixOnly by AppSettings.coverMixOnlyEffects.collectAsStateWithLifecycle()
                 val animatedCanvas by AppSettings.animatedCanvas.collectAsStateWithLifecycle()
                 val canvasOverCellular by AppSettings.canvasOverCellular.collectAsStateWithLifecycle()
+                val canvasOrder by AppSettings.canvasProviderOrder.collectAsStateWithLifecycle()
                 SettingsGroup(header = stringResource(R.string.cover_section_transition)) {
                     SettingsRow(
                         icon = SfIcons.Animation,
@@ -4040,6 +4043,15 @@ fun SettingsChoicePage(
                             )
                         },
                         onClick = { AppSettings.setCanvasOverCellular(!canvasOverCellular) },
+                    )
+                    RowDivider()
+                    SettingsRow(
+                        icon = SfIcons.Reorder,
+                        title = stringResource(R.string.canvas_provider_order),
+                        subtitle = canvasOrder.joinToString(" › ") { it.label },
+                        enabled = animatedCanvas,
+                        trailing = { Chevron() },
+                        onClick = onCanvasProviders,
                     )
                 }
                 SettingsGroup(header = stringResource(R.string.cover_section_spotify)) {
