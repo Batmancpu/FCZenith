@@ -3035,9 +3035,10 @@ fun NowPlayingScreen(
                 // Spotify layar penuh, live blur off: alas panel HANYA blur frame beku
                 // klipnya sendiri. Cover lagu tidak boleh tampil sama sekali, juga bukan
                 // sebagai cadangan selagi blur frame belum siap.
-                // Live blur off: Spotify Canvas memakai jalur default (blur cover statis +
-                // sleeve terbang ke header), bukan lagi blur frame beku klip.
-                val spotifyFrameOnly = false
+                // Live blur off: Spotify Canvas melebur mulus ke blur frame beku klipnya
+                // sendiri, dan cover tampil diam (fade) di header, tidak terbang.
+                val spotifyFrameOnly = spotifyCanvasOnPhone &&
+                    canvas?.source == CanvasSource.SPOTIFY && !liveCanvasPanels
                 // Blur frame ditahan utuh selama panel terbuka dan selama collapse
                 // (masuk maupun keluar), tepat di bawah klip yang melebur.
                 val spotifyFrameHold = spotifyFrameOnly && (canvasPanelMesh || collapseStarted) &&
@@ -4083,12 +4084,10 @@ fun NowPlayingScreen(
                             val thumb = Rect(Offset(fromStart(0f, thumbW), 0f), Size(thumbW, thumbH))
                             lerp(video, thumb, p())
                         }
-                        // Spotify layar penuh + live blur ON: cover tidak terbang ke header, ia
-                        // langsung diam di posisi header dan hanya fade in/out di tempat.
-                        // Live blur OFF: cover terbang ke header seperti default.
+                        // Spotify layar penuh (live blur ON maupun OFF): cover tidak terbang ke
+                        // header, ia langsung diam di posisi header dan hanya fade in/out di tempat.
                         fun spotifyCoverInPlace(): Boolean =
-                            clipFullscreen && liveCanvasPanels &&
-                                (lyricsOpen || queueOpen || collapseStarted)
+                            clipFullscreen && (lyricsOpen || queueOpen || collapseStarted)
                         fun sleeveRect(): Rect {
                             val card = cardRect()
                             if (spotifyCoverInPlace()) {
@@ -4425,7 +4424,12 @@ fun NowPlayingScreen(
                                     // again by the time it unmounts.
                                     // Whole while the clip's still is standing in for it.
                                     alpha = (
-                                        if (liveCanvasPanels && (lyricsOpen || queueOpen || clipHeldForPanels)) {
+                                        if (clipFullscreen && !liveCanvasPanels &&
+                                            (lyricsOpen || queueOpen || collapseStarted)
+                                        ) {
+                                            // Live blur off: cover fade in/out di header, tanpa terbang.
+                                            smootherStep(((p() - 0.4f) / 0.6f).coerceIn(0f, 1f))
+                                        } else if (liveCanvasPanels && (lyricsOpen || queueOpen || clipHeldForPanels)) {
                                             // The clip is blurred live behind the panel, both ways. A
                                             // full-screen Spotify clip's cover does not fly: it fades in
                                             // at the header on the way in and out again on the way back.
