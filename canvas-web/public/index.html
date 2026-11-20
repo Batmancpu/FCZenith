@@ -179,7 +179,7 @@
         <span class="swap">Change video</span>
       </label>
       <input id="file" type="file" accept="video/mp4" hidden>
-      <div class="rules"><span>1280x1280</span><span>3-8 seconds</span><span>No audio</span><span>Max 3 MB</span></div>
+      <div class="rules"><span>Square 720-1280px</span><span>3-8 seconds</span><span>No audio</span><span>Max 3 MB</span></div>
       <ul id="checks"></ul>
       <div class="secTitle">Song info</div>
       <div class="info">
@@ -267,7 +267,7 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "992141009224",
   appId: "1:992141009224:web:6f27b1b2e2dd9cdeb5937d"
 };
-const RULES = { width: 1280, height: 1280, minSec: 3, maxSec: 8, maxBytes: 3 * 1024 * 1024 };
+const RULES = { minSide: 720, maxSide: 1280, minSec: 3, maxSec: 8, maxBytes: 3 * 1024 * 1024 };
 
 const db = getFirestore(initializeApp(FIREBASE_CONFIG));
 const $ = (id) => document.getElementById(id);
@@ -626,7 +626,7 @@ $("file").onchange = async () => {
   }
   const checks = [
     ["Format MP4", file.type === "video/mp4"],
-    ["Size " + meta.width + "x" + meta.height + " (must be 1280x1280)", meta.width === RULES.width && meta.height === RULES.height],
+    ["Size " + meta.width + "x" + meta.height + " (must be square, 720 to 1280 px)", meta.width === meta.height && meta.width >= RULES.minSide && meta.width <= RULES.maxSide],
     ["Duration " + meta.duration + " seconds (3 to 8)", meta.duration >= RULES.minSec && meta.duration <= RULES.maxSec],
     ["File " + (meta.size / 1048576).toFixed(2) + " MB (max 3 MB)", meta.size <= RULES.maxBytes]
   ];

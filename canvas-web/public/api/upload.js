@@ -334,7 +334,7 @@ module.exports = async (req, res) => {
       const duration = Number(body.duration);
       const width = Number(body.width);
       const height = Number(body.height);
-      if (!(duration >= 3 && duration <= 8) || width !== 1280 || height !== 1280) {
+      if (!(duration >= 3 && duration <= 8) || !Number.isInteger(width) || width !== height || width < 720 || width > 1280) {
         res.status(400).json({ error: "spec_invalid" });
         return;
       }
