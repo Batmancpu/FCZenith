@@ -128,7 +128,7 @@ async function hasDuplicate(uid, key) {
   });
 }
 
-const STALE_TTL_MS = 3 * 24 * 60 * 60 * 1000;
+const STALE_TTL_MS = 3 * 60 * 60 * 1000;
 let lastPurge = 0;
 
 async function purgeStale() {
