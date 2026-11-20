@@ -7,7 +7,7 @@
     <!-- Kotak gelap: squircle 72 dari 108, sama seperti icon glass lainnya. -->
     <path
         android:pathData="M40,18L68,18C82,18 90,26 90,40L90,68C90,82 82,90 68,90L40,90C26,90 18,82 18,68L18,40C18,26 26,18 40,18Z"
-        android:strokeWidth="0.35">
+        android:strokeWidth="1.2">
         <aapt:attr name="android:fillColor">
             <gradient
                 android:startX="54"
