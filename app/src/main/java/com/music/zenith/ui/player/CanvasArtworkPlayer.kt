@@ -76,17 +76,17 @@ private const val TAG = "CanvasArtworkPlayer"
  * as a share of the fade height. The centre keeps the video's bottom, so the
  * boundary reads as a V, as in Apple Music. Android 13+ only.
  */
-private const val CLIP_FADE_CURVE = 1.0f
+private const val CLIP_FADE_CURVE = 0.8f
 
 /** Share of the old fade height that is kept, so the dissolve starts a little lower. */
-private const val CLIP_FADE_HEIGHT_SCALE = 0.68f
+private const val CLIP_FADE_HEIGHT_SCALE = 0.6f
 
 /**
  * Kekuatan kurva fade bawah klip. 1 = smootherstep asli. Makin besar, alpha turun
  * lebih cepat dengan ekor lebih panjang di dalam band yang SAMA, jadi fade terasa
  * lebih kuat dan halus tanpa menggeser batas blur ke atas.
  */
-private const val CLIP_FADE_POWER = 1.8f
+private const val CLIP_FADE_POWER = 1.3f
 
 /**
  * How long a clip gets to paint itself onto a surface it was just handed back
