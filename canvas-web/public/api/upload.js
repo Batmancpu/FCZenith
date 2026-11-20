@@ -123,7 +123,7 @@ async function purgeStale() {
     const cutoff = Date.now() - STALE_TTL_MS;
     let removed = 0;
     for (const row of rows) {
-      if (removed >= 20) break;
+      if (removed >= 5) break;
       const doc = row.document;
       if (!doc) continue;
       const f = doc.fields || {};
@@ -172,7 +172,7 @@ async function purgeOrphans(headers, cutoff) {
   }
   const storageHeaders = { apikey: process.env.SUPABASE_SECRET_KEY, "Content-Type": "application/json" };
   let removed = 0;
-  for (let offset = 0; offset < 500 && removed < 20; offset += 100) {
+  for (let offset = 0; offset < 500 && removed < 5; offset += 100) {
     const list = await fetch(SUPABASE_URL + "/storage/v1/object/list/canvas", {
       method: "POST",
       headers: storageHeaders,
@@ -183,7 +183,7 @@ async function purgeOrphans(headers, cutoff) {
     const files = await list.json();
     if (!Array.isArray(files) || !files.length) return;
     for (const file of files) {
-      if (removed >= 20) break;
+      if (removed >= 5) break;
       const name = String(file.name || "");
       if (!/^\d+-[0-9a-f-]{36}\.mp4$/.test(name) || known.has(name)) continue;
       const made = Date.parse(file.created_at || "");
