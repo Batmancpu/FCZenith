@@ -293,7 +293,7 @@ private val ART_BOX_TOP_PAD = 8.dp
  * short enough to still be reading as artwork where it ends reads as a picture
  * that was cut off rather than one that ran out.
  */
-private const val HERO_FADE_FRACTION = 0.42f
+private const val HERO_FADE_FRACTION = 0.5f
 /**
  * Pudar bawah cover statis layar penuh (lagu tanpa klip Apple/Spotify). Lebih pendek
  * dari [HERO_FADE_FRACTION] agar gambar bertahan lebih rendah seperti di Apple Music;
@@ -3197,7 +3197,7 @@ fun NowPlayingScreen(
                                 else -> HERO_FADE_FRACTION
                             },
                             bottomFadeScale = fadeScale,
-                            bottomFadeEndPx = if (clipPortrait && !clipFillsPanels) with(density) { clipBottom.toPx() }
+                            bottomFadeEndPx = if (clipPortrait && !clipFillsPanels) with(density) { heroHeight.toPx() }
                                 else null,
                             // Blur on the TextureView itself, not a Compose layer over it.
                             blurPx = { with(density) { CANVAS_PANEL_BLUR_DP.dp.toPx() } * panelBlur() },
