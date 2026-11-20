@@ -861,7 +861,22 @@ private fun TextureView.applyContentTransform(
     alignPortraitTop: Boolean,
     fill: Float = 0f,
 ): Boolean {
-    val matrix = contentMatrix(width, height, clipAspect, contentMode, alignPortraitTop, fill)
+    val matrix = contentMatrix(width, height, clipAspect, contentMode, alignPortraitTop, fill)?.also { m ->
+        // Geser Y positif: video ikut membesar ke bawah (zoom dari atas) agar
+        // ada gambar yang bisa dilarutkan di bawah dasar klip aslinya.
+        val extra = CanvasFadeTuning.offsetDp.floatValue * resources.displayMetrics.density
+        if (extra > 0.5f && alignPortraitTop &&
+            contentMode == CanvasContentMode.FIT_PORTRAIT && clipAspect < 1f
+        ) {
+            val v = FloatArray(9)
+            m.getValues(v)
+            val bottom = v[Matrix.MSCALE_Y] * height
+            if (bottom > 1f) {
+                val s = (bottom + extra) / bottom
+                m.postScale(s, s, width / 2f, 0f)
+            }
+        }
+    }
     if (matrix == null) {
         setTransform(Matrix())
         return false
@@ -1063,6 +1078,7 @@ private class AppliedLook {
     private var width = -1
     private var height = -1
     private var fillT = Float.NaN
+    private var offsetT = Float.NaN
 
     private var fade = Float.NaN
     private var fadeBounds = IntSize(-1, -1)
@@ -1079,8 +1095,10 @@ private class AppliedLook {
         fill: Float = 0f,
     ): Boolean {
         if (clipAspect == aspect && contentMode == mode && alignPortraitTop == alignTop &&
-            viewWidth == width && viewHeight == height && fill == fillT
+            viewWidth == width && viewHeight == height && fill == fillT &&
+            CanvasFadeTuning.offsetDp.floatValue == offsetT
         ) return false
+        offsetT = CanvasFadeTuning.offsetDp.floatValue
         aspect = clipAspect
         mode = contentMode
         alignTop = alignPortraitTop

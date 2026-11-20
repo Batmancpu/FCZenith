@@ -174,6 +174,7 @@ private fun FadeTunerPanel() {
                 color = Color.White,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f).padding(end = 8.dp),
             )
             Text(
                 text = "Reset",
