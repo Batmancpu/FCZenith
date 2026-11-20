@@ -65,7 +65,11 @@ private val FallbackColors = listOf(
 
 /** The four mesh colours, wrapped so the backdrop can skip recomposition. */
 @Immutable
-data class MeshPalette(val colors: List<Color>, val edge: List<Color> = emptyList())
+data class MeshPalette(
+    val colors: List<Color>,
+    val edge: List<Color> = emptyList(),
+    val light: Boolean = false,
+)
 
 /**
  * The Apple Music "Now Playing" backdrop: four luminous colour blobs sampled
@@ -128,9 +132,12 @@ fun MeshGradientBackground(
 ) {
     val reduceAnimation by PlayerSettings.reduceAnimation.collectAsStateWithLifecycle()
 
+    // Cover putih/pucat: warna dibuat kalem dan terang (abu kebiruan) seperti
+    // Apple Music, bukan dipaksa gelap pekat yang bentrok dengan cover.
+    val light = palette.light
     val tuned = (palette.colors.ifEmpty { FallbackColors } + FallbackColors)
         .take(4)
-        .map { it.tuned() }
+        .map { if (light) it.tunedLight() else it.tuned() }
 
     // Each colour slot crossfades independently when the track (palette) changes,
     // unless "reduce animation" is on, in which case colours snap straight to target.
@@ -144,7 +151,11 @@ fun MeshGradientBackground(
     val animatedColors = tuned.mapIndexed { index, color ->
         animateColorAsState(color, colorSpec, label = "meshColor$index").value
     }
-    val baseColor by animateColorAsState(tuned.first().dimmed(), colorSpec, label = "meshBase")
+    val baseColor by animateColorAsState(
+        if (light) tuned.first().dimmedLight() else tuned.first().dimmed(),
+        colorSpec,
+        label = "meshBase",
+    )
 
     // Read in the draw lambda, not here: an Animatable read during draw
     // invalidates only the drawing, leaving composition out of the loop.
@@ -237,8 +248,8 @@ fun MeshGradientBackground(
         drawRect(
             brush = Brush.verticalGradient(
                 colors = listOf(
-                    Color.Black.copy(alpha = 0.02f),
-                    Color.Black.copy(alpha = 0.14f),
+                    Color.Black.copy(alpha = if (light) 0f else 0.02f),
+                    Color.Black.copy(alpha = if (light) 0.06f else 0.14f),
                 ),
             ),
         )
@@ -247,6 +258,42 @@ fun MeshGradientBackground(
 
 /** A blob's opacity at its centre. */
 private const val BLOB_ALPHA = 0.85f
+
+/** Share of near-white pixels from which a cover counts as a light one. */
+private const val LIGHT_COVER_SHARE = 0.55f
+
+/** True when the cover is mostly white or very pale, so deep tones would clash with it. */
+internal fun isLightCover(source: ImageBitmap): Boolean {
+    val w = source.width
+    val h = source.height
+    if (w < 8 || h < 8) return false
+    val pixels = source.argbPixels()
+    if (pixels.size != w * h) return false
+    var pale = 0
+    for (p in pixels) {
+        val r = (p shr 16) and 0xFF
+        val g = (p shr 8) and 0xFF
+        val b = p and 0xFF
+        val hi = maxOf(r, g, b)
+        val lo = minOf(r, g, b)
+        if (lo >= 205 && hi - lo <= 40) pale++
+    }
+    return pale >= pixels.size * LIGHT_COVER_SHARE
+}
+
+/** Muted, mid-light version of a swatch: keeps the hue, drops most of the saturation. */
+private fun Color.tunedLight(): Color {
+    val hsl = hsl()
+    hsl[1] = (hsl[1] * 0.45f).coerceIn(0.08f, 0.26f)
+    hsl[2] = 0.44f + 0.12f * hsl[2].coerceIn(0f, 1f)
+    return Color(ColorUtils.HSLToColor(hsl))
+}
+
+private fun Color.dimmedLight(): Color {
+    val hsl = hsl()
+    hsl[2] = 0.38f
+    return Color(ColorUtils.HSLToColor(hsl))
+}
 
 private const val EDGE_BINS = 8
 private const val EDGE_ROWS_SHARE = 0.04f
@@ -491,7 +538,7 @@ fun rememberArtworkColors(imageUrl: String?, canvasFrame: ImageBitmap? = null): 
         val result = SingletonImageLoader.get(context).execute(request)
         val bitmap = (result as? SuccessResult)?.image?.toImageBitmap() ?: return@LaunchedEffect
         val computed = withContext(Dispatchers.Default) {
-            MeshPalette(paletteOf(bitmap), edgeColorsOf(bitmap))
+            MeshPalette(paletteOf(bitmap), edgeColorsOf(bitmap), isLightCover(bitmap))
         }
         artworkPaletteCache[imageUrl] = computed
         palette = computed
@@ -504,7 +551,7 @@ fun rememberArtworkColors(imageUrl: String?, canvasFrame: ImageBitmap? = null): 
         // threshold because compression noise pushes mean luminance above ~12.
         if (isLikelyBlackFrame(frame)) return@LaunchedEffect
         palette = withContext(Dispatchers.Default) {
-            MeshPalette(paletteOf(frame), edgeColorsOf(frame))
+            MeshPalette(paletteOf(frame), edgeColorsOf(frame), isLightCover(frame))
         }
     }
     return palette

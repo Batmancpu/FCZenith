@@ -3118,7 +3118,7 @@ fun NowPlayingScreen(
                         )
                         CoverEdgeBackdrop(
                             edge = meshPalette?.edge.orEmpty(),
-                            tint = meshPalette?.colors?.firstOrNull(),
+                            tint = meshPalette?.takeUnless { it.light }?.colors?.firstOrNull(),
                             frame = { canvasEdgeFrame },
                             seam = {
                                 with(density) {
