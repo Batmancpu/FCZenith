@@ -44,6 +44,9 @@
   .feedSearch { position: absolute; top: calc(8px + env(safe-area-inset-top, 0px)); left: 14px; right: 14px; z-index: 5; }
   .feedSearch input { display: block; width: 100%; margin: 0; padding: 9px 14px 9px 38px; font: inherit; color: var(--text); border: 0; border-radius: 10px; outline: none; background: rgba(120,120,128,0.32) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239a9aab' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-3.5-3.5'/%3E%3C/svg%3E") no-repeat 12px center / 17px; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
   .feedMsg { position: absolute; top: 50%; left: 0; right: 0; margin: 0; text-align: center; color: var(--muted); pointer-events: none; }
+  .gateBox { position: relative; z-index: 2; display: grid; justify-items: center; gap: 10px; width: min(86%, 320px); text-align: center; }
+  .gateBox b { font-size: 20px; font-weight: 700; }
+  .gateBox span { color: var(--muted); font-size: 14px; }
 
   #upload { position: fixed; inset: 0; z-index: 30; overflow-y: auto; overscroll-behavior: contain; background: var(--bg); }
   body.up .tabs { display: none; }
@@ -630,6 +633,8 @@ $("send").onclick = async () => {
 
 let feedItems = [];
 let feedLoaded = false;
+let feedGuest = true;
+const GUEST_FEED_LIMIT = 10;
 
 const feedObserver = new IntersectionObserver((entries) => {
   for (const e of entries) {
@@ -702,18 +707,44 @@ function renderFeed() {
   const feed = $("feed");
   feedObserver.disconnect();
   feed.innerHTML = "";
-  const list = feedItems.filter((i) => !q || norm((i.data.song || "") + " " + (i.data.artist || "")).includes(q));
+  const all = feedItems.filter((i) => !q || norm((i.data.song || "") + " " + (i.data.artist || "")).includes(q));
+  feedGuest = !session();
+  const locked = feedGuest && all.length > GUEST_FEED_LIMIT;
+  const list = locked ? all.slice(0, GUEST_FEED_LIMIT) : all;
   $("findStatus").textContent = list.length ? "" : "No canvases yet.";
   for (const item of list) {
     const el = slide(item.id, item.data);
     feed.appendChild(el);
     feedObserver.observe(el);
   }
+  if (locked) feed.appendChild(gateSlide());
 }
 $("qSearch").oninput = renderFeed;
 
+function gateSlide() {
+  const box = document.createElement("div");
+  box.className = "slide";
+  const inner = document.createElement("div");
+  inner.className = "gateBox";
+  const title = document.createElement("b");
+  title.textContent = "Want to see more canvases?";
+  const sub = document.createElement("span");
+  sub.textContent = "Sign in with Telegram to unlock the full feed.";
+  const btn = document.createElement("button");
+  btn.className = "primary";
+  btn.textContent = "Sign in";
+  btn.onclick = () => show("mine");
+  inner.append(title, sub, btn);
+  box.appendChild(inner);
+  return box;
+}
+
 async function loadFeed() {
-  if (feedLoaded) { for (const v of document.querySelectorAll(".slide video")) if (v.getAttribute("src")) v.play().catch(() => {}); return; }
+  if (feedLoaded) {
+    if (feedGuest !== !session()) { renderFeed(); return; }
+    for (const v of document.querySelectorAll(".slide video")) if (v.getAttribute("src")) v.play().catch(() => {});
+    return;
+  }
   $("findStatus").textContent = "Loading...";
   try {
     const snap = await getDocs(query(collection(db, "canvases"), where("status", "==", "approved"), limit(50)));
