@@ -80,6 +80,7 @@ fun CanvasProvidersDialog(
             modifier = Modifier
                 .width(ALERT_WIDTH)
                 .macOSPopupMotion(motion)
+                .iosMenuJelly(touch, 0.5f, 0.5f)
                 .clip(shape)
                 .alertSurface(hazeState, frosted = true, shape = shape)
                 .clickable(
@@ -88,8 +89,7 @@ fun CanvasProvidersDialog(
                     onClick = {},
                 )
                 .macOSPopupContent(motion)
-                .iosMenuTouchHost(touch, iosMenuColors().pressed)
-                .iosMenuJelly(touch, 0.5f, 0.5f),
+                .iosMenuTouchHost(touch, iosMenuColors().pressed),
         ) {
             Column(
                 modifier = Modifier
