@@ -97,6 +97,57 @@ async function recentUploads(uid) {
   }).length;
 }
 
+const STALE_TTL_MS = 3 * 24 * 60 * 60 * 1000;
+let lastPurge = 0;
+
+async function purgeStale() {
+  if (Date.now() - lastPurge < 60 * 60 * 1000) return;
+  lastPurge = Date.now();
+  try {
+    const token = await googleToken();
+    const headers = { Authorization: "Bearer " + token, "Content-Type": "application/json" };
+    const res = await fetch(FS + ":runQuery", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        structuredQuery: {
+          from: [{ collectionId: "canvases" }],
+          where: { fieldFilter: { field: { fieldPath: "status" }, op: "NOT_EQUAL", value: { stringValue: "approved" } } },
+          limit: 100
+        }
+      }),
+      signal: AbortSignal.timeout(8000)
+    });
+    if (!res.ok) return;
+    const rows = await res.json();
+    const cutoff = Date.now() - STALE_TTL_MS;
+    let removed = 0;
+    for (const row of rows) {
+      if (removed >= 20) break;
+      const doc = row.document;
+      if (!doc) continue;
+      const f = doc.fields || {};
+      if (f.status && f.status.stringValue === "approved") continue;
+      const created = f.createdAt && f.createdAt.timestampValue ? Date.parse(f.createdAt.timestampValue) : 0;
+      if (!created || created > cutoff) continue;
+      const url = f.url && f.url.stringValue ? f.url.stringValue : "";
+      const name = url.split("/").pop();
+      if (!/^\d+-[0-9a-f-]{36}\.mp4$/.test(name)) continue;
+      const gone = await fetch(
+        "https://firestore.googleapis.com/v1/" + doc.name + "?currentDocument.updateTime=" + encodeURIComponent(doc.updateTime),
+        { method: "DELETE", headers, signal: AbortSignal.timeout(8000) }
+      );
+      if (!gone.ok) continue;
+      await fetch(SUPABASE_URL + "/storage/v1/object/canvas/" + name, {
+        method: "DELETE",
+        headers: { apikey: process.env.SUPABASE_SECRET_KEY },
+        signal: AbortSignal.timeout(8000)
+      });
+      removed += 1;
+    }
+  } catch (error) {}
+}
+
 function esc(text) {
   return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
@@ -166,6 +217,7 @@ module.exports = async (req, res) => {
     }
 
     if (body.action === "ticket") {
+      await purgeStale();
       const name = session.uid + "-" + crypto.randomUUID() + ".mp4";
       const r = await fetch(SUPABASE_URL + "/storage/v1/object/upload/sign/canvas/" + name, {
         method: "POST",
