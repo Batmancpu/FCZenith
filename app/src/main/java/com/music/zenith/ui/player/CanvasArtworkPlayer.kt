@@ -700,7 +700,8 @@ internal fun AndroidCanvasArtworkPlayer(
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 // Read here so the blur follows the panel's progress every frame.
-                val blur = blurPx().let { if (it < 0.5f) 0f else it }
+                val blur = (blurPx() * CanvasFadeTuning.blurScale.floatValue)
+                    .let { if (it < 0.5f) 0f else it }
                 val fadeNow = bottomFade * bottomFadeScale().coerceIn(0f, 1f)
                 // Ujung fade ikut turun mengikuti dasar klip yang tumbuh memenuhi view.
                 val fadeEnd = bottomFadeEndPx?.let { it + (bounds.height - it) * fill }
@@ -952,7 +953,9 @@ private fun TextureView.setBottomFade(
     endPx: Float?,
     blurPx: Float = 0f,
 ) {
-    val endY = endPx?.coerceIn(0f, bounds.height.toFloat()) ?: bounds.height.toFloat()
+    val offsetPx = CanvasFadeTuning.offsetDp.floatValue * resources.displayMetrics.density
+    val endY = ((endPx ?: bounds.height.toFloat()) + offsetPx)
+        .coerceIn(0f, bounds.height.toFloat())
     // The blur lives on the view's own RenderNode, like the fade: a Compose
     // blur layer around a TextureView leaves its frames sharp. Blur first,
     // then the fade mask, so the edge dissolves the blurred picture.
@@ -967,7 +970,7 @@ private fun TextureView.setBottomFade(
     }
     // Along smootherstep, as the still sleeve's banner dissolves, so the clip
     // and a still of it standing in for it end the same way.
-    val fadeH = endY * fraction.coerceAtMost(1f) * CLIP_FADE_HEIGHT_SCALE
+    val fadeH = (endY * fraction.coerceAtMost(1f) * CLIP_FADE_HEIGHT_SCALE).coerceAtLeast(1f)
     val gradient: Shader = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         curvedFadeShader(bounds.width.toFloat(), endY, fadeH, fadeH * CLIP_FADE_CURVE)
     } else {
@@ -1014,9 +1017,10 @@ uniform float endY;
 uniform float fadeH;
 uniform float lift;
 uniform float power;
+uniform float curveExp;
 half4 main(float2 p) {
     float u = clamp(p.x / width, 0.0, 1.0) * 2.0 - 1.0;
-    float t = clamp((p.y - (endY - fadeH - lift * u * u)) / fadeH, 0.0, 1.0);
+    float t = clamp((p.y - (endY - fadeH - lift * pow(abs(u), curveExp))) / fadeH, 0.0, 1.0);
     float s = t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
     return half4(0.0, 0.0, 0.0, pow(1.0 - s, power));
 }
@@ -1030,6 +1034,7 @@ private fun curvedFadeShader(width: Float, endY: Float, fadeH: Float, lift: Floa
         setFloatUniform("fadeH", fadeH.coerceAtLeast(1f))
         setFloatUniform("lift", lift)
         setFloatUniform("power", CLIP_FADE_POWER)
+        setFloatUniform("curveExp", CanvasFadeTuning.curveExp.floatValue.coerceAtLeast(0.5f))
     }
 
 /**
