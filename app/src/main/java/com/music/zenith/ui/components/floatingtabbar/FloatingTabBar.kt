@@ -117,6 +117,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.music.zenith.data.settings.AppSettings
 import com.music.zenith.ui.components.GlassSpring
@@ -997,7 +998,9 @@ private fun SharedTransitionScope.ExpandedBar(
                     elevations = elevations,
                     animatedVisibilityScope = animatedVisibilityScope,
                     tabBarContentModifier = tabBarContentModifier,
-                    modifier = Modifier.weight(1f)
+                    // Di atas lingkaran Search: indikator yang terangkat melewati tepi pill
+                    // tetap tergambar utuh, tidak tertimpa atau terpotong lingkaran.
+                    modifier = Modifier.weight(1f).zIndex(1f)
                 )
             }
 
