@@ -837,13 +837,17 @@ $("viewerClose").onclick = () => {
   else closeViewer();
 };
 
+let mineRun = 0;
+
 async function loadMine() {
+  const run = ++mineRun;
   const list = $("mineList");
   list.innerHTML = "";
   if (!session()) { $("mineStatus").textContent = "Sign in with Telegram to see your uploads."; return; }
   $("mineStatus").textContent = "Loading...";
   try {
     const data = await api("mine", {});
+    if (run !== mineRun) return;
     const labels = { approved: "Approved", pending: "Pending", rejected: "Rejected" };
     $("mineStatus").textContent = data.items.length ? "" : "You haven't uploaded any canvases yet.";
     $("stUp").textContent = String(data.items.length);
@@ -898,6 +902,7 @@ async function loadMine() {
       list.appendChild(cell);
     }
   } catch (error) {
+    if (run !== mineRun) return;
     $("mineStatus").textContent = "Failed to load: " + error.message;
   }
 }
