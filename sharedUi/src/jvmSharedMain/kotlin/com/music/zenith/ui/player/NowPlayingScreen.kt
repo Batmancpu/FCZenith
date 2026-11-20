@@ -2543,8 +2543,11 @@ fun NowPlayingScreen(
     // on) juga harus jadi sumber blur live untuk popup dan menu di atasnya. Tanpa ini
     // spotifyCanvasPresentation sudah false begitu panel terbuka (heroClip lepas di
     // p >= 0.5), sehingga popup jatuh ke still statis.
+    // clipHeldForPanels menahan backdrop live sepanjang animasi kembali ke player utama,
+    // supaya blur tidak putus lalu menyala lagi saat panel menutup.
     val liveBackdropOn = spotifyCanvasPresentation ||
-        (liveCanvasPanels && clipFullscreen && canvasRendered && (lyricsOpen || queueOpen))
+        (liveCanvasPanels && clipFullscreen && canvasRendered &&
+            (lyricsOpen || queueOpen || clipHeldForPanels))
     val reportLiveCanvas by rememberUpdatedState(onLiveCanvasChanged)
     LaunchedEffect(liveBackdropOn) { reportLiveCanvas(liveBackdropOn) }
     DisposableEffect(Unit) { onDispose { reportLiveCanvas(false) } }

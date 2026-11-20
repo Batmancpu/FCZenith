@@ -346,6 +346,10 @@ internal fun AndroidCanvasArtworkPlayer(
                 val aspect = if (width.isFinite() && width > 0f && videoSize.height > 0) {
                     width / videoSize.height
                 } else 0f
+                // Ukuran "tidak diketahui" sesaat (surface diganti di tengah transisi) tidak
+                // boleh menghapus matriks crop: video akan tampak gepeng dan blur hilang.
+                // Klip baru sudah mereset aspect lewat LaunchedEffect(url).
+                if (aspect <= 0f && clipAspect > 0f) return
                 if (aspect != clipAspect) rendered = false
                 clipAspect = aspect
                 reportAspect(aspect)
@@ -610,6 +614,10 @@ internal fun AndroidCanvasArtworkPlayer(
                         height: Int,
                     ) {
                         delegate?.onSurfaceTextureSizeChanged(surface, width, height)
+                        // Matriks crop dihitung ulang seketika, bukan menunggu update berikutnya.
+                        textureView?.applyContentTransform(
+                            clipAspect, currentContentMode, currentAlignPortraitTop, currentFillProgress(),
+                        )
                         if (currentContentMode == CanvasContentMode.FIT_PORTRAIT && clipAspect in 0f..1f) {
                             rendered = false
                         }
@@ -662,6 +670,13 @@ internal fun AndroidCanvasArtworkPlayer(
                             }
                         }
                     }
+                }
+            }
+            texture.addOnLayoutChangeListener { v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
+                if (right - left != oldRight - oldLeft || bottom - top != oldBottom - oldTop) {
+                    (v as TextureView).applyContentTransform(
+                        clipAspect, currentContentMode, currentAlignPortraitTop, currentFillProgress(),
+                    )
                 }
             }
             textureView = texture
@@ -761,6 +776,7 @@ private fun TextureView.captureAt(
             }
         } finally {
             setTransform(viewTransform)
+            invalidate()
         }
         if (raw == null) return null
         val frame = shownFrame(raw, clipAspect, contentMode, alignPortraitTop)
