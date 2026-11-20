@@ -3096,6 +3096,25 @@ fun NowPlayingScreen(
                         colorFadeMillis = 3_500,
                         modifier = Modifier.graphicsLayer { alpha = 1f - fullArtworkBackdropAlpha },
                     )
+                    if (fullBleedArt && heroMode) {
+                        val edgeAlpha by animateFloatAsState(
+                            targetValue = if (!lyricsOpen && !queueOpen) 1f else 0f,
+                            animationSpec = tween(durationMillis = 300),
+                            label = "coverEdgeTint",
+                        )
+                        CoverEdgeBackdrop(
+                            edge = meshPalette?.edge.orEmpty(),
+                            seam = {
+                                with(density) {
+                                    heroHeight.toPx() +
+                                        CanvasFadeTuning.offsetDp.floatValue.coerceAtLeast(0f).dp.toPx()
+                                }
+                            },
+                            modifier = Modifier.graphicsLayer {
+                                alpha = (1f - fullArtworkBackdropAlpha) * edgeAlpha
+                            },
+                        )
+                    }
                 }
                 if (canvasMeshAlpha > 0.001f) {
                     FullArtworkBlurBackdrop(

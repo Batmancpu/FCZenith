@@ -23,7 +23,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
@@ -63,7 +65,7 @@ private val FallbackColors = listOf(
 
 /** The four mesh colours, wrapped so the backdrop can skip recomposition. */
 @Immutable
-data class MeshPalette(val colors: List<Color>)
+data class MeshPalette(val colors: List<Color>, val edge: List<Color> = emptyList())
 
 /**
  * The Apple Music "Now Playing" backdrop: four luminous colour blobs sampled
@@ -246,6 +248,94 @@ fun MeshGradientBackground(
 /** A blob's opacity at its centre. */
 private const val BLOB_ALPHA = 0.85f
 
+private const val EDGE_BINS = 8
+private const val EDGE_ROWS_SHARE = 0.04f
+private const val EDGE_SIDE_SHARE = 0.08f
+private const val EDGE_MAX_LIGHTNESS = 0.52f
+private const val EDGE_MEAN_MIX = 0.35f
+private const val EDGE_RISE_START = 0.55f
+private const val EDGE_DROP_SHARE = 0.16f
+
+internal fun edgeColorsOf(source: ImageBitmap): List<Color> {
+    val w = source.width
+    val h = source.height
+    if (w < EDGE_BINS * 2 || h < 8) return emptyList()
+    val pixels = source.argbPixels()
+    if (pixels.size != w * h) return emptyList()
+    val rows = (h * EDGE_ROWS_SHARE).toInt().coerceIn(1, h)
+    val side = (w * EDGE_SIDE_SHARE).toInt()
+    val span = w - side * 2
+    val bins = List(EDGE_BINS) { bin ->
+        val from = side + span * bin / EDGE_BINS
+        val stop = (side + span * (bin + 1) / EDGE_BINS).coerceAtLeast(from + 1)
+        var red = 0L
+        var green = 0L
+        var blue = 0L
+        var count = 0
+        for (y in h - rows until h) {
+            for (x in from until stop) {
+                val p = pixels[y * w + x]
+                red += (p shr 16) and 0xFF
+                green += (p shr 8) and 0xFF
+                blue += p and 0xFF
+                count++
+            }
+        }
+        val n = count.coerceAtLeast(1)
+        Color((red / n).toInt(), (green / n).toInt(), (blue / n).toInt())
+    }
+    val mean = Color(
+        (bins.sumOf { it.red.toDouble() } / bins.size).toFloat(),
+        (bins.sumOf { it.green.toDouble() } / bins.size).toFloat(),
+        (bins.sumOf { it.blue.toDouble() } / bins.size).toFloat(),
+    )
+    return bins.map { androidx.compose.ui.graphics.lerp(it, mean, EDGE_MEAN_MIX).edgeTuned() }
+}
+
+private fun Color.edgeTuned(): Color {
+    val hsl = FloatArray(3)
+    ColorUtils.colorToHSL(toArgb(), hsl)
+    hsl[2] = hsl[2].coerceAtMost(EDGE_MAX_LIGHTNESS)
+    return Color(ColorUtils.HSLToColor(hsl))
+}
+
+@Composable
+fun CoverEdgeBackdrop(
+    edge: List<Color>,
+    seam: () -> Float,
+    modifier: Modifier = Modifier,
+) {
+    if (edge.size < 2) return
+    Canvas(
+        modifier = modifier
+            .fillMaxSize()
+            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen },
+    ) {
+        val seamY = seam().coerceIn(0f, size.height)
+        if (seamY < 1f) return@Canvas
+        val top = seamY * EDGE_RISE_START
+        val bottom = (seamY + size.height * EDGE_DROP_SHARE).coerceAtMost(size.height)
+        if (bottom - top < 1f) return@Canvas
+        val seamAt = ((seamY - top) / (bottom - top)).coerceIn(0.05f, 1f)
+        val riseEnd = seamAt * 0.6f
+        val steps = 8
+        val stops = ArrayList<Pair<Float, Color>>()
+        for (i in 0..steps) {
+            val t = i / steps.toFloat()
+            stops += (riseEnd * t) to Color.Black.copy(alpha = smootherStep(t))
+        }
+        for (i in 0..steps) {
+            val t = i / steps.toFloat()
+            stops += (seamAt + (1f - seamAt) * t) to Color.Black.copy(alpha = 1f - smootherStep(t))
+        }
+        drawRect(brush = Brush.horizontalGradient(colors = edge, startX = 0f, endX = size.width))
+        drawRect(
+            brush = Brush.verticalGradient(colorStops = stops.toTypedArray(), startY = top, endY = bottom),
+            blendMode = BlendMode.DstIn,
+        )
+    }
+}
+
 /**
  * How long each palette in a [cyclingMeshPalette] is held, which is also how
  * long the fade into it takes — pass it as `colorFadeMillis` so one crossfade
@@ -339,7 +429,9 @@ fun rememberArtworkColors(imageUrl: String?, canvasFrame: ImageBitmap? = null): 
             .build()
         val result = SingletonImageLoader.get(context).execute(request)
         val bitmap = (result as? SuccessResult)?.image?.toImageBitmap() ?: return@LaunchedEffect
-        val computed = MeshPalette(withContext(Dispatchers.Default) { paletteOf(bitmap) })
+        val computed = withContext(Dispatchers.Default) {
+            MeshPalette(paletteOf(bitmap), edgeColorsOf(bitmap))
+        }
         artworkPaletteCache[imageUrl] = computed
         palette = computed
     }
@@ -350,8 +442,9 @@ fun rememberArtworkColors(imageUrl: String?, canvasFrame: ImageBitmap? = null): 
         // ExoPlayer decodes real content).  A dark sleeve will still exceed the
         // threshold because compression noise pushes mean luminance above ~12.
         if (isLikelyBlackFrame(frame)) return@LaunchedEffect
-        val colors = withContext(Dispatchers.Default) { paletteOf(frame) }
-        palette = MeshPalette(colors)
+        palette = withContext(Dispatchers.Default) {
+            MeshPalette(paletteOf(frame), edgeColorsOf(frame))
+        }
     }
     return palette
 }
