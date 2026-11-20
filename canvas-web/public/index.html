@@ -149,6 +149,11 @@
   .delBtn { position: absolute; z-index: 3; top: 6px; right: 6px; width: 26px; height: 26px; padding: 0; border-radius: 50%; font-size: 18px; line-height: 1; color: #fff; background: rgba(0,0,0,0.55); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
   .likes { position: absolute; z-index: 2; left: 8px; bottom: 6px; font-size: 13px; font-weight: 600; text-shadow: 0 1px 6px rgba(0,0,0,0.9); }
   .cell { cursor: pointer; }
+  .byBtn { justify-self: start; margin-top: 4px; padding: 4px 10px; border-radius: 999px; font-size: 12.5px; font-weight: 500; color: #fff; background: rgba(250,88,106,0.85); text-shadow: none; }
+  .admBtn { width: 48px; height: 48px; padding: 0; border-radius: 50%; font-size: 24px; line-height: 1; color: #fff; background: rgba(255,69,58,0.75); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+  #userView { position: fixed; inset: 0; z-index: 33; overflow-y: auto; overscroll-behavior: contain; background: var(--bg); }
+  #userView .note { text-align: center; padding: 8px 16px; }
+  .userHead { padding: calc(56px + env(safe-area-inset-top, 0px)) 16px 8px; text-align: center; }
   .cell video { pointer-events: none; }
   #viewer { position: fixed; inset: 0; z-index: 35; background: #000; }
   #viewer .feed { height: 100%; }
@@ -254,6 +259,18 @@
     </div>
     <div id="viewerFeed" class="feed"></div>
   </section>
+
+  <section id="userView" hidden>
+    <div class="upBar">
+      <button id="userClose" class="navBtn" aria-label="Close"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div class="userHead">
+      <div id="userAvatar" class="avatar">Z</div>
+      <h2 id="userName"></h2>
+    </div>
+    <p id="userStatus" class="note"></p>
+    <div id="userList" class="grid"></div>
+  </section>
 </main>
 
 <div id="rulesPop" hidden>
@@ -342,6 +359,19 @@ function session() {
   return DEV ? { token: "dev", name: "Dev Preview" } : null;
 }
 
+let isAdmin = false;
+
+function refreshRole() {
+  if (!session()) { isAdmin = false; return; }
+  api("mine", { action: "role" }).then((d) => {
+    const next = !!(d && d.admin);
+    if (next !== isAdmin) {
+      isAdmin = next;
+      if (feedLoaded) renderFeed();
+    }
+  }).catch(() => {});
+}
+
 function renderAuth() {
   const s = session();
   $("loginBox").hidden = !!s;
@@ -350,13 +380,14 @@ function renderAuth() {
   $("profName").textContent = nm;
   $("avatar").textContent = nm.slice(0, 1).toUpperCase() || "Z";
   if (!$("mine").hidden) loadMine();
+  refreshRole();
 }
 
 async function api(path, body) {
   const s = session();
   if (DEV && s && s.token === "dev") {
     await new Promise((r) => setTimeout(r, 400));
-    if (path === "mine") return { items: DEV_MINE };
+    if (path === "mine") return body && body.action === "role" ? { admin: true } : { items: DEV_MINE };
     if (path === "upload") return { ok: true, name: "dev.mp4", uploadUrl: "", remaining: 5 };
     return { ok: true };
   }
@@ -528,6 +559,7 @@ $("tabBrowse").onclick = () => show("browse");
 $("tabMine").onclick = () => show("mine");
 window.addEventListener("popstate", (e) => {
   if (!$("viewer").hidden) { closeViewer(); return; }
+  if (!$("userView").hidden) { closeUser(); return; }
   show(e.state && e.state.zc ? e.state.zc : "browse", true);
 });
 renderAuth();
@@ -761,6 +793,13 @@ function slide(id, data) {
   const sub = document.createElement("span");
   sub.textContent = [data.artist, data.album].filter(Boolean).join(" - ");
   meta.append(title, sub);
+  if (isAdmin && data.uid) {
+    const by = document.createElement("button");
+    by.className = "byBtn";
+    by.textContent = "@ " + (data.uname || data.uid);
+    by.onclick = () => openUser(data.uid, data.uname || "");
+    meta.appendChild(by);
+  }
   const side = document.createElement("div");
   side.className = "side";
   const button = document.createElement("button");
@@ -789,6 +828,30 @@ function slide(id, data) {
     button.disabled = false;
   };
   side.append(button, count);
+  if (isAdmin) {
+    const rm = document.createElement("button");
+    rm.className = "admBtn";
+    rm.setAttribute("aria-label", "Delete");
+    rm.textContent = "\u00D7";
+    rm.onclick = async () => {
+      const sure = await askConfirm({
+        title: "Delete this canvas?",
+        text: "Admin action. This video will be permanently removed.",
+        ok: "Delete"
+      });
+      if (!sure) return;
+      rm.disabled = true;
+      try {
+        await api("mine", { action: "delete", id });
+        feedItems = feedItems.filter((i) => i.id !== id);
+        feedLoaded = false;
+        box.remove();
+      } catch (error) {
+        rm.disabled = false;
+      }
+    };
+    side.appendChild(rm);
+  }
   box.append(video, meta, side);
   return box;
 }
@@ -877,6 +940,91 @@ function closeViewer() {
 $("viewerClose").onclick = () => {
   if (history.state && history.state.viewer) history.back();
   else closeViewer();
+};
+
+let userRun = 0;
+
+async function openUser(uid, name) {
+  const run = ++userRun;
+  if (!$("viewer").hidden) closeViewer();
+  for (const v of document.querySelectorAll(".slide video")) v.pause();
+  $("userName").textContent = name || uid;
+  $("userAvatar").textContent = (name || "Z").slice(0, 1).toUpperCase();
+  $("userList").innerHTML = "";
+  $("userStatus").textContent = "Loading...";
+  if ($("userView").hidden) history.pushState({ zc: current, user: 1 }, "");
+  $("userView").hidden = false;
+  try {
+    const data = await api("mine", { action: "user", uid });
+    if (run !== userRun) return;
+    const labels = { approved: "Approved", pending: "Pending", rejected: "Rejected" };
+    const approved = data.items.filter((i) => i.status === "approved").length;
+    const likes = data.items.reduce((n, i) => n + (i.likes || 0), 0);
+    $("userStatus").textContent = data.items.length
+      ? data.items.length + " uploads \u00B7 " + approved + " approved \u00B7 " + likes + " likes"
+      : "No uploads yet.";
+    data.items.forEach((it, idx) => {
+      const cell = document.createElement("div");
+      cell.className = "cell";
+      const video = document.createElement("video");
+      video.src = it.url + "#t=0.1";
+      video.muted = true;
+      video.playsInline = true;
+      video.controls = false;
+      video.disablePictureInPicture = true;
+      video.preload = "metadata";
+      cell.appendChild(video);
+      cell.onclick = () => openViewer(data.items, idx);
+      const del = document.createElement("button");
+      del.className = "delBtn";
+      del.setAttribute("aria-label", "Delete");
+      del.textContent = "\u00D7";
+      del.onclick = async (e) => {
+        e.stopPropagation();
+        const sure = await askConfirm({
+          title: "Delete this canvas?",
+          text: "Admin action. This video will be permanently removed.",
+          ok: "Delete"
+        });
+        if (!sure) return;
+        del.disabled = true;
+        try {
+          await api("mine", { action: "delete", id: it.id });
+          feedLoaded = false;
+          openUser(uid, name);
+        } catch (error) {
+          del.disabled = false;
+          $("userStatus").textContent = "Failed to delete: " + error.message;
+        }
+      };
+      cell.appendChild(del);
+      if (it.status !== "approved") {
+        const badge = document.createElement("span");
+        badge.className = "badge " + it.status;
+        badge.textContent = labels[it.status] || it.status;
+        cell.appendChild(badge);
+      }
+      const likeEl = document.createElement("span");
+      likeEl.className = "likes";
+      likeEl.textContent = "\u2665 " + (it.likes || 0);
+      cell.appendChild(likeEl);
+      $("userList").appendChild(cell);
+    });
+  } catch (error) {
+    if (run !== userRun) return;
+    $("userStatus").textContent = "Failed to load: " + error.message;
+  }
+}
+
+function closeUser() {
+  userRun++;
+  $("userView").hidden = true;
+  $("userList").innerHTML = "";
+  for (const v of document.querySelectorAll("#feed .slide video")) if (v.getAttribute("src")) v.play().catch(() => {});
+}
+$("userClose").onclick = () => {
+  if (history.state && history.state.user) history.back();
+  else closeUser();
 };
 
 let mineRun = 0;
