@@ -398,15 +398,27 @@ private fun DrawScope.drawTunedFadeMask(endY: Float, fadeFraction: Float, shown:
         val kept = (1f - smootherStep(t)).pow(power)
         t to Color.Black.copy(alpha = 1f - shown * (1f - kept))
     }
-    val columns = if (lift < 1f) 1 else 32
+    val columns = if (lift < 1f) 1 else 64
     for (c in 0 until columns) {
         val left = (size.width * c / columns).roundToInt().toFloat()
         val right = (size.width * (c + 1) / columns).roundToInt().toFloat()
         val u = if (columns == 1) 0f else (c + 0.5f) / columns * 2f - 1f
         val edge = if (u < 0f) -u else u
         val startY = endY - fadeH - lift * edge.pow(curveExp)
+        val slope = if (columns == 1) {
+            0f
+        } else {
+            val dy = -lift * curveExp * edge.pow(curveExp - 1f) * 2f / size.width
+            if (u < 0f) -dy else dy
+        }
+        val centerX = (left + right) / 2f
+        val span = fadeH / (1f + slope * slope)
         drawRect(
-            brush = Brush.verticalGradient(colorStops = stops, startY = startY, endY = startY + fadeH),
+            brush = Brush.linearGradient(
+                *stops,
+                start = Offset(centerX, startY),
+                end = Offset(centerX - slope * span, startY + span),
+            ),
             topLeft = Offset(left, 0f),
             size = Size(right - left, size.height),
             blendMode = BlendMode.DstIn,
