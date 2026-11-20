@@ -293,10 +293,10 @@ internal fun edgeColorsOf(source: ImageBitmap): List<Color> {
 }
 
 private fun Color.edgeTuned(): Color {
-    val hsl = FloatArray(3)
-    ColorUtils.colorToHSL(toArgb(), hsl)
-    hsl[2] = hsl[2].coerceAtMost(EDGE_MAX_LIGHTNESS)
-    return Color(ColorUtils.HSLToColor(hsl))
+    val lightness = (maxOf(red, green, blue) + minOf(red, green, blue)) / 2f
+    if (lightness <= EDGE_MAX_LIGHTNESS) return copy(alpha = 1f)
+    val scale = EDGE_MAX_LIGHTNESS / lightness
+    return Color(red * scale, green * scale, blue * scale)
 }
 
 @Composable
