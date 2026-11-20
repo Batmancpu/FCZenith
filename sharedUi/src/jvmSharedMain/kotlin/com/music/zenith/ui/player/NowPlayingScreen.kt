@@ -3111,7 +3111,9 @@ fun NowPlayingScreen(
                         colorFadeMillis = 3_500,
                         modifier = Modifier.graphicsLayer { alpha = 1f - fullArtworkBackdropAlpha },
                     )
-                    if (fullBleedArt && heroMode) {
+                    // Sambungan tepi cover tetap tampil di lagu ber-canvas (canvasHero)
+                    // walau "Sampul layar penuh" dimatikan; tanpa canvas tetap ikut setelan.
+                    if ((fullBleedArt || canvasHero) && heroMode) {
                         val edgeAlpha by animateFloatAsState(
                             targetValue = if (!lyricsOpen && !queueOpen) 1f else 0f,
                             animationSpec = tween(durationMillis = 300),
