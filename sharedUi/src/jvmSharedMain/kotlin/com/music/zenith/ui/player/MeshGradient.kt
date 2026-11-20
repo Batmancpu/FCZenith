@@ -50,6 +50,7 @@ import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.min
+import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.math.sqrt
 
@@ -201,15 +202,17 @@ fun MeshGradientBackground(
             Offset(0.20f, 0.25f),
         )
         val speeds = listOf(1f, -0.7f, 0.85f, -1.15f)
+        val blobRadius = listOf(0.74f, 0.62f, 0.52f, 0.48f)
+        val blobAlpha = listOf(1.1f, 0.96f, 0.72f, 0.58f)
         val drift = phase.value
 
         animatedColors.forEachIndexed { index, color ->
             val anchor = anchors[index]
             val center = Offset(
-                x = (anchor.x + 0.16f * cos(drift * speeds[index] + index * 1.7f)) * size.width,
-                y = (anchor.y + 0.16f * sin(drift * speeds[index] * 0.9f + index * 2.3f)) * size.height,
+                x = (anchor.x + 0.12f * cos(drift * speeds[index] + index * 1.7f)) * size.width,
+                y = (anchor.y + 0.12f * sin(drift * speeds[index] * 0.9f + index * 2.3f)) * size.height,
             )
-            val radius = size.maxDimension * 0.62f
+            val radius = size.maxDimension * blobRadius[index]
             drawCircle(
                 // Along smootherstep rather than a straight falloff: a straight one
                 // stops dead at the rim, and that corner showed as a ring where each
@@ -217,7 +220,7 @@ fun MeshGradientBackground(
                 brush = Brush.radialGradient(
                     colorStops = Array(FADE_CURVE_STOPS + 1) { i ->
                         val t = i / FADE_CURVE_STOPS.toFloat()
-                        t to color.copy(alpha = BLOB_ALPHA * (1f - smootherStep(t)))
+                        t to color.copy(alpha = (BLOB_ALPHA * blobAlpha[index]).coerceAtMost(1f) * (1f - smootherStep(t)))
                     },
                     center = center,
                     radius = radius,
@@ -232,8 +235,8 @@ fun MeshGradientBackground(
         drawRect(
             brush = Brush.verticalGradient(
                 colors = listOf(
-                    Color.Black.copy(alpha = 0.04f),
-                    Color.Black.copy(alpha = 0.20f),
+                    Color.Black.copy(alpha = 0.02f),
+                    Color.Black.copy(alpha = 0.14f),
                 ),
             ),
         )
@@ -416,7 +419,7 @@ private const val MIN_SWATCH_SHARE = 0.03f
 private fun swatchScore(rgb: Int, share: Float): Float {
     val hsl = FloatArray(3).also { ColorUtils.colorToHSL(rgb, it) }
     val vividness = hsl[1] * (1f - abs(2f * hsl[2] - 1f))
-    return sqrt(share) * (0.25f + vividness)
+    return share.pow(0.6f) * (0.3f + vividness)
 }
 
 /** Drop near-duplicates, so the four blobs don't collapse into one wash. */
@@ -488,14 +491,14 @@ private fun Color.hsl(): FloatArray =
 private fun Color.tuned(): Color {
     val hsl = FloatArray(3)
     ColorUtils.colorToHSL(toArgb(), hsl)
-    hsl[1] = if (hsl[1] < 0.12f) hsl[1] else (hsl[1] * 0.85f).coerceIn(0.35f, 0.62f)
-    hsl[2] = 0.16f + 0.16f * hsl[2].coerceIn(0f, 1f)
+    hsl[1] = if (hsl[1] < 0.12f) hsl[1] else (hsl[1] * 1.15f).coerceIn(0.48f, 0.80f)
+    hsl[2] = 0.20f + 0.16f * hsl[2].coerceIn(0f, 1f)
     return Color(ColorUtils.HSLToColor(hsl))
 }
 
 private fun Color.dimmed(): Color {
     val hsl = FloatArray(3)
     ColorUtils.colorToHSL(toArgb(), hsl)
-    hsl[2] = 0.12f
+    hsl[2] = 0.14f
     return Color(ColorUtils.HSLToColor(hsl))
 }
