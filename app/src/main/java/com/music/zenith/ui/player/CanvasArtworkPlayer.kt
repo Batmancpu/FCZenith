@@ -232,6 +232,12 @@ internal fun AndroidCanvasArtworkPlayer(
     /** Pengali [bottomFade] yang dibaca tiap frame, untuk fade yang ikut animasi. */
     bottomFadeScale: () -> Float = { 1f },
     /**
+     * 0..1: seberapa jauh klip portrait yang di-contain sudah tumbuh menjadi crop
+     * layar penuh. Dibaca tiap frame supaya perubahan contain -> cover mengikuti
+     * progres panel, bukan berganti mode dalam satu frame.
+     */
+    fillProgress: () -> Float = { 0f },
+    /**
      * Halts decoding for the length of a caller-driven transition — the sleeve
      * collapsing into the queue or lyrics panel and back — rather than only at
      * the two ends of it. That collapse is driven by the same clock as this
@@ -273,6 +279,7 @@ internal fun AndroidCanvasArtworkPlayer(
     val currentPortraitRevealBounds by rememberUpdatedState(portraitRevealBounds)
     val currentPresentationAlpha by rememberUpdatedState(presentationAlpha)
     val currentPausedForTransition by rememberUpdatedState(pausedForTransition)
+    val currentFillProgress by rememberUpdatedState(fillProgress)
     val reportAspect by rememberUpdatedState(onAspectRatioChanged)
     val currentStartPositionMs by rememberUpdatedState(startPositionMs)
     val currentResumeDelayMs by rememberUpdatedState(resumeDelayMs)
@@ -335,7 +342,7 @@ internal fun AndroidCanvasArtworkPlayer(
                 if (aspect != clipAspect) rendered = false
                 clipAspect = aspect
                 reportAspect(aspect)
-                textureView?.applyContentTransform(clipAspect, currentContentMode, currentAlignPortraitTop)
+                textureView?.applyContentTransform(clipAspect, currentContentMode, currentAlignPortraitTop, currentFillProgress())
             }
 
             override fun onPlayerError(error: PlaybackException) {
@@ -632,7 +639,7 @@ internal fun AndroidCanvasArtworkPlayer(
                         // still artwork until its aspect and transform are ready.
                         if (!rendered) {
                             val transformed = textureView?.applyContentTransform(
-                                clipAspect, currentContentMode, currentAlignPortraitTop,
+                                clipAspect, currentContentMode, currentAlignPortraitTop, currentFillProgress(),
                             ) == true
                             val portrait = currentContentMode == CanvasContentMode.FIT_PORTRAIT &&
                                 clipAspect > 0f && clipAspect < 1f
@@ -680,15 +687,18 @@ internal fun AndroidCanvasArtworkPlayer(
             // closing into the mini player, and each pass built a fresh matrix,
             // gradient and three RenderEffects for a picture that hadn't
             // moved — and re-setting the effect makes the node rebuild it.
-            if (applied.transformDiffers(clipAspect, contentMode, alignPortraitTop, view.width, view.height)) {
-                view.applyContentTransform(clipAspect, contentMode, alignPortraitTop)
+            val fill = fillProgress().coerceIn(0f, 1f)
+            if (applied.transformDiffers(clipAspect, contentMode, alignPortraitTop, view.width, view.height, fill)) {
+                view.applyContentTransform(clipAspect, contentMode, alignPortraitTop, fill)
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 // Read here so the blur follows the panel's progress every frame.
                 val blur = blurPx().let { if (it < 0.5f) 0f else it }
                 val fadeNow = bottomFade * bottomFadeScale().coerceIn(0f, 1f)
-                if (applied.fadeDiffers(fadeNow, bounds, bottomFadeEndPx, blur)) {
-                    view.setBottomFade(fadeNow, bounds, bottomFadeEndPx, blur)
+                // Ujung fade ikut turun mengikuti dasar klip yang tumbuh memenuhi view.
+                val fadeEnd = bottomFadeEndPx?.let { it + (bounds.height - it) * fill }
+                if (applied.fadeDiffers(fadeNow, bounds, fadeEnd, blur)) {
+                    view.setBottomFade(fadeNow, bounds, fadeEnd, blur)
                 }
             } else {
                 frame.fadeFraction = bottomFade * bottomFadeScale().coerceIn(0f, 1f)
@@ -841,8 +851,9 @@ private fun TextureView.applyContentTransform(
     clipAspect: Float,
     contentMode: CanvasContentMode,
     alignPortraitTop: Boolean,
+    fill: Float = 0f,
 ): Boolean {
-    val matrix = contentMatrix(width, height, clipAspect, contentMode, alignPortraitTop)
+    val matrix = contentMatrix(width, height, clipAspect, contentMode, alignPortraitTop, fill)
     if (matrix == null) {
         setTransform(Matrix())
         return false
@@ -863,6 +874,7 @@ private fun contentMatrix(
     clipAspect: Float,
     contentMode: CanvasContentMode,
     alignPortraitTop: Boolean,
+    fill: Float = 0f,
 ): Matrix? {
     if (width <= 0 || height <= 0 || !clipAspect.isFinite() || clipAspect <= 0f) return null
     val viewAspect = width.toFloat() / height
@@ -870,8 +882,8 @@ private fun contentMatrix(
     val pivotY = if (alignPortraitTop && contentMode == CanvasContentMode.FIT_PORTRAIT && clipAspect < 1f) {
         0f
     } else height / 2f
-    return Matrix().apply {
-        val fit = contentMode == CanvasContentMode.FIT_PORTRAIT && clipAspect < 1f
+    val fit = contentMode == CanvasContentMode.FIT_PORTRAIT && clipAspect < 1f
+    val base = Matrix().apply {
         if (fit && clipAspect > viewAspect) {
             setScale(1f, viewAspect / clipAspect, pivotX, pivotY)
         } else if (fit) {
@@ -882,6 +894,17 @@ private fun contentMatrix(
             setScale(1f, viewAspect / clipAspect, pivotX, pivotY)
         }
     }
+    if (!fit || fill <= 0.001f) return base
+    // Klip portrait yang di-contain tumbuh menjadi crop layar penuh: interpolasi kedua
+    // matriks supaya gambar meluncur, bukan melompat saat mode berganti.
+    val cover = contentMatrix(width, height, clipAspect, CanvasContentMode.CROP, false) ?: return base
+    val from = FloatArray(9)
+    val to = FloatArray(9)
+    base.getValues(from)
+    cover.getValues(to)
+    val t = fill.coerceAtMost(1f)
+    for (i in 0 until 9) from[i] += (to[i] - from[i]) * t
+    return Matrix().apply { setValues(from) }
 }
 
 /**
@@ -1017,6 +1040,7 @@ private class AppliedLook {
     private var alignTop = false
     private var width = -1
     private var height = -1
+    private var fillT = Float.NaN
 
     private var fade = Float.NaN
     private var fadeBounds = IntSize(-1, -1)
@@ -1029,15 +1053,17 @@ private class AppliedLook {
         alignPortraitTop: Boolean,
         viewWidth: Int,
         viewHeight: Int,
+        fill: Float = 0f,
     ): Boolean {
         if (clipAspect == aspect && contentMode == mode && alignPortraitTop == alignTop &&
-            viewWidth == width && viewHeight == height
+            viewWidth == width && viewHeight == height && fill == fillT
         ) return false
         aspect = clipAspect
         mode = contentMode
         alignTop = alignPortraitTop
         width = viewWidth
         height = viewHeight
+        fillT = fill
         return true
     }
 
@@ -1151,6 +1177,7 @@ internal fun AndroidCanvasVideo(spec: CanvasVideoSpec, modifier: Modifier) {
         bottomFadeEndPx = spec.bottomFadeEndPx,
         blurPx = spec.blurPx,
         bottomFadeScale = spec.bottomFadeScale,
+        fillProgress = spec.fillProgress,
         pausedForTransition = spec.pausedForTransition,
         resumeDelayMs = spec.resumeDelayMs,
         startPositionMs = spec.startPositionMs,
