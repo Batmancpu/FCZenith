@@ -61,6 +61,7 @@ fun CanvasProvidersDialog(
     val savedOrder by AppSettings.canvasProviderOrder.collectAsStateWithLifecycle()
     val shape = RoundedCornerShape(ALERT_CORNER)
     val motion = rememberMacOSPopupState(onClosed = onDismiss)
+    val touch = rememberJellyMenuTouch()
 
     Box(
         modifier = modifier
@@ -84,7 +85,9 @@ fun CanvasProvidersDialog(
                     interactionSource = remember { MutableInteractionSource() },
                     onClick = {},
                 )
-                .macOSPopupContent(motion),
+                .macOSPopupContent(motion)
+                .iosMenuTouchHost(touch, iosMenuColors().pressed)
+                .iosMenuJelly(touch, 0.5f, 0.5f),
         ) {
             Column(
                 modifier = Modifier
@@ -113,19 +116,23 @@ fun CanvasProvidersDialog(
                 )
             }
 
-            ReorderableProviderList(
-                order = savedOrder,
-                onReorder = AppSettings::setCanvasProviderOrder,
-            )
+            IosMenuScrollEnvironment(touch) {
+                Column {
+                    ReorderableProviderList(
+                        order = savedOrder,
+                        onReorder = AppSettings::setCanvasProviderOrder,
+                    )
 
-            AlertRule()
-            AlertAction(
-                label = stringResource(R.string.reset_to_default),
-                emphasised = false,
-                onClick = AppSettings::resetCanvasProviderOrder,
-            )
-            AlertRule()
-            AlertAction(label = stringResource(R.string.done), emphasised = true, onClick = onDismiss)
+                    AlertRule()
+                    AlertAction(
+                        label = stringResource(R.string.reset_to_default),
+                        emphasised = false,
+                        onClick = AppSettings::resetCanvasProviderOrder,
+                    )
+                    AlertRule()
+                    AlertAction(label = stringResource(R.string.done), emphasised = true, onClick = onDismiss)
+                }
+            }
         }
     }
 }
