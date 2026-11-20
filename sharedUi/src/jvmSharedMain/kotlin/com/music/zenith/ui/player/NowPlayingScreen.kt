@@ -3104,6 +3104,7 @@ fun NowPlayingScreen(
                         )
                         CoverEdgeBackdrop(
                             edge = meshPalette?.edge.orEmpty(),
+                            tint = meshPalette?.colors?.firstOrNull(),
                             seam = {
                                 with(density) {
                                     heroHeight.toPx() +

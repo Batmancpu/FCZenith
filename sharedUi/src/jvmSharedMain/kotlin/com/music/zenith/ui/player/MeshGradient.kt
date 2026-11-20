@@ -254,7 +254,8 @@ private const val EDGE_SIDE_SHARE = 0.08f
 private const val EDGE_MAX_LIGHTNESS = 0.52f
 private const val EDGE_MEAN_MIX = 0.35f
 private const val EDGE_RISE_START = 0.55f
-private const val EDGE_DROP_SHARE = 0.16f
+private const val EDGE_DROP_SHARE = 0.34f
+private const val EDGE_TINT_MIX = 0.3f
 
 internal fun edgeColorsOf(source: ImageBitmap): List<Color> {
     val w = source.width
@@ -304,8 +305,17 @@ fun CoverEdgeBackdrop(
     edge: List<Color>,
     seam: () -> Float,
     modifier: Modifier = Modifier,
+    tint: Color? = null,
 ) {
     if (edge.size < 2) return
+    val colors = remember(edge, tint) {
+        val target = tint?.tuned()
+        if (target == null) {
+            edge
+        } else {
+            edge.map { androidx.compose.ui.graphics.lerp(it, target, EDGE_TINT_MIX) }
+        }
+    }
     Canvas(
         modifier = modifier
             .fillMaxSize()
@@ -326,9 +336,10 @@ fun CoverEdgeBackdrop(
         }
         for (i in 0..steps) {
             val t = i / steps.toFloat()
-            stops += (seamAt + (1f - seamAt) * t) to Color.Black.copy(alpha = 1f - smootherStep(t))
+            val keep = 1f - smootherStep(t)
+            stops += (seamAt + (1f - seamAt) * t) to Color.Black.copy(alpha = keep * keep)
         }
-        drawRect(brush = Brush.horizontalGradient(colors = edge, startX = 0f, endX = size.width))
+        drawRect(brush = Brush.horizontalGradient(colors = colors, startX = 0f, endX = size.width))
         drawRect(
             brush = Brush.verticalGradient(colorStops = stops.toTypedArray(), startY = top, endY = bottom),
             blendMode = BlendMode.DstIn,
