@@ -52,12 +52,12 @@ object CanvasFadeTuning {
     /** Tampilkan tombol dan popup debug di player utama. */
     const val ENABLED = true
 
-    const val DEFAULT_HEIGHT_SCALE = 0.6f
-    const val DEFAULT_CURVE = 0.8f
-    const val DEFAULT_POWER = 1.3f
-    const val DEFAULT_OFFSET_DP = 0f
-    const val DEFAULT_CURVE_EXP = 2f
-    const val DEFAULT_BLUR_SCALE = 1f
+    const val DEFAULT_HEIGHT_SCALE = 0.52f
+    const val DEFAULT_CURVE = 0.06f
+    const val DEFAULT_POWER = 1.37f
+    const val DEFAULT_OFFSET_DP = 80f
+    const val DEFAULT_CURVE_EXP = 4f
+    const val DEFAULT_BLUR_SCALE = 0f
 
     /** Panjang fade: makin besar, batas blur makin naik. */
     val heightScale = mutableFloatStateOf(DEFAULT_HEIGHT_SCALE)
