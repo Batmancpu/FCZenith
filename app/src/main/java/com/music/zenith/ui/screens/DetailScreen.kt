@@ -1962,6 +1962,8 @@ private fun ActionPill(
     // says so.
     val haptics = rememberHaptics()
     val content = if (filled) Color.Black else MaterialTheme.colorScheme.onSurface
+    // Label mengecil bertahap bila tidak muat (font sistem besar, pil sempit).
+    var fontScale by remember(label) { mutableFloatStateOf(1f) }
     Row(
         modifier = modifier
             .glassJelly(GLASS_JELLY_PRESS_WIDE)
@@ -1981,7 +1983,7 @@ private fun ActionPill(
                 haptics.play(Haptic.Resume)
                 onClick()
             }
-            .padding(horizontal = 24.dp),
+            .padding(horizontal = 12.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -1991,12 +1993,14 @@ private fun ActionPill(
             tint = content,
             modifier = Modifier.size(18.dp),
         )
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(6.dp))
         Text(
             text = label,
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.titleMedium.let { it.copy(fontSize = it.fontSize * fontScale) },
             color = content,
             maxLines = 1,
+            softWrap = false,
+            onTextLayout = { if (it.hasVisualOverflow && fontScale > 0.6f) fontScale -= 0.07f },
         )
     }
 }
