@@ -709,14 +709,20 @@ internal fun AndroidCanvasArtworkPlayer(
             // closing into the mini player, and each pass built a fresh matrix,
             // gradient and three RenderEffects for a picture that hadn't
             // moved — and re-setting the effect makes the node rebuild it.
+            // Crop penuh tanpa fade bawah tidak punya margin transparan: opaque menghindari
+            // buffer setengah transparan yang tampak sebagai garis hitam saat blur berubah.
+            val wantOpaque = contentMode == CanvasContentMode.CROP && bottomFade <= 0.001f
+            if (view.isOpaque != wantOpaque) view.isOpaque = wantOpaque
             val fill = fillProgress().coerceIn(0f, 1f)
             if (applied.transformDiffers(clipAspect, contentMode, alignPortraitTop, view.width, view.height, fill)) {
                 view.applyContentTransform(clipAspect, contentMode, alignPortraitTop, fill)
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 // Read here so the blur follows the panel's progress every frame.
+                // Dibulatkan per 2px: RenderEffect tidak dibuat ulang tiap frame animasi,
+                // sehingga layer blur tidak ter-render ulang di tengah frame decoder baru.
                 val blur = (blurPx() * CanvasFadeTuning.blurScale.floatValue)
-                    .let { if (it < 0.5f) 0f else it }
+                    .let { if (it < 0.5f) 0f else (it / 2f).roundToInt() * 2f }
                 val fadeNow = bottomFade * bottomFadeScale().coerceIn(0f, 1f)
                 // Ujung fade ikut turun mengikuti dasar klip yang tumbuh memenuhi view.
                 val fadeEnd = bottomFadeEndPx?.let { it + (bounds.height - it) * fill }
