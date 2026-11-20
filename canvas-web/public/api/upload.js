@@ -70,8 +70,9 @@ async function isMember(userId) {
   const json = await res.json();
   if (!json.ok) throw new Error("telegram check failed");
   const status = json.result.status;
-  return status === "creator" || status === "administrator" || status === "member" ||
-    (status === "restricted" && json.result.is_member === true);
+  if (status === "creator" || status === "administrator") return "admin";
+  const member = status === "member" || (status === "restricted" && json.result.is_member === true);
+  return member ? "member" : "";
 }
 
 async function recentUploads(uid) {
@@ -257,12 +258,13 @@ module.exports = async (req, res) => {
   }
   const body = req.body && typeof req.body === "object" ? req.body : {};
   try {
-    if (!(await isMember(session.uid))) {
+    const role = await isMember(session.uid);
+    if (!role) {
       res.status(403).json({ error: "not_member" });
       return;
     }
-    const used = await recentUploads(session.uid);
-    if (used >= DAILY_LIMIT) {
+    const used = role === "admin" ? 0 : await recentUploads(session.uid);
+    if (role !== "admin" && used >= DAILY_LIMIT) {
       res.status(429).json({ error: "limit_reached", limit: DAILY_LIMIT });
       return;
     }
