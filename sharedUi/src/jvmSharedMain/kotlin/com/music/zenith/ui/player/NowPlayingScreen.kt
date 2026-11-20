@@ -3120,6 +3120,7 @@ fun NowPlayingScreen(
                             edge = meshPalette?.edge.orEmpty(),
                             tint = meshPalette?.takeUnless { it.light }?.colors?.firstOrNull(),
                             frame = { canvasEdgeFrame },
+                            frozen = dockMoving || collapseStarted,
                             seam = {
                                 with(density) {
                                     heroHeight.toPx() +
@@ -3246,7 +3247,8 @@ fun NowPlayingScreen(
                             },
                             onFrameCaptured = {
                                 if (!clipFullscreen && !tabletArtworkBackdrop &&
-                                    !lyricsOpen && !queueOpen && !queueDragging
+                                    !lyricsOpen && !queueOpen && !queueDragging &&
+                                    !dockMoving && !collapseStarted
                                 ) acceptCanvasFrame(it)
                             },
                             // The full-screen Spotify video has no mesh to re-tint.
@@ -3254,7 +3256,7 @@ fun NowPlayingScreen(
                             // readback cadence from this provider alone.
                             refreshFrameEveryMs = if (
                                 clipFullscreen || tabletArtworkBackdrop || lyricsOpen || queueOpen ||
-                                queueDragging || dockMoving
+                                queueDragging || dockMoving || collapseStarted
                             ) {
                                 null
                             } else {
@@ -4873,12 +4875,15 @@ fun NowPlayingScreen(
                                         onRenderedChanged = { canvasRendered = it },
                                         frameCapturePx = if (legacyMesh) CANVAS_FRAME_CAPTURE_PX else LIVE_BLUR_CAPTURE_PX,
                                         onFrameCaptured = {
-                                            if (!tabletArtworkBackdrop && !lyricsOpen && !queueOpen) {
+                                            if (!tabletArtworkBackdrop && !lyricsOpen && !queueOpen &&
+                                                !dockMoving && !collapseStarted
+                                            ) {
                                                 acceptCanvasFrame(it)
                                             }
                                         },
                                         refreshFrameEveryMs = if (
-                                            tabletArtworkBackdrop || lyricsOpen || queueOpen || dockMoving
+                                            tabletArtworkBackdrop || lyricsOpen || queueOpen || dockMoving ||
+                                                collapseStarted
                                         ) null else meshRefreshMs,
                                         modifier = Modifier.fillMaxSize(),
                                     )

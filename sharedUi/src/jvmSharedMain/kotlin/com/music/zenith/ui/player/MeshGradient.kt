@@ -355,6 +355,7 @@ fun CoverEdgeBackdrop(
     modifier: Modifier = Modifier,
     tint: Color? = null,
     frame: () -> ImageBitmap? = { null },
+    frozen: Boolean = false,
 ) {
     val reduceAnimation by PlayerSettings.reduceAnimation.collectAsStateWithLifecycle()
     // Warna tepi dari frame klip yang sedang diputar. Frame dibaca lewat lambda
@@ -385,8 +386,8 @@ fun CoverEdgeBackdrop(
     // Warna yang benar-benar digambar: mendekati target tiap frame secara
     // eksponensial, jadi perubahan antar pengambilan frame tidak melompat.
     val shown = remember { mutableStateOf<List<Color>>(emptyList()) }
-    LaunchedEffect(target, reduceAnimation) {
-        if (target.size < 2 || reduceAnimation || shown.value.size != target.size) {
+    LaunchedEffect(target, reduceAnimation, frozen) {
+        if (target.size < 2 || reduceAnimation || frozen || shown.value.size != target.size) {
             shown.value = target
             return@LaunchedEffect
         }
