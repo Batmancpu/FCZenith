@@ -76,10 +76,10 @@ private const val TAG = "CanvasArtworkPlayer"
  * as a share of the fade height. The centre keeps the video's bottom, so the
  * boundary reads as a V, as in Apple Music. Android 13+ only.
  */
-private const val CLIP_FADE_CURVE = 0.9f
+private const val CLIP_FADE_CURVE = 0.35f
 
 /** Share of the old fade height that is kept, so the dissolve starts a little lower. */
-private const val CLIP_FADE_HEIGHT_SCALE = 0.8f
+private const val CLIP_FADE_HEIGHT_SCALE = 0.62f
 
 /**
  * How long a clip gets to paint itself onto a surface it was just handed back
