@@ -82,6 +82,13 @@ private const val CLIP_FADE_CURVE = 0.6f
 private const val CLIP_FADE_HEIGHT_SCALE = 0.68f
 
 /**
+ * Kekuatan kurva fade bawah klip. 1 = smootherstep asli. Makin besar, alpha turun
+ * lebih cepat dengan ekor lebih panjang di dalam band yang SAMA, jadi fade terasa
+ * lebih kuat dan halus tanpa menggeser batas blur ke atas.
+ */
+private const val CLIP_FADE_POWER = 1.8f
+
+/**
  * How long a clip gets to paint itself onto a surface it was just handed back
  * before the still art is brought in behind it instead. Long enough to cover a
  * decoder being re-created from cold, short enough that a clip which is never
@@ -970,7 +977,15 @@ private fun TextureView.setBottomFade(
             0f,
             endY,
             IntArray(FADE_CURVE_STOPS + 1) { i ->
-                android.graphics.Color.argb(1f - smootherStep(i / FADE_CURVE_STOPS.toFloat()), 0f, 0f, 0f)
+                android.graphics.Color.argb(
+                    Math.pow(
+                        (1f - smootherStep(i / FADE_CURVE_STOPS.toFloat())).toDouble(),
+                        CLIP_FADE_POWER.toDouble(),
+                    ).toFloat(),
+                    0f,
+                    0f,
+                    0f,
+                )
             },
             FloatArray(FADE_CURVE_STOPS + 1) { i -> i / FADE_CURVE_STOPS.toFloat() },
             Shader.TileMode.CLAMP,
@@ -998,11 +1013,12 @@ uniform float width;
 uniform float endY;
 uniform float fadeH;
 uniform float lift;
+uniform float power;
 half4 main(float2 p) {
     float u = clamp(p.x / width, 0.0, 1.0) * 2.0 - 1.0;
     float t = clamp((p.y - (endY - fadeH - lift * u * u)) / fadeH, 0.0, 1.0);
     float s = t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
-    return half4(0.0, 0.0, 0.0, 1.0 - s);
+    return half4(0.0, 0.0, 0.0, pow(1.0 - s, power));
 }
 """
 
@@ -1013,6 +1029,7 @@ private fun curvedFadeShader(width: Float, endY: Float, fadeH: Float, lift: Floa
         setFloatUniform("endY", endY)
         setFloatUniform("fadeH", fadeH.coerceAtLeast(1f))
         setFloatUniform("lift", lift)
+        setFloatUniform("power", CLIP_FADE_POWER)
     }
 
 /**
