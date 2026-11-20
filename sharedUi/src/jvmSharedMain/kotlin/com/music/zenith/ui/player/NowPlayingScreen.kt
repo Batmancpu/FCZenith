@@ -377,15 +377,38 @@ private fun DrawScope.drawHeldClipFrame(image: ImageBitmap, clip: HeldClipFrame)
         dstSize = IntSize(width.roundToInt().coerceAtLeast(1), height.roundToInt().coerceAtLeast(1)),
     )
     if (clip.fade > 0.001f) {
+        drawTunedFadeMask(endY = height, fadeFraction = clip.fade.coerceAtMost(1f), shown = 1f)
+    }
+}
+
+/**
+ * Mask pudar bawah yang mengikuti [CanvasFadeTuning] (tinggi, lekuk V, bentuk V, power),
+ * sama dengan yang dipakai klip hidup, supaya cover statis dan klip tampil identik.
+ * [shown] 1 = pudar penuh, 0 = tanpa pudar.
+ */
+private fun DrawScope.drawTunedFadeMask(endY: Float, fadeFraction: Float, shown: Float) {
+    if (size.width <= 0f || size.height <= 0f || endY <= 0f || fadeFraction <= 0.001f) return
+    val fadeH = (endY * fadeFraction.coerceAtMost(1f) * CanvasFadeTuning.effectiveHeight())
+        .coerceAtLeast(1f)
+    val lift = (fadeH + endY * 0.15f) * CanvasFadeTuning.effectiveCurve()
+    val curveExp = CanvasFadeTuning.curveExp.floatValue.coerceAtLeast(0.5f)
+    val power = CanvasFadeTuning.power.floatValue.coerceAtLeast(0.1f)
+    val stops = Array(FADE_CURVE_STOPS + 1) { i ->
+        val t = i / FADE_CURVE_STOPS.toFloat()
+        val kept = (1f - smootherStep(t)).pow(power)
+        t to Color.Black.copy(alpha = 1f - shown * (1f - kept))
+    }
+    val columns = if (lift < 1f) 1 else 32
+    for (c in 0 until columns) {
+        val left = (size.width * c / columns).roundToInt().toFloat()
+        val right = (size.width * (c + 1) / columns).roundToInt().toFloat()
+        val u = if (columns == 1) 0f else (c + 0.5f) / columns * 2f - 1f
+        val edge = if (u < 0f) -u else u
+        val startY = endY - fadeH - lift * edge.pow(curveExp)
         drawRect(
-            brush = Brush.verticalGradient(
-                colorStops = Array(FADE_CURVE_STOPS + 1) { i ->
-                    val t = i / FADE_CURVE_STOPS.toFloat()
-                    t to Color.Black.copy(alpha = 1f - smootherStep(t))
-                },
-                startY = height * (1f - clip.fade.coerceAtMost(1f)),
-                endY = height,
-            ),
+            brush = Brush.verticalGradient(colorStops = stops, startY = startY, endY = startY + fadeH),
+            topLeft = Offset(left, 0f),
+            size = Size(right - left, size.height),
             blendMode = BlendMode.DstIn,
         )
     }
@@ -2002,7 +2025,9 @@ fun NowPlayingScreen(
         ((heroHeight - heroTitleDrop).value * HERO_FADE_FRACTION / clipBottom.value).coerceIn(0f, 1f)
     } else 0f
     heroClipGeometry.portrait = clipPortrait
-    heroClipGeometry.bannerHeightPx = with(density) { heroHeight.toPx() }
+    heroClipGeometry.bannerHeightPx = with(density) {
+        heroHeight.toPx() + CanvasFadeTuning.offsetDp.floatValue.coerceAtLeast(0f).dp.toPx()
+    }
     heroClipGeometry.fade = if (clipPortrait) clipFadeFraction else HERO_FADE_FRACTION
     val statusBarTop = stableStatusBarInsets().asPaddingValues().calculateTopPadding()
     // What sits between the status bar and the artwork: the drag strip. Read
@@ -4109,7 +4134,8 @@ fun NowPlayingScreen(
                                     // is, from the same top edge.
                                     size = Size(
                                         playerBounds.width.toFloat(),
-                                        stillBottomPx().takeIf { it > 0f } ?: heroHeight.roundToPx().toFloat(),
+                                        (stillBottomPx().takeIf { it > 0f } ?: heroHeight.roundToPx().toFloat()) +
+                                            CanvasFadeTuning.offsetDp.floatValue.coerceAtLeast(0f).dp.toPx(),
                                     ),
                                 )
                             }
@@ -4531,18 +4557,11 @@ fun NowPlayingScreen(
                                         )
                                     }
                                     if (shown > 0f) {
-                                        drawRect(
-                                            // Along smootherstep, not a straight ramp,
-                                            // so neither end of the dissolve shows as a line.
-                                            brush = Brush.verticalGradient(
-                                                colorStops = Array(FADE_CURVE_STOPS + 1) { i ->
-                                                    val t = i / FADE_CURVE_STOPS.toFloat()
-                                                    t to Color.Black.copy(alpha = 1f - shown * smootherStep(t))
-                                                },
-                                                startY = size.height * (1f - stillFadeFraction()),
-                                                endY = size.height,
-                                            ),
-                                            blendMode = BlendMode.DstIn,
+                                        // Mask yang sama dengan klip hidup (CanvasFadeTuning).
+                                        drawTunedFadeMask(
+                                            endY = size.height,
+                                            fadeFraction = stillFadeFraction(),
+                                            shown = shown,
                                         )
                                     }
                                 },
