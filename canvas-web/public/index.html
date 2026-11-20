@@ -65,6 +65,19 @@
   .dropHint[hidden] ~ .swap { display: block; }
   .rules { display: flex; justify-content: center; gap: 5px; margin: 0 0 16px; white-space: nowrap; }
   .rules span { font-size: 11px; color: var(--muted); padding: 4px 8px; border-radius: 999px; background: var(--card); }
+  .infoBtn { padding: 6px 14px; border-radius: 999px; font-size: 13px; font-weight: 500; color: var(--accent); background: var(--card); }
+  #rulesPop { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 24px; background: rgba(0,0,0,0); transition: background 0.18s ease; }
+  #rulesPop.show { background: rgba(0,0,0,0.55); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+  .popCard { width: min(100%, 340px); padding: 22px 18px 16px; border-radius: 22px; background: var(--card2); border: 0.5px solid var(--line); box-shadow: 0 24px 60px rgba(0,0,0,0.55); transform: scale(0.92); opacity: 0; transition: transform 0.2s cubic-bezier(0.2, 0.9, 0.3, 1.2), opacity 0.18s ease; }
+  #rulesPop.show .popCard { transform: none; opacity: 1; }
+  .popCard h3 { margin: 0 0 12px; font-size: 19px; font-weight: 700; letter-spacing: -0.2px; text-align: center; }
+  .popRow { display: grid; grid-template-columns: 96px 1fr; gap: 10px; align-items: baseline; padding: 10px 2px; border-bottom: 0.5px solid var(--line); }
+  .popRow:last-of-type { border-bottom: 0; }
+  .popRow span { color: var(--muted); font-size: 14px; }
+  .popRow b { font-weight: 500; font-size: 14.5px; }
+  .popNote { margin: 8px 2px 16px; color: var(--muted); font-size: 12.5px; }
+  .popCard button.primary { padding: 12px 16px; font-size: 16px; }
+  @media (prefers-reduced-motion: reduce) { #rulesPop, .popCard { transition: none; } }
   ul { list-style: none; padding: 0; margin: 0 0 14px; background: var(--card); border-radius: 12px; overflow: hidden; }
   ul:empty { display: none; }
   li { padding: 11px 14px; font-size: 14px; border-bottom: 0.5px solid var(--line); }
@@ -179,7 +192,7 @@
         <span class="swap">Change video</span>
       </label>
       <input id="file" type="file" accept="video/mp4" hidden>
-      <div class="rules"><span>Square 720-1280px</span><span>3-8 seconds</span><span>No audio</span><span>Max 3 MB</span></div>
+      <div class="rules"><button id="rulesBtn" class="infoBtn" type="button">Video requirements</button></div>
       <ul id="checks"></ul>
       <div class="secTitle">Song info</div>
       <div class="info">
@@ -242,6 +255,20 @@
     <div id="viewerFeed" class="feed"></div>
   </section>
 </main>
+
+<div id="rulesPop" hidden>
+  <div class="popCard" role="dialog" aria-modal="true" aria-labelledby="rulesTitle">
+    <h3 id="rulesTitle">Video requirements</h3>
+    <div class="popRow"><span>Format</span><b>MP4</b></div>
+    <div class="popRow"><span>Shape</span><b>Square (1:1), width equals height</b></div>
+    <div class="popRow"><span>Resolution</span><b>720 to 1280 px, e.g. 720, 1024, 1080, 1280</b></div>
+    <div class="popRow"><span>Duration</span><b>3 to 8 seconds</b></div>
+    <div class="popRow"><span>Audio</span><b>No audio</b></div>
+    <div class="popRow"><span>File size</span><b>Max 3 MB</b></div>
+    <p class="popNote">Non-square videos (like 9:16) are rejected because they would be cropped in the app.</p>
+    <button id="rulesClose" class="primary" type="button">Got it</button>
+  </div>
+</div>
 
 <div id="dlg" hidden>
   <div class="dlgCard" role="alertdialog" aria-modal="true" aria-labelledby="dlgTitle" aria-describedby="dlgText">
@@ -483,6 +510,20 @@ $("tabUpload").onclick = () => {
   show("upload");
 };
 $("upClose").onclick = () => show("browse");
+
+function closeRules() {
+  const pop = $("rulesPop");
+  pop.classList.remove("show");
+  setTimeout(() => { if (!pop.classList.contains("show")) pop.hidden = true; }, 200);
+}
+$("rulesBtn").onclick = () => {
+  const pop = $("rulesPop");
+  pop.hidden = false;
+  requestAnimationFrame(() => pop.classList.add("show"));
+};
+$("rulesClose").onclick = closeRules;
+$("rulesPop").onclick = (e) => { if (e.target === $("rulesPop")) closeRules(); };
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("rulesPop").hidden) closeRules(); });
 $("tabBrowse").onclick = () => show("browse");
 $("tabMine").onclick = () => show("mine");
 window.addEventListener("popstate", (e) => {
