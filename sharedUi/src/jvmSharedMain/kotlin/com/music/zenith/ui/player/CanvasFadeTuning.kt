@@ -57,7 +57,7 @@ object CanvasFadeTuning {
     const val DEFAULT_POWER = 1.37f
     const val DEFAULT_OFFSET_DP = 80f
     const val DEFAULT_CURVE_EXP = 4f
-    const val DEFAULT_BLUR_SCALE = 0f
+    const val DEFAULT_BLUR_SCALE = 1.95f
 
     /** Panjang fade: makin besar, batas blur makin naik. */
     val heightScale = mutableFloatStateOf(DEFAULT_HEIGHT_SCALE)
