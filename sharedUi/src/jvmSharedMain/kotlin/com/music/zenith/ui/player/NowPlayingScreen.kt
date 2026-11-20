@@ -3314,7 +3314,7 @@ fun NowPlayingScreen(
                 // Live blur on: the clip itself is blurred live on its TextureView; no static still.
 
                 // Popup debug untuk menyetel fade bawah klip secara langsung.
-                if (CanvasFadeTuning.unlocked.value && heroClipMounted != null && !dockMoving && !lyricsOpen && !queueOpen) {
+                if (CanvasFadeTuning.unlocked.value && (heroClipMounted != null || fullBleedArt) && !dockMoving && !lyricsOpen && !queueOpen) {
                     CanvasFadeDebugTuner()
                 }
 
