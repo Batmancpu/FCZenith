@@ -3,6 +3,7 @@ const { guard } = require("./_guard");
 
 const PROJECT_ID = "zenith-canvas-17133";
 const FS = "https://firestore.googleapis.com/v1/projects/" + PROJECT_ID + "/databases/(default)/documents";
+const SUPABASE_URL = "https://ljckgisqhlypvszlckvf.supabase.co";
 const tokenCache = { value: "", exp: 0 };
 
 function b64u(obj) {
@@ -78,6 +79,42 @@ module.exports = async (req, res) => {
   }
   try {
     const token = await googleToken();
+    const body = req.body && typeof req.body === "object" ? req.body : {};
+    if (body.action === "delete") {
+      const id = String(body.id || "");
+      if (!/^[A-Za-z0-9]{10,40}$/.test(id) || !process.env.SUPABASE_SECRET_KEY) {
+        res.status(400).json({ error: "bad_id" });
+        return;
+      }
+      const dh = { Authorization: "Bearer " + token, "Content-Type": "application/json" };
+      const found = await fetch(FS + "/canvases/" + id, { headers: dh, signal: AbortSignal.timeout(8000) });
+      if (found.status === 404) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      if (!found.ok) throw new Error("firestore get " + found.status);
+      const doc = await found.json();
+      const df = doc.fields || {};
+      if (str(df.uid) !== String(session.uid)) {
+        res.status(403).json({ error: "forbidden" });
+        return;
+      }
+      const gone = await fetch(
+        FS + "/canvases/" + id + "?currentDocument.updateTime=" + encodeURIComponent(doc.updateTime),
+        { method: "DELETE", headers: dh, signal: AbortSignal.timeout(8000) }
+      );
+      if (!gone.ok) throw new Error("firestore delete " + gone.status);
+      const fileName = str(df.url).split("/").pop();
+      if (/^\d+-[0-9a-f-]{36}\.mp4$/.test(fileName)) {
+        await fetch(SUPABASE_URL + "/storage/v1/object/canvas/" + fileName, {
+          method: "DELETE",
+          headers: { apikey: process.env.SUPABASE_SECRET_KEY },
+          signal: AbortSignal.timeout(8000)
+        });
+      }
+      res.status(200).json({ ok: true });
+      return;
+    }
     const r = await fetch(FS + ":runQuery", {
       method: "POST",
       headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },

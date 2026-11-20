@@ -133,6 +133,7 @@
   .cell::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 36%; background: linear-gradient(to top, rgba(0,0,0,0.65), transparent); pointer-events: none; }
   .badge { position: absolute; z-index: 2; top: 6px; left: 6px; padding: 2px 8px; border-radius: 6px; font-size: 11.5px; font-weight: 600; color: #000; background: var(--warn); }
   .badge.rejected { color: #fff; background: var(--bad); }
+  .delBtn { position: absolute; z-index: 3; top: 6px; right: 6px; width: 26px; height: 26px; padding: 0; border-radius: 50%; font-size: 18px; line-height: 1; color: #fff; background: rgba(0,0,0,0.55); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
   .likes { position: absolute; z-index: 2; left: 8px; bottom: 6px; font-size: 13px; font-weight: 600; text-shadow: 0 1px 6px rgba(0,0,0,0.9); }
   .cell { cursor: pointer; }
   .cell video { pointer-events: none; }
@@ -813,6 +814,24 @@ async function loadMine() {
       cell.appendChild(video);
       const itemIndex = data.items.indexOf(it);
       cell.onclick = () => openViewer(data.items, itemIndex);
+      const del = document.createElement("button");
+      del.className = "delBtn";
+      del.setAttribute("aria-label", "Delete");
+      del.textContent = "\u00D7";
+      del.onclick = async (e) => {
+        e.stopPropagation();
+        if (!confirm("Delete this canvas? This cannot be undone.")) return;
+        del.disabled = true;
+        try {
+          await api("mine", { action: "delete", id: it.id });
+          feedLoaded = false;
+          loadMine();
+        } catch (error) {
+          del.disabled = false;
+          alert("Failed to delete: " + error.message);
+        }
+      };
+      cell.appendChild(del);
       if (it.status !== "approved") {
         const badge = document.createElement("span");
         badge.className = "badge " + it.status;
