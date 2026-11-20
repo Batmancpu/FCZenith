@@ -145,7 +145,58 @@ async function purgeStale() {
       });
       removed += 1;
     }
+    await purgeOrphans(headers, cutoff);
   } catch (error) {}
+}
+
+async function purgeOrphans(headers, cutoff) {
+  const res = await fetch(FS + ":runQuery", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      structuredQuery: {
+        from: [{ collectionId: "canvases" }],
+        select: { fields: [{ fieldPath: "url" }] },
+        limit: 5000
+      }
+    }),
+    signal: AbortSignal.timeout(8000)
+  });
+  if (!res.ok) return;
+  const rows = await res.json();
+  if (!Array.isArray(rows) || rows.length >= 5000) return;
+  const known = new Set();
+  for (const row of rows) {
+    const field = row.document && row.document.fields && row.document.fields.url;
+    if (field && field.stringValue) known.add(field.stringValue.split("/").pop());
+  }
+  const storageHeaders = { apikey: process.env.SUPABASE_SECRET_KEY, "Content-Type": "application/json" };
+  let removed = 0;
+  for (let offset = 0; offset < 500 && removed < 20; offset += 100) {
+    const list = await fetch(SUPABASE_URL + "/storage/v1/object/list/canvas", {
+      method: "POST",
+      headers: storageHeaders,
+      body: JSON.stringify({ prefix: "", limit: 100, offset, sortBy: { column: "created_at", order: "asc" } }),
+      signal: AbortSignal.timeout(8000)
+    });
+    if (!list.ok) return;
+    const files = await list.json();
+    if (!Array.isArray(files) || !files.length) return;
+    for (const file of files) {
+      if (removed >= 20) break;
+      const name = String(file.name || "");
+      if (!/^\d+-[0-9a-f-]{36}\.mp4$/.test(name) || known.has(name)) continue;
+      const made = Date.parse(file.created_at || "");
+      if (!made || made > cutoff) continue;
+      const gone = await fetch(SUPABASE_URL + "/storage/v1/object/canvas/" + name, {
+        method: "DELETE",
+        headers: { apikey: process.env.SUPABASE_SECRET_KEY },
+        signal: AbortSignal.timeout(8000)
+      });
+      if (gone.ok) removed += 1;
+    }
+    if (files.length < 100) return;
+  }
 }
 
 function esc(text) {
