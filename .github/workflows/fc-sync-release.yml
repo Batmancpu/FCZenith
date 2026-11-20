@@ -99,14 +99,14 @@ jobs:
             # Prefer incoming hunks in upstream-owned files; FC integrations live in build overlays.
             if ! git merge --no-edit --no-ff -X theirs "$TARGET_SHA"; then
               conflicts="$(git diff --name-only --diff-filter=U)"
-              if [[ -z "$conflicts" ]] || grep -qv '^.github/workflows/' <<< "$conflicts"; then
-                echo "Upstream merge has conflicts outside FC-owned workflows; stopping safely." >&2
+              if [[ -z "$conflicts" ]] || grep -Evq '^(\.github/workflows/|README\.md$|\.github/assets/brrmusic-banner\.svg$)' <<< "$conflicts"; then
+                echo "Upstream merge has conflicts outside FC-owned workflows and documentation; stopping safely." >&2
                 git merge --abort
                 exit 1
               fi
 
-              git checkout "$BASE_SHA" -- .github/workflows
-              git add -A .github/workflows
+              git checkout "$BASE_SHA" -- .github/workflows README.md .github/assets/brrmusic-banner.svg
+              git add -A .github/workflows README.md .github/assets/brrmusic-banner.svg
               remaining="$(git diff --name-only --diff-filter=U)"
               if [[ -n "$remaining" ]]; then
                 echo "Workflow conflict could not be resolved safely:" >&2
@@ -127,13 +127,13 @@ jobs:
           echo "commits_ahead=$COMMITS_AHEAD" >> "$GITHUB_OUTPUT"
           echo "Upstream source: $SOURCE_REF ($TARGET_SHA), $COMMITS_AHEAD commits beyond stable $TAG."
  
-      - name: Preserve FCZenith-owned GitHub Actions workflows
+      - name: Preserve brrMusic-owned workflows and README
         run: |
           set -euo pipefail
           # The app source follows the latest safe upstream descendant;
-          # CI/CD ownership stays with FCZenith. Do not import upstream workflows.
+          # CI/CD and brrMusic README/hero art remain fork-owned across merges.
           git rm -r --ignore-unmatch .github/workflows
-          git checkout "${{ steps.upstream.outputs.base_sha }}" -- .github/workflows
+          git checkout "${{ steps.upstream.outputs.base_sha }}" -- .github/workflows README.md .github/assets/brrmusic-banner.svg
 
       - name: Decide whether a release is needed
         id: decision
