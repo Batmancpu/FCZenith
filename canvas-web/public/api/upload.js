@@ -70,8 +70,9 @@ async function isMember(userId) {
   const json = await res.json();
   if (!json.ok) throw new Error("telegram check failed");
   const status = json.result.status;
-  return status === "creator" || status === "administrator" || status === "member" ||
-    (status === "restricted" && json.result.is_member === true);
+  if (status === "creator" || status === "administrator") return "admin";
+  const member = status === "member" || (status === "restricted" && json.result.is_member === true);
+  return member ? "member" : "";
 }
 
 async function recentUploads(uid) {
@@ -95,6 +96,108 @@ async function recentUploads(uid) {
     const field = row.document && row.document.fields && row.document.fields.createdAt;
     return field && Date.parse(field.timestampValue) >= since;
   }).length;
+}
+
+const STALE_TTL_MS = 3 * 24 * 60 * 60 * 1000;
+let lastPurge = 0;
+
+async function purgeStale() {
+  if (Date.now() - lastPurge < 60 * 60 * 1000) return;
+  lastPurge = Date.now();
+  try {
+    const token = await googleToken();
+    const headers = { Authorization: "Bearer " + token, "Content-Type": "application/json" };
+    const res = await fetch(FS + ":runQuery", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        structuredQuery: {
+          from: [{ collectionId: "canvases" }],
+          where: { fieldFilter: { field: { fieldPath: "status" }, op: "NOT_EQUAL", value: { stringValue: "approved" } } },
+          limit: 100
+        }
+      }),
+      signal: AbortSignal.timeout(8000)
+    });
+    if (!res.ok) return;
+    const rows = await res.json();
+    const cutoff = Date.now() - STALE_TTL_MS;
+    let removed = 0;
+    for (const row of rows) {
+      if (removed >= 5) break;
+      const doc = row.document;
+      if (!doc) continue;
+      const f = doc.fields || {};
+      if (f.status && f.status.stringValue === "approved") continue;
+      const created = f.createdAt && f.createdAt.timestampValue ? Date.parse(f.createdAt.timestampValue) : 0;
+      if (!created || created > cutoff) continue;
+      const url = f.url && f.url.stringValue ? f.url.stringValue : "";
+      const name = url.split("/").pop();
+      if (!/^\d+-[0-9a-f-]{36}\.mp4$/.test(name)) continue;
+      const gone = await fetch(
+        "https://firestore.googleapis.com/v1/" + doc.name + "?currentDocument.updateTime=" + encodeURIComponent(doc.updateTime),
+        { method: "DELETE", headers, signal: AbortSignal.timeout(8000) }
+      );
+      if (!gone.ok) continue;
+      await fetch(SUPABASE_URL + "/storage/v1/object/canvas/" + name, {
+        method: "DELETE",
+        headers: { apikey: process.env.SUPABASE_SECRET_KEY },
+        signal: AbortSignal.timeout(8000)
+      });
+      removed += 1;
+    }
+    await purgeOrphans(headers, cutoff);
+  } catch (error) {}
+}
+
+async function purgeOrphans(headers, cutoff) {
+  const res = await fetch(FS + ":runQuery", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      structuredQuery: {
+        from: [{ collectionId: "canvases" }],
+        select: { fields: [{ fieldPath: "url" }] },
+        limit: 5000
+      }
+    }),
+    signal: AbortSignal.timeout(8000)
+  });
+  if (!res.ok) return;
+  const rows = await res.json();
+  if (!Array.isArray(rows) || rows.length >= 5000) return;
+  const known = new Set();
+  for (const row of rows) {
+    const field = row.document && row.document.fields && row.document.fields.url;
+    if (field && field.stringValue) known.add(field.stringValue.split("/").pop());
+  }
+  const storageHeaders = { apikey: process.env.SUPABASE_SECRET_KEY, "Content-Type": "application/json" };
+  let removed = 0;
+  for (let offset = 0; offset < 500 && removed < 5; offset += 100) {
+    const list = await fetch(SUPABASE_URL + "/storage/v1/object/list/canvas", {
+      method: "POST",
+      headers: storageHeaders,
+      body: JSON.stringify({ prefix: "", limit: 100, offset, sortBy: { column: "created_at", order: "asc" } }),
+      signal: AbortSignal.timeout(8000)
+    });
+    if (!list.ok) return;
+    const files = await list.json();
+    if (!Array.isArray(files) || !files.length) return;
+    for (const file of files) {
+      if (removed >= 5) break;
+      const name = String(file.name || "");
+      if (!/^\d+-[0-9a-f-]{36}\.mp4$/.test(name) || known.has(name)) continue;
+      const made = Date.parse(file.created_at || "");
+      if (!made || made > cutoff) continue;
+      const gone = await fetch(SUPABASE_URL + "/storage/v1/object/canvas/" + name, {
+        method: "DELETE",
+        headers: { apikey: process.env.SUPABASE_SECRET_KEY },
+        signal: AbortSignal.timeout(8000)
+      });
+      if (gone.ok) removed += 1;
+    }
+    if (files.length < 100) return;
+  }
 }
 
 function esc(text) {
@@ -155,17 +258,19 @@ module.exports = async (req, res) => {
   }
   const body = req.body && typeof req.body === "object" ? req.body : {};
   try {
-    if (!(await isMember(session.uid))) {
+    const role = await isMember(session.uid);
+    if (!role) {
       res.status(403).json({ error: "not_member" });
       return;
     }
-    const used = await recentUploads(session.uid);
-    if (used >= DAILY_LIMIT) {
+    const used = role === "admin" ? 0 : await recentUploads(session.uid);
+    if (role !== "admin" && used >= DAILY_LIMIT) {
       res.status(429).json({ error: "limit_reached", limit: DAILY_LIMIT });
       return;
     }
 
     if (body.action === "ticket") {
+      await purgeStale();
       const name = session.uid + "-" + crypto.randomUUID() + ".mp4";
       const r = await fetch(SUPABASE_URL + "/storage/v1/object/upload/sign/canvas/" + name, {
         method: "POST",

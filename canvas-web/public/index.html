@@ -44,6 +44,9 @@
   .feedSearch { position: absolute; top: calc(8px + env(safe-area-inset-top, 0px)); left: 14px; right: 14px; z-index: 5; }
   .feedSearch input { display: block; width: 100%; margin: 0; padding: 9px 14px 9px 38px; font: inherit; color: var(--text); border: 0; border-radius: 10px; outline: none; background: rgba(120,120,128,0.32) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239a9aab' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-3.5-3.5'/%3E%3C/svg%3E") no-repeat 12px center / 17px; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
   .feedMsg { position: absolute; top: 50%; left: 0; right: 0; margin: 0; text-align: center; color: var(--muted); pointer-events: none; }
+  .gateBox { position: relative; z-index: 2; display: grid; justify-items: center; gap: 10px; width: min(86%, 320px); text-align: center; }
+  .gateBox b { font-size: 20px; font-weight: 700; }
+  .gateBox span { color: var(--muted); font-size: 14px; }
 
   #upload { position: fixed; inset: 0; z-index: 30; overflow-y: auto; overscroll-behavior: contain; background: var(--bg); }
   body.up .tabs { display: none; }
@@ -130,12 +133,26 @@
   .cell::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 36%; background: linear-gradient(to top, rgba(0,0,0,0.65), transparent); pointer-events: none; }
   .badge { position: absolute; z-index: 2; top: 6px; left: 6px; padding: 2px 8px; border-radius: 6px; font-size: 11.5px; font-weight: 600; color: #000; background: var(--warn); }
   .badge.rejected { color: #fff; background: var(--bad); }
+  .delBtn { position: absolute; z-index: 3; top: 6px; right: 6px; width: 26px; height: 26px; padding: 0; border-radius: 50%; font-size: 18px; line-height: 1; color: #fff; background: rgba(0,0,0,0.55); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
   .likes { position: absolute; z-index: 2; left: 8px; bottom: 6px; font-size: 13px; font-weight: 600; text-shadow: 0 1px 6px rgba(0,0,0,0.9); }
   .cell { cursor: pointer; }
   .cell video { pointer-events: none; }
   #viewer { position: fixed; inset: 0; z-index: 35; background: #000; }
   #viewer .feed { height: 100%; }
   #viewer .upBar { z-index: 45; }
+  #dlg { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 24px; background: rgba(0,0,0,0); transition: background 0.18s ease; }
+  #dlg.show { background: rgba(0,0,0,0.55); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+  .dlgCard { width: min(100%, 320px); padding: 24px 20px 16px; border-radius: 22px; text-align: center; background: var(--card2); border: 0.5px solid var(--line); box-shadow: 0 24px 60px rgba(0,0,0,0.55); transform: scale(0.92); opacity: 0; transition: transform 0.2s cubic-bezier(0.2, 0.9, 0.3, 1.2), opacity 0.18s ease; }
+  #dlg.show .dlgCard { transform: none; opacity: 1; }
+  .dlgIcon { width: 52px; height: 52px; margin: 0 auto 14px; display: grid; place-items: center; border-radius: 50%; color: var(--bad); background: rgba(255,69,58,0.14); }
+  .dlgIcon svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .dlgCard h3 { margin: 0 0 6px; font-size: 19px; font-weight: 700; letter-spacing: -0.2px; }
+  .dlgCard p { margin: 0 0 20px; color: var(--muted); font-size: 14px; }
+  .dlgBtns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .dlgBtns button { padding: 13px 10px; border-radius: 14px; font-size: 16px; font-weight: 600; }
+  #dlgCancel { background: rgba(120,120,128,0.24); }
+  #dlgOk { color: #fff; background: var(--bad); }
+  @media (prefers-reduced-motion: reduce) { #dlg, .dlgCard { transition: none; } }
 </style>
 </head>
 <body>
@@ -226,6 +243,18 @@
   </section>
 </main>
 
+<div id="dlg" hidden>
+  <div class="dlgCard" role="alertdialog" aria-modal="true" aria-labelledby="dlgTitle" aria-describedby="dlgText">
+    <div class="dlgIcon"><svg viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/><path d="M10 11v6M14 11v6"/></svg></div>
+    <h3 id="dlgTitle"></h3>
+    <p id="dlgText"></p>
+    <div class="dlgBtns">
+      <button id="dlgCancel" type="button">Cancel</button>
+      <button id="dlgOk" type="button">Delete</button>
+    </div>
+  </div>
+</div>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import { getFirestore, collection, getDocs, query, where, limit } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
@@ -242,6 +271,29 @@ const RULES = { width: 1280, height: 1280, minSec: 3, maxSec: 8, maxBytes: 3 * 1
 
 const db = getFirestore(initializeApp(FIREBASE_CONFIG));
 const $ = (id) => document.getElementById(id);
+
+function askConfirm(opts) {
+  return new Promise((resolve) => {
+    const dlg = $("dlg");
+    $("dlgTitle").textContent = opts.title;
+    $("dlgText").textContent = opts.text;
+    $("dlgOk").textContent = opts.ok;
+    dlg.hidden = false;
+    requestAnimationFrame(() => dlg.classList.add("show"));
+    const onKey = (e) => { if (e.key === "Escape") done(false); };
+    const done = (value) => {
+      dlg.classList.remove("show");
+      document.removeEventListener("keydown", onKey);
+      setTimeout(() => { if (!dlg.classList.contains("show")) dlg.hidden = true; }, 200);
+      resolve(value);
+    };
+    document.addEventListener("keydown", onKey);
+    $("dlgOk").onclick = () => done(true);
+    $("dlgCancel").onclick = () => done(false);
+    dlg.onclick = (e) => { if (e.target === dlg) done(false); };
+    $("dlgCancel").focus();
+  });
+}
 
 const DEV = !/[?&]dev=0/.test(location.search) && ["localhost", "127.0.0.1"].includes(location.hostname);
 const DEV_VIDEO = "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4";
@@ -630,6 +682,8 @@ $("send").onclick = async () => {
 
 let feedItems = [];
 let feedLoaded = false;
+let feedGuest = true;
+const GUEST_FEED_LIMIT = 10;
 
 const feedObserver = new IntersectionObserver((entries) => {
   for (const e of entries) {
@@ -702,18 +756,44 @@ function renderFeed() {
   const feed = $("feed");
   feedObserver.disconnect();
   feed.innerHTML = "";
-  const list = feedItems.filter((i) => !q || norm((i.data.song || "") + " " + (i.data.artist || "")).includes(q));
+  const all = feedItems.filter((i) => !q || norm((i.data.song || "") + " " + (i.data.artist || "")).includes(q));
+  feedGuest = !session();
+  const locked = feedGuest && all.length > GUEST_FEED_LIMIT;
+  const list = locked ? all.slice(0, GUEST_FEED_LIMIT) : all;
   $("findStatus").textContent = list.length ? "" : "No canvases yet.";
   for (const item of list) {
     const el = slide(item.id, item.data);
     feed.appendChild(el);
     feedObserver.observe(el);
   }
+  if (locked) feed.appendChild(gateSlide());
 }
 $("qSearch").oninput = renderFeed;
 
+function gateSlide() {
+  const box = document.createElement("div");
+  box.className = "slide";
+  const inner = document.createElement("div");
+  inner.className = "gateBox";
+  const title = document.createElement("b");
+  title.textContent = "Want to see more canvases?";
+  const sub = document.createElement("span");
+  sub.textContent = "Sign in with Telegram to unlock the full feed.";
+  const btn = document.createElement("button");
+  btn.className = "primary";
+  btn.textContent = "Sign in";
+  btn.onclick = () => show("mine");
+  inner.append(title, sub, btn);
+  box.appendChild(inner);
+  return box;
+}
+
 async function loadFeed() {
-  if (feedLoaded) { for (const v of document.querySelectorAll(".slide video")) if (v.getAttribute("src")) v.play().catch(() => {}); return; }
+  if (feedLoaded) {
+    if (feedGuest !== !session()) { renderFeed(); return; }
+    for (const v of document.querySelectorAll(".slide video")) if (v.getAttribute("src")) v.play().catch(() => {});
+    return;
+  }
   $("findStatus").textContent = "Loading...";
   try {
     const snap = await getDocs(query(collection(db, "canvases"), where("status", "==", "approved"), limit(50)));
@@ -782,6 +862,29 @@ async function loadMine() {
       cell.appendChild(video);
       const itemIndex = data.items.indexOf(it);
       cell.onclick = () => openViewer(data.items, itemIndex);
+      const del = document.createElement("button");
+      del.className = "delBtn";
+      del.setAttribute("aria-label", "Delete");
+      del.textContent = "\u00D7";
+      del.onclick = async (e) => {
+        e.stopPropagation();
+        const sure = await askConfirm({
+          title: "Delete this canvas?",
+          text: "This video will be permanently removed and can't be recovered.",
+          ok: "Delete"
+        });
+        if (!sure) return;
+        del.disabled = true;
+        try {
+          await api("mine", { action: "delete", id: it.id });
+          feedLoaded = false;
+          loadMine();
+        } catch (error) {
+          del.disabled = false;
+          $("mineStatus").textContent = "Failed to delete: " + error.message;
+        }
+      };
+      cell.appendChild(del);
       if (it.status !== "approved") {
         const badge = document.createElement("span");
         badge.className = "badge " + it.status;

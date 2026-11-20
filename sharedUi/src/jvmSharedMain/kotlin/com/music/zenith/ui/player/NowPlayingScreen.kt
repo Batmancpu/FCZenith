@@ -293,7 +293,7 @@ private val ART_BOX_TOP_PAD = 8.dp
  * short enough to still be reading as artwork where it ends reads as a picture
  * that was cut off rather than one that ran out.
  */
-private const val HERO_FADE_FRACTION = 0.42f
+private const val HERO_FADE_FRACTION = 0.32f
 /**
  * Pudar bawah cover statis layar penuh (lagu tanpa klip Apple/Spotify). Lebih pendek
  * dari [HERO_FADE_FRACTION] agar gambar bertahan lebih rendah seperti di Apple Music;
@@ -1905,7 +1905,7 @@ fun NowPlayingScreen(
     // A full-screen Spotify clip stays on screen, blurred live, for the whole of a
     // panel's opening and closing; its cover only fades in at the header and out
     // again as the panel leaves.
-    val clipHeldForPanels = clipFullscreen && liveCanvasPanels && collapseStarted
+    val clipHeldForPanels = heroClipMounted != null && liveCanvasPanels && collapseStarted
     val clipPortrait = !clipFullscreen &&
         heroClipMounted != null && canvasAspect > 0f && canvasAspect < 1f
     // Klip hero non-portrait yang tumbuh mulus dari banner ke layar penuh (dan kembali)
@@ -2372,7 +2372,7 @@ fun NowPlayingScreen(
     // Whether the still is on screen in the clip's place: while it moves, and
     // until the clip has painted the same frame again.
     fun stillTakesOver(): Boolean = still() != null && CanvasStills.fresh &&
-        !(liveCanvasPanels && (lyricsOpen || queueOpen)) &&
+        !(liveCanvasPanels && (lyricsOpen || queueOpen || clipHeldForPanels)) &&
         (collapseStarted || dockMoving || lyricsOpen || queueOpen || queueDragging || !canvasRendered)
     // A portrait still is the clip's whole picture, not the banner's square:
     // top-aligned across the player's width, as the clip is contained, and as
@@ -3192,7 +3192,7 @@ fun NowPlayingScreen(
                             // Spotify's 9:16 Canvas is the phone background, so it
                             // covers every edge. Other providers retain the contained
                             // portrait treatment introduced for motion cover art.
-                            contentMode = if (clipFullscreen || clipFillsPanels) {
+                            contentMode = if (clipFullscreen || (clipFillsPanels && !clipPortrait)) {
                                 CanvasContentMode.CROP
                             } else {
                                 CanvasContentMode.FIT_PORTRAIT
@@ -3267,12 +3267,12 @@ fun NowPlayingScreen(
                             bottomFade = when {
                                 clipFullscreen -> 0f
                                 growBox -> HERO_FADE_FRACTION
-                                clipFillsPanels -> 0f
                                 clipPortrait -> clipFadeFraction
+                                clipFillsPanels -> 0f
                                 else -> HERO_FADE_FRACTION
                             },
                             bottomFadeScale = fadeScale,
-                            bottomFadeEndPx = if (clipPortrait && !clipFillsPanels) with(density) { clipBottom.toPx() }
+                            bottomFadeEndPx = if (clipPortrait) with(density) { clipBottom.toPx() }
                                 else null,
                             // Blur on the TextureView itself, not a Compose layer over it.
                             blurPx = { with(density) { CANVAS_PANEL_BLUR_DP.dp.toPx() } * panelBlur() },
@@ -3282,7 +3282,8 @@ fun NowPlayingScreen(
                                     if (growBox) {
                                         Modifier.fillMaxWidth().layout { measurable, constraints ->
                                             val full = constraints.maxHeight
-                                            val hero = heroHeight.roundToPx().coerceIn(0, full)
+                                            val hero = (heroHeight + CanvasFadeTuning.offsetDp.floatValue.coerceAtLeast(0f).dp)
+                                                .roundToPx().coerceIn(0, full)
                                             val h = (hero + (full - hero) * p().coerceIn(0f, 1f)).roundToInt()
                                             val placeable = measurable.measure(
                                                 constraints.copy(minHeight = h, maxHeight = h),
@@ -3290,7 +3291,9 @@ fun NowPlayingScreen(
                                             layout(placeable.width, h) { placeable.place(0, 0) }
                                         }
                                     } else if (clipFullscreen || clipPortrait || clipFillsPanels) Modifier.fillMaxSize()
-                                    else Modifier.fillMaxWidth().height(heroHeight),
+                                    else Modifier.fillMaxWidth().height(
+                                        heroHeight + CanvasFadeTuning.offsetDp.floatValue.coerceAtLeast(0f).dp,
+                                    ),
                                 )
                                 .drawWithContent {
                                     drawContent()
@@ -3307,8 +3310,8 @@ fun NowPlayingScreen(
                                         val dimFade = when {
                                             clipFullscreen -> 0f
                                             growBox -> HERO_FADE_FRACTION * (1f - smootherStep(p().coerceIn(0f, 1f)))
-                                            clipFillsPanels -> 0f
                                             clipPortrait -> clipFadeFraction
+                                            clipFillsPanels -> 0f
                                             else -> HERO_FADE_FRACTION
                                         }
                                         if (dimFade <= 0.001f) {
@@ -3317,7 +3320,7 @@ fun NowPlayingScreen(
                                             // Dim mengikuti fade bawah klip (kurva smootherStep yang
                                             // sama), supaya tidak ada tepi flat di batas kotak hero
                                             // saat panel lirik/antrean menutup.
-                                            val fadeEnd = if (clipPortrait && !clipFillsPanels) {
+                                            val fadeEnd = if (clipPortrait) {
                                                 clipBottom.toPx().coerceIn(1f, size.height)
                                             } else {
                                                 size.height
@@ -3347,6 +3350,12 @@ fun NowPlayingScreen(
                 }
 
                 // Live blur on: the clip itself is blurred live on its TextureView; no static still.
+
+                // Popup debug untuk menyetel fade bawah klip secara langsung.
+                // Matikan lewat CanvasFadeTuning.ENABLED bila sudah tidak dibutuhkan.
+                if (CanvasFadeTuning.ENABLED && heroClipMounted != null && !dockMoving && !lyricsOpen && !queueOpen) {
+                    CanvasFadeDebugTuner()
+                }
 
                 // Frame terakhir Spotify Canvas layar penuh, di atas latar dan di
                 // bawah kontrol. Tak terlihat sampai lagu berganti; lalu menutup
@@ -4428,7 +4437,13 @@ fun NowPlayingScreen(
                                             if (clipFullscreen) {
                                                 smootherStep(((p() - 0.4f) / 0.6f).coerceIn(0f, 1f))
                                             } else {
-                                                1f
+                                                // Klip non-Spotify ikut bertahan di belakang panel; cover
+                                                // baru muncul saat mengecil jadi header, bukan menutupi klip
+                                                // begitu panel dibuka.
+                                                maxOf(
+                                                    smootherStep(((p() - 0.4f) / 0.6f).coerceIn(0f, 1f)),
+                                                    1f - canvasCover.floatValue,
+                                                )
                                             }
                                         } else if (stillTakesOver()) 1f
                                         else if (heroClip != null) 1f - canvasCover.floatValue
@@ -4684,7 +4699,7 @@ fun NowPlayingScreen(
                                             // see [stillTakesOver] — and, for the reason
                                             // above, drawn only while it can be seen.
                                             stillTakesOver() || !canvasRendered ||
-                                            (liveCanvasPanels && (lyricsOpen || queueOpen)) ||
+                                            (liveCanvasPanels && (lyricsOpen || queueOpen || clipHeldForPanels)) ||
                                             (heroMode && canvasCover.floatValue < 1f)
                                         ) {
                                             drawCropped(frame.image)
