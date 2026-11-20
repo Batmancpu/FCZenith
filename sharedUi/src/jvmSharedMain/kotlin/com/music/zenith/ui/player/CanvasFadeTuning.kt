@@ -86,6 +86,22 @@ object CanvasFadeTuning {
         blurScale.floatValue = DEFAULT_BLUR_SCALE
     }
 
+    /**
+     * Respons cepat di awal: nilai slider rendah sudah memberi efek besar, lalu
+     * melandai mendekati maksimum. Memetakan 0..[max] ke 0..[max] secara ease-out.
+     */
+    private fun fastCurve(value: Float, max: Float): Float {
+        val n = (value / max).coerceIn(0f, 1f)
+        val inv = 1f - n
+        return max * (1f - inv * inv * inv)
+    }
+
+    /** Tinggi fade efektif yang dipakai klip. */
+    fun effectiveHeight(): Float = fastCurve(heightScale.floatValue, 2f)
+
+    /** Lekuk V efektif yang dipakai klip. */
+    fun effectiveCurve(): Float = fastCurve(curve.floatValue, 3f)
+
     /** Berubah setiap kali salah satu nilai berubah; dibaca blok update view klip. */
     fun signature(): Int =
         java.util.Objects.hash(

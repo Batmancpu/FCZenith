@@ -76,10 +76,10 @@ private const val TAG = "CanvasArtworkPlayer"
  * as a share of the fade height. The centre keeps the video's bottom, so the
  * boundary reads as a V, as in Apple Music. Android 13+ only.
  */
-private val CLIP_FADE_CURVE: Float get() = CanvasFadeTuning.curve.floatValue
+private val CLIP_FADE_CURVE: Float get() = CanvasFadeTuning.effectiveCurve()
 
 /** Share of the old fade height that is kept, so the dissolve starts a little lower. */
-private val CLIP_FADE_HEIGHT_SCALE: Float get() = CanvasFadeTuning.heightScale.floatValue
+private val CLIP_FADE_HEIGHT_SCALE: Float get() = CanvasFadeTuning.effectiveHeight()
 
 /**
  * Kekuatan kurva fade bawah klip. 1 = smootherstep asli. Makin besar, alpha turun
@@ -987,7 +987,7 @@ private fun TextureView.setBottomFade(
     // and a still of it standing in for it end the same way.
     val fadeH = (endY * fraction.coerceAtMost(1f) * CLIP_FADE_HEIGHT_SCALE).coerceAtLeast(1f)
     val gradient: Shader = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        curvedFadeShader(bounds.width.toFloat(), endY, fadeH, fadeH * CLIP_FADE_CURVE)
+        curvedFadeShader(bounds.width.toFloat(), endY, fadeH, (fadeH + endY * 0.15f) * CLIP_FADE_CURVE)
     } else {
         LinearGradient(
             0f,
