@@ -38,32 +38,28 @@ It inherits a capable music experience from [Zenith](https://github.com/rezapran
 <tr>
 <td width="50%" valign="top">
 
-### Adaptive Spatial Audio
-
-**More dimension. Less guesswork.**
-
-A lightweight stereo widening and crossfeed engine with per-track preferences. When enabled, its automatic decision policy can use your **explicit On/Off feedback** to remember which tracks benefit from processing.
-
-- On-device learning; no saved raw audio samples.
-- Per-track On/Off controls with Auto decision status.
-- Safety bypasses for unsuitable output paths and conflicting processing.
-
-[How the engine works](fc/spatial-audio/README.md)
+<h3>Adaptive Spatial Audio</h3>
+<p><strong>More dimension. Less guesswork.</strong></p>
+<p>A lightweight stereo widening and crossfeed engine with per-track preferences. When enabled, its automatic decision policy can use your <strong>explicit On/Off feedback</strong> to remember which tracks benefit from processing.</p>
+<ul>
+<li>On-device learning; no saved raw audio samples.</li>
+<li>Per-track On/Off controls with Auto decision status.</li>
+<li>Safety bypasses for unsuitable output paths and conflicting processing.</li>
+</ul>
+<p><a href="fc/spatial-audio/README.md">How the engine works</a></p>
 
 </td>
 <td width="50%" valign="top">
 
-### Refined audio path <sub>(experimental)</sub>
-
-**Controlled, reversible iteration.**
-
-Two optional audio-quality layers refine stereo width, crossfeed, center preservation and limiter behavior. Both are **enabled in the current release configuration** and can be rolled back independently.
-
-- A gentler width/crossfeed profile and sample-rate-aware filtering.
-- Additional low-frequency side control and centered-signal preservation.
-- Automated DSP regression coverage across common sample rates.
-
-[Quality experiment](fc/spatial-audio/experimental/README.md) · [Refinement details](fc/spatial-audio/refinement/README.md)
+<h3>Refined audio path <sub>(experimental)</sub></h3>
+<p><strong>Controlled, reversible iteration.</strong></p>
+<p>Two optional audio-quality layers refine stereo width, crossfeed, center preservation and limiter behavior. Both are <strong>enabled in the current release configuration</strong> and can be rolled back independently.</p>
+<ul>
+<li>A gentler width/crossfeed profile and sample-rate-aware filtering.</li>
+<li>Additional low-frequency side control and centered-signal preservation.</li>
+<li>Automated DSP regression coverage across common sample rates.</li>
+</ul>
+<p><a href="fc/spatial-audio/experimental/README.md">Quality experiment</a> · <a href="fc/spatial-audio/refinement/README.md">Refinement details</a></p>
 
 </td>
 </tr>
