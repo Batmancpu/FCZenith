@@ -3090,7 +3090,7 @@ fun NowPlayingScreen(
                             else smootherStep(p().coerceIn(0f, 1f))
                         }
                         // Fade bawah klip hero menghilang bertahap seiring klip memenuhi layar.
-                        val fadeScale: () -> Float = if (growBox || (clipPortrait && liveCanvasPanels)) {
+                        val fadeScale: () -> Float = if (growBox) {
                             ({ 1f - smootherStep(p().coerceIn(0f, 1f)) })
                         } else {
                             ({ 1f })
@@ -3197,11 +3197,6 @@ fun NowPlayingScreen(
                                 else -> HERO_FADE_FRACTION
                             },
                             bottomFadeScale = fadeScale,
-                            // Klip portrait (Apple) tumbuh mulus dari kotak contain ke layar penuh
-                            // mengikuti progres collapse, tanpa berganti mode di satu frame.
-                            fillProgress = {
-                                if (clipPortrait && liveCanvasPanels) smootherStep(p().coerceIn(0f, 1f)) else 0f
-                            },
                             bottomFadeEndPx = if (clipPortrait) with(density) { clipBottom.toPx() }
                                 else null,
                             // Blur on the TextureView itself, not a Compose layer over it.
@@ -3237,7 +3232,7 @@ fun NowPlayingScreen(
                                         val dimFade = when {
                                             clipFullscreen -> 0f
                                             growBox -> HERO_FADE_FRACTION * (1f - smootherStep(p().coerceIn(0f, 1f)))
-                                            clipPortrait -> clipFadeFraction * (1f - smootherStep(p().coerceIn(0f, 1f)))
+                                            clipPortrait -> clipFadeFraction
                                             clipFillsPanels -> 0f
                                             else -> HERO_FADE_FRACTION
                                         }
@@ -3248,8 +3243,7 @@ fun NowPlayingScreen(
                                             // sama), supaya tidak ada tepi flat di batas kotak hero
                                             // saat panel lirik/antrean menutup.
                                             val fadeEnd = if (clipPortrait) {
-                                                val bottom = clipBottom.toPx().coerceIn(1f, size.height)
-                                                bottom + (size.height - bottom) * smootherStep(p().coerceIn(0f, 1f))
+                                                clipBottom.toPx().coerceIn(1f, size.height)
                                             } else {
                                                 size.height
                                             }
