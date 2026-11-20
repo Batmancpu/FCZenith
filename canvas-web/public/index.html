@@ -673,7 +673,8 @@ $("send").onclick = async () => {
       login_required: "Sign in with Telegram first.",
       spec_invalid: "Video specifications do not match.",
       file_invalid: "Invalid video file.",
-      bad_text: "Title, artist, or album is too long."
+      bad_text: "Title, artist, or album is too long.",
+      duplicate: "You already uploaded a canvas for this song."
     };
     $("status").textContent = "Failed: " + (known[error.message] || error.message);
     $("send").disabled = false;
