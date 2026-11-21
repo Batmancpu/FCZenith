@@ -1150,7 +1150,7 @@ private fun SharedTransitionScope.ExpandedTabs(
             // Back from the standalone tab (Search): the pill flies in from where
             // that tab sits, one step past the last tab, instead of just appearing.
             if (lastSelectedTabIndex < 0) {
-                pill.enterFrom(tabCount.toDouble(), selectedTabIndex)
+                pill.enterFrom((tabCount - 1).toDouble(), selectedTabIndex)
             } else {
                 pill.animateTo(selectedTabIndex)
             }
@@ -1201,7 +1201,18 @@ private fun SharedTransitionScope.ExpandedTabs(
                         modifier = Modifier
                             .matchParentSize()
                             .pillPlacement(
-                                center = { pillCenterInRow(pill.position) },
+                                center = {
+                                    // Dijepit di dalam lebar pill: tidak boleh melewati tepi
+                                    // ke circle Search.
+                                    val c = pillCenterInRow(pill.position)
+                                    val half = pill.flatSize(restSize, liftedSize).width / 2f
+                                    val padRightPx = with(density) {
+                                        contentPadding.calculateRightPadding(layoutDirection).toPx()
+                                    }
+                                    val lo = half - padLeftPx
+                                    val hi = rowSize.width + padRightPx - half
+                                    if (hi > lo) Offset(c.x.coerceIn(lo, hi), c.y) else c
+                                },
                                 size = { pill.flatSize(restSize, liftedSize) },
                             ),
                     )
@@ -1425,7 +1436,17 @@ private fun SharedTransitionScope.ExpandedTabs(
                 modifier = Modifier
                     .matchParentSize()
                     .pillPlacement(
-                        center = { pillCenterInRow(pill.position) + Offset(padLeftPx, padTopPx) },
+                        center = {
+                            // Dijepit di dalam lebar pill: lensa yang terangkat tidak boleh
+                            // masuk ke circle Search.
+                            val c = pillCenterInRow(pill.position) + Offset(padLeftPx, padTopPx)
+                            val half = pill.liveSize(restSize, liftedSize).width / 2f
+                            val padRightPx = with(density) {
+                                contentPadding.calculateRightPadding(layoutDirection).toPx()
+                            }
+                            val barWidth = rowSize.width + padLeftPx + padRightPx
+                            if (barWidth > half * 2f) Offset(c.x.coerceIn(half, barWidth - half), c.y) else c
+                        },
                         size = { pill.liveSize(restSize, liftedSize) },
                     ),
             )
@@ -1570,7 +1591,7 @@ private fun Modifier.animateEnterExitTab(
 }
 
 /** How far past the last tab, in tab steps, a drag may carry the indicator towards the standalone tab. */
-private const val STANDALONE_DRAG_REACH = 1f
+private const val STANDALONE_DRAG_REACH = 0f
 
 private class FloatingTabBarScopeImpl(
     private val inlineSplitLast: Boolean = false,
