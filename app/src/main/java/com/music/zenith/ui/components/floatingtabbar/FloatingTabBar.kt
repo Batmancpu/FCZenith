@@ -1144,6 +1144,10 @@ private fun SharedTransitionScope.ExpandedTabs(
         Offset(if (isRtl) rowSize.width - x else x, rowHeightPx / 2f)
     }
     val showPill = selectedTabIndex >= 0 && tabWidthPx > 0f
+    // Geser tepi depan lensa saat ditarik melewati ujung, searah tarikan (dibalik untuk RTL).
+    val overShiftPx: () -> Float = {
+        (if (isRtl) -1f else 1f) * pill.over * (tabWidthPx * 0.3f + tabStepPx * 0.1f)
+    }
 
     LaunchedEffect(selectedTabIndex) {
         if (selectedTabIndex >= 0) {
@@ -1308,8 +1312,11 @@ private fun SharedTransitionScope.ExpandedTabs(
                                     totalDrag += delta * direction
                                     val dragMax = scope.tabs.lastIndex.toFloat() +
                                         (if (scope.standaloneTab != null) STANDALONE_DRAG_REACH else 0f)
-                                    val absoluteIndexFloat = (dragStartIndex + totalDrag / step)
-                                        .coerceIn(0f, dragMax)
+                                    val rawIndex = dragStartIndex + totalDrag / step
+                                    val absoluteIndexFloat = rawIndex.coerceIn(0f, dragMax)
+                                    // Mentok di ujung tapi jari masih menarik: lensa tertarik
+                                    // seperti karet, lalu memantul kembali saat dilepas.
+                                    pill.pullOver(rubberOvershoot(rawIndex - absoluteIndexFloat))
                                     pill.dragTo(absoluteIndexFloat)
 
                                     val approximateTab = absoluteIndexFloat.roundToInt()
@@ -1425,7 +1432,9 @@ private fun SharedTransitionScope.ExpandedTabs(
                 modifier = Modifier
                     .matchParentSize()
                     .pillPlacement(
-                        center = { pillCenterInRow(pill.position) + Offset(padLeftPx, padTopPx) },
+                        center = {
+                            pillCenterInRow(pill.position) + Offset(padLeftPx + overShiftPx(), padTopPx)
+                        },
                         size = { pill.liveSize(restSize, liftedSize) },
                     ),
             )
@@ -1567,6 +1576,17 @@ private fun Modifier.animateEnterExitTab(
                 if (animatedBlur > 0f) BlurEffect(animatedBlur, animatedBlur) else null
         }
     }
+}
+
+/** Jarak maksimum, dalam langkah tab, indikator boleh tertarik melewati ujung pill. */
+private const val OVERSHOOT_LIMIT = 0.3f
+
+/** Hambatan karet: makin jauh ditarik melewati ujung, makin berat, mendekati [OVERSHOOT_LIMIT]. */
+private fun rubberOvershoot(over: Float): Float {
+    if (over == 0f) return 0f
+    val r = abs(over) / OVERSHOOT_LIMIT
+    val v = OVERSHOOT_LIMIT * (r / (r + 1f))
+    return if (over < 0f) -v else v
 }
 
 /** How far past the last tab, in tab steps, a drag may carry the indicator towards the standalone tab. */
