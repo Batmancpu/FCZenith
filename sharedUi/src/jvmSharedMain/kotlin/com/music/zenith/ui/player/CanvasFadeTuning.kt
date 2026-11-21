@@ -261,7 +261,7 @@ internal object ControlLayoutTuning {
 internal fun ControlGap(
     volumeHidden: Boolean,
     lyricStrip: Boolean,
-    extra: Dp = Dp.Zero,
+    extra: Dp = 0.dp,
     pick: (ControlProfile) -> Float,
 ) {
     Layout(content = {}) { _, constraints ->
