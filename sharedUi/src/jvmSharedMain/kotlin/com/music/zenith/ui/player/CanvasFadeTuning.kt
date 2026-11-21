@@ -436,6 +436,9 @@ private fun DebugTunerPanel(
                     CanvasFadeTuning.reset()
                 } else {
                     ControlLayoutTuning.reset(hideVolume, lyricStrip)
+                    ControlLayoutTuning.titleSeparateOn.value = false
+                    ControlLayoutTuning.artExtraDp.floatValue = 0f
+                    ControlLayoutTuning.titleExtraDp.floatValue = 0f
                 }
             }
             PanelChip(if (copied) "Tersalin" else "Salin") {
