@@ -1201,18 +1201,7 @@ private fun SharedTransitionScope.ExpandedTabs(
                         modifier = Modifier
                             .matchParentSize()
                             .pillPlacement(
-                                center = {
-                                    // Dijepit di dalam lebar pill: tidak boleh melewati tepi
-                                    // ke circle Search.
-                                    val c = pillCenterInRow(pill.position)
-                                    val half = pill.flatSize(restSize, liftedSize).width / 2f
-                                    val padRightPx = with(density) {
-                                        contentPadding.calculateRightPadding(layoutDirection).toPx()
-                                    }
-                                    val lo = half - padLeftPx
-                                    val hi = rowSize.width + padRightPx - half
-                                    if (hi > lo) Offset(c.x.coerceIn(lo, hi), c.y) else c
-                                },
+                                center = { pillCenterInRow(pill.position) },
                                 size = { pill.flatSize(restSize, liftedSize) },
                             ),
                     )
@@ -1436,17 +1425,7 @@ private fun SharedTransitionScope.ExpandedTabs(
                 modifier = Modifier
                     .matchParentSize()
                     .pillPlacement(
-                        center = {
-                            // Dijepit di dalam lebar pill: lensa yang terangkat tidak boleh
-                            // masuk ke circle Search.
-                            val c = pillCenterInRow(pill.position) + Offset(padLeftPx, padTopPx)
-                            val half = pill.liveSize(restSize, liftedSize).width / 2f
-                            val padRightPx = with(density) {
-                                contentPadding.calculateRightPadding(layoutDirection).toPx()
-                            }
-                            val barWidth = rowSize.width + padLeftPx + padRightPx
-                            if (barWidth > half * 2f) Offset(c.x.coerceIn(half, barWidth - half), c.y) else c
-                        },
+                        center = { pillCenterInRow(pill.position) + Offset(padLeftPx, padTopPx) },
                         size = { pill.liveSize(restSize, liftedSize) },
                     ),
             )
