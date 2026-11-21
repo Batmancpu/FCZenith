@@ -513,14 +513,14 @@ private fun ControlTab(hideVolume: Boolean, lyricStrip: Boolean, lyricStripAvail
     if (!lyricStripAvailable) {
         Caption("Lirik tersinkron mati di Pengaturan, jadi baris lirik tidak bisa tampil.")
     }
-    Caption("Judul & artis (baris yang dilingkari): berlaku global, terpisah dari profil dan lirik atas bar.")
-    SwitchRow("Judul tidak ikut lirik", ControlLayoutTuning.titleSeparateOn.value) {
+    Caption("Geser baris judul, artis, dan bintang saja. Lirik di atas bar tidak ikut bergeser, jadi jarak ke lirik bisa diatur bebas.")
+    SwitchRow("Buang turunan otomatis saat lirik mati", ControlLayoutTuning.titleSeparateOn.value) {
         ControlLayoutTuning.titleSeparateOn.value = it
     }
     TunerRow("Cover turun (mode kartu)", ControlLayoutTuning.artExtraDp.floatValue, -30f..60f, 1f) {
         ControlLayoutTuning.artExtraDp.floatValue = it
     }
-    TunerRow("Judul & artis turun", ControlLayoutTuning.titleExtraDp.floatValue, -40f..80f, 1f) {
+    TunerRow("Judul/artis/bintang turun", ControlLayoutTuning.titleExtraDp.floatValue, -120f..120f, 1f) {
         ControlLayoutTuning.titleExtraDp.floatValue = it
     }
     Caption(
