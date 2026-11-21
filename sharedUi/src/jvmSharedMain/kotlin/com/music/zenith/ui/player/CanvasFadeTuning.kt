@@ -182,6 +182,15 @@ internal object ControlLayoutTuning {
     val hideVolumeOverride = mutableStateOf<Boolean?>(null)
     val lyricStripOverride = mutableStateOf<Boolean?>(null)
 
+    /** Judul & artis tidak lagi ikut aturan lirik atas bar; posisinya hanya dari setelan di bawah. */
+    val titleSeparateOn = mutableStateOf(false)
+
+    /** Geser cover mode kartu (dp, + turun). */
+    val artExtraDp = mutableFloatStateOf(0f)
+
+    /** Geser judul & artis (dp, + turun). */
+    val titleExtraDp = mutableFloatStateOf(0f)
+
     private fun index(volumeHidden: Boolean, lyricStrip: Boolean): Int =
         (if (volumeHidden) 2 else 0) + (if (lyricStrip) 0 else 1)
 
@@ -203,12 +212,28 @@ internal object ControlLayoutTuning {
 
     fun resetAll() {
         profiles.forEach { it.value = ControlProfile() }
+        titleSeparateOn.value = false
+        artExtraDp.floatValue = 0f
+        titleExtraDp.floatValue = 0f
     }
 
     fun clearOverrides() {
         hideVolumeOverride.value = null
         lyricStripOverride.value = null
     }
+
+    private fun safe(value: Float): Float = if (value.isFinite()) value else 0f
+
+    /** Judul terpisah dari lirik? Hanya berlaku selama mode debug aktif. */
+    fun titleSeparate(): Boolean = CanvasFadeTuning.unlocked.value && titleSeparateOn.value
+
+    /** Geser cover mode kartu. Nol saat mode debug mati. */
+    fun artExtra(): Dp =
+        if (CanvasFadeTuning.unlocked.value) safe(artExtraDp.floatValue).dp else 0.dp
+
+    /** Geser judul & artis. Nol saat mode debug mati. */
+    fun titleExtra(): Dp =
+        if (CanvasFadeTuning.unlocked.value) safe(titleExtraDp.floatValue).dp else 0.dp
 
     /** Volume disembunyikan? Dipaksa panel debug hanya selama mode debug aktif. */
     fun hideVolume(setting: Boolean): Boolean =
@@ -232,6 +257,10 @@ internal object ControlLayoutTuning {
         appendLine(
             "Saklar saat ini: volume=${if (hideVolume) "sembunyi" else "tampil"}, " +
                 "lirik atas bar=${if (lyricStrip) "tampil" else "sembunyi"}",
+        )
+        appendLine(
+            "Judul & artis: terpisah dari lirik=${titleSeparateOn.value}, " +
+                "artExtraDp = ${fmt(artExtraDp.floatValue)}f, titleExtraDp = ${fmt(titleExtraDp.floatValue)}f",
         )
         for (hidden in listOf(false, true)) {
             for (strip in listOf(true, false)) {
@@ -484,6 +513,16 @@ private fun ControlTab(hideVolume: Boolean, lyricStrip: Boolean, lyricStripAvail
     if (!lyricStripAvailable) {
         Caption("Lirik tersinkron mati di Pengaturan, jadi baris lirik tidak bisa tampil.")
     }
+    Caption("Judul & artis (baris yang dilingkari): berlaku global, terpisah dari profil dan lirik atas bar.")
+    SwitchRow("Judul tidak ikut lirik", ControlLayoutTuning.titleSeparateOn.value) {
+        ControlLayoutTuning.titleSeparateOn.value = it
+    }
+    TunerRow("Cover turun (mode kartu)", ControlLayoutTuning.artExtraDp.floatValue, -30f..60f, 1f) {
+        ControlLayoutTuning.artExtraDp.floatValue = it
+    }
+    TunerRow("Judul & artis turun", ControlLayoutTuning.titleExtraDp.floatValue, -40f..80f, 1f) {
+        ControlLayoutTuning.titleExtraDp.floatValue = it
+    }
     Caption(
         "Profil aktif: volume ${if (hideVolume) "sembunyi" else "tampil"}, " +
             "lirik ${if (lyricStrip) "tampil" else "sembunyi"}. Tiap kombinasi punya setelan sendiri.",
@@ -513,7 +552,7 @@ private fun ControlTab(hideVolume: Boolean, lyricStrip: Boolean, lyricStripAvail
         if (hasOverride) {
             PanelChip("Ikuti Pengaturan") { ControlLayoutTuning.clearOverrides() }
         }
-        PanelChip("Reset 4 profil") { ControlLayoutTuning.resetAll() }
+        PanelChip("Reset semua") { ControlLayoutTuning.resetAll() }
     }
 }
 

@@ -3991,10 +3991,17 @@ fun NowPlayingScreen(
                             .coerceAtLeast(0.dp) / 2
                         // The lyric strip sits right under the credits row, so the
                         // extra drop would push the artist into it.
-                        val cardArtDrop =
-                            if (!heroMode && !videoMode && !lyricStripEnabled) CARD_ART_DROP else 0.dp
+                        // Saat dipisah dari lirik (popup debug), turunan otomatis karena
+                        // lirik atas bar mati dibuang; posisi hanya dari setelan debug.
+                        val titleSeparate = ControlLayoutTuning.titleSeparate()
+                        val cardArtDrop = (
+                            (if (!heroMode && !videoMode && !lyricStripEnabled && !titleSeparate) CARD_ART_DROP else 0.dp) +
+                                (if (videoMode) 0.dp else ControlLayoutTuning.artExtra())
+                            ).coerceAtLeast(0.dp)
                         val cardTitleDrop =
-                            if (!heroMode && !videoMode && !lyricStripEnabled) CARD_TITLE_DROP else 0.dp
+                            (if (!heroMode && !videoMode && !lyricStripEnabled && !titleSeparate) CARD_TITLE_DROP else 0.dp) +
+                                (if (videoMode) 0.dp else ControlLayoutTuning.titleExtra())
+                        val titleHeroDrop = if (titleSeparate) 0.dp else heroTitleDrop
                         // Functions of the collapse, called at placement and measure
                         // — see [p]. Composition never reads them.
                         fun artSize(): Dp = lerp(fullArt, THUMB_SIZE, p())
@@ -4004,7 +4011,7 @@ fun NowPlayingScreen(
                         // hard against the left edge with the credits beside it.
                         fun artStart(): Dp = lerp((maxWidth - fullArt) / 2, 0.dp, p())
                         fun regularTitleTop(): Dp =
-                            lerp(groupTop + slotArt + ART_TITLE_GAP + heroTitleDrop + cardTitleDrop, 0.dp, p())
+                            lerp(groupTop + slotArt + ART_TITLE_GAP + titleHeroDrop + cardTitleDrop, 0.dp, p())
                         // Once Spotify's control deck has left, keep the only remaining
                         // player chrome against the bottom edge instead of stranding it
                         // where the artwork's title normally sits near mid-screen.
@@ -4038,7 +4045,7 @@ fun NowPlayingScreen(
                         // screen's top and this box's own top is fixed padding, so it
                         // can simply be added back up rather than measured.
                         val bannerBottom = statusBarTop + topStrip + ART_BOX_TOP_PAD +
-                            groupTop + slotArt + ART_TITLE_GAP / 2 + heroTitleDrop
+                            groupTop + slotArt + ART_TITLE_GAP / 2 + titleHeroDrop
                         // Frozen while lyrics are up. The controls now retain their full
                         // footprint across the transition, so this answer is identical
                         // on both sides; avoiding writes during the panel keeps the
