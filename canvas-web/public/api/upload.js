@@ -4,7 +4,7 @@ const { guard } = require("./_guard");
 const PROJECT_ID = "zenith-canvas-17133";
 const SUPABASE_URL = "https://ljckgisqhlypvszlckvf.supabase.co";
 const FS = "https://firestore.googleapis.com/v1/projects/" + PROJECT_ID + "/databases/(default)/documents";
-const DAILY_LIMIT = 5;
+const DAILY_LIMIT = 3;
 const MAX_BYTES = 3 * 1024 * 1024;
 const tokenCache = { value: "", exp: 0 };
 
@@ -77,12 +77,13 @@ async function isMember(userId) {
 
 async function recentUploads(uid) {
   const token = await googleToken();
+  const headers = { Authorization: "Bearer " + token, "Content-Type": "application/json" };
   const res = await fetch(FS + ":runQuery", {
     method: "POST",
-    headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({
       structuredQuery: {
-        from: [{ collectionId: "canvases" }],
+        from: [{ collectionId: "uploadLog" }],
         where: { fieldFilter: { field: { fieldPath: "uid" }, op: "EQUAL", value: { stringValue: uid } } },
         limit: 200
       }
@@ -92,10 +93,29 @@ async function recentUploads(uid) {
   if (!res.ok) throw new Error("firestore query " + res.status);
   const rows = await res.json();
   const since = Date.now() - 24 * 60 * 60 * 1000;
-  return rows.filter((row) => {
-    const field = row.document && row.document.fields && row.document.fields.createdAt;
-    return field && Date.parse(field.timestampValue) >= since;
-  }).length;
+  let active = 0;
+  let removed = 0;
+  for (const row of rows) {
+    const doc = row.document;
+    if (!doc) continue;
+    const field = doc.fields && doc.fields.at;
+    const at = field && field.timestampValue ? Date.parse(field.timestampValue) : 0;
+    if (at >= since) {
+      active += 1;
+      continue;
+    }
+    if (removed < 10) {
+      removed += 1;
+      try {
+        await fetch("https://firestore.googleapis.com/v1/" + doc.name, {
+          method: "DELETE",
+          headers,
+          signal: AbortSignal.timeout(8000)
+        });
+      } catch (error) {}
+    }
+  }
+  return active;
 }
 
 async function hasDuplicate(uid, key) {
@@ -128,6 +148,7 @@ async function hasDuplicate(uid, key) {
   });
 }
 
+const REJECTED_TTL_MS = 3 * 60 * 60 * 1000;
 const STALE_TTL_MS = 3 * 24 * 60 * 60 * 1000;
 let lastPurge = 0;
 
@@ -160,7 +181,9 @@ async function purgeStale() {
       const f = doc.fields || {};
       if (f.status && f.status.stringValue === "approved") continue;
       const created = f.createdAt && f.createdAt.timestampValue ? Date.parse(f.createdAt.timestampValue) : 0;
-      if (!created || created > cutoff) continue;
+      const isRejected = f.status && f.status.stringValue === "rejected";
+      const limit = isRejected ? Date.now() - REJECTED_TTL_MS : cutoff;
+      if (!created || created > limit) continue;
       const url = f.url && f.url.stringValue ? f.url.stringValue : "";
       const name = url.split("/").pop();
       if (!/^\d+-[0-9a-f-]{36}\.mp4$/.test(name)) continue;
@@ -347,6 +370,18 @@ module.exports = async (req, res) => {
         return;
       }
       const token = await googleToken();
+      const logged = await fetch(FS + "/uploadLog", {
+        method: "POST",
+        headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fields: {
+            uid: { stringValue: session.uid },
+            at: { timestampValue: new Date().toISOString() }
+          }
+        }),
+        signal: AbortSignal.timeout(8000)
+      });
+      if (!logged.ok) throw new Error("firestore log " + logged.status);
       const created = await fetch(FS + "/canvases", {
         method: "POST",
         headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
