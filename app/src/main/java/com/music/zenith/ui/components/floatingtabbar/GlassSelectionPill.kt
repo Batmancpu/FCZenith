@@ -507,9 +507,6 @@ internal fun GlassSelectionPill(
     barGlass: LayerBackdrop,
     tabRow: LayerBackdrop,
     modifier: Modifier,
-    /** Glass dan ikon circle Search, supaya lensa membiaskannya saat berdiri di atasnya. */
-    searchGlass: LayerBackdrop? = null,
-    searchIcon: LayerBackdrop? = null,
     /**
      * Colour the tab row is masked to inside the pill: the accent copy of the
      * row that Kyant's LiquidBottomTabs records for its lens. Unspecified keeps
@@ -535,8 +532,8 @@ internal fun GlassSelectionPill(
     val tabsBackdrop = remember(tabRow, iconTint, motion, iconLiftMul) {
         PillTabsBackdrop(tabRow, iconTint) { 1f + PILL_ICON_LIFT_SCALE * iconLiftMul * motion.material }
     }
-    val backdrop = remember(page, barGlass, searchGlass, searchIcon, tabsBackdrop, fillColor, edge, fillMul) {
-        SelectionPillBackdrop(page, barGlass, tabsBackdrop, Color.Unspecified, edge, searchGlass, searchIcon) {
+    val backdrop = remember(page, barGlass, tabsBackdrop, fillColor, edge, fillMul) {
+        SelectionPillBackdrop(page, barGlass, tabsBackdrop, Color.Unspecified, edge) {
             fillColor.copy(alpha = (fillColor.alpha * fillMul * (1f - motion.material)).coerceIn(0f, 1f))
         }
     }
@@ -636,8 +633,6 @@ private class SelectionPillBackdrop(
     private val tabs: Backdrop,
     private val tint: Color,
     private val edge: Color,
-    private val searchGlass: LayerBackdrop?,
-    private val searchIcon: LayerBackdrop?,
     private val fill: () -> Color,
 ) : Backdrop {
 
@@ -651,9 +646,6 @@ private class SelectionPillBackdrop(
         with(page) { drawBackdrop(density, coordinates, layerBlock) }
         with(bar) { drawBackdrop(density, coordinates, layerBlock) }
         drawBarRim(bar, coordinates, edge)
-        // Circle Search: hanya glass-nya yang ikut dibiaskan lensa. Tepi dan halo bayangannya
-        // tidak digambar: bertumpuk dengan lengkung lensa, hasilnya pita gelap yang berlebihan.
-        searchGlass?.let { with(it) { drawBackdrop(density, coordinates, layerBlock) } }
         val color = fill()
         if (color.alpha > 0f) {
             // Past every edge: the recorded area includes the lens's padding.
@@ -670,8 +662,6 @@ private class SelectionPillBackdrop(
         } else {
             with(tabs) { drawBackdrop(density, coordinates, layerBlock) }
         }
-        // Ikon Search di atas isi dan fill, seperti baris tab.
-        searchIcon?.let { with(it) { drawBackdrop(density, coordinates, layerBlock) } }
     }
 }
 

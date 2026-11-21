@@ -124,7 +124,6 @@ import com.music.zenith.ui.components.GlassSpring
 import com.music.zenith.ui.components.JellyPush
 import com.music.zenith.ui.components.LocalGlassExport
 import com.music.zenith.ui.components.PILL_INSET
-import com.music.zenith.ui.components.backdrop.backdrops.LayerBackdrop
 import com.music.zenith.ui.components.backdrop.backdrops.layerBackdrop
 import com.music.zenith.ui.components.backdrop.backdrops.rememberLayerBackdrop
 import com.music.zenith.ui.components.isGlassSupported
@@ -809,9 +808,6 @@ private fun SharedTransitionScope.StandaloneTabBody(
     animatedVisibilityScope: AnimatedVisibilityScope,
     tabBarContentModifier: @Composable () -> Modifier,
     modifier: Modifier,
-    /** Dibagikan ke lensa indikator tab supaya circle ini ikut terbiaskan; null = lokal. */
-    exportGlass: LayerBackdrop? = null,
-    exportIcon: LayerBackdrop? = null,
 ) {
     val reduceAnimation by AppSettings.reduceAnimation.collectAsStateWithLifecycle()
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
@@ -824,10 +820,8 @@ private fun SharedTransitionScope.StandaloneTabBody(
     val glassIndicator by AppSettings.glassIndicator.collectAsStateWithLifecycle()
     pill.reduceMotion = reduceAnimation
     pill.squashScale = glassIndicator.squash
-    val localBarGlass = rememberLayerBackdrop()
-    val localIconLayer = rememberLayerBackdrop()
-    val barGlass = exportGlass ?: localBarGlass
-    val iconLayer = exportIcon ?: localIconLayer
+    val barGlass = rememberLayerBackdrop()
+    val iconLayer = rememberLayerBackdrop()
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
     val pressedAt = remember { LongArray(1) }
@@ -961,10 +955,6 @@ private fun SharedTransitionScope.ExpandedBar(
 ) {
     val standaloneTab = scope.standaloneTab
     val hasTabGroup = scope.tabs.isNotEmpty()
-    // Glass dan ikon circle Search, direkam di sini supaya lensa indikator tab
-    // yang berdiri di atasnya ikut membiaskannya.
-    val searchGlass = rememberLayerBackdrop()
-    val searchIcon = rememberLayerBackdrop()
 
     // The accessory spans the full width above the tab row; the tab pill and the
     // standalone tab are packed together and centered (iOS 26 style).
@@ -1010,8 +1000,6 @@ private fun SharedTransitionScope.ExpandedBar(
                     tabBarContentModifier = tabBarContentModifier,
                     // Di atas lingkaran Search: indikator yang terangkat melewati tepi pill
                     // tetap tergambar utuh, tidak tertimpa atau terpotong lingkaran.
-                    searchGlass = searchGlass,
-                    searchIcon = searchIcon,
                     modifier = Modifier.weight(1f).zIndex(1f)
                 )
             }
@@ -1024,8 +1012,6 @@ private fun SharedTransitionScope.ExpandedBar(
                     elevations = elevations,
                     animatedVisibilityScope = animatedVisibilityScope,
                     tabBarContentModifier = tabBarContentModifier,
-                    searchGlass = searchGlass,
-                    searchIcon = searchIcon,
                     modifier = Modifier
                         .fillMaxHeight()
                         .aspectRatio(1f)
@@ -1084,9 +1070,7 @@ private fun SharedTransitionScope.ExpandedTabs(
     elevations: FloatingTabBarElevations,
     animatedVisibilityScope: AnimatedVisibilityScope,
     modifier: Modifier,
-    tabBarContentModifier: @Composable () -> Modifier,
-    searchGlass: LayerBackdrop,
-    searchIcon: LayerBackdrop,
+    tabBarContentModifier: @Composable () -> Modifier
 ) {
     val inlineTab = scope.getInlineTab(selectedTabKey)
     val selectedTabIndex = scope.tabs.indexOfFirst { it.key == selectedTabKey }
@@ -1444,8 +1428,6 @@ private fun SharedTransitionScope.ExpandedTabs(
                 fillColor = colors.indicatorColor,
                 barGlass = barGlass,
                 tabRow = tabRow,
-                searchGlass = searchGlass,
-                searchIcon = searchIcon,
                 iconTint = colors.selectedContentColor,
                 modifier = Modifier
                     .matchParentSize()
@@ -1468,15 +1450,11 @@ private fun SharedTransitionScope.ExpandedStandaloneTab(
     elevations: FloatingTabBarElevations,
     animatedVisibilityScope: AnimatedVisibilityScope,
     modifier: Modifier,
-    tabBarContentModifier: @Composable () -> Modifier,
-    searchGlass: LayerBackdrop,
-    searchIcon: LayerBackdrop,
+    tabBarContentModifier: @Composable () -> Modifier
 ) {
     StandaloneTabBody(
         standaloneTab = standaloneTab,
         isInline = false,
-        exportGlass = searchGlass,
-        exportIcon = searchIcon,
         shapes = shapes,
         colors = colors,
         elevation = elevations.expandedElevation,
