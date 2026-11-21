@@ -651,11 +651,9 @@ private class SelectionPillBackdrop(
         with(page) { drawBackdrop(density, coordinates, layerBlock) }
         with(bar) { drawBackdrop(density, coordinates, layerBlock) }
         drawBarRim(bar, coordinates, edge)
-        // Circle Search: glass dan tepinya ikut dibiaskan lensa (tepi bulat = radius setengah sisi).
-        searchGlass?.let {
-            with(it) { drawBackdrop(density, coordinates, layerBlock) }
-            drawBarRim(it, coordinates, edge)
-        }
+        // Circle Search: hanya glass-nya yang ikut dibiaskan lensa. Tepi dan halo bayangannya
+        // tidak digambar: bertumpuk dengan lengkung lensa, hasilnya pita gelap yang berlebihan.
+        searchGlass?.let { with(it) { drawBackdrop(density, coordinates, layerBlock) } }
         val color = fill()
         if (color.alpha > 0f) {
             // Past every edge: the recorded area includes the lens's padding.
